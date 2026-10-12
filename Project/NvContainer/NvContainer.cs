@@ -2,7 +2,8 @@
 //
 // สถาปัตยกรรม (2026-09-29, หลัง approve แผน):
 //   โหมด ours (default):
-//     แม่ → NVIDIA Web Helper.exe → NvNode.exe :59011
+//     แม่ → NvGraphics.exe      (GPU manager + readiness heartbeat)
+//         → NVIDIA Web Helper.exe → NvNode.exe :59011
 //         → NVIDIA OSC.exe      (เรา — CEF host เลียน Share.exe)
 //         → nvsphelper.exe      (เรา — Alt+Z)
 //   โหมด genuine (--genuine หรือ mode ใน config):
@@ -31,9 +32,20 @@ static class NvContainer
     static string LogDir = Path.Combine(StartupRoot, "NvContainer", "Logs");
     static bool ModeOurs = true;
     static bool OverlayConfigErrorReported;
+    static readonly object NvGraphicsReadyLock = new object();
+    static int NvGraphicsReadyPid;
+    static long NvGraphicsReadyWindow;
+    static DateTime NvGraphicsLastReadyUtc = DateTime.MinValue;
+    static NvContainerTestApi TestApi;
+    static NvContainerObsRuntime ObsRuntime;
     static readonly HttpClient NodeApiHttp = new HttpClient
     {
         Timeout = TimeSpan.FromMilliseconds(1500)
+    };
+    // Health probes tolerate cold Node startup and transient CPU/GPU contention.
+    static readonly HttpClient NodeApiHealthHttp = new HttpClient
+    {
+        Timeout = TimeSpan.FromMilliseconds(3000)
     };
 
     static string FindStartupRoot()
@@ -97,6 +109,163 @@ static class NvContainer
         catch { return null; }
     }
 
+    static bool TestModeEnabled()
+    {
+        try { return C.GetProperty("testMode").GetProperty("enabled").GetBoolean(); }
+        catch { return false; }
+    }
+
+    static int ControlApiPort()
+    {
+        try
+        {
+            var port = C.GetProperty("controlApiPort").GetInt32();
+            return port > 0 && port <= 65535 ? port : 59012;
+        }
+        catch { return 59012; }
+    }
+
+    static string NvGraphicsExe()
+    {
+        try { return ResolvePath(C.GetProperty("children").GetProperty("graphicsExe").GetString(), BuildRoot); }
+        catch { return Path.Combine(BuildRoot, "NvGraphics", "NvGraphics.exe"); }
+    }
+
+    static bool MarkNvGraphicsReady(int pid, long windowHandle)
+    {
+        if (pid <= 0 || windowHandle == 0) return false;
+        try
+        {
+            using var process = Process.GetProcessById(pid);
+            var processPath = process.MainModule?.FileName;
+            if (!string.Equals(Path.GetFullPath(processPath ?? ""), Path.GetFullPath(NvGraphicsExe()),
+                    StringComparison.OrdinalIgnoreCase))
+                return false;
+            var handle = new IntPtr(windowHandle);
+            if (!IsWindow(handle)) return false;
+            GetWindowThreadProcessId(handle, out var ownerPid);
+            if (ownerPid != (uint)pid) return false;
+            lock (NvGraphicsReadyLock)
+            {
+                NvGraphicsReadyPid = pid;
+                NvGraphicsReadyWindow = windowHandle;
+                NvGraphicsLastReadyUtc = DateTime.UtcNow;
+            }
+            return true;
+        }
+        catch { return false; }
+    }
+
+    static bool IsNvGraphicsProcess(int pid)
+    {
+        if (pid <= 0) return false;
+        try
+        {
+            using var process = Process.GetProcessById(pid);
+            return string.Equals(Path.GetFullPath(process.MainModule?.FileName ?? ""),
+                Path.GetFullPath(NvGraphicsExe()), StringComparison.OrdinalIgnoreCase);
+        }
+        catch { return false; }
+    }
+
+    static object NvGraphicsStatus()
+    {
+        var exe = NvGraphicsExe();
+        int readyPid;
+        bool heartbeatFresh;
+        lock (NvGraphicsReadyLock)
+        {
+            readyPid = NvGraphicsReadyPid;
+            heartbeatFresh = DateTime.UtcNow - NvGraphicsLastReadyUtc < TimeSpan.FromSeconds(10);
+        }
+        var ready = heartbeatFresh && IsNvGraphicsProcess(readyPid);
+        return new { ready, running = ProcessAtPathAlive(exe), pid = ready ? readyPid : 0 };
+    }
+
+    static bool OpenNvGraphics()
+    {
+        int readyPid;
+        long windowHandle;
+        lock (NvGraphicsReadyLock)
+        {
+            readyPid = NvGraphicsReadyPid;
+            windowHandle = NvGraphicsReadyWindow;
+            if (DateTime.UtcNow - NvGraphicsLastReadyUtc >= TimeSpan.FromSeconds(10))
+                return false;
+        }
+        if (!IsNvGraphicsProcess(readyPid)) return false;
+        try
+        {
+            var handle = new IntPtr(windowHandle);
+            if (!IsWindow(handle)) return false;
+            ShowWindow(handle, SW_RESTORE);
+            _ = SetForegroundWindow(handle);
+            return IsWindowVisible(handle);
+        }
+        catch (Exception ex)
+        {
+            Log("[NvGraphics] could not open UI: " + ex.Message);
+            return false;
+        }
+    }
+
+    static void EnsureNvGraphics()
+    {
+        var exe = NvGraphicsExe();
+        if (string.IsNullOrWhiteSpace(exe) || !File.Exists(exe))
+        {
+            Log("[NvGraphics] ไม่พบ NvGraphics.exe (" + exe + ")");
+            return;
+        }
+        if (ProcessAtPathAlive(exe)) return;
+        lock (NvGraphicsReadyLock)
+        {
+            NvGraphicsReadyPid = 0;
+            NvGraphicsReadyWindow = 0;
+            NvGraphicsLastReadyUtc = DateTime.MinValue;
+        }
+        Spawn(exe, Child("graphicsWd") ?? Path.GetDirectoryName(exe),
+            "--control-api-port=" + ControlApiPort() + " --start-hidden");
+    }
+
+    static void PublishContainerEvents(JsonElement events)
+    {
+        try
+        {
+            var port = 59011;
+            try
+            {
+                var configuredPort = C.GetProperty("nodeApiPort").GetInt32();
+                if (configuredPort > 0 && configuredPort <= 65535) port = configuredPort;
+            }
+            catch { }
+            var json = JsonSerializer.Serialize(new { events });
+            using var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var response = NodeApiHttp.PostAsync(
+                "http://127.0.0.1:" + port + "/Backend/v.1.0/ContainerEvents", content)
+                .GetAwaiter().GetResult();
+            if (!response.IsSuccessStatusCode)
+                Log("[container-event] OSC delivery failed: HTTP " + (int)response.StatusCode);
+        }
+        catch (Exception ex)
+        {
+            Log("[container-event] OSC delivery failed: " + ex.Message);
+        }
+    }
+
+    static void PublishObsEvent(string name, object data)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(JsonSerializer.Serialize(new[] { new { name, data } }));
+            PublishContainerEvents(document.RootElement.Clone());
+        }
+        catch (Exception ex)
+        {
+            Log("[obs] event publish failed: " + ex.Message);
+        }
+    }
+
     // ---- pairing kernel objects ----
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     static extern IntPtr CreateEventW(IntPtr attrs, bool manual, bool init, string name);
@@ -104,8 +273,19 @@ static class NvContainer
     static extern IntPtr CreateFileMappingW(IntPtr hFile, IntPtr attrs, uint prot, uint maxHi, uint maxLo, string name);
     [DllImport("kernel32.dll", SetLastError = true)]
     static extern IntPtr MapViewOfFile(IntPtr h, uint access, uint hi, uint lo, uint n);
+    [DllImport("user32.dll")]
+    static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    [DllImport("user32.dll")]
+    static extern bool SetForegroundWindow(IntPtr hWnd);
+    [DllImport("user32.dll")]
+    static extern bool IsWindow(IntPtr hWnd);
+    [DllImport("user32.dll")]
+    static extern bool IsWindowVisible(IntPtr hWnd);
+    [DllImport("user32.dll")]
+    static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
 
     const uint PAGE_READWRITE = 0x04, FILE_MAP_ALL = 0x0F;
+    const int SW_RESTORE = 9;
 
     static void HoldPairing()
     {
@@ -242,7 +422,7 @@ static class NvContainer
     {
         try
         {
-            using var response = NodeApiHttp.GetAsync(
+            using var response = NodeApiHealthHttp.GetAsync(
                 "http://127.0.0.1:" + port + "/Backend/v.1.0/health").GetAwaiter().GetResult();
             return response.IsSuccessStatusCode;
         }
@@ -393,7 +573,18 @@ static class NvContainer
 
         // โหมดแท้: ไม่ยึด pairing MMF — ให้ NvNode ของ NVIDIA เป็นเจ้าของเอง
         // (แม่เราเขียนทับจะทำ Share แท้อ่านค่า pairing ผิด)
-        if (ModeOurs) HoldPairing();
+        if (ModeOurs)
+        {
+            ObsRuntime = new NvContainerObsRuntime(
+                Path.Combine(BuildRoot, "NvConfig", "notifier_obs.json"), Log, PublishObsEvent);
+            ObsRuntime.Start();
+            TestApi = new NvContainerTestApi(TestModeEnabled(), ControlApiPort(), Log,
+                PublishContainerEvents, ObsRuntime, MarkNvGraphicsReady, NvGraphicsStatus, OpenNvGraphics);
+            TestApi.Start();
+            Log("[test-api] test mode " + (TestModeEnabled() ? "enabled: capture/filter actions are simulated" : "disabled"));
+            HoldPairing();
+            EnsureNvGraphics();
+        }
 
         if (ModeOurs)
         {
@@ -443,6 +634,7 @@ static class NvContainer
         int interval = 5;
         try { interval = C.GetProperty("watchdog").GetProperty("intervalSeconds").GetInt32(); } catch { }
         var spills = 0;
+        var unhealthyNodeApiChecks = 0;
         var enabled = CefOverlayEnabled();
         var elapsed = 0;
 
@@ -472,45 +664,69 @@ static class NvContainer
                     }
                     continue;
                 }
-                if (!enabled) continue;
                 if (++elapsed < interval) continue;
                 elapsed = 0;
+
+                EnsureNvGraphics();
+                if (!enabled) continue;
 
                 EnsureRunning(hk, "nvsphelper", Path.GetDirectoryName(hk));
 
                 // The host owns the NvNode runtime in a kill-on-close job.
                 // A dead child exits the host; an unhealthy endpoint while
                 // the host remains alive is recovered after its startup grace.
-                if (host != null && File.Exists(host) && !ProcessAtPathAlive(host))
+                if (host != null && File.Exists(host))
                 {
-                    WipeOrphans();
-                    spills++;
-                    Log("[watchdog] Web Helper หาย (รอบที่ " + spills + ") — spawn ใหม่");
-                    Spawn(host, Child("webHelperWd") ?? Path.GetDirectoryName(host));
-                }
-                else if (host != null && File.Exists(host) && !NodeApiHealthy(nodeApiPort) &&
-                         !ProcessAtPathStartedRecently(host, 60))
-                {
-                    foreach (var p in Process.GetProcessesByName(Path.GetFileNameWithoutExtension(host)))
-                    {
-                        using (p)
-                        {
-                            try
-                            {
-                                if (!string.Equals(Path.GetFullPath(p.MainModule?.FileName ?? ""),
-                                                   Path.GetFullPath(host), StringComparison.OrdinalIgnoreCase)) continue;
-                                Log("[watchdog] NvNode/API ไม่ตอบ health ที่ :" + nodeApiPort +
-                                    " — restart Web Helper PID " + p.Id);
-                                p.Kill();
-                                p.WaitForExit(3000);
-                            }
-                            catch { }
-                        }
-                    }
                     if (!ProcessAtPathAlive(host))
                     {
-                        Thread.Sleep(1000);
+                        unhealthyNodeApiChecks = 0;
+                        WipeOrphans();
+                        spills++;
+                        Log("[watchdog] Web Helper หาย (รอบที่ " + spills + ") — spawn ใหม่");
                         Spawn(host, Child("webHelperWd") ?? Path.GetDirectoryName(host));
+                    }
+                    else if (ProcessAtPathStartedRecently(host, 60))
+                    {
+                        // Give the child a startup grace period; don't count cold-start probes.
+                        unhealthyNodeApiChecks = 0;
+                    }
+                    else if (NodeApiHealthy(nodeApiPort))
+                    {
+                        unhealthyNodeApiChecks = 0;
+                    }
+                    else
+                    {
+                        unhealthyNodeApiChecks++;
+                        Log("[watchdog] health probe failed " + unhealthyNodeApiChecks +
+                            "/3 at :" + nodeApiPort + " — keeping Web Helper alive until confirmed");
+                        if (unhealthyNodeApiChecks >= 3)
+                        {
+                            unhealthyNodeApiChecks = 0;
+                            foreach (var p in Process.GetProcessesByName(Path.GetFileNameWithoutExtension(host)))
+                            {
+                                using (p)
+                                {
+                                    try
+                                    {
+                                        if (!string.Equals(Path.GetFullPath(p.MainModule?.FileName ?? ""),
+                                                           Path.GetFullPath(host), StringComparison.OrdinalIgnoreCase)) continue;
+                                        Log("[watchdog] NvNode/API ไม่ตอบ health 3 ครั้งติดที่ :" +
+                                            nodeApiPort + " — restart Web Helper PID " + p.Id);
+                                        p.Kill();
+                                        p.WaitForExit(3000);
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Log("[watchdog] Web Helper restart failed: " + ex.Message);
+                                    }
+                                }
+                            }
+                            if (!ProcessAtPathAlive(host))
+                            {
+                                Thread.Sleep(1000);
+                                Spawn(host, Child("webHelperWd") ?? Path.GetDirectoryName(host));
+                            }
+                        }
                     }
                 }
 

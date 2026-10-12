@@ -1,11 +1,12 @@
 ﻿{
-    "buildUtc":  "2026-10-08T14:18:40.2092553Z",
+    "buildUtc":  "2026-10-11T19:46:59.5133549Z",
     "configuration":  "Release",
     "sourceRoot":  "Project",
     "projects":  [
                      "Overlay OSC\\NVIDIA OSC\\NVIDIA OSC.vcxproj",
                      "Overlay OSC\\NVIDIA NodeAPI\\NVIDIA Web Helper\\NVIDIA Web Helper.vbproj",
                      "NvContainer\\NvContainer\\NvContainer.csproj",
+                     "NvGraphics\\NvGraphics.App\\NvGraphics.csproj",
                      "NvContainer\\NvShadowPlayHelper\\nvsphelper.csproj",
                      "Launcher.Cef\\Launcher.vcxproj",
                      "Launcher.Cef\\Launcher Bootstrap.vcxproj"

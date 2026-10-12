@@ -1,0 +1,7 @@
+/build/
+/obj/
+*.exp
+*.lib
+*.pdb
+*.ilk
+*.ipch

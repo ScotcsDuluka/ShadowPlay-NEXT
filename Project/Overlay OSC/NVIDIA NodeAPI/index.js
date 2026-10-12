@@ -24,7 +24,40 @@ var nvUtil = require('./shims/NvUtil.js');
 nvUtil.ClaimSingleInstance();
 
 var fs = require('fs');
+var path = require('path');
+var containerTestMode = false;
+var containerControlApiPort = 59012;
+var containerConfigFound = false;
+var containerConfigError = null;
+try {
+    var configDir = __dirname;
+    for (var configDepth = 0; configDepth < 10; configDepth++) {
+        var containerConfigPath = path.join(configDir, 'NvConfig', 'nvcontainer.json');
+        if (fs.existsSync(containerConfigPath)) {
+            var containerConfig = JSON.parse(fs.readFileSync(containerConfigPath, 'utf8'));
+            containerTestMode = !!(containerConfig.testMode && containerConfig.testMode.enabled);
+            var configuredControlPort = Number(containerConfig.controlApiPort);
+            if (Number.isInteger(configuredControlPort) && configuredControlPort > 0 && configuredControlPort <= 65535) {
+                containerControlApiPort = configuredControlPort;
+            }
+            containerConfigFound = true;
+            break;
+        }
+        var parentDir = path.dirname(configDir);
+        if (parentDir === configDir) break;
+        configDir = parentDir;
+    }
+} catch (e) {
+    containerConfigError = e;
+}
+process.env.NV_CONTAINER_TEST_MODE = containerTestMode ? '1' : '0';
+process.env.NV_CONTAINER_CONTROL_API_PORT = String(containerControlApiPort);
 var logger = require('./Logger.js')(nvUtil, GetNvNodeAppdataDirectoryPath() + '\\nvnode.log');
+if (containerConfigError) {
+    logger.error('Unable to read NvContainer configuration; using non-test defaults: ' + containerConfigError.message);
+} else if (!containerConfigFound) {
+    logger.info('NvContainer configuration not found; using non-test defaults');
+}
 
 var openSslConfigPath = GetNvNodeAppdataDirectoryPath() + '\\openssl.cfg';
 process.env.OPENSSL_CONF = openSslConfigPath;
@@ -162,16 +195,43 @@ logger.info('fast-boot ready');
 
 logger.info('Loading ExpressJS dependency...');
 var app = require('./node_modules/express/index.js')();
-// ★ mods: รายชื่อ CSS mod ใน osc/mods — host ฉีดเข้าหน้าทุกครั้งที่โหลด
+
+// GPU runtime state event validation (/Duluka/v1/GpuRuntimeState).
+var gpuRuntimeValidation = require('./gpuRuntimeValidation.js');
+var isValidGpuRuntimeState = gpuRuntimeValidation.isValidGpuRuntimeState;
+
+app.get('/nvcamera-test-mode.js', function (req, res) {
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+    res.end('window.NV_CONTAINER_TEST_MODE = ' + (containerTestMode ? 'true' : 'false') + ';');
+});
+
+// OSC CSS/JS mods in osc/mods — the host injects them when the page loads.
 app.get('/mods/list', function (req, res) {
     var dir = require('path').join(__dirname, 'osc', 'mods');
     var fs = require('fs');
     res.setHeader('Cache-Control', 'no-store');
     fs.readdir(dir, function (err, files) {
         if (err) { res.json([]); return; }
+        // Serve only the source-owned mod manifest. The Build tree may retain
+        // retired CSS/JS files; auto-loading every extension would reactivate them.
+        var allowedMods = {
+            'base.css': true,
+            'gpu-profiles.js': true,
+            'gpu-profiles.css': true,
+            'gpu-status-panel.css': true,
+            'gpu-status-panel.js': true,
+            'notification-settings.js': true,
+            'overlays.css': true,
+            'preferences.css': true,
+            'privacy-control.css': true,
+            'providers.css': true,
+            'notifications.css': true,
+            'video-capture-options.css': true,
+            'video-capture-options.js': true
+        };
         files = files.filter(function (f) {
-            var l = f.toLowerCase();
-            return l.endsWith('.css') || l.endsWith('.js');
+            return allowedMods[f.toLowerCase()] === true;
         }).sort();
         var remaining = files.length;
         var mods = [];
@@ -204,6 +264,289 @@ var http = require('http');
 logger.info('Creating HTTP server...');
 var httpServer = http.createServer(app);
 
+    // NvContainer owns hotkey dispatch; it publishes the resulting OSC event here.
+    app.post('/Backend/v.1.0/ContainerEvents', function (req, res) {
+        var remote = req.socket && req.socket.remoteAddress;
+        if (remote !== '127.0.0.1' && remote !== '::1' && remote !== '::ffff:127.0.0.1') {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'loopback only' }));
+            return;
+        }
+        var body = '';
+        req.on('data', function (chunk) {
+            body += chunk;
+            if (body.length > 65536) req.destroy();
+        });
+
+        req.on('end', function () {
+            try {
+                var payload = JSON.parse(body || '{}');
+                if (!Array.isArray(payload.events) || payload.events.length > 32) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'invalid events' }));
+                    return;
+                }
+                var delivered = 0;
+                payload.events.forEach(function (event) {
+                    if (!event || !event.data) return;
+                    if (event.name === '/ShadowPlay/v.1.0/Hotkey' &&
+                        typeof event.data.hotkeyId === 'string') {
+                        io.emit(event.name, event.data);
+                        delivered++;
+                        return;
+                    }
+                    if (event.name === '/Duluka/v1/GpuRuntimeState') {
+                        if (isValidGpuRuntimeState(event.data)) {
+                            io.emit(event.name, event.data);
+                            delivered++;
+                        }
+                        return;
+                    }
+                    if (event.name === '/Duluka/v1/GpuPreferenceApplied') {
+                        if (gpuRuntimeValidation.isValidGpuPreferenceApplied(event.data)) {
+                            io.emit(event.name, event.data);
+                            delivered++;
+                        }
+                        return;
+                    }
+                    if (event.name === '/Duluka/v1/GpuAdapterInventory') {
+                        if (gpuRuntimeValidation.isValidGpuAdapterInventory(event.data)) {
+                            io.emit(event.name, event.data);
+                            delivered++;
+                        }
+                        return;
+                    }
+                    if (event.name !== '/Duluka/v1/OBSNotification' ||
+                        !/^(RECORD_STARTED|RECORD_STOPPED|RECORD_PAUSED|RECORD_RESUMED|INSTANT_REPLAY_STARTED|INSTANT_REPLAY_STOPPED|INSTANT_REPLAY_SAVED|BROADCAST_STARTED|BROADCAST_STOPPED)$/.test(event.data.selection)) return;
+                    io.emit(event.name, event.data);
+                    delivered++;
+                });
+                res.writeHead(delivered === payload.events.length ? 200 : 400,
+                    { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ delivered: delivered }));
+            } catch (e) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'invalid JSON' }));
+            }
+        });
+    });
+
+    // Restart remains loopback-only and requires explicit user confirmation.
+    // Bound the upstream wait so a non-responsive NvContainer cannot leave CEF pending forever.
+    app.post('/Duluka/v1/gpu/restart', function (req, res) {
+        var remote = req.socket && req.socket.remoteAddress;
+        if (remote !== '127.0.0.1' && remote !== '::1' && remote !== '::ffff:127.0.0.1') {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'loopback only' }));
+            return;
+        }
+
+        var body = '';
+        req.on('data', function (chunk) {
+            body += chunk;
+            if (body.length > 4096) req.destroy();
+        });
+        req.on('end', function () {
+            var payload;
+            try {
+                payload = JSON.parse(body || '{}');
+            } catch (e) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'invalid JSON' }));
+                return;
+            }
+            if (!payload || payload.confirmed !== true ||
+                typeof payload.exePath !== 'string' || payload.exePath.length > 512) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'confirmation and exePath are required' }));
+                return;
+            }
+
+            var completed = false;
+            var proxyTimer;
+            var proxy = require('http').request({
+                host: '127.0.0.1',
+                port: containerControlApiPort,
+                path: '/v1/gpu/restart',
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+            }, function (upstream) {
+                var responseBody = '';
+                upstream.on('data', function (chunk) { responseBody += chunk; });
+                upstream.on('end', function () {
+                    if (completed || res.finished) return;
+                    completed = true;
+                    clearTimeout(proxyTimer);
+                    res.writeHead(upstream.statusCode || 502, { 'Content-Type': 'application/json' });
+                    res.end(responseBody || JSON.stringify({ error: 'NvContainer returned an empty response' }));
+                });
+                upstream.on('error', function (error) {
+                    if (completed) return;
+                    completed = true;
+                    clearTimeout(proxyTimer);
+                    logger.error('GPU restart response failed: ' + error.message);
+                    if (!res.headersSent && !res.finished) {
+                        res.writeHead(502, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ error: 'NvContainer response failed' }));
+                    }
+                });
+            });
+            proxyTimer = setTimeout(function () {
+                if (completed) return;
+                completed = true;
+                logger.error('GPU restart request timed out.');
+                proxy.abort();
+                if (!res.headersSent && !res.finished) {
+                    res.writeHead(504, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'NvContainer request timed out' }));
+                }
+            }, 30000);
+            res.on('close', function () {
+                if (completed) return;
+                completed = true;
+                clearTimeout(proxyTimer);
+                proxy.abort();
+            });
+            proxy.on('error', function (error) {
+                if (completed) return;
+                completed = true;
+                clearTimeout(proxyTimer);
+                logger.error('GPU restart request failed: ' + error.message);
+                if (!res.headersSent && !res.finished) {
+                    res.writeHead(502, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'NvContainer is unavailable' }));
+                }
+            });
+            proxy.end(body);
+        });
+    });
+
+    function proxyGpuProfileRequest(req, res, upstreamPath, method, timeoutMs) {
+        var remote = req.socket && req.socket.remoteAddress;
+        if (remote !== '127.0.0.1' && remote !== '::1' && remote !== '::ffff:127.0.0.1') {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'loopback only' }));
+            return;
+        }
+
+        function forward(body) {
+            var headers = { 'Content-Type': 'application/json' };
+            if (body) headers['Content-Length'] = Buffer.byteLength(body);
+            var completed = false;
+            var proxy = require('http').request({
+                host: '127.0.0.1',
+                port: containerControlApiPort,
+                path: upstreamPath,
+                method: method,
+                headers: headers
+            }, function (upstream) {
+                var responseBody = '';
+                upstream.on('data', function (chunk) { responseBody += chunk; });
+                upstream.on('end', function () {
+                    if (completed || res.finished) return;
+                    completed = true;
+                    clearTimeout(proxyTimer);
+                    res.writeHead(upstream.statusCode || 502, { 'Content-Type': 'application/json' });
+                    res.end(responseBody || JSON.stringify({ error: 'NvContainer returned an empty response' }));
+                });
+                upstream.on('error', function (error) {
+                    if (completed) return;
+                    completed = true;
+                    clearTimeout(proxyTimer);
+                    logger.error('GPU profile response failed: ' + error.message);
+                    if (!res.headersSent && !res.finished) {
+                        res.writeHead(502, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ error: 'NvContainer response failed' }));
+                    }
+                });
+            });
+            var proxyTimer = setTimeout(function () {
+                if (completed) return;
+                completed = true;
+                logger.error('GPU profile request timed out: ' + method + ' ' + upstreamPath);
+                proxy.abort();
+                if (!res.headersSent && !res.finished) {
+                    res.writeHead(504, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'NvContainer request timed out' }));
+                }
+            }, timeoutMs || 15000);
+            res.on('close', function () {
+                if (completed) return;
+                completed = true;
+                clearTimeout(proxyTimer);
+                proxy.abort();
+            });
+            proxy.on('error', function (error) {
+                if (completed) return;
+                completed = true;
+                clearTimeout(proxyTimer);
+                logger.error('GPU profile request failed: ' + error.message);
+                if (!res.headersSent && !res.finished) {
+                    res.writeHead(502, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'NvContainer is unavailable' }));
+                }
+            });
+            if (body) proxy.end(body);
+            else proxy.end();
+        }
+
+        if (method === 'GET') {
+            forward('');
+            return;
+        }
+        var body = '';
+        req.on('data', function (chunk) {
+            body += chunk;
+            if (body.length > 4096) req.destroy();
+        });
+        req.on('end', function () {
+            forward(body);
+        });
+    }
+
+    app.get('/Duluka/v1/gpu/profiles', function (req, res) {
+        proxyGpuProfileRequest(req, res, '/v1/gpu/profiles', 'GET');
+    });
+    app.get('/Duluka/v1/gpu/running-games', function (req, res) {
+        proxyGpuProfileRequest(req, res, '/v1/gpu/running-games', 'GET');
+    });
+    app.post('/Duluka/v1/gpu/profiles/add', function (req, res) {
+        proxyGpuProfileRequest(req, res, '/v1/gpu/profiles/add', 'POST');
+    });
+    app.get('/Duluka/v1/gpu/manager', function (req, res) {
+        proxyGpuProfileRequest(req, res, '/v1/gpu/manager', 'GET');
+    });
+    app.get('/Duluka/v1/gpu/file-picker/executable', function (req, res) {
+        proxyGpuProfileRequest(req, res, '/v1/gpu/file-picker/executable', 'GET', 120000);
+    });
+    app.get('/Duluka/v1/gpu/running-profile-paths', function (req, res) {
+        proxyGpuProfileRequest(req, res, '/v1/gpu/running-profile-paths', 'GET');
+    });
+    app.post('/Duluka/v1/gpu/profiles/save', function (req, res) {
+        proxyGpuProfileRequest(req, res, '/v1/gpu/profiles/save', 'POST');
+    });
+    app.post('/Duluka/v1/gpu/profiles/remove', function (req, res) {
+        proxyGpuProfileRequest(req, res, '/v1/gpu/profiles/remove', 'POST');
+    });
+    app.post('/Duluka/v1/gpu/preference/apply', function (req, res) {
+        proxyGpuProfileRequest(req, res, '/v1/gpu/preference/apply', 'POST');
+    });
+    app.post('/Duluka/v1/gpu/preference/remove', function (req, res) {
+        proxyGpuProfileRequest(req, res, '/v1/gpu/preference/remove', 'POST');
+    });
+    app.get('/Duluka/v1/gpu/graphics/status', function (req, res) {
+        proxyGpuProfileRequest(req, res, '/v1/gpu/graphics/status', 'GET');
+    });
+    app.post('/Duluka/v1/gpu/graphics/open', function (req, res) {
+        proxyGpuProfileRequest(req, res, '/v1/gpu/graphics/open', 'POST');
+    });
+    app.post('/Duluka/v1/gpu/backups/restore', function (req, res) {
+        proxyGpuProfileRequest(req, res, '/v1/gpu/backups/restore', 'POST');
+    });
+    app.post('/Duluka/v1/gpu/runtime/check', function (req, res) {
+        proxyGpuProfileRequest(req, res, '/v1/gpu/runtime/check', 'POST');
+    });
+
     // OUR LANE: host health probe (the managed NVIDIA Web Helper.exe waits
     // for this before declaring the backend healthy — standalone addition).
     app.get('/Backend/v.1.0/health', function (req, res) {
@@ -216,7 +559,11 @@ var httpServer = http.createServer(app);
         var m = (req.url || '').match(/hk=([A-Za-z0-9_]+)/);
         var name = m ? m[1] : 'OpenShare';
         if (typeof global.__nvFire === 'function') {
-            global.__nvFire(name);
+            if (global.__nvFire(name) !== true) {
+                res.writeHead(503, { 'Content-Type': 'text/plain' });
+                res.end('hotkey callback is not ready');
+                return;
+            }
             res.writeHead(200, { 'Content-Type': 'text/plain' });
             res.end('fired ' + name);
         } else {
@@ -292,7 +639,7 @@ app.use(function (req, res, next) {
     next();
 });
 
-// route-floor: UNLOCK ALL — ดักทุก route ของ OSC ตอบ shape จริง + state สลับได้จริง
+// route-floor: OSC API route facade with persisted settings and runtime state.
 require('./shims/route-floor.js')(app, io);
 // ★ เว็บเวอร์ชันของ OSC ของเรา — http://127.0.0.1:<port>/osc/
 try {

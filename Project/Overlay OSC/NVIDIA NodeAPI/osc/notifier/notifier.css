@@ -65,16 +65,16 @@ body > nv-osc-notifier.notifier-slider {
 .nv-toast {
     box-sizing: border-box;
     position: absolute;
-    overflow: hidden;
+    overflow: visible;
     right: 0;                                 /* wrapper อยู่กับที่; ชั้นดำ/เขียวเป็นตัวเลื่อน */
     width: var(--nv-width);
     height: var(--nv-height);
     top: 0;                                   /* JS set ตาม slot rank */
     pointer-events: auto;
     cursor: pointer;
+    opacity: 0.90;
     transition: right var(--nv-slide-ms) var(--nv-ease),
                 top var(--nv-glide-ms) var(--nv-ease);
-    /* ไม่มี box-shadow/radius ในแท้ — osc วาดในหน้าเดียวกับ UI ไม่ต้องมีเงา */
     border-radius: 0;
 }
 
@@ -165,10 +165,10 @@ body > nv-osc-notifier.notifier-slider {
 
 .nv-toast__icon-image {
     box-sizing: border-box;
-    display: none;
-    width: 48px;
-    height: 48px;
-    margin: 0 20px;
+    display: block;
+    width: 56px;
+    height: 56px;
+    margin: 0 16px;
     object-fit: contain;
     flex-shrink: 0;
 }
@@ -179,6 +179,26 @@ body > nv-osc-notifier.notifier-slider {
     align-items: flex-start;
     justify-content: center;
     min-width: 0;
+    flex: 1 1 auto;
+}
+
+.nv-toast__action {
+    display: none;
+    flex: 0 0 auto;
+    margin: 0 14px 0 8px;
+    padding: 7px 10px;
+    border: 1px solid var(--nv-green);
+    border-radius: 2px;
+    background: transparent;
+    color: #fff;
+    font: 600 13px 'Segoe UI', sans-serif;
+    cursor: pointer;
+}
+.nv-toast__action:hover,
+.nv-toast__action:focus-visible {
+    background: var(--nv-green);
+    color: #111;
+    outline: none;
 }
 
 .nv-toast__text {
@@ -223,6 +243,13 @@ body > nv-osc-notifier.notifier-slider {
     height: 150px !important;
     top: 0 !important;
 }
+.nv-toast.is-large .nv-toast__subtext,
+.nv-toast.is-tall .nv-toast__subtext {
+    margin-top: 2px;
+    line-height: 1.2;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
 
 /* ============================================================================
    FLIP (แท้: .notifier-flip) — Updater UI ของแท้ ตอนข้อความซ้ำ
@@ -244,4 +271,44 @@ body > nv-osc-notifier.notifier-slider {
 .nv-toast__green, .nv-toast__black, .nv-toast__content {
     perspective: 800px;                          /* แท้: .notifier-slider{perspective:800px} */
     backface-visibility: hidden;
+}
+
+/* ============================================================================
+   ขนาดพิเศษเฉพาะ NvGraphics (additive — ไม่แตะค่าแท้ใดๆ)
+   ----------------------------------------------------------------------------
+/* ============================================================================
+   ขนาดพิเศษเฉพาะ NvGraphics (additive — ไม่แตะค่าแท้ใดๆ)
+   ----------------------------------------------------------------------------
+   การ์ด GPU ปรับความกว้างตามความยาวข้อความ 3 ระดับ (s/m/l):
+   s=360 · m=460 · l=560 — ความสูงคง var(--nv-height) เดิม เพื่อให้
+   stack layout และ animation (slide/glide) เล่นครบเหมือนการ์ดแท้ทุกประการ
+   offstage ขยายตามความกว้างของแต่ละระดับ ไม่ให้การ์ดโผล่ค้างกลางทาง
+/* ============================================================================
+   ขนาดพิเศษเฉพาะ NvGraphics (additive — ไม่แตะค่าแท้ใดๆ)
+   ----------------------------------------------------------------------------
+   การ์ด GPU ใช้ 2 ความกว้างตามรูปแบบแจ้งเตือน:
+   preference จาก Windows=350 · apply/default=380 — ความสูง/ฟอนต์คงเดิม
+   offstage ขยายตามความกว้างเพื่อให้การ์ดเลื่อนเข้า/ออกพ้นจอครบ
+   ส่วน subtext ของการ์ด GPU เรียงบรรทัดปกติ (ยกเลิก margin-top:-25px ของแท้
+   ที่ใช้ทับบรรทัดหลัก — ใช้กับการ์ด GPU แล้วข้อความชนกัน)
+   ========================================================================== */
+.nv-toast.is-gpu {
+    width: var(--gpu-w);
+    height: var(--nv-height);
+    --nv-offstage-right: calc(var(--gpu-w) * -1 - 30px);
+}
+.nv-toast.is-gpu > .nv-toast__green,
+.nv-toast.is-gpu > .nv-toast__black {
+    width: var(--gpu-w) !important;
+    height: var(--nv-height) !important;
+    top: 0 !important;
+}
+.nv-toast.is-gpu .nv-toast__subtext {
+    margin-top: 2px;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+    max-width: 100%;
+    opacity: 0.85;
 }

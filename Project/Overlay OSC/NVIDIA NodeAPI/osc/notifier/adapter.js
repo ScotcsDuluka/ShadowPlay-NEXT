@@ -12,8 +12,34 @@
         'eventAggregator',
         'NOTIFICATION_EVENT',
         'NOTIFICATION_DATA',
-        function ($filter, $log, eventAggregator, notificationEvent, notificationData) {
+        'socketService',
+        function ($filter, $log, eventAggregator, notificationEvent, notificationData, socketService) {
+            var obsNotifications = {
+                RECORD_STARTED: true,
+                RECORD_STOPPED: true,
+                RECORD_PAUSED: true,
+                RECORD_RESUMED: true,
+                INSTANT_REPLAY_STARTED: true,
+                INSTANT_REPLAY_STOPPED: true,
+                INSTANT_REPLAY_SAVED: true,
+                BROADCAST_STARTED: true,
+                BROADCAST_STOPPED: true
+            };
+            var obsNotificationDefinitions = {
+                RECORD_PAUSED: {
+                    id: 'RECORD_PAUSED',
+                    message: 'l10n.notificationManualRecordPaused',
+                    icon: 'icon-record'
+                },
+                RECORD_RESUMED: {
+                    id: 'RECORD_RESUMED',
+                    message: 'l10n.notificationManualRecordResumed',
+                    icon: 'icon-record icon-highlighted'
+                }
+            };
+
             function findNotification(selection) {
+                if (obsNotificationDefinitions[selection]) return obsNotificationDefinitions[selection];
                 for (var i = 0; i < notificationData.length; i++) {
                     if (notificationData[i].id === selection) return notificationData[i];
                 }
@@ -48,7 +74,10 @@
                 var arg1 = localizeArgument(event.arg1);
                 var arg2 = localizeArgument(event.arg2);
                 var args = { arg1: arg1, arg2: arg2 };
-                var message = $filter('translate')(item.message, args);
+                var messageKey = event.selection === 'INSTANT_REPLAY_SAVED' && event.durationUnavailable === true
+                    ? 'l10n.notificationInstantReplaySavedNoDuration'
+                    : item.message;
+                var message = $filter('translate')(messageKey, args);
                 var subtext = item.messageSubtext
                     ? $filter('translate')(item.messageSubtext, args)
                     : '';
@@ -62,9 +91,44 @@
                 });
             }
 
-            window.Notifier.setSlotCount(2);
+            function registerObsSocket() {
+                socketService.register('/Duluka/v1/OBSNotification', 'nv-obs-notification');
+                $log.info('[notifier] OBS toast socket subscribed');
+            }
+
+            var handledObsEvents = [];
+            function showObsNotification(event) {
+                if (!event || !obsNotifications[event.selection]) {
+                    $log.warn('[notifier] Ignored malformed OBS notification', event);
+                    return;
+                }
+                if (typeof event.eventId === 'string') {
+                    if (handledObsEvents.indexOf(event.eventId) !== -1) return;
+                    handledObsEvents.push(event.eventId);
+                    if (handledObsEvents.length > 32) handledObsEvents.shift();
+                }
+                showNotification(event);
+                $log.info('[notifier] OBS toast displayed: ' + event.selection);
+            }
+
+            fetch('/Notifier/v.1.0/settings')
+                .then(function (response) {
+                    if (!response.ok) throw new Error('Unable to load notifier settings (' + response.status + ')');
+                    return response.json();
+                })
+                .then(function (settings) {
+                    window.Notifier.setSlotCount(settings.slotCount);
+                    $log.info('[notifier] configured slots: ' + settings.slotCount);
+                })
+                .catch(function (error) {
+                    $log.error('[notifier] settings could not be loaded; using default slot count', error);
+                    window.Notifier.setSlotCount(2);
+                });
             window.Notifier.startHeartbeat();
             eventAggregator.on(notificationEvent, showNotification);
+            registerObsSocket();
+            eventAggregator.on('connect', registerObsSocket);
+            eventAggregator.on('nv-obs-notification', showObsNotification);
             window.NvNotifierBridge = {
                 show: showNotification,
                 status: function () { return window.Notifier.status(); }

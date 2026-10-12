@@ -321,18 +321,78 @@ void KillProcessFromPath(const wchar_t* name, const std::wstring& exe_path) {
   CloseHandle(snap);
 }
 
+// Loopback connect with a hard deadline. A plain blocking connect can
+// stall the caller (including the CEF UI thread) while a local endpoint is
+// half-open or the network stack is unhealthy.
+static bool ConnectLoopbackSocket(SOCKET s, unsigned port,
+                                  unsigned timeout_ms) {
+  u_long nonblocking = 1;
+  if (ioctlsocket(s, FIONBIO, &nonblocking) == SOCKET_ERROR) return false;
+
+  sockaddr_in a;
+  memset(&a, 0, sizeof(a));
+  a.sin_family = AF_INET;
+  a.sin_port = htons(static_cast<u_short>(port));
+  a.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+
+  int rc = connect(s, reinterpret_cast<sockaddr*>(&a), sizeof(a));
+  if (rc == SOCKET_ERROR) {
+    const int connect_error = WSAGetLastError();
+    if (connect_error != WSAEWOULDBLOCK &&
+        connect_error != WSAEINPROGRESS &&
+        connect_error != WSAEALREADY) {
+      u_long blocking = 0;
+      ioctlsocket(s, FIONBIO, &blocking);
+      WSASetLastError(connect_error);
+      return false;
+    }
+
+    fd_set writable;
+    fd_set exceptional;
+    FD_ZERO(&writable);
+    FD_ZERO(&exceptional);
+    FD_SET(s, &writable);
+    FD_SET(s, &exceptional);
+    timeval timeout;
+    timeout.tv_sec = static_cast<long>(timeout_ms / 1000);
+    timeout.tv_usec = static_cast<long>((timeout_ms % 1000) * 1000);
+    rc = select(0, NULL, &writable, &exceptional, &timeout);
+    if (rc <= 0) {
+      const int wait_error = (rc == 0) ? WSAETIMEDOUT : WSAGetLastError();
+      u_long blocking = 0;
+      ioctlsocket(s, FIONBIO, &blocking);
+      WSASetLastError(wait_error);
+      return false;
+    }
+
+    int socket_error = 0;
+    int error_size = sizeof(socket_error);
+    if (getsockopt(s, SOL_SOCKET, SO_ERROR,
+                   reinterpret_cast<char*>(&socket_error),
+                   &error_size) == SOCKET_ERROR ||
+        socket_error != 0) {
+      const int wait_error = socket_error != 0
+                                 ? socket_error
+                                 : WSAGetLastError();
+      u_long blocking = 0;
+      ioctlsocket(s, FIONBIO, &blocking);
+      WSASetLastError(wait_error);
+      return false;
+    }
+  }
+
+  u_long blocking = 0;
+  if (ioctlsocket(s, FIONBIO, &blocking) == SOCKET_ERROR) return false;
+  return true;
+}
+
 bool IsTcpPortOpen(unsigned port) {
   WSADATA wsa;
   if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) return false;
   bool alive = false;
   SOCKET s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if (s != INVALID_SOCKET) {
-    sockaddr_in a;
-    memset(&a, 0, sizeof(a));
-    a.sin_family = AF_INET;
-    a.sin_port = htons(static_cast<u_short>(port));
-    a.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    alive = connect(s, reinterpret_cast<sockaddr*>(&a), sizeof(a)) == 0;
+    alive = ConnectLoopbackSocket(s, port, 200);
     closesocket(s);
   }
   WSACleanup();
@@ -360,14 +420,22 @@ bool SendHubLine(const std::string& line) {
   bool ok = false;
   SOCKET s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if (s != INVALID_SOCKET) {
-    sockaddr_in a;
-    memset(&a, 0, sizeof(a));
-    a.sin_family = AF_INET;
-    a.sin_port = htons(5001);  // NVIDIA API hub (Duluka.Server owns 5000)
-    a.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    if (connect(s, reinterpret_cast<sockaddr*>(&a), sizeof(a)) == 0) {
+    const DWORD send_timeout_ms = 750;
+    setsockopt(s, SOL_SOCKET, SO_SNDTIMEO,
+               reinterpret_cast<const char*>(&send_timeout_ms),
+               sizeof(send_timeout_ms));
+    // OPEN OVERLAY calls this from a worker; bound the worker too, rather
+    // than allowing a stalled localhost connect/send to linger indefinitely.
+    if (ConnectLoopbackSocket(s, 5001, 300)) {
       std::string frame = line + "\r\n";
-      ok = send(s, frame.data(), (int)frame.size(), 0) > 0;
+      int sent = 0;
+      const int frame_size = static_cast<int>(frame.size());
+      while (sent < frame_size) {
+        const int n = send(s, frame.data() + sent, frame_size - sent, 0);
+        if (n <= 0) break;
+        sent += n;
+      }
+      ok = sent == frame_size;
     }
     closesocket(s);
   }
@@ -382,23 +450,54 @@ bool HttpPostLocal(unsigned port, const std::wstring& path) {
   bool ok = false;
   SOCKET s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if (s != INVALID_SOCKET) {
-    sockaddr_in a;
-    memset(&a, 0, sizeof(a));
-    a.sin_family = AF_INET;
-    a.sin_port = htons(static_cast<u_short>(port));
-    a.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    if (connect(s, reinterpret_cast<sockaddr*>(&a), sizeof(a)) == 0) {
+    // Connect is separately bounded because SO_RCVTIMEO does not apply to it.
+    const DWORD io_timeout_ms = 750;
+    setsockopt(s, SOL_SOCKET, SO_RCVTIMEO,
+               reinterpret_cast<const char*>(&io_timeout_ms),
+               sizeof(io_timeout_ms));
+    setsockopt(s, SOL_SOCKET, SO_SNDTIMEO,
+               reinterpret_cast<const char*>(&io_timeout_ms),
+               sizeof(io_timeout_ms));
+
+    if (ConnectLoopbackSocket(s, port, 300)) {
       std::string req = "POST " + WideToUtf8(path) +
                         " HTTP/1.1\r\nHost: 127.0.0.1\r\n"
                         "Content-Type: application/json\r\n"
                         "Content-Length: 2\r\nConnection: close\r\n\r\n{}";
-      if (send(s, req.data(), (int)req.size(), 0) > 0) {
-        // Status line only — the body (a JSON echo) is not needed here.
+      int sent = 0;
+      const int request_size = static_cast<int>(req.size());
+      while (sent < request_size) {
+        const int n = send(s, req.data() + sent, request_size - sent, 0);
+        if (n <= 0) break;
+        sent += n;
+      }
+      if (sent == request_size) {
+        // Read a complete status line instead of assuming a single recv()
+        // contains the whole header. SO_RCVTIMEO bounds every blocking read.
+        std::string status_line;
         char buf[64] = {};
-        int n = recv(s, buf, sizeof(buf) - 1, 0);
-        if (n > 0) buf[n] = 0;
-        ok = (n > 0 && strncmp(buf, "HTTP/1.", 7) == 0 &&
-              strstr(buf, " 200 ") != NULL);
+        const ULONGLONG response_deadline = GetTickCount64() + io_timeout_ms;
+        while (status_line.size() < 256) {
+          const ULONGLONG now = GetTickCount64();
+          if (now >= response_deadline) break;
+          const DWORD remaining = static_cast<DWORD>(response_deadline - now);
+          fd_set readable;
+          FD_ZERO(&readable);
+          FD_SET(s, &readable);
+          timeval timeout;
+          timeout.tv_sec = static_cast<long>(remaining / 1000);
+          timeout.tv_usec = static_cast<long>((remaining % 1000) * 1000);
+          const int ready = select(0, &readable, NULL, NULL, &timeout);
+          if (ready <= 0) break;
+          const int n = recv(s, buf, sizeof(buf), 0);
+          if (n <= 0) break;
+          status_line.append(buf, n);
+          if (status_line.find("\r\n") != std::string::npos) break;
+        }
+        const size_t line_end = status_line.find("\r\n");
+        if (line_end != std::string::npos) status_line.resize(line_end);
+        ok = status_line.find("HTTP/1.") == 0 &&
+             status_line.find(" 200 ") != std::string::npos;
       }
     }
     closesocket(s);

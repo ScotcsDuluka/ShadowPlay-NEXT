@@ -36,6 +36,7 @@
 #include <cmath>
 #include <vector>
 #include <functional>
+#include <mutex>
 // ★ GPU compositor ทั้งสายแบบของแท้ (offscreen_renderer_d3d11.cpp):
 //   CEF shared texture (D3D11) → shader premultiply → swapchain alpha → DComp
 //   ไม่มีพิกเซลแตะ CPU เลย (เดิม: premultiply 7MB/เฟรมใน C++ = กระตุก + กิน CPU)
@@ -68,7 +69,7 @@ struct OscConfig {
     std::wstring subprocess_path;
     int debug_port = 59099;
     bool windowed = true;          // ★ สเปก OWNER (10:5x): ให้ CEF จัดการ render เอง (GPU native)
-    int max_fps = 60;              // CEF 73 OSR maximum
+    int max_fps = 240;             // shared-texture OSR supports the requested rate; software OSR caps at 60
     bool show_fps = true;          // ★ FPS meter บน overlay (นับเฟรมที่แสดงจริง)
     bool gdi_compositor = false;   // true = UpdateLayeredWindow (แสดงผลชัวร์) แทน DComp
 };
@@ -177,8 +178,8 @@ static void LoadConfig() {
     g_cfg.debug_port = (int)CfgNum(json, "debugPort", 59099);
     g_cfg.gdi_compositor = CfgStr(json, "compositor") == L"gdi";
     g_cfg.windowed = CfgNum(json, "windowed", 1) != 0;
-    g_cfg.max_fps = (int)CfgNum(json, "maxFps", 60);
-    if (g_cfg.max_fps < 1 || g_cfg.max_fps > 60) g_cfg.max_fps = 60;
+    g_cfg.max_fps = (int)CfgNum(json, "maxFps", 240);
+    if (g_cfg.max_fps < 1 || g_cfg.max_fps > 240) g_cfg.max_fps = 240;
     g_cfg.show_fps = CfgNum(json, "showFps", 1) != 0;
 }
 
@@ -279,6 +280,7 @@ static bool g_gpu_shared = false;       // ขอ shared texture จาก CEF (
 static ULONGLONG g_page_loaded_ms = 0;  // เฝ้า: shared ไม่ยิงใน 8 วิ → สลับโหมด upload
 static ID3D11Texture2D* g_up_tex = nullptr;   // texture รับ upload (โหมดกึ่ง GPU)
 static int g_up_w = 0, g_up_h = 0;
+static bool g_up_initialized = false;
 static IDCompositionDevice* g_dcomp_dev = nullptr;
 static IDCompositionTarget* g_dcomp_target = nullptr;
 static IDCompositionVisual* g_dcomp_visual = nullptr;
@@ -286,10 +288,12 @@ static IDXGIDevice2* g_dxgi_dev2 = nullptr;
 static bool g_dcomp_bound = false;
 static ID3D11Texture2D* g_own_rt = nullptr;   // RT ของเรา (back buffer ของ swapchain เครื่องนี้ bind=0 วาดไม่ได้)
 static int g_own_w = 0, g_own_h = 0;
+static bool g_gpu_shared_frame_initialized = false;
 
 // วาดลง RT ของเราเสมอ แล้ว copy ลง back buffer — บังคับทุกเส้นทางผ่านนี้
 static bool EnsureOwnRT(int w, int h) {
     if (g_own_rt && g_own_w == w && g_own_h == h) return true;
+    g_gpu_shared_frame_initialized = false;
     if (g_own_rt) { g_own_rt->Release(); g_own_rt = nullptr; g_gpu_rtv->Release(); g_gpu_rtv = nullptr; }
     D3D11_TEXTURE2D_DESC td{};
     td.Width = w; td.Height = h; td.MipLevels = 1; td.ArraySize = 1;
@@ -444,8 +448,12 @@ fail:
 
 // ★ สถานะ OSC (ย้ายขึ้นบน — ให้ GpuComposite/GPUDUMP ใช้ได้)
 static std::vector<RECT> g_ui_rects;         // พิกัดจอ (scale แล้ว)
+static std::vector<RECT> g_notifier_rects;   // การ์ดที่กดได้ขณะหน้า base คลิกทะลุ
+static std::mutex g_notifier_rects_mutex;
 static double g_css_scale = 1.0;             // css px → จอ px (zoom แท้ fit)
+static int g_disp_w = 0, g_disp_h = 0, g_dst_x = 0, g_dst_y = 0;
 static bool g_ui_open = false;
+static std::atomic<bool> g_ui_open_snapshot{ false };
 static std::atomic<bool> g_route_clickthrough{ true };
 static bool g_applied_clickthrough = false;
 static bool g_input_mode_initialized = false;
@@ -458,7 +466,8 @@ static ID3D11Texture2D* g_shared_tex = nullptr;   // ★ cache: handle เดิ
 static ID3D11ShaderResourceView* g_shared_srv = nullptr;
 static uint64_t g_shared_handle_cached = 0;
 
-static void GpuComposite(uint64_t shared_handle, int w, int h) {
+static void GpuComposite(uint64_t shared_handle, int w, int h,
+    const std::vector<CefRect>& dirty_rects) {
     if (!g_gpu_ok) return;
     // ★ วัดจังหวะเฟรม (12:1x): มาติด ๆ 16ms = scheduler ปกติ / ระเบิดชุด = begin-frame สะดุด
     {
@@ -560,88 +569,43 @@ static void GpuComposite(uint64_t shared_handle, int w, int h) {
     }
 
     if (EnsureOwnRT(w, h)) {
-        // ★ GPU path หลัก: copy shared texture (premultiplied แล้ว) ตรงเข้า
-        //   own RT → back buffer — pure GPU copy (shader path พิสูจน์แล้ววะโปร่ง 09:24)
-        char dc[4] = { 0 };
-        bool want_direct = GetEnvironmentVariableA("OSC_DIRECTCOPY", dc, 4) > 0 && dc[0] == '1';
-        if (GetEnvironmentVariableA("OSC_SHADERDRAW", dc, 4) > 0 && dc[0] == '1')
-            want_direct = false;   // legacy diagnostic switch
-        if (want_direct) {
-            ID3D11Texture2D* t2 = nullptr;
-            if (SUCCEEDED(tex->QueryInterface(__uuidof(ID3D11Texture2D), (void**)&t2)) && t2) {
-                D3D11_TEXTURE2D_DESC td{}; t2->GetDesc(&td);
-                if ((int)td.Width == w && (int)td.Height == h) {
-                    g_gpu_ctx->CopyResource(g_own_rt, t2);   // void — ทำงานเสมอ (typeless family ใช้ได้)
-                    PresentToSwap(w, h);
-                    static bool dcl = false;
-                    if (!dcl) { dcl = true; Log("[gpu] direct-copy path active (GPU ล้วน)"); }
-                    // ★ OSC_GPUDUMP=1 — ดัมป์ท่อ 3 ขั้นตอนเมื่อ OSC เปิด (ทุก 240 เฟรม):
-                    //   shared tex → ownRT → backbuffer (นับพิกเซลไม่โปร่งใส + จุดกลาง)
-                    {
-                        static char dg[4] = { 0 };
-                        static bool dumpOn = (GetEnvironmentVariableA("OSC_GPUDUMP", dg, 4) > 0 && dg[0] == '1');
-                        static unsigned long long dcalls = 0;
-                        dcalls++;
-                        if (dumpOn && g_ui_open && (dcalls % 240 == 20) && g_own_rt) {
-                            auto stage = [&](ID3D11Texture2D* src, const char* name) {
-                                D3D11_TEXTURE2D_DESC d{}; src->GetDesc(&d);
-                                D3D11_TEXTURE2D_DESC st = d;
-                                st.Usage = D3D11_USAGE_STAGING; st.BindFlags = 0;
-                                st.CPUAccessFlags = D3D11_CPU_ACCESS_READ; st.MiscFlags = 0;
-                                st.MipLevels = 1; st.ArraySize = 1;
-                                st.SampleDesc.Count = 1; st.SampleDesc.Quality = 0;
-                                ID3D11Texture2D* stg = nullptr;
-                                if (FAILED(g_gpu_dev->CreateTexture2D(&st, nullptr, &stg)))
-                                    { Log(std::string("[pipe] ") + name + " staging FAIL"); return; }
-                                g_gpu_ctx->CopyResource(stg, src);
-                                D3D11_MAPPED_SUBRESOURCE mp{};
-                                if (SUCCEEDED(g_gpu_ctx->Map(stg, 0, D3D11_MAP_READ, 0, &mp))) {
-                                    unsigned char* px = (unsigned char*)mp.pData;
-                                    int nonzero = 0, total = 0;
-                                    for (int gy = 0; gy < 9; gy++) for (int gx = 0; gx < 16; gx++) {
-                                        size_t off = (size_t)(d.Height * (gy + 1) / 10) * mp.RowPitch
-                                                   + (size_t)(d.Width * (gx + 1) / 17) * 4;
-                                        total++; if (px[off + 3] > 0) nonzero++;
-                                    }
-                                    size_t c = (size_t)(d.Height / 2) * mp.RowPitch + (size_t)(d.Width / 2) * 4;
-                                    char b[160];
-                                    snprintf(b, sizeof(b), "[pipe] %-8s %ux%u nonzero=%d/%d center=%02X%02X%02X%02X",
-                                        name, d.Width, d.Height, nonzero, total, px[c], px[c+1], px[c+2], px[c+3]);
-                                    Log(b);
-                                    g_gpu_ctx->Unmap(stg, 0);
-                                }
-                                stg->Release();
-                            };
-                            stage(t2, "shared");
-                            stage(g_own_rt, "ownRT");
-                            ID3D11Texture2D* back = nullptr;
-                            if (SUCCEEDED(g_gpu_swap->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)&back))) {
-                                stage(back, "backbuf");
-                                back->Release();
-                            }
-                            RECT wr; GetWindowRect(g_hwnd, &wr);
-                            char b[120];
-                            snprintf(b, sizeof(b), "[pipe] window=(%ld,%ld)-(%ld,%ld) ui_open=%d",
-                                wr.left, wr.top, wr.right, wr.bottom, (int)g_ui_open);
-                            Log(b);
-                        }
-                    }
+        ID3D11Texture2D* source = nullptr;
+        if (SUCCEEDED(tex->QueryInterface(__uuidof(ID3D11Texture2D),
+                (void**)&source)) && source) {
+            D3D11_TEXTURE2D_DESC desc{};
+            source->GetDesc(&desc);
+            if ((int)desc.Width == w && (int)desc.Height == h) {
+                if (!g_gpu_shared_frame_initialized) {
+                    g_gpu_ctx->CopyResource(g_own_rt, source);
+                    g_gpu_shared_frame_initialized = true;
                 } else {
-                    Log("[gpu] DIRECTCOPY size mismatch — shader path");
+                    bool copied = false;
+                    for (const CefRect& rect : dirty_rects) {
+                        int left = (std::max)(0, rect.x);
+                        int top = (std::max)(0, rect.y);
+                        int right = (int)(std::min)((LONGLONG)w,
+                            (LONGLONG)rect.x + rect.width);
+                        int bottom = (int)(std::min)((LONGLONG)h,
+                            (LONGLONG)rect.y + rect.height);
+                        if (right <= left || bottom <= top) continue;
+                        D3D11_BOX box{
+                            (UINT)left, (UINT)top, 0,
+                            (UINT)right, (UINT)bottom, 1
+                        };
+                        g_gpu_ctx->CopySubresourceRegion(g_own_rt, 0,
+                            (UINT)left, (UINT)top, 0, source, 0, &box);
+                        copied = true;
+                    }
+                    if (!copied) {
+                        source->Release();
+                        return;
+                    }
                 }
-                t2->Release();
+                PresentToSwap(w, h);
+            } else {
+                Log("[gpu] shared texture size mismatch");
             }
-        } else {
-            D3D11_VIEWPORT vp{ 0, 0, (float)w, (float)h, 0, 1 };
-            g_gpu_ctx->OMSetRenderTargets(1, &g_gpu_rtv, nullptr);
-            g_gpu_ctx->RSSetViewports(1, &vp);
-            g_gpu_ctx->PSSetShaderResources(0, 1, &srv);
-            g_gpu_ctx->PSSetSamplers(0, 1, &g_gpu_samp);
-            g_gpu_ctx->VSSetShader(g_gpu_vs, nullptr, 0);
-            g_gpu_ctx->PSSetShader(g_gpu_ps_pass ? g_gpu_ps_pass : g_gpu_ps, nullptr, 0);
-            g_gpu_ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-            g_gpu_ctx->Draw(3, 0);              // fullscreen triangle
-            PresentToSwap(w, h);
+            source->Release();
         }
     }
     // ★ tex/srv = cache ของ g_shared_tex/g_shared_srv — ห้าม release ต่อ frame (12:1x)
@@ -649,31 +613,45 @@ static void GpuComposite(uint64_t shared_handle, int w, int h) {
 
 // โหมดกึ่ง GPU (fallback): CEF ส่ง BGRA มาทาง CPU ครั้งเดียว → upload → shader premultiply
 // ไม่มี SetDIBits/UpdateLayeredWindow/premultiply-loop เลย — GDI=0
-static void GpuUploadComposite(const void* bgra, int w, int h) {
+static void GpuUploadComposite(const void* bgra, int w, int h,
+    const std::vector<CefRect>& dirty_rects) {
     if (!g_gpu_ok) return;
     if (!g_up_tex || g_up_w != w || g_up_h != h) {
         if (g_up_tex) { g_up_tex->Release(); g_up_tex = nullptr; }
         D3D11_TEXTURE2D_DESC td{};
         td.Width = w; td.Height = h; td.MipLevels = 1; td.ArraySize = 1;
         td.Format = DXGI_FORMAT_B8G8R8A8_UNORM; td.SampleDesc.Count = 1;
-        td.Usage = D3D11_USAGE_DYNAMIC; td.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-        td.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+        td.Usage = D3D11_USAGE_DEFAULT; td.BindFlags = D3D11_BIND_SHADER_RESOURCE;
         if (FAILED(g_gpu_dev->CreateTexture2D(&td, nullptr, &g_up_tex))) {
             static int ctf = 0; if (ctf++ < 3) Log("[gpu] upload CreateTexture2D FAILED"); return;
         }
         g_up_w = w; g_up_h = h;
+        g_up_initialized = false;
     }
-    D3D11_MAPPED_SUBRESOURCE map{};
-    if (FAILED(g_gpu_ctx->Map(g_up_tex, 0, D3D11_MAP_WRITE_DISCARD, 0, &map))) {
-        static int mf = 0; if (mf++ < 3) Log("[gpu] upload Map FAILED"); return;
-    }
-    // BGRA ตรง ๆ — เส้นทาง DMA ของไดรเวอร์ (ไม่ใช่ลูปคำนวณ)
-    if ((int)map.RowPitch == w * 4) {
-        memcpy(map.pData, bgra, (size_t)w * h * 4);
+    if (!g_up_initialized) {
+        g_gpu_ctx->UpdateSubresource(g_up_tex, 0, nullptr, bgra, w * 4, 0);
+        g_up_initialized = true;
     } else {
-        for (int y = 0; y < h; y++)
-            memcpy((char*)map.pData + (size_t)y * map.RowPitch,
-                   (const char*)bgra + (size_t)y * w * 4, (size_t)w * 4);
+        bool updated = false;
+        for (const CefRect& rect : dirty_rects) {
+            int left = (std::max)(0, rect.x);
+            int top = (std::max)(0, rect.y);
+            int right = (int)(std::min)((LONGLONG)w,
+                (LONGLONG)rect.x + rect.width);
+            int bottom = (int)(std::min)((LONGLONG)h,
+                (LONGLONG)rect.y + rect.height);
+            if (right <= left || bottom <= top) continue;
+            D3D11_BOX box{
+                (UINT)left, (UINT)top, 0,
+                (UINT)right, (UINT)bottom, 1
+            };
+            const unsigned char* source = (const unsigned char*)bgra +
+                ((size_t)top * w + left) * 4;
+            g_gpu_ctx->UpdateSubresource(g_up_tex, 0, &box, source,
+                w * 4, 0);
+            updated = true;
+        }
+        if (!updated) return;
     }
     // ★ วินิจฉัย: พิกเซลแรกของ buffer ที่ CEF ส่งมา (ครั้งเดียว)
     {
@@ -688,7 +666,6 @@ static void GpuUploadComposite(const void* bgra, int w, int h) {
             Log(buf);
         }
     }
-    g_gpu_ctx->Unmap(g_up_tex, 0);
     ID3D11ShaderResourceView* srv = nullptr;
     if (FAILED(g_gpu_dev->CreateShaderResourceView(g_up_tex, nullptr, &srv))) {
         static int usf = 0; if (usf++ < 3) Log("[gpu] upload SRV FAILED"); return;
@@ -716,6 +693,7 @@ static void GpuUploadComposite(const void* bgra, int w, int h) {
 // ★ สั่ง visibility จากเธรดอื่น (CEF/HTTP) ผ่าน message — หน้าต่างเป็นของเธรด CEF UI
 static const UINT WM_OSC_VIS = WM_APP + 2;
 static const UINT WM_OSC_ROUTE = WM_APP + 3;
+static const UINT WM_OSC_PICKER_MODE = WM_APP + 4;
 
 static int NotificationSafeOverlayWidth(int monitor_width) {
     // A monitor-sized top-level HWND puts Windows in QUNS_BUSY and suppresses notifications.
@@ -858,6 +836,7 @@ static void ParseDisplayRects(const std::string& req) {
         g_ui_rects.push_back(r);
         open = true;
     }
+
     if (g_ui_open != open)
         Log(std::string("[ui] displayRects: ") + (open ? (std::to_string(g_ui_rects.size()) + " rects") : "empty"));
     // ★ state machine (สเปก OWNER): rects = ขอบเขตคลิกเท่านั้น — ห้ามแตะสถานะเด็ดขาด!
@@ -865,8 +844,54 @@ static void ParseDisplayRects(const std::string& req) {
     //   ทั้งที่ overlay ยังไม่แสดง — สถานะเปิด/ปิด = WIN_OPEN_OSC / WIN_CLOSE_OSC เท่านั้น)
 }
 
+static void ParseNotifierRects(const std::string& req) {
+    size_t p = req.find("\"displayRects\"");
+    if (p == std::string::npos) return;
+    size_t ab = req.find('[', p);
+    if (ab == std::string::npos) return;
+    size_t ae = req.find(']', ab);
+    if (ae == std::string::npos) ae = req.size();
+    std::string body = req.substr(ab, ae - ab);
+    std::vector<RECT> rects;
+    size_t pos = 0;
+    while ((pos = body.find('{', pos)) != std::string::npos) {
+        size_t cb = body.find('}', pos);
+        if (cb == std::string::npos) break;
+        std::string obj = body.substr(pos, cb - pos);
+        pos = cb + 1;
+        auto num = [&](const char* key)->double {
+            size_t q = obj.find(key);
+            return q == std::string::npos ? -1e9 : atof(obj.c_str() + q + strlen(key));
+        };
+        double x = num("\"x\":"), y = num("\"y\":");
+        double w = num("\"width\":"), h = num("\"height\":");
+        if (x <= -1e8 || y <= -1e8 || w <= 0 || h <= 0) continue;
+        RECT r{};
+        if (g_disp_w > 0 && g_disp_h > 0 && g_view_w > 0 && g_view_h > 0) {
+            r.left = g_dst_x + (LONG)((LONGLONG)x * g_disp_w / g_view_w);
+            r.top = g_dst_y + (LONG)((LONGLONG)y * g_disp_h / g_view_h);
+            r.right = g_dst_x + (LONG)((LONGLONG)(x + w) * g_disp_w / g_view_w);
+            r.bottom = g_dst_y + (LONG)((LONGLONG)(y + h) * g_disp_h / g_view_h);
+        } else {
+            r.left = (LONG)(x * g_css_scale);
+            r.top = (LONG)(y * g_css_scale);
+            r.right = (LONG)((x + w) * g_css_scale);
+            r.bottom = (LONG)((y + h) * g_css_scale);
+        }
+        if (r.right > r.left && r.bottom > r.top) rects.push_back(r);
+    }
+    {
+        std::lock_guard<std::mutex> lock(g_notifier_rects_mutex);
+        g_notifier_rects = std::move(rects);
+    }
+}
+
+static void ClearNotifierRects() {
+    std::lock_guard<std::mutex> lock(g_notifier_rects_mutex);
+    g_notifier_rects.clear();
+}
+
 // view-scale state: ตำแหน่ง/ขนาดภาพที่ถูกวางลงจอ (ใช้แมพเมาส์จอ↔view)
-static int g_disp_w = 0, g_disp_h = 0, g_dst_x = 0, g_dst_y = 0;
 static std::atomic<double> g_ui_adjust{ 1.0 };   // ปรับสดด้วย Ctrl+ลูกเมาส์
 
 // ★ สูตร zoom ของ Share.exe แท้ (วัดสดผ่าน CDP :9222 ของ Share วันที่ 2026-10-07 —
@@ -915,7 +940,7 @@ static void CompositeFrame(const void* bgra, int w, int h, const std::vector<Cef
     // ★ ลำดับความเร็ว: (1) shared texture เต็ม GPU มาทาง OnAcceleratedPaint (ไม่ผ่านฟังก์ชันนี้)
     //   (2) GPU-assisted upload — memcpy เดียว + shader (ที่นี่) (3) GDI เดิม (รองสุดท้าย)
     if (g_gpu_ok) {
-        GpuUploadComposite(bgra, w, h);
+        GpuUploadComposite(bgra, w, h, dirty);
         if (g_gpu_frame.load()) { EnsureShownOnce(); return; }
     }
     if (!g_hdc_mem || g_bmp_w != w || g_bmp_h != h) {
@@ -1198,14 +1223,35 @@ static void HandleOscQuery(const std::string& req, bool persistent,
         return;
     }
 
-    if (cmd == "QUERY_WIN_CLOSE_OSC") {
-        if (g_devtools_open.load() || GetTickCount64() < g_devtools_close_grace_until.load()) {
-            Log("[state] ignored close request while DevTools is active or closing");
-            reply("{}");
+    if (cmd == "QUERY_OSC_GET_OPEN_STATE") {
+        reply(g_ui_open_snapshot.load() ? "true" : "false");
+        return;
+    }
+
+    if (cmd == "QUERY_OSC_SET_PICKER_MODE") {
+        bool active;
+        if (req.find("\"active\":true") != std::string::npos) {
+            active = true;
+        } else if (req.find("\"active\":false") != std::string::npos) {
+            active = false;
+        } else {
+            reply("{\"error\":\"active must be a boolean\"}");
             return;
         }
+        DWORD_PTR applied = FALSE;
+        if (!g_hwnd || !SendMessageTimeoutW(g_hwnd, WM_OSC_PICKER_MODE,
+                active ? 1 : 0, 0, SMTO_ABORTIFHUNG, 2000, &applied) || !applied) {
+            reply("{\"error\":\"Could not change OSC picker z-order\"}");
+            return;
+        }
+        reply("{}");
+        return;
+    }
+
+    if (cmd == "QUERY_WIN_CLOSE_OSC") {
         // แบบของแท้: หน้าเพจเป็นเจ้าของ UI — ปิดเองทาง socket แล้ว
         g_ui_rects.clear();
+        ClearNotifierRects();
         // [P1#1 Copilot] ส่งแค่ intent — สถานะให้ UI thread (WM_OSC_VIS) เป็นผู้เขียน
         if (g_hwnd) PostMessageW(g_hwnd, WM_OSC_VIS, 0, 0);
         reply("{}");
@@ -1218,6 +1264,11 @@ static void HandleOscQuery(const std::string& req, bool persistent,
             Log("[ui] SET_DISPLAY_RECTS payload: " + req.substr(0, 300));
         }
         ParseDisplayRects(req);
+        reply("{}");
+        return;
+    }
+    if (cmd == "QUERY_OSC_SET_NOTIFIER_RECTS") {
+        ParseNotifierRects(req);
         reply("{}");
         return;
     }
@@ -1533,6 +1584,7 @@ public:
         // ★ state machine: renderer ตาย = หน้าไม่มีทางส่ง WIN_CLOSE เอง → บังคับปิด
         //   (กันค้าง "เปิดล่องหน": กินคลิก/โฟกัสทั้งจอทั้งที่จอไม่มีอะไร)
         g_ui_rects.clear();
+        ClearNotifierRects();
         // [P1#1 Copilot] ส่ง intent — UI thread เป็นผู้เขียนสถานะ
         if (g_hwnd) PostMessageW(g_hwnd, WM_OSC_VIS, 0, 0);
         // renderer ตัวใหม่เกิดแต่ไม่โหลดซ้ำเอง — ReloadIgnoreCache ตอนยังไม่มี navigation
@@ -1589,7 +1641,8 @@ public:
     }
     // ★ GPU path ของแท้: shared texture บน D3D11 — ไม่มีพิกเซลผ่าน CPU เลย
     //   (CEF 73: signature เก่า = handle + width/height แยกพารามิเตอร์)
-    void OnAcceleratedPaint(CefRefPtr<CefBrowser>, PaintElementType type, const RectList&,
+    void OnAcceleratedPaint(CefRefPtr<CefBrowser>, PaintElementType type,
+        const RectList& dirtyRects,
         void* shared_handle) override {
         if (type != PET_VIEW) return;
         static int calls = 0;
@@ -1604,7 +1657,8 @@ public:
             Log("[fps] " + std::to_string(cnt * 1000 / (int)(now - t0)) + " fps (GPU path)");
             cnt = 0; t0 = now;
         }
-        GpuComposite((uint64_t)(uintptr_t)shared_handle, g_view_w, g_view_h);
+        GpuComposite((uint64_t)(uintptr_t)shared_handle, g_view_w, g_view_h,
+            dirtyRects);
         if (g_gpu_frame.load()) EnsureShownOnce();
     }
     bool GetScreenPoint(CefRefPtr<CefBrowser>, int viewX, int viewY, int& screenX, int& screenY) override {
@@ -1670,6 +1724,8 @@ static void CreateBrowserNow() {
     CefBrowserSettings bs;
     bs.background_color = CefColorSetARGB(0, 0, 0, 0);
     bs.windowless_frame_rate = g_cfg.max_fps;
+    Log("[cfg] requested OSR frame rate=" + std::to_string(g_cfg.max_fps) +
+        " fps; shared_texture=" + std::to_string(wi.shared_texture_enabled));
     // CEF 73 passes external_begin_frame_enabled as force_software_compositor
     // to ui::Compositor. Keep its internal scheduler so shared-texture OSR stays on GPU.
     wi.external_begin_frame_enabled = false;
@@ -1723,12 +1779,22 @@ static CefMouseEvent MkMousePt(POINT s) {
     return e;
 }
 static bool ScreenInUiRects(POINT s) {
+    if (g_disp_w <= 0 || g_disp_h <= 0) return false;
+    RECT overlay_rect{
+        g_dst_x - 1,
+        g_dst_y - 1,
+        g_dst_x + (std::max)(1, g_disp_w) + 1,
+        g_dst_y + g_disp_h + 1
+    };
+    if (!PtInRect(&overlay_rect, s)) return false;
+
     // ★ แบบของแท้: OSC เปิด = modal — จับเมาส์ทั้งจอส่งเข้า CEF
     //   (คลิกนอกปุ่ม = เพจปิด overlay เอง / คลิกปุ่ม = action)
     //   ยุคก่อน hook อยู่บนเธรด UI ที่ตันเลยเคอร์เซอร์แข็ง — ตอนนี้ hook เธรดเฉพาะแล้ว
-    if (g_route_clickthrough) return false;
-    (void)s;
-    return true;
+    if (!g_route_clickthrough) return true;
+    std::lock_guard<std::mutex> lock(g_notifier_rects_mutex);
+    return std::any_of(g_notifier_rects.begin(), g_notifier_rects.end(),
+        [&](const RECT& rect) { return PtInRect(&rect, s) != FALSE; });
 }
 static HHOOK g_mouse_hook = nullptr;
 // ★ บทเรียน 06:36 — hook ต้องอยู่เธรดเฉพาะ (มี pump ของตัวเอง) เพราะ LL hook
@@ -1789,7 +1855,11 @@ static LRESULT CALLBACK LowLevelMouseProc(int code, WPARAM w, LPARAM l) {
 }
 static DWORD WINAPI HookThreadProc(LPVOID) {
     g_mouse_hook = SetWindowsHookExW(WH_MOUSE_LL, LowLevelMouseProc, GetModuleHandleW(nullptr), 0);
-    if (g_mouse_hook) Log("[ui] low-level mouse hook installed (dedicated thread)");
+    if (!g_mouse_hook) {
+        Log("[ui] ERROR: low-level mouse hook installation failed err=" + std::to_string(GetLastError()));
+        return 1;
+    }
+    Log("[ui] low-level mouse hook installed (dedicated thread)");
     MSG m;
     while (GetMessageW(&m, nullptr, 0, 0) > 0) { TranslateMessage(&m); DispatchMessageW(&m); }
     return 0;
@@ -1885,6 +1955,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     switch (msg) {
     case WM_OSC_ROUTE: {
         const bool clickthrough = w != 0;
+        if (!clickthrough) ClearNotifierRects();
         if (g_route_clickthrough != clickthrough) {
             g_route_clickthrough = clickthrough;
             Log(std::string("[route] input mode -> ") +
@@ -1906,6 +1977,12 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         }
         return 0;
     }
+    case WM_OSC_PICKER_MODE: {
+        if (g_ui_open) return TRUE;
+        HWND insert_after = w ? HWND_NOTOPMOST : HWND_TOPMOST;
+        return SetWindowPos(g_hwnd, insert_after, 0, 0, 0, 0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE) ? TRUE : FALSE;
+    }
     case WM_OSC_VIS: {
         // ★ [P1#1 Copilot] UI thread เป็นเจ้าของ g_ui_open ผู้เดียว — HTTP/หน้า/ผู้ตาย
         //   ส่ง "intent" มาเท่านั้น: w=0 close · w=1 open · w=2 toggle
@@ -1919,6 +1996,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM w, LPARAM l) {
             return 0;
         }
         g_ui_open = ns;
+        g_ui_open_snapshot.store(ns);
         if (ns) {
             if (!was) {
                 KillTimer(g_hwnd, 3);
@@ -2511,6 +2589,19 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int) {
     CefRefPtr<OscApp> app = new OscApp();
     if (CefExecuteProcess(args, app.get(), nullptr) >= 0) return 0;
 
+    // CEF renderer/GPU/utility processes return above; only the main overlay
+    // process owns this mutex, shared by every staged copy of NVIDIA OSC.exe.
+    HANDLE instance_mutex = CreateMutexW(
+        nullptr, TRUE, L"Local\\NVIDIA.ShadowPlay.OSC");
+    if (!instance_mutex) {
+        Log("[instance] mutex creation failed: " + std::to_string(GetLastError()));
+        return 1;
+    }
+    if (GetLastError() == ERROR_ALREADY_EXISTS) {
+        CloseHandle(instance_mutex);
+        return 0;
+    }
+
     LoadConfig();
     LogInit();
     AddVectoredExceptionHandler(1, CrashVecHandler);
@@ -2585,6 +2676,13 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int) {
     if (!CefInitialize(args, settings, app.get(), nullptr)) return 1;
     Log("[main] initialized — MTML + own pump");
 
+    HANDLE hook_thread = CreateThread(nullptr, 0, HookThreadProc, nullptr, 0, nullptr);
+    if (!hook_thread) {
+        Log("[ui] ERROR: could not start low-level mouse hook thread err=" + std::to_string(GetLastError()));
+        CefShutdown();
+        return 1;
+    }
+    CloseHandle(hook_thread);
     CreateThread(nullptr, 0, ServerThread, nullptr, 0, nullptr);
     CreateThread(nullptr, 0, ToggleListener, nullptr, 0, nullptr);
 

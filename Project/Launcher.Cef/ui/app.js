@@ -20,17 +20,46 @@
     return new Promise(function (resolve, reject) {
       if (!bridgeUp) { reject(new Error('no bridge')); return; }
       var req = { command: command };
+      var settled = false;
+      var queryId = null;
+      // OPEN OVERLAY may legitimately wait for NvContainer-owned services to
+      // start (two bounded 15s readiness windows); all other RPCs should be
+      // quick and must not leave controls waiting forever.
+      var timeoutMs = command === 'LAUNCHER_OPEN_OVERLAY' ? 35000 : 8000;
+      var timer = setTimeout(function () {
+        if (settled) return;
+        settled = true;
+        if (queryId !== null && typeof window.cefQueryCancel === 'function') {
+          try { window.cefQueryCancel(queryId); } catch (e) {}
+        }
+        reject(new Error(command + ' timed out after ' + timeoutMs + 'ms'));
+      }, timeoutMs);
+
       if (extra) {
         for (var k in extra) { if (extra.hasOwnProperty(k)) req[k] = extra[k]; }
       }
-      window.cefQuery({
-        request: JSON.stringify(req),
-        persistent: false,
-        onSuccess: function (response) {
-          try { resolve(JSON.parse(response)); } catch (e) { resolve(response); }
-        },
-        onFailure: function (code, msg) { reject(new Error(code + ': ' + msg)); }
-      });
+      try {
+        queryId = window.cefQuery({
+          request: JSON.stringify(req),
+          persistent: false,
+          onSuccess: function (response) {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            try { resolve(JSON.parse(response)); } catch (e) { resolve(response); }
+          },
+          onFailure: function (code, msg) {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            reject(new Error(code + ': ' + msg));
+          }
+        });
+      } catch (error) {
+        settled = true;
+        clearTimeout(timer);
+        reject(error);
+      }
     });
   }
   if (bridgeTag) {

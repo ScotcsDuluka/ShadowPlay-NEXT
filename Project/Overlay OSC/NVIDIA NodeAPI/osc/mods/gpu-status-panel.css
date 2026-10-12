@@ -1,0 +1,76 @@
+#nv-gpu-settings {
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, .12);
+  color: #fff;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+#nv-gpu-settings .nv-gpu-heading {
+  margin-bottom: 14px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+#nv-gpu-settings .nv-gpu-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 520px;
+  min-height: 34px;
+  color: #fff;
+  font-size: 14px;
+}
+
+#nv-gpu-settings .nv-gpu-toggle input {
+  width: 34px;
+  height: 18px;
+  accent-color: #76b900;
+}
+
+#nv-gpu-settings .nv-gpu-description,
+#nv-gpu-settings .nv-gpu-empty {
+  margin: 8px 0 16px;
+  color: rgba(255, 255, 255, .72);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+#nv-gpu-settings .nv-gpu-section-title {
+  margin: 14px 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+#nv-gpu-settings .nv-gpu-game-row,
+#nv-gpu-settings .nv-gpu-adapter-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) auto;
+  gap: 4px 16px;
+  max-width: 760px;
+  padding: 9px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+  font-size: 13px;
+}
+
+#nv-gpu-settings .nv-gpu-state {
+  color: #b8b8b8;
+  text-align: right;
+}
+
+#nv-gpu-settings .nv-gpu-state-verified,
+#nv-gpu-settings .nv-gpu-state-multipleadapters {
+  color: #76b900;
+}
+
+#nv-gpu-settings .nv-gpu-state-unknown {
+  color: #ffca68;
+}
+
+#nv-gpu-settings .nv-gpu-detail,
+#nv-gpu-settings .nv-gpu-preference,
+#nv-gpu-settings .nv-gpu-adapter-row span {
+  grid-column: 1 / -1;
+  color: rgba(255, 255, 255, .76);
+  overflow-wrap: anywhere;
+}

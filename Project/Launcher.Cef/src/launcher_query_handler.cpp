@@ -8,6 +8,7 @@
 
 #include "include/cef_browser.h"
 #include "include/cef_frame.h"
+#include "include/cef_task.h"
 
 #include "launcher_json.h"
 #include "launcher_supervisor.h"
@@ -15,6 +16,22 @@
 #include "launcher_win.h"
 
 namespace {
+
+volatile LONG g_exit_all_started = 0;
+
+// EXIT ALL runs the process shutdown in a worker and posts the final window
+// close back to CEF's UI thread after the owned processes have been handled.
+class QueryHandlerUiTask : public CefTask {
+ public:
+  explicit QueryHandlerUiTask(void (*callback)()) : callback_(callback) {}
+  void Execute() override {
+    if (callback_) callback_();
+  }
+
+ private:
+  void (*callback_)();
+  IMPLEMENT_REFCOUNTING(QueryHandlerUiTask);
+};
 
 void RespondOk(CefRefPtr<CefMessageRouterBrowserSide::Callback> callback,
                const std::string& response) {
@@ -62,8 +79,14 @@ bool LauncherQueryHandler::OnQuery(CefRefPtr<CefBrowser> browser,
   }
 
   if (cmd == "LAUNCHER_GET_STATE") {
-    RespondOk(callback, supervisor_ ? supervisor_->Snapshot().ToJson()
-                                    : std::string("{}"));
+    // Snapshot performs process and loopback-port probes. Keep that work off
+    // the CEF UI thread so a slow Windows process/socket query cannot stall
+    // painting or input.
+    LauncherSupervisor* supervisor = supervisor_;
+    std::thread([supervisor, callback]() {
+      RespondOk(callback, supervisor ? supervisor->Snapshot().ToJson()
+                                     : std::string("{}"));
+    }).detach();
     return true;
   }
 
@@ -73,12 +96,14 @@ bool LauncherQueryHandler::OnQuery(CefRefPtr<CefBrowser> browser,
     const bool value = launcherjson::GetBool(req, "value");
     const bool ok = launcherutil::WriteConfigBool(
         L"Overlay", L"UseOverlayEnabled", value);
-    if (ok && supervisor_ &&
+    LauncherSupervisor* supervisor = supervisor_;
+    if (ok && supervisor &&
         launcherutil::ReadConfigBool(L"Overlay", L"EngineOverlayMode", false)) {
       if (value) {
-        supervisor_->StartEngineOverlayChainAsync();
+        supervisor->StartEngineOverlayChainAsync();
       } else {
-        supervisor_->StopCefOverlay();
+        // A hung OSC HTTP handler must not block the CEF message loop.
+        std::thread([supervisor]() { supervisor->StopCefOverlay(); }).detach();
       }
     }
     RespondOk(callback, ok ? "{\"ok\":true}" : "{\"ok\":false}");
@@ -93,14 +118,16 @@ bool LauncherQueryHandler::OnQuery(CefRefPtr<CefBrowser> browser,
     const bool value = launcherjson::GetBool(req, "value");
     const bool ok = launcherutil::WriteConfigBool(
         L"Overlay", L"EngineOverlayMode", value);
-    if (ok && supervisor_) {
+    LauncherSupervisor* supervisor = supervisor_;
+    if (ok && supervisor) {
       if (value &&
           launcherutil::ReadConfigBool(L"Overlay", L"UseOverlayEnabled", false)) {
         // Power is already on: prepare the newly selected engine without
         // showing the overlay. Power-off mode selection starts no services.
-        supervisor_->StartEngineOverlayChainAsync();
+        supervisor->StartEngineOverlayChainAsync();
       } else if (!value) {
-        supervisor_->StopCefOverlay();
+        // Keep a blocked OSC /hide handler from freezing the UI thread.
+        std::thread([supervisor]() { supervisor->StopCefOverlay(); }).detach();
       }
     }
     RespondOk(callback, ok ? "{\"ok\":true}" : "{\"ok\":false}");
@@ -147,11 +174,30 @@ bool LauncherQueryHandler::OnQuery(CefRefPtr<CefBrowser> browser,
   }
 
   if (cmd == "LAUNCHER_EXIT_ALL") {
-    // Installer-mode exit: reset the overlay switch, kill the family,
-    // then close the launcher.
+    // The browser can still receive input while cleanup runs; only start one
+    // shutdown worker so repeated clicks cannot race multiple kill passes.
+    if (InterlockedCompareExchange(&g_exit_all_started, 1, 0) != 0) {
+      RespondOk(callback, "{\"ok\":true}");
+      return true;
+    }
+    // Installer-mode exit: do process/file I/O away from the CEF UI thread,
+    // then post the close back to CEF after cleanup has actually finished.
+    LauncherSupervisor* supervisor = supervisor_;
+    void (*close_callback)() = request_close_cb_;
     RespondOk(callback, "{\"ok\":true}");
-    if (supervisor_) supervisor_->InstallerExit();
-    if (request_close_cb_) request_close_cb_();
+    if (supervisor) {
+      std::thread([supervisor, close_callback]() {
+        // Stop the poll/watch thread first so it cannot respawn NvContainer
+        // while InstallerExit is shutting down the owned process family.
+        supervisor->Stop();
+        supervisor->InstallerExit();
+        if (close_callback) {
+          CefPostTask(TID_UI, new QueryHandlerUiTask(close_callback));
+        }
+      }).detach();
+    } else if (close_callback) {
+      close_callback();
+    }
     return true;
   }
 

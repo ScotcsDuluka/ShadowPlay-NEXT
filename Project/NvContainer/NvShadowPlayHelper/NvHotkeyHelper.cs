@@ -11,6 +11,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -39,7 +40,7 @@ static class NvShadowPlayHelper
     static readonly string BuildRoot = FindBuildRoot();
     static readonly string ConfigPath = Path.Combine(BuildRoot, "NvConfig", "nvsphelper.json");
     static readonly string SettingsPath = Path.Combine(BuildRoot, "Overlay OSC", "NVIDIA NodeAPI", "shadowplay-settings.json");
-    static string _fireUrl = "http://127.0.0.1:59011/?hk={name}";
+    static string _fireUrl = "http://127.0.0.1:59012/v1/hotkey/{name}";
     static string _logFile = Path.Combine(BuildRoot, "NvContainer", "Logs", "nvsphelper.log");
 
     static string FindBuildRoot()
@@ -91,7 +92,9 @@ static class NvShadowPlayHelper
     static int _nextId = 1;
     // RegisterHotKey(NULL,…) ผูกกับเธรดที่เรียก — re-register ต้องเกิดบนเธรดหลักเท่านั้น
     // (watcher แค่ปักธง หลักวนมาเห็นแล้วค่อยทำ — ไม่งั้นถอดของเดิมไม่ได้ = 1409 ค้าง)
-    static volatile bool _reregister;
+    static long _settingsChangedAt = -1;
+    static string _registeredHotkeySignature = "";
+    const long SETTINGS_CHANGE_DEBOUNCE_MS = 250;
     // ★ retry: คีย์ที่ลงทะเบียนไม่ได้ตอนบูต (มีคนถือชั่วคราว เช่น grip ตอนปิดสายแท้)
     //   ลองซ้ำทุก 10 วิ จนได้ — ได้เมื่อไหร่ Alt+X กลับมาเอง
     static readonly Dictionary<string, Tuple<uint, uint>> FailedKeys = new Dictionary<string, Tuple<uint, uint>>();
@@ -152,8 +155,18 @@ static class NvShadowPlayHelper
                 }
             }
         }
-        catch { /* ยังไม่มีไฟล์ = ใช้ default */ }
+        catch (Exception ex)
+        {
+            if (ex is not FileNotFoundException && ex is not DirectoryNotFoundException)
+                Log("[settings] read failed; using defaults: " + ex.Message);
+        }
         return all;
+    }
+
+    static string HotkeySignature(Dictionary<string, int[]> keys)
+    {
+        return string.Join(";", keys.OrderBy(kv => kv.Key, StringComparer.Ordinal)
+            .Select(kv => kv.Key + "=" + string.Join(",", kv.Value)));
     }
 
     static void RegisterAll()
@@ -167,6 +180,7 @@ static class NvShadowPlayHelper
         Registered.Clear();
 
         var all = LoadAllKeys();
+        var signature = HotkeySignature(all);
         // ★ [P2#5 Copilot] reconcile: คีย์ที่ผู้ใช้ลบ/แก้ — ถอดออกจากตาราง retry ทั้งหมด
         var live = new System.Collections.Generic.HashSet<string>(all.Keys);
         var deadF = new System.Collections.Generic.List<string>();
@@ -225,6 +239,7 @@ static class NvShadowPlayHelper
                 }
             }
         }
+        _registeredHotkeySignature = signature;
         Log("[hk] รวมลงทะเบียน " + Registered.Count + " ตัว");
     }
 
@@ -237,18 +252,34 @@ static class NvShadowPlayHelper
         GC.KeepAlive(single);
 
         LoadConfig();
-        RegisterAll();
         if (timeBeginPeriod(1) != 0)
             Log("[hotkey] warning: could not set 1ms timer resolution");
 
-        // ตามไฟล์ settings — ผู้ใช้แก้คีย์ใน OSC = มีผลทันที
+        // Watch the settings file before registering so an update during startup
+        // cannot be missed. Saves are atomic, so listen for replacement as well.
         var watcher = new FileSystemWatcher(Path.GetDirectoryName(SettingsPath), Path.GetFileName(SettingsPath))
         {
-            NotifyFilter = NotifyFilters.LastWrite,
-            EnableRaisingEvents = true
+            NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size |
+                NotifyFilters.FileName | NotifyFilters.CreationTime,
+            EnableRaisingEvents = false
         };
-        // ปักธงเท่านั้น — re-register ให้เธรดหลักทำ (hotkey ผูกเธรด)
-        watcher.Changed += delegate { _reregister = true; };
+        FileSystemEventHandler settingsChanged = delegate
+        {
+            Interlocked.Exchange(ref _settingsChangedAt, Environment.TickCount64);
+        };
+        watcher.Changed += settingsChanged;
+        watcher.Created += settingsChanged;
+        watcher.Renamed += delegate
+        {
+            Interlocked.Exchange(ref _settingsChangedAt, Environment.TickCount64);
+        };
+        watcher.Error += delegate(object sender, ErrorEventArgs e)
+        {
+            Log("[settings] watcher error: " + e.GetException().Message);
+            Interlocked.Exchange(ref _settingsChangedAt, Environment.TickCount64);
+        };
+        watcher.EnableRaisingEvents = true;
+        RegisterAll();
 
         var m = new MSG();
         while (true)
@@ -321,11 +352,17 @@ static class NvShadowPlayHelper
                     }
                 }
             }
-            if (_reregister)
+            long settingsChangedAt = Interlocked.Read(ref _settingsChangedAt);
+            if (settingsChangedAt >= 0 &&
+                Environment.TickCount64 - settingsChangedAt >= SETTINGS_CHANGE_DEBOUNCE_MS &&
+                Interlocked.CompareExchange(ref _settingsChangedAt, -1, settingsChangedAt) == settingsChangedAt)
             {
-                _reregister = false;
-                Log("[hk] settings เปลี่ยน — re-register (เธรดหลัก)");
-                RegisterAll();
+                var signature = HotkeySignature(LoadAllKeys());
+                if (!string.Equals(signature, _registeredHotkeySignature, StringComparison.Ordinal))
+                {
+                    Log("[hk] hotkey settings changed — re-register immediately");
+                    RegisterAll();
+                }
             }
             Thread.Sleep(1);
         }

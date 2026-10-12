@@ -30,15 +30,28 @@
   font: 50px/67px nvgcshare, sans-serif;
 }
 
-#nv-video-capture-options .nv-video-engine-row {
+.nv-video-engine-row {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-#nv-video-capture-options .nv-video-engine-engine-controls {
+.resolution-fps.layout-row.nv-video-engine-fields-row {
   align-items: flex-start;
-  margin: 3px 0 0 67px;
+  gap: 0;
+  flex-wrap: wrap;
+}
+
+.resolution-fps.layout-row.nv-video-engine-fields-row > .nv-video-engine-field {
+  box-sizing: border-box;
+  flex: 1 1 22%;
+  min-width: 190px;
+  max-width: none;
+  margin: 10px 6px;
+}
+
+.nv-video-engine-field .customize-header-text {
+  min-height: 18px;
 }
 
 #nv-video-capture-options .nv-video-engine-modes {
@@ -69,7 +82,7 @@
   cursor: default;
 }
 
-#nv-video-capture-options .nv-video-engine-field {
+.nv-video-engine-field {
   position: relative;
   display: flex;
   flex: 1 1 0;
@@ -80,86 +93,94 @@
   font: 10px "Segoe UI Semibold", "Segoe UI", sans-serif;
 }
 
-#nv-video-capture-options .nv-video-engine-engine-controls > .nv-video-engine-field {
-  min-width: 240px;
-}
-
-#nv-video-capture-options .nv-video-engine-engine-controls > .nv-video-engine-field > span {
-  position: absolute;
-  top: -22px;
-}
-
-#nv-video-capture-options .nv-video-engine-select {
-  box-sizing: border-box;
+.nv-video-engine-select {
   width: 100%;
-  height: 34px;
-  padding: 0 7px;
-  border: 0;
-  border-radius: 0;
-  background: #212326;
-  color: #fff;
-  font: 14px "Segoe UI", sans-serif;
 }
 
 #nv-video-capture-options .nv-video-engine-advanced {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr);
   align-items: stretch;
-  gap: 6px;
+  gap: 18px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+#nv-video-capture-options .nv-video-engine-preview-panel {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  padding: 10px 12px;
+  box-sizing: border-box;
+  background: #212326;
 }
 
 #nv-video-capture-options .nv-video-engine-preview {
   display: flex;
-  min-height: 80px;
+  min-height: 0;
+  min-width: 0;
   flex: 1 1 auto;
   flex-direction: column;
-  gap: 6px;
-  padding: 6px;
-  background: #212326;
+  gap: 8px;
+  box-sizing: border-box;
 }
 
 #nv-video-capture-options .nv-video-engine-preview-title {
   color: #fff;
-  font: 10px "Segoe UI Semibold", "Segoe UI", sans-serif;
+  font: 12px "Segoe UI Semibold", "Segoe UI", sans-serif;
 }
 
 #nv-video-capture-options .nv-video-engine-preview-value {
+  min-width: 0;
   color: #fff;
-  font: 8px "Segoe UI", sans-serif;
+  font: 11px/1.45 "Segoe UI", sans-serif;
+  white-space: normal;
   overflow-wrap: anywhere;
 }
 
 #nv-video-capture-options .nv-video-engine-actions {
   display: flex;
-  flex: 0 0 78px;
-  flex-direction: column;
-  gap: 4px;
+  flex-direction: row;
+  gap: 8px;
+  min-width: 0;
+  margin-top: auto;
+  padding-top: 8px;
 }
 
 #nv-video-capture-options .nv-video-engine-action {
-  min-height: 37px;
-  border: 1px solid #fff;
-  border-radius: 0;
-  background: #212326;
-  color: #fff;
-  font: 10px "Segoe UI", sans-serif;
-  cursor: pointer;
-}
-
-#nv-video-capture-options .nv-video-engine-action:hover,
-#nv-video-capture-options .nv-video-engine-action:focus {
-  border: 2px solid #76b900;
+  box-sizing: border-box;
+  min-width: 96px;
+  flex: 0 1 128px;
+  width: auto;
+  min-height: 34px;
+  margin: 0;
+  padding: 0 12px;
+  text-transform: none;
 }
 
 #nv-video-capture-options .nv-video-engine-advanced-fields {
   display: flex;
-  flex: 0 0 223px;
+  min-width: 0;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
+  padding-top: 2px;
+}
+
+#nv-video-capture-options .nv-video-engine-advanced-fields .nv-video-engine-field {
+  width: 100%;
+  min-width: 0;
+  flex: 0 0 auto;
+  margin: 0;
 }
 
 #nv-video-capture-options .nv-video-engine-footer {
+  display: flex;
+  align-items: center;
+  gap: 24px;
   min-height: 42px;
-  margin: 14px 0 0 67px;
+  margin: 18px 0 0;
 }
 
 #nv-video-capture-options .nv-video-engine-cursor-label {
@@ -185,9 +206,13 @@
 }
 
 #nv-video-capture-options .nv-video-engine-status {
+  max-width: none;
+  min-width: 0;
   margin-left: auto;
   color: #919191;
   font: 10px "Segoe UI", sans-serif;
+  text-align: right;
+  overflow-wrap: anywhere;
 }
 
 #nv-video-capture-options .nv-video-engine-error {
@@ -200,34 +225,37 @@
     padding-left: 12px;
   }
 
-  #nv-video-capture-options .nv-video-engine-engine-controls {
-    align-items: stretch;
-    flex-direction: column;
+  .resolution-fps.layout-row.nv-video-engine-fields-row {
+    gap: 0;
   }
 
-  #nv-video-capture-options .nv-video-engine-modes {
-    flex: 0 1 auto;
-    flex-wrap: wrap;
-  }
-
-  #nv-video-capture-options .nv-video-engine-engine-controls > .nv-video-engine-field {
-    width: 100%;
-  }
-
-  #nv-video-capture-options .nv-video-engine-engine-controls > .nv-video-engine-field > span {
-    position: static;
+  .resolution-fps.layout-row.nv-video-engine-fields-row > .nv-video-engine-field {
+    flex-basis: calc(50% - 4px);
+    min-width: 150px;
+    margin-right: 6px;
+    margin-left: 6px;
   }
 
   #nv-video-capture-options .nv-video-engine-advanced {
-    flex-direction: column;
-  }
-
-  #nv-video-capture-options .nv-video-engine-advanced-fields {
-    flex: 0 0 auto;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   #nv-video-capture-options .nv-video-engine-actions {
-    flex: 0 0 auto;
     flex-direction: row;
+  }
+
+  #nv-video-capture-options .nv-video-engine-preview {
+    min-height: 96px;
+  }
+
+  #nv-video-capture-options .nv-video-engine-footer {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  #nv-video-capture-options .nv-video-engine-status {
+    margin-left: 0;
+    text-align: left;
   }
 }

@@ -128,6 +128,7 @@ $activeProjects = @(
     @{ Path = 'Overlay OSC\NVIDIA OSC\NVIDIA OSC.vcxproj'; Platform = 'x64' },
     @{ Path = 'Overlay OSC\NVIDIA NodeAPI\NVIDIA Web Helper\NVIDIA Web Helper.vbproj'; Platform = 'x64' },
     @{ Path = 'NvContainer\NvContainer\NvContainer.csproj'; Platform = 'AnyCPU' },
+    @{ Path = 'NvGraphics\NvGraphics.App\NvGraphics.csproj'; Platform = 'AnyCPU' },
     @{ Path = 'NvContainer\NvShadowPlayHelper\nvsphelper.csproj'; Platform = 'AnyCPU' },
     @{ Path = 'Launcher.Cef\Launcher.vcxproj'; Platform = 'x64' },
     @{ Path = 'Launcher.Cef\Launcher Bootstrap.vcxproj'; Platform = 'x64' }
@@ -208,6 +209,15 @@ if (Test-Path -LiteralPath $legacyOverlayConfig) {
 $containerOutput = Join-Path $BuildRoot 'NvContainer'
 Copy-RuntimeFiles (Join-Path $ProjectRoot ("NvContainer\NvContainer\bin\Release\{0}" -f $TargetFramework)) $containerOutput
 Copy-RuntimeFiles (Join-Path $ProjectRoot ("NvContainer\NvShadowPlayHelper\bin\Release\{0}" -f $TargetFramework)) $containerOutput
+$graphicsBuildOutput = Join-Path $Repo 'Build\NVIDIA ShadowPlay\NvGraphics'
+$graphicsOutput = Join-Path $BuildRoot 'NvGraphics'
+if ([IO.Path]::GetFullPath($graphicsBuildOutput) -ne [IO.Path]::GetFullPath($graphicsOutput)) {
+    Copy-RuntimeFiles $graphicsBuildOutput $graphicsOutput
+}
+$containerGraphicsExe = Join-Path $containerOutput 'NvGraphics.exe'
+if (Test-Path -LiteralPath $containerGraphicsExe) {
+    Remove-Item -LiteralPath $containerGraphicsExe -Force
+}
 
 # Launcher host/UI slot; CEF runtime is shared from the OSC slot below.
 $launcherOutput = Join-Path $ProjectRoot 'Launcher.Cef\bin\x64\Release'

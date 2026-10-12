@@ -20,8 +20,8 @@ var NOTIFIER_CONST = {
        เหลือเฉพาะตัวที่ JS ใช้จริง:                                                   */
     AUTOCLOSE_MS: 6000,         /* autoClose 6000 (WinForms) — osc แท้ไม่มี timer (หน้าคุมเอง) คงไว้ตาม WinForms */
     EXIT_MS: 600,               /* รอ slide-out จบก่อนถอน DOM */
-    DANCE_OUT_MS: 600,          /* StartSlide black panel (WinForms T30.3) */
-    DANCE_TURNAROUND_MS: 200,   /* Timer ก่อนสลับ rider และเริ่มกลับ */
+    DANCE_OUT_MS: 300,          /* Faster updater dance, preserving the full exit */
+    DANCE_TURNAROUND_MS: 300,   /* Swap only after the card is fully offstage */
     DANCE_IN_MS: 300,           /* StartSlide black panel กลับเข้า */
     RIDER_FADE_MS: 200,         /* WinForms rider fade: 20 ticks × 10ms */
     STACK_PITCH_PX: 100,        /* StackPitchPx = 100 (card 90 + gap 10) */
@@ -190,6 +190,10 @@ function isToggleGroup(group) {
     return sameToastGroup(group, 'recording') || sameToastGroup(group, 'replay');
 }
 
+function isProtectedToastGroup(group) {
+    return /^gpu-/.test(String(group || '').toLowerCase());
+}
+
 /* ============================================================================
    SECTION 5 — SLOT ROUTER (Loader.vb UpdateNotifier บรรทัด 497-604 ครบทุกกฎ)
    ----------------------------------------------------------------------------
@@ -210,29 +214,73 @@ var notifierRouter = {
     stackEl: null
 };
 
+var lastNativeNotifierRects = null;
+var nativeNotifierRectsPending = false;
+var queuedNativeNotifierRects = null;
+
+function sendNativeNotifierRects(signature, rects) {
+    nativeNotifierRectsPending = true;
+    window.cefQuery({
+        request: JSON.stringify({
+            command: 'QUERY_OSC_SET_NOTIFIER_RECTS',
+            displayRects: rects
+        }),
+        onSuccess: function () {
+            lastNativeNotifierRects = signature;
+            nativeNotifierRectsPending = false;
+            var queued = queuedNativeNotifierRects;
+            queuedNativeNotifierRects = null;
+            if (queued && queued.signature !== lastNativeNotifierRects)
+                sendNativeNotifierRects(queued.signature, queued.rects);
+        },
+        onFailure: function () {
+            lastNativeNotifierRects = null;
+            nativeNotifierRectsPending = false;
+            queuedNativeNotifierRects = null;
+        }
+    });
+}
+
+function syncNativeNotifierRects() {
+    if (typeof window.cefQuery !== 'function') return;
+    var rects = [];
+    if (window.location.hash === '#/base' && notifierRouter.stackEl) {
+        var cards = notifierRouter.stackEl.querySelectorAll('.nv-toast.is-open:not(.is-leaving)');
+        for (var i = 0; i < cards.length; i++) {
+            var rect = cards[i].getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0) {
+                rects.push({
+                    x: rect.left,
+                    y: rect.top,
+                    width: rect.width,
+                    height: rect.height
+                });
+            }
+        }
+    }
+    var signature = JSON.stringify(rects);
+    if (nativeNotifierRectsPending) {
+        queuedNativeNotifierRects = { signature: signature, rects: rects };
+    } else if (signature !== lastNativeNotifierRects) {
+        sendNativeNotifierRects(signature, rects);
+    }
+}
+
+window.addEventListener('hashchange', function () {
+    lastNativeNotifierRects = null;
+    syncNativeNotifierRects();
+});
+
 function notifierEnsureStack() {
     if (notifierRouter.stackEl && document.body.contains(notifierRouter.stackEl)) {
-        notifierApplyPixelScale(notifierRouter.stackEl);
         return notifierRouter.stackEl;
     }
     var stack = document.createElement('div');
     stack.className = 'nv-notifier-stack';
     stack.id = 'nv-notifier-stack';
-    notifierApplyPixelScale(stack);
     document.body.appendChild(stack);
     notifierRouter.stackEl = stack;
     return stack;
-}
-
-function notifierApplyPixelScale(stack) {
-    var deviceScale = window.devicePixelRatio;
-    if (!isFinite(deviceScale) || deviceScale <= 0) return;
-
-    var pixelScale = 1 / deviceScale;
-    var currentScale = parseFloat(stack.style.zoom);
-    if (!isFinite(currentScale) || Math.abs(currentScale - pixelScale) > 0.0001) {
-        stack.style.zoom = String(pixelScale);
-    }
 }
 
 /* SlotIsAlive (แท้ บรรทัด 768-775): unit มีชีวิต = Visible หรือ green_stop visible
@@ -262,10 +310,15 @@ function updateSlotLiveness() {
 
 /* RegisterActiveSlot (แท้ บรรทัด 799-803): ใหม่ = ล่างสุดของ stack
    dance/coalesce ไม่ re-rank */
-function registerActiveSlot(slotIdx) {
+function registerActiveSlot(slotIdx, priority) {
     if (notifierRouter.slotOrder.indexOf(slotIdx) >= 0) return;
-    notifierRouter.slotOrder.push(slotIdx);
+    if (priority) notifierRouter.slotOrder.unshift(slotIdx);
+    else notifierRouter.slotOrder.push(slotIdx);
     notifierRouter.wasAlive[slotIdx] = true;
+}
+
+function stackPitch(unit) {
+    return (unit && unit.height || NOTIFIER_CONST.STACK_PITCH_PX - 10) + 10;
 }
 
 /* AssignUnitY: stack container วางที่ baseY=105px แล้ว; คืน child offset = rank × pitch
@@ -274,7 +327,10 @@ function registerActiveSlot(slotIdx) {
 function assignUnitY(slotIdx) {
     var rank = notifierRouter.slotOrder.indexOf(slotIdx);
     if (rank < 0) rank = notifierRouter.slotOrder.length;
-    var y = rank * NOTIFIER_CONST.STACK_PITCH_PX;
+    var y = 0;
+    for (var i = 0; i < rank; i++) {
+        y += stackPitch(notifierRouter.slots[notifierRouter.slotOrder[i]]);
+    }
     console.log('[Stack] slot ' + slotIdx + ' assigned stack offset Y=' + y +
                 ' (rank ' + notifierRouter.slotOrder.length + ')');
     return y;
@@ -288,7 +344,10 @@ function compactStack() {
         var slotIdx = notifierRouter.slotOrder[rank];
         var unit = notifierRouter.slots[slotIdx];
         if (!unit) continue;
-        var target = rank * NOTIFIER_CONST.STACK_PITCH_PX;
+        var target = 0;
+        for (var i = 0; i < rank; i++) {
+            target += stackPitch(notifierRouter.slots[notifierRouter.slotOrder[i]]);
+        }
         if (unit.inTransition) continue;
         if (unit.top !== target) {
             unit.top = target;
@@ -307,13 +366,16 @@ function createUnit(slotIdx, entry, message, topY, group) {
     var el = document.createElement('div');
     el.className = 'nv-toast';
     if (entry.positive) el.className += ' is-positive';
+    if (entry.width) el.className += ' is-gpu';
+    if (entry.size) el.className += ' ' + entry.size;   /* NvGraphics: ขนาดพิเศษ (is-gpu-large) */
+    if (entry.width) el.style.setProperty('--gpu-w', entry.width + 'px');
     el.style.top = topY + 'px';          /* ตำแหน่ง stack — glide ด้วย transition top */
 
     /* โครงตาม template-009 แท้:
        notifier-green (ชั้นหลัง) + notifier-black (ชั้นหน้า border-left เขียวในตัว)
        ข้างในดำ = .notifier (content) → icon + text-container(text + subtext)      */
     var green = document.createElement('div');
-    green.className = 'nv-toast__green';
+    green.className = 'nv-toast__green md-shadow-bottom-z-2';
 
     var black = document.createElement('div');
     black.className = 'nv-toast__black';
@@ -348,6 +410,15 @@ function createUnit(slotIdx, entry, message, topY, group) {
     content.appendChild(icon);
     content.appendChild(iconImage);
     content.appendChild(textContainer);
+    var actionButton = document.createElement('button');
+    actionButton.className = 'nv-toast__action';
+    actionButton.type = 'button';
+    actionButton.addEventListener('click', function (event) {
+        event.stopPropagation();
+        if (unit && unit.action && typeof unit.action.run === 'function')
+            unit.action.run();
+    });
+    content.appendChild(actionButton);
     black.appendChild(content);
     el.appendChild(green);
     el.appendChild(black);
@@ -362,6 +433,7 @@ function createUnit(slotIdx, entry, message, topY, group) {
         slot: slotIdx,
         el: el,
         group: group || '',
+        height: entry.size === 'is-large' ? 124 : entry.size === 'is-tall' ? 150 : 90,
         steady: false,          /* = การ์ดจอด + เนื้อหาโผล่แล้ว (สายตา OWNER) */
         inTransition: false,    /* = _inTransition (exit กำลังวิ่ง) */
         dancing: false,         /* = _isDancing (dance กำลังวิ่ง) */
@@ -373,8 +445,18 @@ function createUnit(slotIdx, entry, message, topY, group) {
         textEl: text,
         subtextEl: subtext,
         iconEl: icon,
-        iconImageEl: iconImage
+        iconImageEl: iconImage,
+        actionEl: actionButton,
+        action: null,
+        onClosed: null
     };
+    iconImage.addEventListener('error', function () {
+        if (!unit.fallbackIcon) return;
+        iconImage.removeAttribute('src');
+        iconImage.style.display = 'none';
+        icon.textContent = unit.fallbackIcon;
+        icon.style.display = '';
+    });
     notifierRouter.slots[slotIdx] = unit;
     paintUnit(unit, message, entry);
     return unit;
@@ -383,18 +465,39 @@ function createUnit(slotIdx, entry, message, topY, group) {
 /* paintSub ของแท้ (OscNotifierController d()): icon class + message + subtext */
 function paintUnit(unit, message, entry, subtextMessage) {
     subtextMessage = subtextMessage || (entry && entry.subtext);
+    if (entry && typeof entry.onClosed === 'function') unit.onClosed = entry.onClosed;
+    unit.el.classList.remove('is-large', 'is-tall', 'is-gpu');
+    if (entry && entry.size) unit.el.classList.add(entry.size);
+    if (entry && Number.isFinite(entry.width) && entry.width >= 380) {
+        unit.el.classList.add('is-gpu');
+        unit.el.style.setProperty('--gpu-w', entry.width + 'px');
+    } else {
+        unit.el.style.removeProperty('--gpu-w');
+    }
+    unit.height = entry && entry.size === 'is-large' ? 124 :
+        entry && entry.size === 'is-tall' ? 150 : 90;
     var iconClass = entry && entry.iconClass ? ' ' + entry.iconClass : '';
     unit.iconEl.className = 'nv-toast__icon share-icon' + iconClass +
         (entry && entry.positive ? ' is-highlighted' : '');
-    unit.iconEl.textContent = (entry && entry.icon) || '';
+    unit.fallbackIcon = entry && entry.fallbackIcon || '';
     if (entry && entry.iconPath) {
+        unit.iconEl.textContent = '';
         unit.iconImageEl.src = entry.iconPath;
         unit.iconImageEl.style.display = '';
         unit.iconEl.style.display = 'none';
     } else {
         unit.iconImageEl.removeAttribute('src');
         unit.iconImageEl.style.display = 'none';
+        unit.iconEl.textContent = unit.fallbackIcon || (entry && entry.icon) || '';
         unit.iconEl.style.display = '';
+    }
+    unit.action = entry && entry.action ? entry.action : null;
+    if (unit.action && unit.action.label) {
+        unit.actionEl.textContent = unit.action.label;
+        unit.actionEl.style.display = 'inline-flex';
+    } else {
+        unit.actionEl.textContent = '';
+        unit.actionEl.style.display = 'none';
     }
     unit.textEl.textContent = message;
     if (subtextMessage) {
@@ -415,8 +518,16 @@ function destroyUnit(slotIdx) {
     var el = unit.el;
     setTimeout(function () {
         if (el && el.parentNode) el.parentNode.removeChild(el);
+        notifyUnitClosed(unit);
     }, NOTIFIER_CONST.EXIT_MS);
     notifierRouter.slots[slotIdx] = undefined;   /* UpdateSlotLiveness เก็บงานที่เหลือ */
+}
+
+function notifyUnitClosed(unit) {
+    if (typeof unit.onClosed !== 'function') return;
+    var onClosed = unit.onClosed;
+    unit.onClosed = null;
+    onClosed();
 }
 
 /* ============================================================================
@@ -456,6 +567,7 @@ function slideOutAll(unit) {
     var onAllOut = function (event) {
         if (event.propertyName !== 'right' || event.target !== greenEl) return;
         greenEl.removeEventListener('transitionend', onAllOut);
+        notifyUnitClosed(unit);
         destroyUnit(unit.slot);
     };
     greenEl.addEventListener('transitionend', onAllOut);
@@ -513,15 +625,17 @@ function danceToast(unit, message, entry, group) {
         unit.revealTimer = null;
     }
 
-    /* WinForms StartSlide: black.Left 0 → Width + 300; green stays parked. */
+    var offstageRight = -(unit.el.getBoundingClientRect().width + 30);
+
+    /* WinForms StartSlide: black panel fully exits before its rider is replaced. */
     black.style.transition = 'right ' + NOTIFIER_CONST.DANCE_OUT_MS + 'ms cubic-bezier(0.215, 0.61, 0.355, 1)';
-    black.style.right = '-600px';
+    black.style.right = offstageRight + 'px';
     if (content) { content.style.transition = 'none'; content.style.opacity = '0'; }
 
     setTimeout(function () {
-        /* StartSlide replaces this panel's animation and sets panel.Left=Width. */
+        /* Keep the card fully offstage while swapping text/icon, then slide it back. */
         black.style.transition = 'none';
-        black.style.right = '-300px';
+        black.style.right = offstageRight + 'px';
         void black.offsetWidth;
         var pending = unit.pendingDanceUpdate || { message: message, entry: entry };
         unit.pendingDanceUpdate = null;
@@ -563,6 +677,44 @@ function danceToast(unit, message, entry, group) {
 function updateNotifier(message, entry, group) {
     updateSlotLiveness();                    /* reconcile ก่อนตัดสินใจ (แท้บรรทัด 508) */
     var slotCount = configuredSlotCount();   /* อ่านใหม่ทุก toast (แท้บรรทัด 510) */
+
+    if (entry.priority) {
+        if (entry.updaterUi) {
+            for (var updateSlot = 1; updateSlot <= slotCount; updateSlot++) {
+                var updateUnit = notifierRouter.slots[updateSlot];
+                if (!updateUnit || !sameToastGroup(updateUnit.group, group)) continue;
+                if (!updateUnit.inTransition || updateUnit.dancing) {
+                    danceToast(updateUnit, message, entry, group);
+                    return;
+                }
+            }
+        }
+        for (var freeSlot = 1; freeSlot <= slotCount; freeSlot++) {
+            if (!notifierRouter.slots[freeSlot]) {
+                registerActiveSlot(freeSlot, true);
+                var priorityUnit = createUnit(
+                    freeSlot, entry, message, assignUnitY(freeSlot), group);
+                choreographEntrance(priorityUnit);
+                return;
+            }
+        }
+        for (var replaceSlot = 1; replaceSlot <= slotCount; replaceSlot++) {
+            var replaceUnit = notifierRouter.slots[replaceSlot];
+            if (replaceUnit && replaceUnit.steady && !replaceUnit.inTransition &&
+                !isProtectedToastGroup(replaceUnit.group)) {
+                var orderIndex = notifierRouter.slotOrder.indexOf(replaceSlot);
+                if (orderIndex > 0) {
+                    notifierRouter.slotOrder.splice(orderIndex, 1);
+                    notifierRouter.slotOrder.unshift(replaceSlot);
+                }
+                compactStack();
+                danceToast(replaceUnit, message, entry, group);
+                return;
+            }
+        }
+        console.log('[Stack] no free or replaceable slot for priority toast: ' + group);
+        return;
+    }
 
     /* ---- กฎ 1: group live บน side slot + steady → dance ใน slot นั้น ---- */
     if (slotCount >= 2 && notifierRouter.slots[2] && notifierRouter.slots[2].steady &&
@@ -650,17 +802,20 @@ function displaceFirstNormalSlot(message, entry, group) {
     var slotCount = configuredSlotCount();
     var main = notifierRouter.slots[1];
 
-    if (main && main.steady && !main.inTransition && !isToggleGroup(main.group)) {
+    if (main && main.steady && !main.inTransition && !isToggleGroup(main.group) &&
+        !isProtectedToastGroup(main.group)) {
         danceToast(main, message, entry, group);
         return;
     }
     if (slotCount >= 2 && notifierRouter.slots[2] && notifierRouter.slots[2].steady &&
-        !notifierRouter.slots[2].inTransition && !isToggleGroup(notifierRouter.slots[2].group)) {
+        !notifierRouter.slots[2].inTransition && !isToggleGroup(notifierRouter.slots[2].group) &&
+        !isProtectedToastGroup(notifierRouter.slots[2].group)) {
         danceToast(notifierRouter.slots[2], message, entry, group);
         return;
     }
     if (slotCount >= 3 && notifierRouter.slots[3] && notifierRouter.slots[3].steady &&
-        !notifierRouter.slots[3].inTransition && !isToggleGroup(notifierRouter.slots[3].group)) {
+        !notifierRouter.slots[3].inTransition && !isToggleGroup(notifierRouter.slots[3].group) &&
+        !isProtectedToastGroup(notifierRouter.slots[3].group)) {
         danceToast(notifierRouter.slots[3], message, entry, group);
         return;
     }
@@ -668,6 +823,10 @@ function displaceFirstNormalSlot(message, entry, group) {
     if (main && main.inTransition && !main.dancing) {
         console.log('[Stack] no normal slot + main closing — dropped (no queue): ' + group);
         return;   /* ของแท้ drop จริง (no queue — OWNER rule) */
+    }
+    if (main && isProtectedToastGroup(main.group)) {
+        console.log('[Stack] protected GPU toast retained; dropped incoming toast: ' + group);
+        return;
     }
     console.log('[Stack] all slots toggle — displaced onto main: ' + group);
     danceToast(main, message, entry, group);
@@ -752,7 +911,14 @@ var Notifier = {
             iconClass: opts.iconClass || '',
             iconPath: opts.iconPath || '',
             subtext: opts.subtext || '',
-            positive: !!opts.positive
+            width: Number.isFinite(opts.width) && opts.width >= 380 ? opts.width : 0,
+            positive: !!opts.positive,
+            action: opts.action || null,
+            size: opts.size || '',
+            priority: !!opts.priority,
+            updaterUi: !!opts.updaterUi,
+            fallbackIcon: opts.fallbackIcon || '',
+            onClosed: typeof opts.onClosed === 'function' ? opts.onClosed : null
         },
                               opts.group || ('raw:' + message));
     },
@@ -775,11 +941,9 @@ var Notifier = {
         if (Notifier._heartbeat) return;
         Notifier._heartbeat = setInterval(function () {
             try {
-                if (notifierRouter.stackEl && document.body.contains(notifierRouter.stackEl)) {
-                    notifierApplyPixelScale(notifierRouter.stackEl);
-                }
                 updateSlotLiveness();
                 compactStack();
+                syncNativeNotifierRects();
             } catch (err) {
                 console.log('[Stack] heartbeat error: ' + err.message);  /* แท้: ห้ามให้ heartbeat ฆ่าแอป */
             }

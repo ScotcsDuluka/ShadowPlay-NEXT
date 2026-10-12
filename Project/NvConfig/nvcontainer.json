@@ -1,13 +1,20 @@
 {
   "$comment": "ตัวแม่ NvContainer.exe — ศูนย์กลาง config ของ Duluka System ทั้งหมด",
   "mode": "ours",
-  "$mode_note": "ours = ดูแล Project NodeAPI ใน Overlay OSC\\NVIDIA NodeAPI :59011 + NVIDIA OSC.exe + nvsphelper.exe | NvCapture.exe ยังไม่ spawn | genuine = NVIDIA Share.exe แท้",
+  "$mode_note": "ours = NvContainer ดูแล NvGraphics.exe, NodeAPI ใน Overlay OSC\\NVIDIA NodeAPI :59011, NVIDIA OSC.exe และ nvsphelper.exe | NvCapture.exe ยังไม่ spawn | genuine = NVIDIA Share.exe แท้",
+  "controlApiPort": 59012,
+  "testMode": {
+    "enabled": true,
+    "$note": "NvContainer simulates supported capture and game-filter actions for UI testing; no capture/filter operation is started."
+  },
   "buildRoot": ".",
   "children": {
     "webHelperExe": "Overlay OSC\\NVIDIA NodeAPI\\NVIDIA Web Helper.exe",
     "webHelperWd": "Overlay OSC\\NVIDIA NodeAPI",
     "oscExe": "Overlay OSC\\NVIDIA OSC\\NVIDIA OSC.exe",
     "oscWd": "Overlay OSC\\NVIDIA OSC",
+    "graphicsExe": "NvGraphics\\NvGraphics.exe",
+    "graphicsWd": "NvGraphics",
     "$oscExe_note": "OSC host ที่ใช้งานและยืนยันแล้ว",
     "genuineShareExe": "%ProgramFiles%\\NVIDIA Corporation\\NVIDIA GeForce Experience\\NVIDIA Share.exe",
     "genuineShareWd": "%ProgramFiles%\\NVIDIA Corporation\\NVIDIA GeForce Experience",

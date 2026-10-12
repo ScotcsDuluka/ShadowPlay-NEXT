@@ -1,4 +1,3 @@
-#   powershell -File deploy-launcher.ps1 -NoBuild   # stage current bin only
 # Compatibility entry point; the canonical Project-only build owns staging.
 param(
     [string]$Dest = '',

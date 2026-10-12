@@ -1,5 +1,5 @@
-﻿// route-floor.js — UNLOCK ALL: ดักทุก route ของ OSC ตอบ shape จริง
-// + state สลับได้จริง (record/IR toggle ปุ่มหน้า = สถานะเปลี่ยนจริง)
+// route-floor.js — OSC API facade with response shapes and local runtime state.
+// Hardware-dependent features still require their real backend/device support.
 // mount: require('./shims/route-floor.js')(app);  — วางก่อน module routes
 'use strict';
 
@@ -39,7 +39,9 @@ const FPS = [60, 30];
 // ---- settings persistence (ไฟล์เดียวกับ NvShadowPlayAPINode shim — seed จากของแท้) ----
 const fs = require('fs');
 const path = require('path');
-const SETTINGS_FILE = path.join(__dirname, '..', 'shadowplay-settings.json');
+const http = require('http');
+const SETTINGS_FILE = process.env.NV_SHADOWPLAY_SETTINGS_FILE ||
+  path.join(__dirname, '..', 'shadowplay-settings.json');
 const SETTINGS_DEFAULTS = {
   record:       { quality: 'VeryGood', resolution: 'In-game', framerate: 60, bitrateBps: 50000000 },
   instantReplay:{ quality: 'Custom', resolution: '1440p HD', framerate: 60, bitrateBps: 50000000, replayLengthSeconds: 15 },
@@ -53,6 +55,8 @@ const SETTINGS_DEFAULTS = {
   recordpaths:  { videos: 'C:\\Users\\ScotcsDuluka\\Videos', tempFiles: 'C:\\Users\\SCOTCS~1\\AppData\\Local\\Temp\\' },
   broadcastPreference: { provider: 'AlwaysAsk' },
   customoverlay:{ enable: false, path: '', slots: {} },
+  notifier:     { slotCount: 2 },
+  obs:          { enabled: false },
   indicators:   { fps: { state: false, position: 'top-right' }, record: { state: false }, viewer: { state: false } },
   highlights:   { enabled: false, sizeMB: 5120, tempSaveFolder: '' },
   language:     { language: 'en-US' },
@@ -79,13 +83,14 @@ function loadSettings() {
     return settings;
   }
   catch (e) {
+    if (e.code !== 'ENOENT') throw e;
     const settings = JSON.parse(JSON.stringify(SETTINGS_DEFAULTS));
     settings.highlights.tempSaveFolder = settings.recordpaths.videos;
     return settings;
   }
 }
 function saveSettings(s) {
-  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(s, null, 2));
+  writeJsonFileAtomic(SETTINGS_FILE, s);
 }
 function persistSettings(s, res) {
   try {
@@ -135,7 +140,7 @@ function readJsonFile(file, fallback) {
   }
 }
 function writeJsonFileAtomic(file, value) {
-  const temp = file + '.' + process.pid + '.tmp';
+  const temp = file + '.' + process.pid + '.' + Date.now() + '.tmp';
   try {
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(temp, JSON.stringify(value, null, 2));
@@ -177,8 +182,12 @@ function captureOptions(paths) {
   const useNativeResolution = nestedCurrent.use_native_resolution !== undefined
     ? nestedCurrent.use_native_resolution === true
     : (recording.UseNativeResolution !== undefined ? recording.UseNativeResolution === true : true);
+  const configuredQuality = recording.Preset || recording.preset;
+  const quality = ['Low', 'Medium', 'High', 'Custom'].indexOf(configuredQuality) >= 0
+    ? configuredQuality : 'Custom';
   return {
     engineMode: mode,
+    quality: quality,
     apiCapture: apiCapture,
     encoder: encoder,
     encoderPreset: Number(nestedCurrent.encoder_preset || recording.EncoderPreset ||
@@ -195,6 +204,21 @@ function captureOptions(paths) {
 function validateCaptureOptions(body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return 'Capture options require a JSON object';
   if (body.engineMode !== 'FFmpeg' && body.engineMode !== 'Duluka') return 'engineMode must be FFmpeg or Duluka';
+  if (body.quality !== undefined &&
+      ['Low', 'Medium', 'High', 'Custom'].indexOf(body.quality) < 0) {
+    return 'quality must be Low, Medium, High, or Custom';
+  }
+  if (!Number.isInteger(body.fps) || body.fps < 1 || body.fps > 800) {
+    return 'fps must be an integer from 1 to 800';
+  }
+  if (!Number.isInteger(body.bitrateKbps) || body.bitrateKbps < 1 || body.bitrateKbps > 150000) {
+    return 'bitrateKbps must be an integer from 1 to 150000';
+  }
+  if (typeof body.useNativeResolution !== 'boolean') return 'useNativeResolution must be a boolean';
+  if (!Number.isInteger(body.width) || body.width < 1 || body.width > 16384 ||
+      !Number.isInteger(body.height) || body.height < 1 || body.height > 16384) {
+    return 'width and height must be integers from 1 to 16384';
+  }
   const apiOptions = body.engineMode === 'Duluka'
     ? ['dxgi_desktop_duplication']
     : ['ddagrab', 'gdigrab', 'gfxcapture'];
@@ -220,6 +244,91 @@ function readBody(req, done) {
 function savedHotkey(name) {
   const s = loadSettings();
   return (s.hotkeys && s.hotkeys[name]) || HOTKEYS[name] || [];
+}
+
+function isContainerTestRoute(req) {
+  if (req.method !== 'GET' && req.method !== 'POST') return false;
+  return /^\/ShadowPlay\/v\.1\.0\/(Record\/(Enable|Running|Save)|InstantReplay\/(Enable|Running|Save)|Broadcast\/(Enable|Running|Pause)|Screenshot\/(Support|Capture)|Capture\/State|OSC\/MainView)$/.test(req.path) ||
+    /^\/NvCamera\/v\.1\.\d+(\/|$)/.test(req.path) ||
+    /^\/Duluka\/v\.1\.0\/(State|Actual)$/.test(req.path);
+}
+
+function isContainerOwnedMenuRoute(req) {
+  const path = req.path;
+  return (req.method === 'GET' &&
+      (path === '/NvCamera/v.1.0/Compatible' ||
+       path === '/NvCamera/v.1.0/GetNvCameraConfig' ||
+       path === '/ShadowPlay/v.1.0/Screenshot/Support')) ||
+    (req.method === 'POST' &&
+      (path === '/NvCamera/v.1.0/GetAvailable' ||
+       path === '/NvCamera/v.1.0/GetFreestyleSupport' ||
+       path === '/NvCamera/v.1.0/EnableMods'));
+}
+
+function containerControlPort() {
+  const port = Number(process.env.NV_CONTAINER_CONTROL_API_PORT);
+  return Number.isInteger(port) && port > 0 && port <= 65535 ? port : 59012;
+}
+
+function containerTestStatus(callback) {
+  const port = containerControlPort();
+  const request = http.get({ hostname: '127.0.0.1', port: port, path: '/v1/status', timeout: 1500 }, function (response) {
+    let raw = '';
+    response.setEncoding('utf8');
+    response.on('data', function (chunk) { raw += chunk; });
+    response.on('end', function () {
+      try {
+        const status = JSON.parse(raw);
+        if (response.statusCode !== 200 || typeof status.testMode !== 'boolean') {
+          return callback(new Error('NvContainer returned an invalid test-mode status'));
+        }
+        if (process.env.NV_CONTAINER_TEST_MODE === '1' && status.testMode !== true) {
+          return callback(new Error('NvContainer test-mode configuration does not match NvNode'));
+        }
+        callback(null, status);
+      } catch (e) {
+        callback(new Error('NvContainer returned invalid test-mode status'));
+      }
+    });
+  });
+  request.on('timeout', function () { request.destroy(new Error('NvContainer test-mode status timed out')); });
+  request.on('error', callback);
+}
+
+function sendContainerTestCommand(req, res, body, callback) {
+  requestContainer('POST', '/v1/dispatch', {
+    method: req.method,
+    path: req.path,
+    body: body
+  }, callback);
+}
+
+function requestContainer(method, route, body, callback) {
+  const port = containerControlPort();
+  const payload = body === undefined ? null : Buffer.from(JSON.stringify(body));
+  const request = http.request({
+    hostname: '127.0.0.1',
+    port: port,
+    path: route,
+    method: method,
+    timeout: 3000,
+    headers: payload
+      ? { 'Content-Type': 'application/json', 'Content-Length': payload.length }
+      : {}
+  }, function (response) {
+    let raw = '';
+    response.setEncoding('utf8');
+    response.on('data', function (chunk) { raw += chunk; });
+    response.on('end', function () {
+      let result;
+      try { result = JSON.parse(raw); }
+      catch (e) { return callback(new Error('NvContainer returned invalid test-command response')); }
+      callback(null, result);
+    });
+  });
+  request.on('timeout', function () { request.destroy(new Error('NvContainer test command timed out')); });
+  request.on('error', callback);
+  request.end(payload || undefined);
 }
 
 const state = require('./osc-runtime-state.js');
@@ -256,6 +365,44 @@ module.exports = function routeFloor(app, io) {
   // ตัวอัด = NvCapture.exe (bus: NvContainer.exe spawn + watchdog)
   // หน้า/REST คุม recordEnabled → engine poll /Duluka plane เอง → Actual กลับมาที่นี่
 
+  // NvContainer owns stable main-menu capability replies in every mode and
+  // test-mode capture/game-filter replies before legacy routes can handle them.
+  app.use(function (req, res, next) {
+    const containerOwnedMenuRoute = isContainerOwnedMenuRoute(req);
+    if (!containerOwnedMenuRoute && !isContainerTestRoute(req)) return next();
+    containerTestStatus(function (statusError, status) {
+      if (statusError) {
+        console.error('[osc-backend] NvContainer test-mode status unavailable: ' + statusError.message);
+        return res.status(503).json({ type: 'Error', code: -1, codeText: 'NVCONTAINER_UNAVAILABLE',
+          message: 'NvContainer is required to handle this OSC request' });
+      }
+      if (!status.testMode && !containerOwnedMenuRoute) return next();
+
+      const dispatch = function (body) {
+        sendContainerTestCommand(req, res, body, function (dispatchError, result) {
+          if (dispatchError) {
+            console.error('[osc-backend] NvContainer test dispatch failed: ' + dispatchError.message);
+            return res.status(503).json({ type: 'Error', code: -1, codeText: 'NVCONTAINER_DISPATCH_FAILED',
+              message: 'NvContainer could not handle this OSC request' });
+          }
+          if (!result || result.handled !== true) {
+            return res.status(502).json({ type: 'Error', code: -1, codeText: 'NVCONTAINER_UNHANDLED',
+              message: 'NvContainer did not handle this OSC request' });
+          }
+          (result.events || []).forEach(function (event) {
+            if (io && event && typeof event.name === 'string') {
+              try { io.emit(event.name, event.data); }
+              catch (e) { console.error('[osc-backend] test event delivery failed: ' + e.message); }
+            }
+          });
+          res.status(result.statusCode || 200).json(result.body || {});
+        });
+      };
+      if (req.method === 'POST') readBody(req, dispatch);
+      else dispatch(null);
+    });
+  });
+
   // ★ แบบของแท้ (CaptureStateChangeNotificationCallback): state เปลี่ยน = emit
   //   ผ่าน socket.io ให้หน้าเห็นทันที ไม่ต้องรอ poll รอบถัดไป
   function emitCapture(name, data) {
@@ -267,8 +414,52 @@ module.exports = function routeFloor(app, io) {
     const m = req.method;
     const p = req.path;
 
+    if (p === '/OBS/v.1.0/settings' || p === '/OBS/v.1.0/status' ||
+        p === '/OBS/v.1.0/test') {
+      const controlPath = p === '/OBS/v.1.0/settings' ? '/v1/obs/settings'
+        : p === '/OBS/v.1.0/status' ? '/v1/obs/status'
+          : '/v1/obs/test';
+      const allowedMethod = p === '/OBS/v.1.0/settings' || p === '/OBS/v.1.0/status' ? ['GET', 'POST'] : ['POST'];
+      if (allowedMethod.indexOf(m) < 0) {
+        res.status(405).json({ type: 'Error', code: 4, codeText: 'METHOD_NOT_ALLOWED',
+          message: 'Method not allowed for OBS control' });
+        return;
+      }
+      const proxy = function (body) {
+        requestContainer(m, controlPath, body, function (error, result) {
+          if (error) {
+            console.error('[osc-backend] NvContainer OBS request failed: ' + error.message);
+            return res.status(503).json({ type: 'Error', code: -1, codeText: 'NVCONTAINER_UNAVAILABLE',
+              message: 'NvContainer OBS runtime is unavailable' });
+          }
+          if (!result || result.handled !== true) {
+            return res.status(502).json({ type: 'Error', code: -1, codeText: 'NVCONTAINER_UNHANDLED',
+              message: 'NvContainer did not handle this OBS request' });
+          }
+          return res.status(result.statusCode || 200).json(result.body || {});
+        });
+      };
+      if (m === 'POST') return readBody(req, proxy);
+      return proxy(undefined);
+    }
+
     // ---- POST desired state: retries must be safe and idempotent ----
     if (m === 'POST') {
+      if (p === '/Notifier/v.1.0/settings') {
+        readBody(req, function (body) {
+          const slotCount = body && Number(body.slotCount);
+          if (!Number.isInteger(slotCount) || slotCount < 1 || slotCount > 3) {
+            res.status(400).json({ type: 'Error', code: 4, codeText: 'ET_INVALID_DATA',
+              message: 'slotCount must be an integer from 1 to 3' });
+            return;
+          }
+          const settings = loadSettings();
+          settings.notifier = Object.assign({}, settings.notifier || {}, { slotCount: slotCount });
+          if (!persistSettings(settings, res)) return;
+          res.status(200).json(settings.notifier);
+        });
+        return;
+      }
       if (p === '/DulukaCapture/v.1.0/settings') {
         readBody(req, function (body) {
           const validationError = validateCaptureOptions(body);
@@ -287,6 +478,7 @@ module.exports = function routeFloor(app, io) {
             const config = readJsonFile(paths.config, {});
             const recordingKey = config.Recording ? 'Recording' : config.recording ? 'recording' : 'Recording';
             const recording = config[recordingKey] || {};
+            if (body.quality !== undefined) recording.Preset = body.quality;
             const nested = recording.current && typeof recording.current === 'object';
             const isDuluka = body.engineMode === 'Duluka';
             const apiCapture = isDuluka ? 'ddagrab' : body.apiCapture;
@@ -296,12 +488,22 @@ module.exports = function routeFloor(app, io) {
               recording.encoder = body.encoder;
               recording.encoder_now = body.encoder;
               recording.current.encoder_preset = body.encoderPreset;
+              recording.current.fps = body.fps;
+              recording.current.bitrate = body.bitrateKbps;
+              recording.current.use_native_resolution = body.useNativeResolution;
+              recording.current.width = body.width;
+              recording.current.height = body.height;
             } else {
               recording.EngineMode = body.engineMode;
               recording.APICapture = apiCapture;
               recording.Encoder = body.encoder;
               recording.EncoderNow = body.encoder;
               recording.EncoderPreset = body.encoderPreset;
+              recording.FPS = body.fps;
+              recording.Bitrate = body.bitrateKbps;
+              recording.UseNativeResolution = body.useNativeResolution;
+              recording.Width = body.width;
+              recording.Height = body.height;
             }
             config[recordingKey] = recording;
             const engine = readJsonFile(paths.engine, {});
@@ -709,6 +911,9 @@ module.exports = function routeFloor(app, io) {
     if (m === 'GET') {
       const G = function (body) { res.status(200).json(body); };
 
+      if (p === '/Notifier/v.1.0/settings') {
+        return G(loadSettings().notifier || SETTINGS_DEFAULTS.notifier);
+      }
       if (p === '/DulukaCapture/v.1.0/settings') {
         try {
           const paths = captureConfigPaths();

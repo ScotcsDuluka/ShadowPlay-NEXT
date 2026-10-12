@@ -14,6 +14,6 @@
       "vk": "G"
     }
   ],
-  "fireUrl": "http://127.0.0.1:59011/?hk={name}",
+  "fireUrl": "http://127.0.0.1:59012/v1/hotkey/{name}",
   "logFile": "NvContainer\\Logs\\nvsphelper.log"
 }

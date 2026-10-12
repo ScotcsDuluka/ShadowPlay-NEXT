@@ -21,10 +21,18 @@ let oscWindowStateCallback = null;   // the overlay open/close driver
 let oscCaptureStateCallback = null;
 const registered = {};   // name -> content (from HotKey registrations)
 let monitorEnabled = false;
+const hotkeyEventIds = {
+  RecordToggle: 'Manual',
+  RecordSave: 'DVR',
+  InstantReplayToggle: 'DVRToggle',
+  BroadcastToggle: 'GameCast',
+  BroadcastPauseToggle: 'PauseResume',
+};
 
 // ---- settings persistence (OSC-DATA-CONTRACT §3: ค่า seed จากของแท้) ----
 const fs = require('fs');
-const SETTINGS_FILE = path.join(__dirname, '..', 'shadowplay-settings.json');
+const SETTINGS_FILE = process.env.NV_SHADOWPLAY_SETTINGS_FILE ||
+  path.join(__dirname, '..', 'shadowplay-settings.json');
 const SETTINGS_DEFAULTS = {
   record:       { quality: 'VeryGood', resolution: 'In-game', framerate: 60, bitrateBps: 50000000 },
   audio:        { mode: 'both' },
@@ -34,16 +42,63 @@ const SETTINGS_DEFAULTS = {
   customoverlay:{ enable: false, path: '' },
 };
 function loadSettings() {
-  try { return Object.assign({}, SETTINGS_DEFAULTS, JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'))); }
-  catch (e) { return JSON.parse(JSON.stringify(SETTINGS_DEFAULTS)); }
+  try {
+    const stored = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
+    if (!stored || typeof stored !== 'object' || Array.isArray(stored)) {
+      throw new Error('OSC settings must contain a JSON object');
+    }
+    return Object.assign({}, SETTINGS_DEFAULTS, stored);
+  } catch (e) {
+    if (e.code === 'ENOENT') return JSON.parse(JSON.stringify(SETTINGS_DEFAULTS));
+    throw e;
+  }
 }
 function saveSettings(s) {
-  try { fs.writeFileSync(SETTINGS_FILE, JSON.stringify(s, null, 2)); }
-  catch (e) { try { console.error('[shim:settings] save failed: ' + e.message); } catch (e2) {} }
+  const temp = SETTINGS_FILE + '.' + process.pid + '.' + Date.now() + '.tmp';
+  try {
+    fs.mkdirSync(path.dirname(SETTINGS_FILE), { recursive: true });
+    fs.writeFileSync(temp, JSON.stringify(s, null, 2));
+    fs.renameSync(temp, SETTINGS_FILE);
+  } catch (e) {
+    try { fs.unlinkSync(temp); } catch (_) {}
+    throw e;
+  }
+}
+
+function replyWithSettings(doReply, select) {
+  let result;
+  try {
+    result = select(loadSettings());
+  } catch (e) {
+    if (typeof doReply === 'function') doReply(e);
+    else throw e;
+    return;
+  }
+  if (typeof doReply === 'function') doReply(null, result);
+  return result;
+}
+
+function updateSettings(doReply, update, afterSave) {
+  let result;
+  try {
+    const settings = loadSettings();
+    result = update(settings);
+    saveSettings(settings);
+    if (typeof afterSave === 'function') afterSave(result);
+  } catch (e) {
+    console.error('[shim:settings] save failed: ' + e.message);
+    if (typeof doReply === 'function') doReply(e);
+    else throw e;
+    return;
+  }
+  if (typeof doReply === 'function') doReply(null, result);
+  return result;
 }
 
 function fire(name) {
-  const data = Object.assign({ hotKeyName: name }, registered[name] || {});
+  const data = Object.assign({ hotKeyName: name }, registered[name] || {}, {
+    hotkeyId: hotkeyEventIds[name] || name,
+  });
   const isOpenShare = String(name).toLowerCase() === 'openshare';
   try {
     console.log('[shim:hotkey] firing ' + name);
@@ -57,7 +112,11 @@ function fire(name) {
     }
     // OpenShare uses only WindowState; sending a Hotkey event as well makes the
     // page process the same toggle through two independent socket channels.
-    if (hotkeyCallback) hotkeyCallback(data);
+    if (typeof hotkeyCallback !== 'function') {
+      console.error('[shim:hotkey] Hotkey callback is not ready for ' + name);
+      return false;
+    }
+    hotkeyCallback(data);
     return true;
   } catch (e) {
     try { console.error('[shim:hotkey] fire failed: ' + e.message); } catch (e2) {}
@@ -73,56 +132,59 @@ const specific = {
   SetHotkeyCallback: function (cb) { hotkeyCallback = cb; },
   // ---- settings: เก็บ/อ่านจริง (signature ตาม NvShadowPlayAPI.js ของแท้) ----
   GetManualRecordSettings: function (doReply) {
-    if (typeof doReply === 'function') doReply(null, loadSettings().record);
+    return replyWithSettings(doReply, function (s) { return s.record; });
   },
   SetManualRecordSettings: function (doReply, content) {
-    const s = loadSettings();
-    if (content && typeof content === 'object') s.record = Object.assign(s.record, content);
-    saveSettings(s);
-    if (typeof doReply === 'function') doReply(null, s.record);
+    return updateSettings(doReply, function (s) {
+      if (content && typeof content === 'object') s.record = Object.assign({}, s.record, content);
+      return s.record;
+    });
   },
   GetBroadcastSettings: function (doReply) {
-    if (typeof doReply === 'function') doReply(null, loadSettings().broadcast);
+    return replyWithSettings(doReply, function (s) { return s.broadcast; });
   },
   SetBroadcastSettings: function (doReply, content) {
-    const s = loadSettings();
-    if (content && typeof content === 'object') s.broadcast = Object.assign(s.broadcast, content);
-    saveSettings(s);
-    if (typeof doReply === 'function') doReply(null, s.broadcast);
+    return updateSettings(doReply, function (s) {
+      if (content && typeof content === 'object') s.broadcast = Object.assign({}, s.broadcast, content);
+      return s.broadcast;
+    });
   },
   AudioMode: function (doReply, enable, content) {
     // แท้: AudioMode(doReply, true, content) ตอน set / (doReply, false) ตอน read
-    const s = loadSettings();
     if (enable && content && typeof content === 'object') {
-      s.audio = Object.assign(s.audio, content);
-      saveSettings(s);
+      return updateSettings(doReply, function (s) {
+        s.audio = Object.assign({}, s.audio, content);
+        return s.audio;
+      });
     }
-    if (typeof doReply === 'function') doReply(null, s.audio);
+    return replyWithSettings(doReply, function (s) { return s.audio; });
   },
   GetWebcamOverlaySettings: function (doReply) {
-    if (typeof doReply === 'function') doReply(null, loadSettings().webcam);
+    return replyWithSettings(doReply, function (s) { return s.webcam; });
   },
   WebcamOverlaySettings: function (doReply, content) {
-    const s = loadSettings();
-    if (content && typeof content === 'object') s.webcam = Object.assign(s.webcam, content);
-    saveSettings(s);
-    if (typeof doReply === 'function') doReply(null, s.webcam);
+    return updateSettings(doReply, function (s) {
+      if (content && typeof content === 'object') s.webcam = Object.assign({}, s.webcam, content);
+      return s.webcam;
+    });
   },
   RecordingPaths: function (doReply, set, content) {
-    const s = loadSettings();
     if (set && content && typeof content === 'object') {
-      s.recordpaths = Object.assign(s.recordpaths, content);
-      saveSettings(s);
+      return updateSettings(doReply, function (s) {
+        s.recordpaths = Object.assign({}, s.recordpaths, content);
+        return s.recordpaths;
+      });
     }
-    if (typeof doReply === 'function') doReply(null, s.recordpaths);
+    return replyWithSettings(doReply, function (s) { return s.recordpaths; });
   },
   CustomOverlayPath: function (doReply, set, content) {
-    const s = loadSettings();
     if (set && content && typeof content === 'object') {
-      s.customoverlay = Object.assign(s.customoverlay, content);
-      saveSettings(s);
+      return updateSettings(doReply, function (s) {
+        s.customoverlay = Object.assign(s.customoverlay, content);
+        return s.customoverlay;
+      });
     }
-    if (typeof doReply === 'function') doReply(null, s.customoverlay);
+    return replyWithSettings(doReply, function (s) { return s.customoverlay; });
   },
   SetOscWindowStateChangeNotificationCallback: function (cb) {
     // The overlay open/close driver: the genuine native fires this and the
@@ -162,19 +224,17 @@ const specific = {
   },
   // hotkey defaults (ค่า GFE แท้): Alt+Z / F1 screenshot / F9 record / F10 IR / F8 broadcast
   GetHotKey: function (doReply, name) {
-    const DEFAULTS = {
-      openshare: [18, 90],
-      Screenshot: [18, 112],
-      RecordToggle: [18, 120],
-      RecordSave: [18, 121],
-      DVRToggle: [18, 118],
-      InstantReplayToggle: [18, 117],
-      BroadcastToggle: [18, 119],
-      BroadcastPauseToggle: [18, 116],
-      CameraToggle: [18, 114],
-    };
-    const keys = DEFAULTS[name] || [];
-    if (typeof doReply === 'function') doReply(null, { keys: keys });
+    try {
+      const key = String(name || '').toLowerCase();
+      const settings = loadSettings();
+      const keys = (settings.hotkeys && settings.hotkeys[key]) ||
+        HOTKEY_DEFAULTS[key] || [];
+      if (typeof doReply === 'function') doReply(null, { keys: keys });
+      return { keys: keys };
+    } catch (e) {
+      if (typeof doReply === 'function') doReply(e);
+      else throw e;
+    }
   },
   GetOSCMainViewData: function (doReply, content) {
     const settings = loadSettings();
@@ -192,13 +252,32 @@ const specific = {
     });
   },
   HotKey: function (doReply, enable, name, content) {
+    const key = String(name || '').toLowerCase();
     if (enable) {
+      const keys = Array.isArray(content) ? content :
+        (content && Array.isArray(content.keys) ? content.keys : null);
+      if (keys) {
+        return updateSettings(doReply, function (settings) {
+          settings.hotkeys = settings.hotkeys || {};
+          settings.hotkeys[key] = keys;
+          return {};
+        }, function () { registered[name] = content || {}; });
+      }
       registered[name] = content || {};
     } else {
       // read: คืนค่า hotkey ที่หน้าตั้งไว้ หรือค่า default GFE
-      const keys = registered[name] || DEF.HOTKEY_DEFAULTS[String(name).toLowerCase()] || [];
-      if (typeof doReply === 'function') doReply(null, { keys: keys });
-      return { keys: keys };
+      try {
+        const settings = loadSettings();
+        const saved = settings.hotkeys && settings.hotkeys[key];
+        const current = registered[name];
+        const keys = saved || (current && current.keys) || HOTKEY_DEFAULTS[key] || [];
+        if (typeof doReply === 'function') doReply(null, { keys: keys });
+        return { keys: keys };
+      } catch (e) {
+        if (typeof doReply === 'function') doReply(e);
+        else throw e;
+        return;
+      }
     }
     // The overlay toggle hotkey fires the WINDOW STATE change (the genuine
     // native -> WindowStateChangeNotificationCallback -> /ShadowPlay/v.1.0/

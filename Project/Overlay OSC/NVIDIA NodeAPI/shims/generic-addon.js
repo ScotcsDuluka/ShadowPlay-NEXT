@@ -13,7 +13,7 @@ const { FLOOR } = require('./data-floor.js');
 // run with the genuine nvcontainer service up, drive every OSC page, then
 // bake the captures into FLOOR permanently). Falls back to stub mode if the
 // genuine module is missing or fails to load.
-const RECORD = process.env.DULUKA_RECORD === '1';
+const RECORD = process.env.DULUKA_RECORD === '1' && process.env.NV_CONTAINER_TEST_MODE !== '1';
 const fs = RECORD ? require('fs') : null;
 const path = RECORD ? require('path') : null;
 

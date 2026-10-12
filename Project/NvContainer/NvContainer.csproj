@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <!-- NvContainer owns NVIDIA OSC.exe, NVIDIA Web Helper.exe, and nvsphelper.exe.
-         NvCapture.exe is intentionally not started by this process manager yet. -->
+    <!-- NvContainer owns NvGraphics.exe, NVIDIA OSC.exe, NVIDIA Web Helper.exe,
+         and nvsphelper.exe. NvCapture.exe is not started yet. -->
     <OutputType>WinExe</OutputType>
     <AssemblyName>NvContainer</AssemblyName>
     <RootNamespace>NvContainer</RootNamespace>
@@ -12,6 +12,13 @@
     <ApplicationIcon>NVIDIA ShadowPlay.ico</ApplicationIcon>
     <Nullable>disable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <UseWindowsForms>true</UseWindowsForms>
   </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\NvGraphics\NvGraphics.Contracts\NvGraphics.Contracts.csproj" />
+    <ProjectReference Include="..\..\NvGraphics\NvGraphics.App\NvGraphics.csproj"
+                      AdditionalProperties="OutputPath=..\..\..\build\NvGraphics-ContainerRef\" />
+  </ItemGroup>
 
 </Project>

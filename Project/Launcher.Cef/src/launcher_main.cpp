@@ -120,16 +120,20 @@ int NvLauncherCefMain(void) {
   params->height = ParseInt(cl->GetSwitchValue("height").ToString(), 648);
 
   // ── single-instance guard (browser process) ──────────────────────────
-  // One named mutex per root dir: a second double-click must not stack a
-  // second CEF stack. Subprocess relaunches exit earlier inside
-  // CefExecuteProcess. Handle deliberately never released — the kernel
-  // destroys the mutex when the process dies.
+  // Subprocess relaunches exit earlier inside CefExecuteProcess. Keep the
+  // name independent of the install path; backslashes are invalid in a
+  // Windows kernel-object name after the Local namespace prefix.
   static HANDLE s_instance_mutex = NULL;
-  s_instance_mutex = CreateMutexW(
-      NULL, TRUE,
-      (L"Local\\NvLauncher-Browser-" + launcherutil::GetRootDir()).c_str());
-  if (s_instance_mutex && GetLastError() == ERROR_ALREADY_EXISTS) {
-    launcherutil::LogLine("second launch for this root - exiting");
+  s_instance_mutex = CreateMutexW(NULL, TRUE, L"Local\\NVIDIA.ShadowPlay.Launcher");
+  if (!s_instance_mutex) {
+    launcherutil::LogLine("single-instance mutex creation failed (error " +
+                          std::to_string(GetLastError()) + ")");
+    return 4;
+  }
+  if (GetLastError() == ERROR_ALREADY_EXISTS) {
+    launcherutil::LogLine("second launcher process - exiting");
+    CloseHandle(s_instance_mutex);
+    s_instance_mutex = NULL;
     return 0;
   }
 

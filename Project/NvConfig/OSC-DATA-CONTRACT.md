@@ -62,3 +62,53 @@ POST /ShadowPlay/v1.0/OSC/GetCustomize/{Record|InstantReplay|Broadcast} {"qualit
 - **โหมด ours**: ถ้ากลับไปใช้ native host ของเรา — implement cefQuery ครบ 10 คำสั่ง + shim node
   เลียน random port/cookie + MMF (แทน fixed 59001) แล้ว UI/hover/ปุ่มจะทำงานเหมือนแท้
 - capture engine เรา: bitrate/bounds จริงจากข้อ 3 (VeryGood=50Mbps, resolutions 8 ค่า, fps 60/30)
+
+## 6. NvGraphics GPU runtime and preference events (schema v1)
+
+NvGraphics sends only to the existing NvContainer loopback control API. NvContainer validates
+each payload and publishes it through the existing ContainerEvents lane; event names are
+fixed by NvContainer and are never accepted from a client.
+
+### Runtime evidence
+
+- Route: `POST /v1/gpu/runtime`
+- Event: `/Duluka/v1/GpuRuntimeState`
+- Required fields: `schemaVersion` (1), `eventId`, absolute `exePath`, `pid`, `state`,
+  `adapters`, `engineTypes`, `windowStartUtc`, `windowDurationMs`, and `reason`.
+- States: `Unknown`, `Inactive`, `Verified`, `MultipleAdapters`.
+- `MultipleAdapters` means 3D activity was observed on multiple resolved physical adapters
+  within the same counter sample. If different adapters appear only in different samples
+  of the observation window, report `Unknown`: the evidence cannot distinguish sequential
+  switching from simultaneous use.
+- Adapter entries carry `name`, PnP `adapterId`, and `pciBusId` when known.
+- The `adapters` array contains runtime evidence only. Windows preferences and preference
+  events must never be used to infer runtime state. `Inactive` is not evidence that a game
+  does not use a GPU.
+
+### Applied preference
+
+- Route: `POST /v1/gpu/preference`
+- Event: `/Duluka/v1/GpuPreferenceApplied`
+- Required fields: `schemaVersion` (1), `eventId`, `exePath`, `adapterId`, `appliedUtc`;
+  `displayName` and `adapterName` are display metadata.
+
+### Adapter inventory
+
+- Route: `POST /v1/gpu/inventory`
+- Event: `/Duluka/v1/GpuAdapterInventory`
+- Required fields: `schemaVersion` (1), `eventId`, `capturedUtc`, and `adapters`.
+- Each adapter may include its PnP identity, PCI bus id, resolved DXGI LUIDs, and
+  nvidia-smi utilization/VRAM values. Missing telemetry remains null/empty; it is never
+  inferred from runtime state or fabricated.
+- Inventory payloads are capped at 32,768 bytes and expire after two minutes. Values are
+  range-checked before NvContainer forwards them under this fixed event name.
+- This event reports a verified per-app Windows preference write only. It does not assert
+  that a running game is using that adapter.
+
+### Validation and freshness
+
+- Runtime payloads are capped at 65,536 bytes; preference payloads at 16,384 bytes.
+- Both contracts reject unknown schema versions and timestamps more than two minutes in
+  the past or future. Consumers should treat older retained runtime/preference state as
+  stale after two minutes.
+- The three GPU event names above are the complete GPU event allowlist for the current schema.
