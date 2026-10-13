@@ -440,8 +440,8 @@ public sealed class NvGraphicsForm : Form
         PreferenceStatus.NotConfigured => "Detected — no preference configured",
         PreferenceStatus.Configured => "Preference configured",
         PreferenceStatus.Applied => "Windows GPU preference applied",
-        PreferenceStatus.RuntimeVerified => "Windows GPU preference applied",
-        PreferenceStatus.RuntimeNotVerified => "Windows GPU preference not verified",
+        PreferenceStatus.RuntimeVerified => "Runtime GPU use verified",
+        PreferenceStatus.RuntimeNotVerified => "Runtime GPU use not verified",
         _ => string.IsNullOrWhiteSpace(p.StatusMessage) ? "Error" : $"Error — {p.StatusMessage}"
     };
 

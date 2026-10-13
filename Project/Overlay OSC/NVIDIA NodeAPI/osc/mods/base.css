@@ -2,7 +2,6 @@
     display: none !important;
 }
 
-
 .osc-content.layout-row {
     position: absolute !important;
     top: 0 !important;
@@ -14,29 +13,25 @@
     padding-bottom: 80px !important;
 }
 
-
-
-.gallery-central-div-broadcast{
-    
-    min-width: 100%!important;
-    max-width: 100%!important;
+.gallery-central-div-broadcast {
+    min-width: 100% !important;
+    max-width: 100% !important;
 }
 
-.confirmation-panel{
-
-    height:175px;
-    min-height: 0!important;
-    max-height: 100%!important;
-    min-width: 100%!important;
-    max-width: 100%!important;
+.confirmation-panel {
+    height: 175px;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
 }
 
 .osc-central-div {
-    width: 100%  !important;
+    width: 100% !important;
     min-width: 100%;
 }
 
-.preferences-root-panel{
+.preferences-root-panel {
     min-width: 0%;
     max-width: 100%;
     min-height: 0%;
@@ -52,3 +47,51 @@
     padding: 0;
     background: #212326;
 }
+
+
+.nv-gallery-fullscreen-layout {
+    box-sizing: border-box !important;
+    padding-right: 360px !important;
+}
+
+.nv-gallery-fullscreen-layout > #gallery.gallery-central-div {
+    box-sizing: border-box !important;
+    flex: 1 1 0 !important;
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    min-height: 100% !important;
+    max-height: 100% !important;
+}
+
+.nv-gallery-fullscreen-layout > .osc-side-buttons {
+    box-sizing: border-box !important;
+    flex: 0 0 280px !important;
+}
+
+.gallery-inside-central-dive {
+    min-height: 100% !important;
+    max-height: 100% !important;
+}
+
+.gallery-central-div-upload {
+    min-height: 100% !important;
+    max-height: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+}
+
+#gallery .gallery-inside-central-div {
+    margin-bottom: 70px !important;
+}
+
+#gallery .gallery-file-row {
+    position: absolute !important;
+    right: 40px;
+    bottom: 20px;
+    left: 40px;
+    margin: 0 !important;
+}
+
+

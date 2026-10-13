@@ -141,7 +141,7 @@
     "l10n.instantReplayTime2a": "{{arg1}} นาที ({{arg2}})",
     "l10n.instantReplayTime3": "{{arg1}} นาที {{arg2}} วินาที ({{arg3}})",
     "l10n.instantReplayTime3a": "{{arg1}} นาที {{arg2}} วินาที ({{arg3}})",
-    "l10n.notificationOpenShare": "กด {{arg1}} เพื่อใช้การโอเวอร์เลย์ในเกมผ่าน GeForce Experience",
+    "l10n.notificationOpenShare": "กด {{arg1}} เพื่อใช้โอเวอร์เลย์ในเกม",
     "l10n.notificationInstantReplayStarted": "เปิดเล่นซ้ำทันทีแล้วในตอนนี้",
     "l10n.notificationInstantReplayStopped": "ปิดเล่นซ้ำทันทีแล้วในตอนนี้",
     "l10n.notificationInstantReplaySaved": "บันทึก {{arg1}} นาที {{arg2}} วินาทีที่ผ่านมา",
@@ -907,6 +907,7 @@
     "l10n.gpuRuntimeChanged": "{{arg1}} เปลี่ยนไปใช้ GPU {{arg2}}",
     "l10n.gpuRuntimeMultiple": "{{arg1}} กำลังใช้ GPU หลายตัว: {{arg2}}",
     "l10n.gpuRuntimeUnknown": "ตรวจสอบ GPU ของ {{arg1}} ไม่สำเร็จ",
+    "l10n.gpuAppRunningOnGpu": "{{arg1}} กำลังทำงานบน GPU",
     "l10n.gpuPreferenceApplied": "ตั้งค่าให้ {{arg1}} ใช้ {{arg2}}",
     "l10n.gpuWindowsPreference": "การตั้งค่า Windows เลือก {{arg2}}",
     "l10n.gpuPreferenceDefault": "ตั้งค่าให้ {{arg1}} ใช้ค่าเริ่มต้นแล้ว"

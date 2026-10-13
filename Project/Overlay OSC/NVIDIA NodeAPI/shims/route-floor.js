@@ -662,14 +662,14 @@ module.exports = function routeFloor(app, io) {
       }
       if (p === '/ShadowPlay/v.1.0/CoPlay/Enable') {
         readBody(req, function (body) {
-          const enabled = requiredBoolean(body, 'status');
+          const enabled = requiredBoolean(body, 'enable');
           if (enabled === null) {
             res.status(400).json({ type: 'Error', code: 4, codeText: 'ET_INVALID_DATA',
-              message: 'CoPlay enable requires a boolean status field' });
+              message: 'CoPlay enable requires a boolean enable field' });
             return;
           }
           state.coplay = enabled;
-          res.status(200).json({ enabled: enabled });
+          res.status(200).json({ enable: enabled });
         });
         return;
       }
@@ -996,7 +996,7 @@ module.exports = function routeFloor(app, io) {
       if (p === '/ShadowPlay/v.1.0/Webcam/Settings') return G(loadSettings().webcam);
       if (p === '/ShadowPlay/v.1.0/Webcam/Enable') return G({ enabled: state.webcamEnable });
       if (p === '/ShadowPlay/v.1.0/Webcam/Shown') return G({ shown: state.webcamEnable });
-      if (p === '/ShadowPlay/v.1.0/CoPlay/Enable') return G({ enabled: state.coplay });
+      if (p === '/ShadowPlay/v.1.0/CoPlay/Enable') return G({ enable: state.coplay });
 
       const indicatorSettings = p.match(/^\/ShadowPlay\/v\.1\.0\/Indicator\/([^/]+)\/Settings$/);
       if (indicatorSettings) {

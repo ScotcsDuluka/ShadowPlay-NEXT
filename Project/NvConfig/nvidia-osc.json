@@ -21,7 +21,7 @@
     "renderScale": 1.0,
     "frameRate": 60,
     "windowed": 0,
-    "maxFps": 240,
+    "maxFps": 60,
     "showFps": 0,
     "uiScale": 1.0,
     "$renderScale_note": "OSR raster buffer scale; screen zoom remains min(screenW/1920, screenH/1080)"

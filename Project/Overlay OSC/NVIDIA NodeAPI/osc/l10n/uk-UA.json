@@ -904,6 +904,7 @@
     "l10n.acctSetupPromptDetail": "GitHub stays a linked sign-in method. Choose your permanent username and a password.",
     "l10n.testNotifier": "Test notifier",
     "l10n.gpuRuntimeStarted": "{{arg1}} is now using {{arg2}}",
+    "l10n.gpuAppRunningOnGpu": "{{arg1}} працює на GPU",
     "l10n.gpuRuntimeChanged": "{{arg1}} switched to GPU {{arg2}}",
     "l10n.gpuRuntimeMultiple": "{{arg1}} is using multiple GPUs: {{arg2}}",
     "l10n.gpuRuntimeUnknown": "Could not verify the GPU for {{arg1}}",

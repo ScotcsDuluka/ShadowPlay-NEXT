@@ -196,9 +196,10 @@ logger.info('fast-boot ready');
 logger.info('Loading ExpressJS dependency...');
 var app = require('./node_modules/express/index.js')();
 
-// GPU runtime state event validation (/Duluka/v1/GpuRuntimeState).
+// GPU runtime and Game Watcher event validation for the loopback ContainerEvents lane.
 var gpuRuntimeValidation = require('./gpuRuntimeValidation.js');
 var isValidGpuRuntimeState = gpuRuntimeValidation.isValidGpuRuntimeState;
+var gameWatcherValidation = require('./gameWatcherValidation.js');
 
 app.get('/nvcamera-test-mode.js', function (req, res) {
     res.setHeader('Cache-Control', 'no-store');
@@ -217,6 +218,8 @@ app.get('/mods/list', function (req, res) {
         // retired CSS/JS files; auto-loading every extension would reactivate them.
         var allowedMods = {
             'base.css': true,
+            'folder-browser-navigation.js': true,
+            'gallery-media-source.js': true,
             'gpu-profiles.js': true,
             'gpu-profiles.css': true,
             'gpu-status-panel.css': true,
@@ -311,6 +314,13 @@ var httpServer = http.createServer(app);
                     }
                     if (event.name === '/Duluka/v1/GpuAdapterInventory') {
                         if (gpuRuntimeValidation.isValidGpuAdapterInventory(event.data)) {
+                            io.emit(event.name, event.data);
+                            delivered++;
+                        }
+                        return;
+                    }
+                    if (event.name === '/Duluka/v1/GameWatcherStatus') {
+                        if (gameWatcherValidation.isValidGameWatcherStatus(event.data)) {
                             io.emit(event.name, event.data);
                             delivered++;
                         }

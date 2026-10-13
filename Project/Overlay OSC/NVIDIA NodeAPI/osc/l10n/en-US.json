@@ -209,7 +209,7 @@
     "l10n.instantReplayTime2a": "{{arg1}} minute ({{arg2}})",
     "l10n.instantReplayTime3": "{{arg1}} minutes {{arg2}} seconds ({{arg3}})",
     "l10n.instantReplayTime3a": "{{arg1}} minute {{arg2}} seconds ({{arg3}})",
-    "l10n.notificationOpenShare": "Press {{arg1}} to use GeForce Experience in-game overlay",
+    "l10n.notificationOpenShare": "Press {{arg1}} to use in-game overlay",
     "l10n.notificationInstantReplayStarted": "Instant Replay is now on",
     "l10n.notificationInstantReplayStopped": "Instant Replay is now off",
     "l10n.notificationInstantReplaySaved": "Saved last {{arg1}} minutes {{arg2}} secs",

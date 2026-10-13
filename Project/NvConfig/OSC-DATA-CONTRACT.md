@@ -89,7 +89,9 @@ fixed by NvContainer and are never accepted from a client.
 
 - Route: `POST /v1/gpu/preference`
 - Event: `/Duluka/v1/GpuPreferenceApplied`
-- Required fields: `schemaVersion` (1), `eventId`, `exePath`, `adapterId`, `appliedUtc`;
+- Required fields: `schemaVersion` (1), `eventId`, `exePath`, and `appliedUtc`.
+  `adapterId` is required unless `isSystemDefault` is `true`; for system-default events
+  it may be empty. `isSystemDefault` is a boolean and defaults to `false`.
   `displayName` and `adapterName` are display metadata.
 
 ### Adapter inventory

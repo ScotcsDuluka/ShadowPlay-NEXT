@@ -18,6 +18,7 @@
     "NvConfig",
     "NvContainer",
     "NvGraphics",
+    "NvAdapters",
     "NvLauncher/Cef",
     "Overlay OSC/NVIDIA NodeAPI",
     "Overlay OSC/NVIDIA OSC"
@@ -27,6 +28,7 @@
     "NVIDIA Web Helper + NvNode": "Overlay OSC/NVIDIA NodeAPI",
     "NVIDIA OSC": "Overlay OSC/NVIDIA OSC",
     "NvContainer + nvsphelper": "NvContainer",
+    "OSC Adapter Host + DXGI hook module": "Overlay OSC/NVIDIA OSC Adapter",
     "Per-game GPU preferences + runtime verification": "NvGraphics",
     "Launcher CEF body": "NvLauncher/Cef"
   }

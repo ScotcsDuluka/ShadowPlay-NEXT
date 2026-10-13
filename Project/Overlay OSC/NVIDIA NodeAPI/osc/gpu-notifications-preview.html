@@ -3,440 +3,231 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>GPU notifications — OSC preview</title>
+  <title>NvGraphics Adapter — card preview</title>
+  <link rel="stylesheet" href="/mods/notifier/notifier-system/notifier.css">
   <style>
-    @font-face {
-      font-family: nvgcshare;
-      src: url("./nvgcshare.woff2") format("woff2");
-      font-display: block;
-    }
     :root {
       color-scheme: dark;
       font-family: "Segoe UI", sans-serif;
-      background: #101112;
       color: #f1f1f1;
-      --green: #76b900;
-      --muted: #a5a8aa;
+      background: #101112;
       --line: #303336;
+      --muted: #a5a8aa;
     }
     * { box-sizing: border-box; }
-    body { margin: 0; padding: 34px 24px 64px; }
-    main { max-width: 1040px; margin: 0 auto; }
-    header { margin-bottom: 30px; }
-    .eyebrow {
-      margin: 0 0 7px;
-      color: var(--green);
-      font: 700 12px/1.4 "Segoe UI", sans-serif;
-      letter-spacing: .12em;
-      text-transform: uppercase;
-    }
-    h1 { margin: 0; font-size: clamp(27px, 4vw, 38px); line-height: 1.15; }
-    .intro { max-width: 760px; margin: 12px 0 0; color: #c1c4c6; line-height: 1.6; }
-    .summary {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 9px;
-      margin-top: 18px;
-    }
-    .pill {
-      border: 1px solid #3b3f42;
-      border-radius: 999px;
-      padding: 6px 10px;
-      color: #d4d6d8;
-      background: #191b1d;
-      font-size: 12px;
-    }
-    .section-title {
-      display: flex;
-      align-items: baseline;
-      gap: 11px;
-      margin: 30px 0 13px;
-    }
-    h2 { margin: 0; font-size: 20px; }
-    .section-title span { color: var(--muted); font-size: 13px; }
-    .group {
-      margin: 0 0 18px;
-      padding: 17px;
-      border: 1px solid var(--line);
-      border-radius: 9px;
-      background: #17191a;
-    }
-    .group-head {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 14px;
-    }
-    h3 { margin: 0; font-size: 15px; }
-    .route { margin-top: 4px; color: var(--muted); font: 12px/1.5 Consolas, monospace; }
-    .size-chip {
-      flex: 0 0 auto;
-      border-radius: 4px;
-      padding: 5px 8px;
-      color: #dceebf;
-      background: #29351b;
-      font: 12px/1.2 Consolas, monospace;
-    }
-    .updater-demo {
-      flex: 0 0 auto;
-      border: 1px solid #53633d;
-      border-radius: 4px;
-      padding: 5px 8px;
-      color: #e2efcf;
-      background: #202719;
-      font: 12px/1.2 "Segoe UI", sans-serif;
-      cursor: pointer;
-    }
-    .updater-demo:hover { background: #31421f; }
-    .toast-stage {
-      display: flex;
-      align-items: center;
-      min-height: 140px;
-      padding: 16px;
-      overflow: hidden;
-      background:
-        linear-gradient(45deg, #17191b 25%, transparent 25%),
-        linear-gradient(-45deg, #17191b 25%, transparent 25%),
-        linear-gradient(45deg, transparent 75%, #17191b 75%),
-        linear-gradient(-45deg, transparent 75%, #17191b 75%);
-      background-color: #141617;
-      background-size: 18px 18px;
-      background-position: 0 0, 0 9px, 9px -9px, -9px 0;
-    }
-    .toast {
-      display: flex;
-      align-items: center;
-      width: min(100%, 300px);
-      height: 90px;
-      min-height: 90px;
-      padding: 0 10px 0 0;
-      overflow: hidden;
-      border-left: 5px solid var(--green);
-      background: #050505;
-      box-shadow: 0 9px 24px #0009;
-    }
-    .icon {
-      display: grid;
-      flex: 0 0 88px;
-      width: 88px;
-      min-height: 48px;
-      place-items: center;
-      color: #fff;
-      font: 48px/1 nvgcshare, "Segoe UI Symbol", sans-serif;
-    }
-    .exe-icon-fallback { display: none; }
-    .icon.gpu { color: var(--green); }
-    .exe-icon {
-      display: block;
-      width: 56px;
-      height: 56px;
-      object-fit: contain;
-      border: 0;
-      border-radius: 0;
-    }
-    .copy { min-width: 0; flex: 1; }
-    .toast-text {
-      display: -webkit-box;
-      overflow: hidden;
-      color: #f5f5f5;
-      font-size: 16px;
-      line-height: 1.3;
-      -webkit-box-orient: vertical;
-      -webkit-line-clamp: 3;
-    }
-    .toast-subtext {
-      margin-top: 5px;
-      color: #c2c4c6;
-      font-size: 13px;
-      line-height: 1.35;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .toast[data-auto-width] { width: 380px; }
-    .fields {
-      display: grid;
-      grid-template-columns: 96px minmax(0, 1fr);
-      gap: 7px 12px;
-      margin: 15px 0 0;
-      font-size: 13px;
-    }
-    .fields dt { color: var(--muted); }
-    .fields dd { margin: 0; overflow-wrap: anywhere; color: #e5e6e7; }
-    code { color: #d3e6b7; font: 12px/1.5 Consolas, monospace; }
-    .warning {
-      margin: 14px 0 0;
-      border-left: 3px solid #d3a53d;
-      padding: 10px 12px;
-      color: #e4d9bb;
-      background: #292419;
-      font-size: 13px;
-      line-height: 1.5;
-    }
-    .condition {
-      margin: 14px 0 0;
-      border-left: 3px solid #76b900;
-      padding: 10px 12px;
-      color: #dce8ca;
-      background: #202719;
-      font-size: 13px;
-      line-height: 1.55;
-    }
-    .inactive {
-      border: 1px dashed #44484b;
-      border-radius: 8px;
-      padding: 15px 17px;
-      color: #b7b9bb;
-      background: #151718;
-      line-height: 1.55;
-    }
-    .inactive strong { color: #e0e1e2; }
-    @media (max-width: 620px) {
-      body { padding: 23px 14px 45px; }
-      .group { padding: 12px; }
-      .toast-stage { padding: 8px; }
-      .toast { padding-right: 10px; }
-      .fields { grid-template-columns: 82px minmax(0, 1fr); }
-    }
+    body { margin: 0; padding: 32px 22px 56px; }
+    main { max-width: 1080px; margin: 0 auto; }
+    header { margin-bottom: 25px; }
+    .eyebrow { margin: 0 0 7px; color: #76b900; font-size: 12px; font-weight: 700; letter-spacing: .12em; }
+    h1 { margin: 0; font-size: clamp(26px, 4vw, 38px); }
+    .intro { max-width: 790px; color: #c1c4c6; line-height: 1.6; }
+    .summary { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    .pill { padding: 6px 10px; border: 1px solid #3b3f42; border-radius: 999px; color: #d4d6d8; background: #191b1d; font-size: 12px; }
+    .card-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); gap: 14px; }
+    .card-demo { min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: 8px; background: #17191a; }
+    .card-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+    h2 { margin: 0; font-size: 16px; }
+    .size { color: #dceebf; font: 12px Consolas, monospace; }
+    .trigger { min-height: 36px; margin: 0 0 12px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .stage { position: relative; display: flex; min-height: 124px; align-items: center; justify-content: flex-end; overflow: hidden; padding: 12px; background: linear-gradient(135deg, #151719, #0c0d0e); }
+    .stage .nv-toast { position: relative; inset: auto; flex: 0 1 auto; width: min(380px, 100%); opacity: 1; }
+    .stage .nv-toast.is-gpu { width: min(var(--gpu-w, 380px), 100%); }
+    .stage .nv-toast.is-gpu > .nv-toast__green,
+    .stage .nv-toast.is-gpu > .nv-toast__black { width: min(var(--gpu-w, 380px), 100%) !important; }
+    .stage .nv-toast__green,
+    .stage .nv-toast__black { right: -410px; }
+    .stage .nv-toast.is-open > .nv-toast__green,
+    .stage .nv-toast.is-open > .nv-toast__black { right: 0; }
+    .stage .nv-toast__icon-image { display: none; }
+    .stage .nv-toast__text-container { overflow: hidden; }
+    .stage .nv-toast__text,
+    .stage .nv-toast__subtext { max-width: 100%; overflow-wrap: anywhere; }
+    .card-demo[data-kind="running"] .nv-toast__subtext { margin-top: 0; }
+    .details { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 6px 10px; margin: 13px 0 0; font-size: 12px; line-height: 1.45; }
+    .details dt { color: var(--muted); }
+    .details dd { margin: 0; overflow-wrap: anywhere; }
+    code { color: #d3e6b7; font: 12px Consolas, monospace; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 13px; }
+    button { border: 1px solid #53633d; border-radius: 4px; padding: 7px 10px; color: #e2efcf; background: #202719; cursor: pointer; }
+    button:hover { background: #31421f; }
+    .note { margin-top: 18px; border-left: 3px solid #76b900; padding: 10px 12px; color: #dce8ca; background: #202719; font-size: 13px; line-height: 1.5; }
+    @media (max-width: 600px) { body { padding: 20px 12px 40px; } .card-demo { padding: 12px; } }
   </style>
 </head>
 <body>
 <main>
   <header>
-    <p class="eyebrow">OSC · GPU notification inventory</p>
-    <h1>การแจ้งเตือน GPU ทั้งหมด</h1>
-    <p class="intro">
-      แสดงทุก toast กลุ่ม GPU ที่สร้างจริงในโค้ดปัจจุบัน พร้อมหน้าตาการ์ดและค่า
-      ICO / TEXT / TEXTSUB / ขนาด             ใช้ขนาดตามที่ระบุและแสดงไอคอน EXE แบบไม่มีกรอบ ใช้แอป <code>Smash_Legends.exe</code>
-      และ GPU ตัวอย่างเพื่อให้เห็นการตัดบรรทัด
-    </p>
+    <p class="eyebrow">OSC · NVGRAPHICS-ADAPTER.JS</p>
+    <h1>การ์ดทั้งหมดจาก NvGraphics-Adapter</h1>
+    <p class="intro">หน้านี้แยกตามรูปแบบการ์ดที่ NvGraphics สร้างจริง โดยใช้ notifier CSS และองค์ประกอบ toast ชุดเดียวกับ runtime: การ์ดเกมบน GPU ที่ apply แล้ว, การตั้ง GPU เฉพาะแอป และการกลับไป System Default</p>
     <div class="summary">
-      <span class="pill">Active toast groups: 3</span>
-      <span class="pill">เหตุการณ์ GPU: 4 รูปแบบ</span>
-      <span class="pill">Runtime GPU toast: ปิด/ไม่มีผู้รับ event</span>
+      <span class="pill">3 รูปแบบการ์ด</span>
+      <span class="pill">GPU notifications เปิด/ปิดได้</span>
+      <span class="pill">Updater UI: การ์ด preference</span>
     </div>
   </header>
 
-  <div class="section-title">
-    <h2>การแจ้งเตือนที่ทำงานอยู่</h2>
-    <span>การ์ด 2 เริ่มหลังการ์ด 1 ปิดแล้ว 800 ms</span>
-  </div>
-
-  <section class="group">
-    <div class="group-head">
-      <div>
-        <h3>1. เปิดแอปที่อยู่ใน Game Profiles</h3>
-        <div class="route">group: gpu-app-open:&lt;exe path&gt; · Updater UI เฉพาะ EXE เดิม</div>
-      </div>
-      <span class="size-chip">ปกติ · 300 × 90</span>
-      <button class="updater-demo" type="button">ทดสอบ Updater UI</button>
-    </div>
-    <div class="toast-stage">
-      <article class="toast">
-        <div class="icon" aria-label="ไอคอน EXE"><img class="exe-icon" data-exe-icon alt=""><span class="exe-icon-fallback">&#xE94F;</span></div>
-        <div class="copy">
-          <div class="toast-text">กด Alt + Z เพื่อใช้การโอเวอร์เลย์ในเกมผ่าน GeForce Experience</div>
+  <section class="card-list" aria-label="NvGraphics notification cards">
+    <article class="card-demo" data-kind="running">
+      <div class="card-head"><h2>1. เกมกำลังทำงานบน GPU</h2><span class="size" data-size>คำนวณความกว้างจริง · สูง 90 px</span></div>
+      <p class="trigger">เมื่อเกมปิดการ์ด OpenShare แล้ว และ NvGraphics พบ EXE ที่กำลังทำงานพร้อม per-app GPU override ที่ apply สำเร็จ</p>
+      <div class="stage">
+        <div class="nv-toast is-gpu is-open" style="--gpu-w:380px">
+          <div class="nv-toast__green"></div>
+          <div class="nv-toast__black"><div class="nv-toast__content">
+            <span class="nv-toast__icon">&#xE94F;</span>
+            <img class="nv-toast__icon-image" alt="">
+            <div class="nv-toast__text-container">
+              <div class="nv-toast__text">Smash_Legends.exe กำลังทำงานบน GPU</div>
+              <div class="nv-toast__subtext">NVIDIA GeForce RTX 4080</div>
+            </div>
+          </div></div>
         </div>
-      </article>
-    </div>
-    <dl class="fields">
-      <dt>ICO</dt><dd>ไอคอน EXE จาก Game Profile (<code>profile.iconDataUri</code>)</dd>
-      <dt>TEXT</dt><dd><code>l10n.notificationOpenShare</code> (Alt + Z) → กด Alt + Z เพื่อใช้การโอเวอร์เลย์ในเกมผ่าน GeForce Experience</dd>
-      <dt>TEXTSUB</dt><dd>ไม่มี</dd>
-      <dt>ขนาด</dt><dd>การ์ดปกติ · 300 × 90 px</dd>
-    </dl>
-    <p class="condition"><strong>เงื่อนไขแสดง:</strong> เปิดการแจ้งเตือน GPU อยู่ และตรวจพบว่า EXE เปลี่ยนจากไม่รันเป็นกำลังรัน พร้อมมีโปรไฟล์อยู่ใน Game Profiles; รอบตรวจครั้งแรกหลังเปิด OSC จะตั้งสถานะเริ่มต้นและไม่แจ้งแอปที่รันอยู่ก่อนแล้ว</p>
+      </div>
+      <dl class="details">
+        <dt>ICO</dt><dd>ไอคอน EXE; fallback <code>&#xE94F;</code></dd>
+        <dt>TEXT</dt><dd><code>l10n.gpuAppRunningOnGpu</code> — มี EXE เป็น <code>arg1</code></dd>
+        <dt>TEXTSUB</dt><dd>ชื่อ adapter ที่ apply แล้ว (<code>lastAppliedAdapterId</code>)</dd>
+        <dt>ขนาด</dt><dd data-width>คำนวณจากข้อความ; อย่างน้อย 380 px (หรือเท่าความกว้าง viewport ที่แคบกว่า)</dd>
+        <dt>Updater UI</dt><dd>ไม่เปิด</dd>
+      </dl>
+      <div class="actions"><button type="button" data-replay>เล่นการ์ด</button></div>
+    </article>
+
+    <article class="card-demo" data-kind="applied">
+      <div class="card-head"><h2>2. ตั้งแอปให้ใช้ GPU</h2><span class="size" data-size>คำนวณความกว้างจริง · สูง 90 px</span></div>
+      <p class="trigger">เมื่อได้รับ <code>GpuPreferenceApplied</code> ใหม่ โดย <code>isSystemDefault: false</code> และการแจ้งเตือน GPU เปิดอยู่</p>
+      <div class="stage">
+        <div class="nv-toast is-gpu is-open" style="--gpu-w:380px">
+          <div class="nv-toast__green"></div>
+          <div class="nv-toast__black"><div class="nv-toast__content">
+            <span class="nv-toast__icon is-highlighted">&#xE94F;</span>
+            <img class="nv-toast__icon-image" alt="">
+            <div class="nv-toast__text-container">
+              <div class="nv-toast__text">ตั้งค่าให้ Smash_Legends.exe ใช้ GPU</div>
+              <div class="nv-toast__subtext">NVIDIA GeForce RTX 4080</div>
+            </div>
+          </div></div>
+        </div>
+      </div>
+      <dl class="details">
+        <dt>ICO</dt><dd>ไอคอน EXE; fallback <code>&#xE94F;</code></dd>
+        <dt>TEXT</dt><dd><code>l10n.gpuPreferenceApplied</code> — EXE และคำว่า GPU เป็น args</dd>
+        <dt>TEXTSUB</dt><dd>ชื่อ adapter จาก event (<code>adapterName</code>/<code>adapterId</code>)</dd>
+        <dt>ขนาด</dt><dd data-width>คำนวณจากข้อความ; อย่างน้อย 380 px (หรือเท่าความกว้าง viewport ที่แคบกว่า)</dd>
+        <dt>Updater UI</dt><dd>เปิด — ใช้ dance animation ของ notifier</dd>
+      </dl>
+      <div class="actions"><button type="button" data-replay>เล่นการ์ด</button><button type="button" data-dance>ทดสอบ Updater UI</button></div>
+    </article>
+
+    <article class="card-demo" data-kind="default">
+      <div class="card-head"><h2>3. กลับไปใช้ System Default</h2><span class="size" data-size>คำนวณความกว้างจริง · สูง 90 px</span></div>
+      <p class="trigger">เมื่อได้รับ <code>GpuPreferenceApplied</code> ใหม่ โดย <code>isSystemDefault: true</code> และการแจ้งเตือน GPU เปิดอยู่</p>
+      <div class="stage">
+        <div class="nv-toast is-gpu is-open" style="--gpu-w:380px">
+          <div class="nv-toast__green"></div>
+          <div class="nv-toast__black"><div class="nv-toast__content">
+            <span class="nv-toast__icon">&#xE94F;</span>
+            <img class="nv-toast__icon-image" alt="">
+            <div class="nv-toast__text-container">
+              <div class="nv-toast__text">ตั้งค่าให้ Smash_Legends.exe ใช้ค่าเริ่มต้นแล้ว</div>
+              <div class="nv-toast__subtext">GPU name for System default is unavailable</div>
+            </div>
+          </div></div>
+        </div>
+      </div>
+      <dl class="details">
+        <dt>ICO</dt><dd>ไอคอน EXE; fallback <code>&#xE94F;</code></dd>
+        <dt>TEXT</dt><dd><code>l10n.gpuPreferenceDefault</code> — มี EXE เป็น <code>arg1</code></dd>
+        <dt>TEXTSUB</dt><dd><code>l10n.gpuSystemDefaultUnavailable</code> ตาม fallback ใน adapter</dd>
+        <dt>ขนาด</dt><dd data-width>คำนวณจากข้อความ; อย่างน้อย 380 px (หรือเท่าความกว้าง viewport ที่แคบกว่า)</dd>
+        <dt>Updater UI</dt><dd>เปิด — ใช้ dance animation ของ notifier</dd>
+      </dl>
+      <div class="actions"><button type="button" data-replay>เล่นการ์ด</button><button type="button" data-dance>ทดสอบ Updater UI</button></div>
+    </article>
   </section>
 
-  <section class="group">
-    <div class="group-head">
-      <div>
-        <h3>2. เปิดแอป — แจ้ง GPU ที่ Windows Settings เลือก</h3>
-        <div class="route">group: gpu-windows-preference:&lt;exe path&gt; · Updater UI เฉพาะ EXE เดิม</div>
-      </div>
-      <span class="size-chip">350 × 90</span>
-      <button class="updater-demo" type="button">ทดสอบ Updater UI</button>
-    </div>
-    <div class="toast-stage">
-      <article class="toast" data-auto-width>
-        <div class="icon" aria-label="ไอคอน EXE"><img class="exe-icon" data-exe-icon alt=""><span class="exe-icon-fallback">&#xE94F;</span></div>
-        <div class="copy">
-          <div class="toast-text">Smash_Legends.exe กำลังรันบน GPU</div>
-          <div class="toast-subtext">NVIDIA GeForce GTX 1080 Ti - ASUS ROG STRIX</div>
-        </div>
-      </article>
-    </div>
-    <dl class="fields">
-      <dt>ICO</dt><dd>ไอคอน EXE (<code>profile.iconDataUri</code>)</dd>
-      <dt>TEXT</dt><dd><code>{EXE} กำลังรันบน GPU</code></dd>
-      <dt>TEXTSUB</dt><dd><code>{GPU Name}</code> จาก Windows GPU preference</dd>
-      <dt>ขนาด</dt><dd>350 × 90 px</dd>
-    </dl>
-    <p class="warning">จะแสดงหลังการ์ด 1 ปิดและถอนออกจากจอแล้ว จากนั้นเว้นอีก 800 ms จึงเริ่มการ์ดนี้</p>
-    <p class="condition"><strong>เงื่อนไขแสดง:</strong> ต้องผ่านเงื่อนไขการเปิดแอปของการ์ด 1 และมี <code>lastAppliedAdapterId</code> ที่ไม่ว่างใน Windows GPU Settings; ถ้าเป็น System default จะไม่แสดงการ์ดนี้</p>
-  </section>
-
-  <section class="group">
-    <div class="group-head">
-      <div>
-        <h3>3. ตั้งค่าเกมให้ใช้ GPU ที่ระบุ</h3>
-        <div class="route">group: gpu-pref:&lt;exe path&gt; · Updater UI เฉพาะ EXE เดิม</div>
-      </div>
-      <span class="size-chip">380 × 90</span>
-      <button class="updater-demo" type="button">ทดสอบ Updater UI</button>
-    </div>
-    <div class="toast-stage">
-      <article class="toast" data-auto-width>
-        <div class="icon" aria-label="ไอคอน EXE"><img class="exe-icon" data-exe-icon alt=""><span class="exe-icon-fallback">&#xE94F;</span></div>
-        <div class="copy">
-          <div class="toast-text">ตั้งค่าให้ Smash_Legends.exe ใช้ GPU</div>
-          <div class="toast-subtext">NVIDIA GeForce GTX 1080 Ti - ASUS ROG STRIX</div>
-        </div>
-      </article>
-    </div>
-    <dl class="fields">
-      <dt>ICO</dt><dd>ไอคอน EXE (<code>iconDataUri</code> จากโปรไฟล์/Windows Graphics)</dd>
-      <dt>TEXT</dt><dd><code>l10n.gpuPreferenceApplied</code> → ตั้งค่าให้ {EXE} ใช้ GPU</dd>
-      <dt>TEXTSUB</dt><dd>ชื่อการ์ดที่ตั้งค่า</dd>
-      <dt>ขนาด</dt><dd>380 × 90 px</dd>
-    </dl>
-    <p class="condition"><strong>เงื่อนไขแสดง:</strong> ได้รับ GPU preference event ที่มี <code>exePath</code> ใช้งานได้, ไม่ใช่ event ซ้ำ และการแจ้งเตือน GPU เปิดอยู่; event ต้องเป็นการเลือก GPU (ไม่ใช่ System default)</p>
-  </section>
-
-  <section class="group">
-    <div class="group-head">
-      <div>
-        <h3>4. เปลี่ยนกลับเป็น System default</h3>
-        <div class="route">group: gpu-pref:&lt;exe path&gt; · Updater UI เฉพาะ EXE เดิม</div>
-      </div>
-      <span class="size-chip">380 × 90</span>
-      <button class="updater-demo" type="button">ทดสอบ Updater UI</button>
-    </div>
-    <div class="toast-stage">
-      <article class="toast" data-auto-width>
-        <div class="icon" aria-label="ไอคอน EXE"><img class="exe-icon" data-exe-icon alt=""><span class="exe-icon-fallback">&#xE94F;</span></div>
-        <div class="copy">
-          <div class="toast-text">ตั้งค่าให้ Smash_Legends.exe ใช้ค่าเริ่มต้นแล้ว</div>
-          <div class="toast-subtext" data-system-default-name>กำลังอ่านชื่อ GPU ของ System default…</div>
-        </div>
-      </article>
-    </div>
-    <dl class="fields">
-      <dt>ICO</dt><dd>ไอคอน EXE (<code>iconDataUri</code> จากโปรไฟล์/Windows Graphics)</dd>
-      <dt>TEXT</dt><dd><code>l10n.gpuPreferenceDefault</code> → ตั้งค่าให้ {EXE} ใช้ค่าเริ่มต้นแล้ว</dd>
-      <dt>TEXTSUB</dt><dd data-system-default-field><code>{GPU Name}</code> ของ System default ที่ Windows รายงาน</dd>
-      <dt>ขนาด</dt><dd>380 × 90 px</dd>
-    </dl>
-    <p class="condition"><strong>เงื่อนไขแสดง:</strong> ได้รับ GPU preference event ที่มี <code>exePath</code> ใช้งานได้, ไม่ใช่ event ซ้ำ, การแจ้งเตือน GPU เปิดอยู่ และ event ระบุ <code>isSystemDefault: true</code> (ลบ override กลับเป็นค่าเริ่มต้น)</p>
-  </section>
-
-  <div class="section-title">
-    <h2>รายการที่ไม่แสดงเป็น toast ตอนนี้</h2>
-  </div>
-  <div class="inactive">
-    <strong>Runtime GPU (4 keys):</strong>
-    <code>gpuRuntimeStarted</code>, <code>gpuRuntimeChanged</code>,
-    <code>gpuRuntimeMultiple</code>, <code>gpuRuntimeUnknown</code>.
-    ยังมีข้อความ l10n และ event validation อยู่ แต่ไม่มี notifier สมัครรับ Runtime GPU
-    event ใน OSC ปัจจุบัน จึงไม่มี ICO / TEXTSUB / ขนาดการ์ดที่กำลังแสดงจริง
-    (ตรงกับการปิดการตรวจ Runtime GPU ที่กำหนดไว้ก่อนหน้า)
-  </div>
-  <script>
-    function replayUpdaterUi(button) {
-      var card = button.closest('.group').querySelector('.toast');
-      if (card.dataset.updaterBusy) return;
-      card.dataset.updaterBusy = 'true';
-      card.style.transition = 'transform 600ms cubic-bezier(0.215, 0.61, 0.355, 1), opacity 200ms';
-      card.style.transform = 'translateX(110%)';
-      card.style.opacity = '0';
-      window.setTimeout(function () {
-        card.style.transition = 'none';
-        card.style.transform = 'translateX(-110%)';
-        void card.offsetWidth;
-        card.style.transition = 'transform 300ms cubic-bezier(0.215, 0.61, 0.355, 1), opacity 200ms';
-        card.style.transform = 'translateX(0)';
-        card.style.opacity = '1';
-        window.setTimeout(function () {
-          card.style.transition = '';
-          card.style.transform = '';
-          card.style.opacity = '';
-          delete card.dataset.updaterBusy;
-        }, 320);
-      }, 600);
-    }
-    document.querySelectorAll('.updater-demo').forEach(function (button) {
-      button.addEventListener('click', function () { replayUpdaterUi(button); });
-    });
-
-    function showExeIconFallback(image) {
-      image.style.display = 'none';
-      image.parentNode.querySelector('.exe-icon-fallback').style.display = 'block';
-    }
-    document.querySelectorAll('[data-exe-icon]').forEach(function (image) {
-      image.addEventListener('error', function () { showExeIconFallback(image); });
-    });
-
-    function fitGpuCards() {
+  <p class="note"><strong>ขอบเขต:</strong> OpenShare ไม่รวมในหน้านี้ เพราะเป็นการ์ดของ <code>OSC-Adapter.js</code>. การ์ด GPU ตอนเริ่มเกมจะไม่แสดงหากไม่มี <code>lastAppliedAdapterId</code>.</p>
+</main>
+<script>
+  function fitCards() {
+    var viewportLimit = Math.max(280, window.innerWidth - 40);
+    document.querySelectorAll('.card-demo').forEach(function (demo) {
+      var card = demo.querySelector('.nv-toast');
+      var text = card.querySelector('.nv-toast__text').textContent;
+      var subtext = card.querySelector('.nv-toast__subtext').textContent;
       var canvas = document.createElement('canvas');
       var context = canvas.getContext('2d');
-      if (!context) return;
-      document.querySelectorAll('.toast[data-auto-width]').forEach(function (card) {
-        var text = card.querySelector('.toast-text').textContent;
-        var subtext = card.querySelector('.toast-subtext').textContent;
-        context.font = '13px "Segoe UI"';
+      var width = 380;
+      if (context) {
+        context.font = '14px "Segoe UI"';
         var subtextWidth = context.measureText(subtext).width;
         context.font = '16px "Segoe UI"';
         var textWidth = context.measureText(text).width;
-        var desired = Math.ceil(Math.max(subtextWidth, textWidth) + 108);
-        var width = Math.max(380, Math.min(desired, Math.max(380, window.innerWidth - 48)));
-        card.style.width = width + 'px';
-        card.closest('.group').querySelector('.size-chip').textContent = width + ' × 90';
-        card.closest('.group').querySelector('.fields dd:last-child').textContent = width + ' × 90 px';
-      });
-    }
-    fetch('/manager').then(function (response) {
-      if (!response.ok) throw new Error('HTTP ' + response.status);
-      return response.json();
-    }).then(function (state) {
-      var path = 'c:\\program files (x86)\\steam\\steamapps\\common\\smash legends\\smash_legends.exe';
-      var candidates = (state.profiles || []).concat(state.windowsApps || []);
-      var app = candidates.find(function (item) {
-        return String(item.exePath || '').toLowerCase() === path && item.iconDataUri;
-      });
-      var defaultAdapter = (state.adapters || []).find(function (adapter) {
-        return adapter.isSystemDefaultDisplayAdapter;
-      });
-      if (app) {
-        document.querySelectorAll('[data-exe-icon]').forEach(function (image) {
-          image.src = app.iconDataUri;
-          image.style.display = 'block';
-          image.parentNode.querySelector('.exe-icon-fallback').style.display = 'none';
-        });
-      } else {
-        document.querySelectorAll('[data-exe-icon]').forEach(showExeIconFallback);
+        var desiredWidth = Math.ceil(Math.max(subtextWidth, textWidth) + 124);
+        width = Math.max(Math.min(380, viewportLimit), Math.min(desiredWidth, viewportLimit));
       }
-      if (defaultAdapter) {
-        document.querySelectorAll('[data-system-default-name]').forEach(function (node) {
-          node.textContent = defaultAdapter.name;
-        });
-        document.querySelectorAll('[data-system-default-field]').forEach(function (node) {
-          node.textContent = defaultAdapter.name + ' (Windows primary display adapter)';
-        });
-      } else {
-        document.querySelectorAll('[data-system-default-name]').forEach(function (node) {
-          node.textContent = 'ไม่พบชื่อ GPU ของ System default';
-        });
-      }
-      fitGpuCards();
-    }).catch(function (error) {
-      console.warn('Could not load the real EXE icon for the preview:', error);
-      document.querySelectorAll('[data-system-default-name]').forEach(function (node) {
-        node.textContent = 'ไม่พบชื่อ GPU ของ System default';
-      });
-      fitGpuCards();
+      card.style.setProperty('--gpu-w', width + 'px');
+      demo.querySelector('[data-size]').textContent = width + ' × 90 px';
+      demo.querySelector('[data-width]').textContent = width + ' × 90 px';
     });
-    window.addEventListener('resize', fitGpuCards);
-  </script>
-</main>
+  }
+
+  function replayCard(card) {
+    card.classList.remove('is-open');
+    window.setTimeout(function () {
+      void card.offsetWidth;
+      card.classList.add('is-open');
+    }, 30);
+  }
+
+  function replayDance(card) {
+    if (card.dataset.dancing) return;
+    card.dataset.dancing = 'true';
+    var black = card.querySelector('.nv-toast__black');
+    var content = card.querySelector('.nv-toast__content');
+    var message = card.querySelector('.nv-toast__text');
+    var originalText = message.dataset.original || message.textContent;
+    message.dataset.original = originalText;
+    var updatedText = originalText + ' · อัปเดตแล้ว';
+    var right = '-' + (card.offsetWidth + 30) + 'px';
+    black.style.transition = 'right 300ms cubic-bezier(0.215, 0.61, 0.355, 1)';
+    black.style.right = right;
+    content.style.transition = 'none';
+    content.style.opacity = '0';
+    window.setTimeout(function () {
+      black.style.transition = 'none';
+      black.style.right = right;
+      void black.offsetWidth;
+      message.textContent = message.textContent === originalText ? updatedText : originalText;
+      black.style.transition = 'right 300ms cubic-bezier(0.215, 0.61, 0.355, 1)';
+      black.style.right = '0';
+      window.setTimeout(function () {
+        content.style.transition = 'opacity 200ms';
+        content.style.opacity = '1';
+        window.setTimeout(function () {
+          content.style.transition = '';
+          content.style.opacity = '';
+        }, 220);
+        black.style.transition = '';
+        black.style.right = '';
+        delete card.dataset.dancing;
+      }, 320);
+    }, 300);
+  }
+
+  document.querySelectorAll('.card-demo').forEach(function (demo) {
+    var card = demo.querySelector('.nv-toast');
+    demo.querySelector('[data-replay]').addEventListener('click', function () {
+      replayCard(card);
+    });
+    var danceButton = demo.querySelector('[data-dance]');
+    if (danceButton) danceButton.addEventListener('click', function () {
+      replayDance(card);
+    });
+  });
+  fitCards();
+  window.addEventListener('resize', fitCards);
+</script>
 </body>
 </html>

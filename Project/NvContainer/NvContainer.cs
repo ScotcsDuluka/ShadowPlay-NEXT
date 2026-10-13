@@ -36,8 +36,11 @@ static class NvContainer
     static int NvGraphicsReadyPid;
     static long NvGraphicsReadyWindow;
     static DateTime NvGraphicsLastReadyUtc = DateTime.MinValue;
-    static NvContainerTestApi TestApi;
-    static NvContainerObsRuntime ObsRuntime;
+    static ContainerTestApi TestApi;
+    static ObsRuntime ObsRuntime;
+    static ApplicationOntologyClient ApplicationOntologyClient;
+    static GameWatcher GameWatcher;
+    static OscAdapterLifecycle OscAdapterLifecycle;
     static readonly HttpClient NodeApiHttp = new HttpClient
     {
         Timeout = TimeSpan.FromMilliseconds(1500)
@@ -123,6 +126,62 @@ static class NvContainer
             return port > 0 && port <= 65535 ? port : 59012;
         }
         catch { return 59012; }
+    }
+
+    static string ApplicationOntologyBaseUrl()
+    {
+        var environmentValue = Environment.GetEnvironmentVariable("APPLICATION_ONTOLOGY_API_BASE_URL");
+        if (!string.IsNullOrWhiteSpace(environmentValue)) return environmentValue.Trim();
+
+        try
+        {
+            var value = C.GetProperty("applicationOntology").GetProperty("baseUrl").GetString();
+            if (!string.IsNullOrWhiteSpace(value)) return value.Trim();
+        }
+        catch { }
+
+        return "https://nv-ontology.pages.dev/api/";
+    }
+
+    static int ApplicationOntologyTimeoutSeconds()
+    {
+        try
+        {
+            var value = C.GetProperty("applicationOntology").GetProperty("timeoutSeconds").GetInt32();
+            return value >= 2 && value <= 15 ? value : 5;
+        }
+        catch { return 5; }
+    }
+
+    static bool ConfigBool(string section, string property, bool fallback)
+    {
+        try
+        {
+            var value = C.GetProperty(section).GetProperty(property);
+            return value.ValueKind == JsonValueKind.True || value.ValueKind == JsonValueKind.False
+                ? value.GetBoolean() : fallback;
+        }
+        catch { return fallback; }
+    }
+
+    static int ConfigInt(string section, string property, int fallback, int min, int max)
+    {
+        try
+        {
+            var value = C.GetProperty(section).GetProperty(property).GetInt32();
+            return value >= min && value <= max ? value : fallback;
+        }
+        catch { return fallback; }
+    }
+
+    static string ConfigString(string section, string property, string fallback)
+    {
+        try
+        {
+            var value = C.GetProperty(section).GetProperty(property).GetString();
+            return string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+        }
+        catch { return fallback; }
     }
 
     static string NvGraphicsExe()
@@ -263,6 +322,22 @@ static class NvContainer
         catch (Exception ex)
         {
             Log("[obs] event publish failed: " + ex.Message);
+        }
+    }
+
+    static void PublishGameWatcherStatus(object data)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(JsonSerializer.Serialize(new[]
+            {
+                new { name = "/Duluka/v1/GameWatcherStatus", data }
+            }));
+            PublishContainerEvents(document.RootElement.Clone());
+        }
+        catch (Exception ex)
+        {
+            Log("[game-watcher] status event publish failed: " + ex.Message);
         }
     }
 
@@ -575,11 +650,31 @@ static class NvContainer
         // (แม่เราเขียนทับจะทำ Share แท้อ่านค่า pairing ผิด)
         if (ModeOurs)
         {
-            ObsRuntime = new NvContainerObsRuntime(
+            ObsRuntime = new ObsRuntime(
                 Path.Combine(BuildRoot, "NvConfig", "notifier_obs.json"), Log, PublishObsEvent);
             ObsRuntime.Start();
-            TestApi = new NvContainerTestApi(TestModeEnabled(), ControlApiPort(), Log,
-                PublishContainerEvents, ObsRuntime, MarkNvGraphicsReady, NvGraphicsStatus, OpenNvGraphics);
+            ApplicationOntologyClient = new ApplicationOntologyClient(
+                ApplicationOntologyBaseUrl(), ApplicationOntologyTimeoutSeconds(), Log);
+            OscAdapterLifecycle = new OscAdapterLifecycle(
+                BuildRoot,
+                ConfigBool("oscAdapter", "enabled", false),
+                ConfigString("oscAdapter", "executable", @"NvAdapters\NVIDIA OSC Adapter.exe"),
+                ConfigString("oscAdapter", "workingDirectory", "NvAdapters"),
+                ConfigInt("oscAdapter", "stopGraceSeconds", 3, 0, 15),
+                Log);
+            GameWatcher = new GameWatcher(
+                ApplicationOntologyClient,
+                OscAdapterLifecycle,
+                ConfigBool("gameWatcher", "enabled", true),
+                ConfigInt("gameWatcher", "pollIntervalSeconds", 3, 1, 15),
+                ConfigInt("gameWatcher", "catalogRefreshSeconds", 30, 10, 300),
+                ConfigInt("gameWatcher", "maxConcurrentResolutions", 4, 1, 8),
+                PublishGameWatcherStatus,
+                Log);
+            GameWatcher.Start();
+            TestApi = new ContainerTestApi(TestModeEnabled(), ControlApiPort(), Log,
+                PublishContainerEvents, ObsRuntime, MarkNvGraphicsReady, NvGraphicsStatus,
+                OpenNvGraphics, ApplicationOntologyClient, GameWatcher, OscAdapterLifecycle);
             TestApi.Start();
             Log("[test-api] test mode " + (TestModeEnabled() ? "enabled: capture/filter actions are simulated" : "disabled"));
             HoldPairing();

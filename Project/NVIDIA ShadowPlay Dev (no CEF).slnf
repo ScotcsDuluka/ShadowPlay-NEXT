@@ -2,28 +2,21 @@
   "solution": {
     "path": "NVIDIA ShadowPlay.sln",
     "projects": [
-      "Launcher.exe\\Launcher.vbproj",
-      "NvBackend\\NvBackend.exe\\NVIDIA Backend.vbproj",
-      "NvBackend\\NVIDIA Web Helper.exe\\NVIDIA Web Helper.vbproj",
-      "NvContainer\\NvContainer\\NvContainer.csproj",
-      "NvGallery\\WinForm\\Gallery.Video.dll\\Gallery.Video.vbproj",
-      "NvOverlay\\Cef\\NvShim\\NvShim.vbproj",
-      "NvOverlay\\WinForm\\NvNotifier.exe\\NVIDIA Notifier.vbproj",
-      "NvOverlay\\WinForm\\NvShadowPlay.exe\\NVIDIA ShadowPlay.vbproj",
-      "NvOverlay\\WinForm\\NvControls\\NvControls.dll\\NVIDIA Controls.vbproj",
-      "ShadowPlay\\nvsphelper64.exe\\NVIDIA ShadowPlay Helper.vbproj",
-      "ShadowPlay\\NvCapServices\\nvspcap - nvidia\\nvspcap.vbproj",
-      "ShadowPlay\\NvCapture\\CaptureEngine.dll\\CaptureEngine.vbproj",
-      "ShadowPlay\\NvCapture\\CaptureEngine.Audio.dll\\CaptureEngine.Audio.csproj",
-      "ShadowPlay\\NvCapture\\CaptureEngine.Audio.Wasapi.dll\\CaptureEngine.Audio.Wasapi.csproj",
-      "ShadowPlay\\NvCapture\\CaptureEngine.Encoder.dll\\CaptureEngine.Encoder.vbproj",
-      "ShadowPlay\\NvCapture\\CaptureEngine.Encoder.Nvenc.dll\\CaptureEngine.Encoder.Nvenc.vbproj",
-      "ShadowPlay\\NvCapture\\CaptureEngine.FFmpegBackend.dll\\CaptureEngine.FFmpegBackend.vbproj",
-      "ShadowPlay\\NvCapture\\CaptureEngine.Recording.dll\\CaptureEngine.Recording.vbproj",
-      "ShadowPlay\\NvCapture\\CaptureEngine.Recording.ConsoleDriver.exe\\CaptureEngine.Recording.ConsoleDriver.vbproj",
-      "ShadowPlay\\NvCapture\\CaptureEngine.Video.dll\\CaptureEngine.Video.vbproj",
-      "ShadowPlay\\NvCapture\\CaptureEngine.Video.Ddagrab.dll\\CaptureEngine.Video.Ddagrab.vbproj",
-      "ShadowPlay\\WgcCapture.dll\\WgcCapture.csproj"
+      "Overlay OSC\\NVIDIA NodeAPI\\NVIDIA Web Helper\\NVIDIA Web Helper.vbproj",
+      "NvContainer\\NvContainer.csproj",
+      "ShadowPlay\\NvShadowPlayHelper\\nvsphelper.csproj",
+      "ShadowPlay\\Duluka Capture\\Unknown\\CaptureEngine.dll\\CaptureEngine.vbproj",
+      "ShadowPlay\\Duluka Capture\\Unknown\\CaptureEngine.Audio.dll\\CaptureEngine.Audio.csproj",
+      "ShadowPlay\\Duluka Capture\\Unknown\\CaptureEngine.Audio.Wasapi.dll\\CaptureEngine.Audio.Wasapi.csproj",
+      "ShadowPlay\\Duluka Capture\\Unknown\\CaptureEngine.Encoder.dll\\CaptureEngine.Encoder.vbproj",
+      "ShadowPlay\\Duluka Capture\\Unknown\\CaptureEngine.Encoder.Nvenc.dll\\CaptureEngine.Encoder.Nvenc.vbproj",
+      "ShadowPlay\\Duluka Capture\\Unknown\\CaptureEngine.FFmpegBackend.dll\\CaptureEngine.FFmpegBackend.vbproj",
+      "ShadowPlay\\Duluka Capture\\Unknown\\CaptureEngine.Recording.dll\\CaptureEngine.Recording.vbproj",
+      "ShadowPlay\\Duluka Capture\\Unknown\\CaptureEngine.Recording.ConsoleDriver.exe\\CaptureEngine.Recording.ConsoleDriver.vbproj",
+      "ShadowPlay\\Duluka Capture\\Unknown\\CaptureEngine.Video.dll\\CaptureEngine.Video.vbproj",
+      "ShadowPlay\\Duluka Capture\\Unknown\\CaptureEngine.Video.Ddagrab.dll\\CaptureEngine.Video.Ddagrab.vbproj",
+      "ShadowPlay\\Duluka Capture\\Unknown\\WgcCapture.dll\\WgcCapture.csproj",
+      "NvGraphics\\NvGraphics.App\\NvGraphics.csproj"
     ]
   }
 }

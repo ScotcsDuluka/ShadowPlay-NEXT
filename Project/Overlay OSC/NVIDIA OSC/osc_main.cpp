@@ -45,6 +45,7 @@
 #include <dxgi1_2.h>
 #include <dcomp.h>
 #include <d3dcompiler.h>
+#include "../NVIDIA OSC Adapter/include/osc_frame_bridge.h"
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "dcomp.lib")
@@ -69,7 +70,7 @@ struct OscConfig {
     std::wstring subprocess_path;
     int debug_port = 59099;
     bool windowed = true;          // ★ สเปก OWNER (10:5x): ให้ CEF จัดการ render เอง (GPU native)
-    int max_fps = 240;             // shared-texture OSR supports the requested rate; software OSR caps at 60
+    int max_fps = 60;
     bool show_fps = true;          // ★ FPS meter บน overlay (นับเฟรมที่แสดงจริง)
     bool gdi_compositor = false;   // true = UpdateLayeredWindow (แสดงผลชัวร์) แทน DComp
 };
@@ -178,7 +179,7 @@ static void LoadConfig() {
     g_cfg.debug_port = (int)CfgNum(json, "debugPort", 59099);
     g_cfg.gdi_compositor = CfgStr(json, "compositor") == L"gdi";
     g_cfg.windowed = CfgNum(json, "windowed", 1) != 0;
-    g_cfg.max_fps = (int)CfgNum(json, "maxFps", 240);
+    g_cfg.max_fps = (int)CfgNum(json, "maxFps", 60);
     if (g_cfg.max_fps < 1 || g_cfg.max_fps > 240) g_cfg.max_fps = 240;
     g_cfg.show_fps = CfgNum(json, "showFps", 1) != 0;
 }
@@ -273,6 +274,7 @@ static ID3D11RenderTargetView* g_gpu_rtv = nullptr;
 static ID3D11PixelShader* g_gpu_ps = nullptr;        // premul (upload path)
 static ID3D11PixelShader* g_gpu_ps_pass = nullptr;   // passthrough (shared path)
 static ID3D11VertexShader* g_gpu_vs = nullptr;
+static ID3D11VertexShader* g_gpu_vs_shared = nullptr;
 static ID3D11SamplerState* g_gpu_samp = nullptr;
 static bool g_gpu_ok = false;           // GPU path ใช้ได้
 static std::atomic<bool> g_gpu_frame{ false };
@@ -288,12 +290,686 @@ static IDXGIDevice2* g_dxgi_dev2 = nullptr;
 static bool g_dcomp_bound = false;
 static ID3D11Texture2D* g_own_rt = nullptr;   // RT ของเรา (back buffer ของ swapchain เครื่องนี้ bind=0 วาดไม่ได้)
 static int g_own_w = 0, g_own_h = 0;
-static bool g_gpu_shared_frame_initialized = false;
+static HANDLE g_frame_bridge_mapping = nullptr;
+static osc_frame_bridge::Frame* g_frame_bridge = nullptr;
+static HANDLE g_consumer_adapter_mapping = nullptr;
+static osc_frame_bridge::ConsumerAdapterInfo* g_consumer_adapter_info = nullptr;
+static std::atomic<bool> g_game_focused{ false };
+static std::atomic<bool> g_ui_open_snapshot{ false };
+static std::atomic<bool> g_notifier_overlay_visible{ false };
+static constexpr UINT WM_OSC_FOCUS_MODE = WM_APP + 0x41;
+static ID3D11Texture2D* g_adapter_frame_texture = nullptr;
+static IDXGIKeyedMutex* g_adapter_frame_mutex = nullptr;
+static HANDLE g_adapter_frame_handle = nullptr;
+static ID3D11Device* g_adapter_frame_device = nullptr;
+static ID3D11DeviceContext* g_adapter_frame_context = nullptr;
+static constexpr size_t AdapterReadbackSlotCount = 3;
+struct AdapterReadbackSlot {
+    ID3D11Texture2D* texture = nullptr;
+    ID3D11Query* completion = nullptr;
+    bool pending = false;
+    bool fullFrame = false;
+    std::vector<D3D11_BOX> dirtyBoxes;
+};
+static AdapterReadbackSlot g_adapter_readback_slots[AdapterReadbackSlotCount]{};
+static size_t g_adapter_readback_write = 0;
+static size_t g_adapter_readback_read = 0;
+static LUID g_adapter_frame_target_luid{};
+static bool g_adapter_frame_target_selected = false;
+static UINT g_adapter_frame_width = 0;
+static UINT g_adapter_frame_height = 0;
+static DXGI_FORMAT g_adapter_frame_format = DXGI_FORMAT_UNKNOWN;
+static bool g_adapter_frame_initialized = false;
+static bool g_adapter_force_full_readback = false;
+static ULONGLONG g_adapter_frame_burst_deadline = 0;
+static bool g_adapter_frame_burst_force_until_deadline = false;
+static constexpr UINT AdapterFrameBurstTimerId = 7;
+static constexpr ULONGLONG AdapterFrameBurstDurationMs = 30000;
+static constexpr UINT AdapterFrameBurstIntervalMs = 16;
+
+static void StartAdapterFrameBurst(const char* reason,
+    bool forceUntilDeadline = false) {
+    if (!g_hwnd) return;
+    const ULONGLONG now = GetTickCount64();
+    const bool burstAlreadyForced =
+        g_adapter_frame_burst_deadline > now &&
+        g_adapter_frame_burst_force_until_deadline;
+    const bool overlayVisible =
+        g_ui_open_snapshot.load(std::memory_order_acquire) ||
+        g_notifier_overlay_visible.load(std::memory_order_acquire);
+    if (!forceUntilDeadline && !burstAlreadyForced && !overlayVisible)
+        return;
+
+    g_adapter_frame_burst_force_until_deadline =
+        forceUntilDeadline || burstAlreadyForced;
+    g_adapter_frame_burst_deadline = now + AdapterFrameBurstDurationMs;
+    SetTimer(g_hwnd, AdapterFrameBurstTimerId,
+        AdapterFrameBurstIntervalMs, nullptr);
+    Log(std::string("[adapter-bridge] 60fps frame burst started for 30s: ") +
+        reason);
+}
+
+static void ReleaseAdapterFrameTexture() {
+    for (auto& slot : g_adapter_readback_slots) {
+        if (slot.texture) {
+            slot.texture->Release();
+            slot.texture = nullptr;
+        }
+        if (slot.completion) {
+            slot.completion->Release();
+            slot.completion = nullptr;
+        }
+        slot.pending = false;
+        slot.fullFrame = false;
+        slot.dirtyBoxes.clear();
+    }
+    g_adapter_readback_write = 0;
+    g_adapter_readback_read = 0;
+    if (g_adapter_frame_mutex) {
+        g_adapter_frame_mutex->Release();
+        g_adapter_frame_mutex = nullptr;
+    }
+    if (g_adapter_frame_texture) {
+        g_adapter_frame_texture->Release();
+        g_adapter_frame_texture = nullptr;
+    }
+    if (g_adapter_frame_handle) {
+        CloseHandle(g_adapter_frame_handle);
+        g_adapter_frame_handle = nullptr;
+    }
+    if (g_adapter_frame_context) {
+        g_adapter_frame_context->Release();
+        g_adapter_frame_context = nullptr;
+    }
+    if (g_adapter_frame_device) {
+        g_adapter_frame_device->Release();
+        g_adapter_frame_device = nullptr;
+    }
+    g_adapter_frame_target_luid = {};
+    g_adapter_frame_target_selected = false;
+    g_adapter_frame_width = 0;
+    g_adapter_frame_height = 0;
+    g_adapter_frame_format = DXGI_FORMAT_UNKNOWN;
+    g_adapter_frame_initialized = false;
+    g_adapter_force_full_readback = false;
+}
+
+static bool GetDeviceAdapterLuid(ID3D11Device* device, LUID& luid) {
+    IDXGIDevice* dxgiDevice = nullptr;
+    IDXGIAdapter* adapter = nullptr;
+    DXGI_ADAPTER_DESC adapterDesc{};
+    HRESULT result = device->QueryInterface(
+        __uuidof(IDXGIDevice), reinterpret_cast<void**>(&dxgiDevice));
+    if (SUCCEEDED(result))
+        result = dxgiDevice->GetAdapter(&adapter);
+    if (SUCCEEDED(result))
+        result = adapter->GetDesc(&adapterDesc);
+    if (adapter) adapter->Release();
+    if (dxgiDevice) dxgiDevice->Release();
+    if (FAILED(result))
+        return false;
+    luid = adapterDesc.AdapterLuid;
+    return true;
+}
+
+static bool EnsureAdapterFrameDevice() {
+    if (!g_consumer_adapter_info) {
+        g_consumer_adapter_mapping = OpenFileMappingW(
+            FILE_MAP_READ, FALSE, osc_frame_bridge::ConsumerAdapterMappingName);
+        if (g_consumer_adapter_mapping)
+            g_consumer_adapter_info =
+                static_cast<osc_frame_bridge::ConsumerAdapterInfo*>(
+                    MapViewOfFile(g_consumer_adapter_mapping, FILE_MAP_READ,
+                        0, 0, sizeof(osc_frame_bridge::ConsumerAdapterInfo)));
+    }
+
+    LUID targetLuid{};
+    bool hasTargetAdapter = false;
+    if (g_consumer_adapter_info &&
+        g_consumer_adapter_info->magic == osc_frame_bridge::ConsumerAdapterMagic &&
+        g_consumer_adapter_info->version == osc_frame_bridge::ConsumerAdapterVersion) {
+        const LONG ownerPid = g_consumer_adapter_info->ownerProcessId;
+        const LONG64 packedLuid = g_consumer_adapter_info->adapterLuid;
+        if (ownerPid > 0 && packedLuid != 0) {
+            HANDLE ownerProcess = OpenProcess(SYNCHRONIZE, FALSE,
+                static_cast<DWORD>(ownerPid));
+            const bool ownerAlive = ownerProcess &&
+                WaitForSingleObject(ownerProcess, 0) == WAIT_TIMEOUT;
+            if (ownerProcess) CloseHandle(ownerProcess);
+            if (ownerAlive) {
+                targetLuid.LowPart = static_cast<DWORD>(packedLuid);
+                targetLuid.HighPart = static_cast<LONG>(
+                    static_cast<std::uint64_t>(packedLuid) >> 32);
+                hasTargetAdapter = true;
+            }
+        }
+    }
+
+    LUID sourceLuid{};
+    if (!GetDeviceAdapterLuid(g_gpu_dev, sourceLuid))
+        return false;
+    if (!hasTargetAdapter)
+        targetLuid = sourceLuid;
+    if (g_adapter_frame_target_selected &&
+        g_adapter_frame_target_luid.LowPart == targetLuid.LowPart &&
+        g_adapter_frame_target_luid.HighPart == targetLuid.HighPart)
+        return g_adapter_frame_device != nullptr ||
+            (sourceLuid.LowPart == targetLuid.LowPart &&
+             sourceLuid.HighPart == targetLuid.HighPart);
+
+    ReleaseAdapterFrameTexture();
+    if (sourceLuid.LowPart == targetLuid.LowPart &&
+        sourceLuid.HighPart == targetLuid.HighPart) {
+        g_adapter_frame_target_luid = targetLuid;
+        g_adapter_frame_target_selected = true;
+        Log("[adapter-bridge] game adapter matches the CEF device; using direct GPU copy");
+        return true;
+    }
+
+    IDXGIFactory1* factory = nullptr;
+    HRESULT result = CreateDXGIFactory1(
+        __uuidof(IDXGIFactory1), reinterpret_cast<void**>(&factory));
+    if (FAILED(result) || !factory) {
+        Log("[adapter-bridge] DXGI factory creation for game adapter failed: " +
+            std::to_string(static_cast<long>(result)));
+        return false;
+    }
+
+    IDXGIAdapter1* matchingAdapter = nullptr;
+    for (UINT index = 0; ; ++index) {
+        IDXGIAdapter1* adapter = nullptr;
+        result = factory->EnumAdapters1(index, &adapter);
+        if (result == DXGI_ERROR_NOT_FOUND)
+            break;
+        if (FAILED(result))
+            break;
+        DXGI_ADAPTER_DESC1 desc{};
+        const HRESULT descResult = adapter->GetDesc1(&desc);
+        if (SUCCEEDED(descResult) &&
+            desc.AdapterLuid.LowPart == targetLuid.LowPart &&
+            desc.AdapterLuid.HighPart == targetLuid.HighPart) {
+            matchingAdapter = adapter;
+            break;
+        }
+        adapter->Release();
+    }
+    factory->Release();
+    if (!matchingAdapter) {
+        Log("[adapter-bridge] game adapter LUID is not available to the OSC process");
+        return false;
+    }
+
+    D3D_FEATURE_LEVEL featureLevel{};
+    result = D3D11CreateDevice(matchingAdapter, D3D_DRIVER_TYPE_UNKNOWN,
+        nullptr, D3D11_CREATE_DEVICE_BGRA_SUPPORT, nullptr, 0,
+        D3D11_SDK_VERSION, &g_adapter_frame_device, &featureLevel,
+        &g_adapter_frame_context);
+    matchingAdapter->Release();
+    if (FAILED(result) || !g_adapter_frame_device ||
+        !g_adapter_frame_context) {
+        Log("[adapter-bridge] game-adapter D3D11 device creation failed: " +
+            std::to_string(static_cast<long>(result)));
+        ReleaseAdapterFrameTexture();
+        return false;
+    }
+
+    g_adapter_frame_target_luid = targetLuid;
+    g_adapter_frame_target_selected = true;
+    char diagnostic[192]{};
+    sprintf_s(diagnostic, sizeof(diagnostic),
+        "[adapter-bridge] CEF/game adapter mismatch; enabled CPU readback "
+        "mirror to game adapter %08lX:%08lX",
+        static_cast<unsigned long>(targetLuid.HighPart),
+        static_cast<unsigned long>(targetLuid.LowPart));
+    Log(diagnostic);
+    return true;
+}
+
+static bool EnsureAdapterFrameTexture(ID3D11Texture2D* sourceTexture) {
+    if (!sourceTexture || !EnsureAdapterFrameDevice())
+        return false;
+    D3D11_TEXTURE2D_DESC sourceDesc{};
+    sourceTexture->GetDesc(&sourceDesc);
+    if (!sourceDesc.Width || !sourceDesc.Height ||
+        sourceDesc.SampleDesc.Count != 1 ||
+        static_cast<std::uint64_t>(sourceDesc.Width) * sourceDesc.Height * 4 >
+            osc_frame_bridge::MaxFrameBytes)
+        return false;
+
+    if (g_adapter_frame_texture &&
+        g_adapter_frame_width == sourceDesc.Width &&
+        g_adapter_frame_height == sourceDesc.Height &&
+        g_adapter_frame_format == sourceDesc.Format)
+        return true;
+
+    ReleaseAdapterFrameTexture();
+    if (!EnsureAdapterFrameDevice())
+        return false;
+    ID3D11Device* targetDevice = g_adapter_frame_device
+        ? g_adapter_frame_device : g_gpu_dev;
+    D3D11_TEXTURE2D_DESC sharedDesc = sourceDesc;
+    sharedDesc.Usage = D3D11_USAGE_DEFAULT;
+    sharedDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+    sharedDesc.CPUAccessFlags = 0;
+    sharedDesc.MiscFlags = D3D11_RESOURCE_MISC_SHARED_NTHANDLE |
+        D3D11_RESOURCE_MISC_SHARED_KEYEDMUTEX;
+
+    HRESULT result = targetDevice->CreateTexture2D(
+        &sharedDesc, nullptr, &g_adapter_frame_texture);
+    if (FAILED(result)) {
+        Log("[adapter-bridge] CreateTexture2D failed: " +
+            std::to_string(static_cast<long>(result)));
+        ReleaseAdapterFrameTexture();
+        return false;
+    }
+
+    IDXGIResource1* sharedResource = nullptr;
+    result = g_adapter_frame_texture->QueryInterface(
+        __uuidof(IDXGIResource1), reinterpret_cast<void**>(&sharedResource));
+    if (SUCCEEDED(result))
+        result = sharedResource->CreateSharedHandle(
+            nullptr, DXGI_SHARED_RESOURCE_READ, nullptr, &g_adapter_frame_handle);
+    if (sharedResource) sharedResource->Release();
+    if (SUCCEEDED(result))
+        result = g_adapter_frame_texture->QueryInterface(
+            __uuidof(IDXGIKeyedMutex),
+            reinterpret_cast<void**>(&g_adapter_frame_mutex));
+    if (SUCCEEDED(result) && g_adapter_frame_device) {
+        D3D11_TEXTURE2D_DESC stagingDesc = sourceDesc;
+        stagingDesc.Usage = D3D11_USAGE_STAGING;
+        stagingDesc.BindFlags = 0;
+        stagingDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+        stagingDesc.MiscFlags = 0;
+        D3D11_QUERY_DESC queryDesc{};
+        queryDesc.Query = D3D11_QUERY_EVENT;
+        for (auto& slot : g_adapter_readback_slots) {
+            result = g_gpu_dev->CreateTexture2D(
+                &stagingDesc, nullptr, &slot.texture);
+            if (SUCCEEDED(result))
+                result = g_gpu_dev->CreateQuery(&queryDesc, &slot.completion);
+            if (FAILED(result))
+                break;
+        }
+    }
+    if (FAILED(result) || !g_adapter_frame_handle || !g_adapter_frame_mutex) {
+        Log("[adapter-bridge] shared-handle or keyed-mutex setup failed: " +
+            std::to_string(static_cast<long>(result)));
+        ReleaseAdapterFrameTexture();
+        return false;
+    }
+
+    g_adapter_frame_width = sourceDesc.Width;
+    g_adapter_frame_height = sourceDesc.Height;
+    g_adapter_frame_format = sourceDesc.Format;
+    char diagnostic[256]{};
+    sprintf_s(diagnostic, sizeof(diagnostic),
+        "[adapter-bridge] created NT shared texture %ux%u format=%u "
+        "adapterLuid=%08lX:%08lX",
+        sourceDesc.Width, sourceDesc.Height,
+        static_cast<unsigned>(sourceDesc.Format),
+        static_cast<unsigned long>(g_adapter_frame_target_luid.HighPart),
+        static_cast<unsigned long>(g_adapter_frame_target_luid.LowPart));
+    Log(diagnostic);
+    return true;
+}
+
+static bool IsHookGameForeground() {
+    static std::mutex consumerAdapterInfoMutex;
+    std::lock_guard<std::mutex> lock(consumerAdapterInfoMutex);
+    if (!g_consumer_adapter_info) {
+        g_consumer_adapter_mapping = OpenFileMappingW(
+            FILE_MAP_READ, FALSE, osc_frame_bridge::ConsumerAdapterMappingName);
+        if (g_consumer_adapter_mapping)
+            g_consumer_adapter_info =
+                static_cast<osc_frame_bridge::ConsumerAdapterInfo*>(
+                    MapViewOfFile(g_consumer_adapter_mapping, FILE_MAP_READ,
+                        0, 0, sizeof(osc_frame_bridge::ConsumerAdapterInfo)));
+    }
+    if (!g_consumer_adapter_info ||
+        g_consumer_adapter_info->magic != osc_frame_bridge::ConsumerAdapterMagic ||
+        g_consumer_adapter_info->version != osc_frame_bridge::ConsumerAdapterVersion)
+        return false;
+
+    const LONG gamePid = g_consumer_adapter_info->ownerProcessId;
+    if (gamePid <= 0)
+        return false;
+
+    return osc_frame_bridge::IsGameOrNvidiaOverlayForeground(
+        static_cast<std::uint32_t>(gamePid));
+}
+
+static bool IsHookGameForegroundStable() {
+    static std::mutex mutex;
+    static bool initialized = false;
+    static bool stableState = false;
+    static bool candidateState = false;
+    static ULONGLONG candidateSince = 0;
+    constexpr ULONGLONG transitionDelayMs = 200;
+
+    const bool foreground = IsHookGameForeground();
+    const ULONGLONG now = GetTickCount64();
+    std::lock_guard<std::mutex> lock(mutex);
+    if (!initialized) {
+        initialized = true;
+        stableState = foreground;
+        candidateState = foreground;
+        candidateSince = now;
+        return stableState;
+    }
+    if (foreground == stableState) {
+        candidateState = foreground;
+        candidateSince = now;
+        return stableState;
+    }
+    if (foreground != candidateState) {
+        candidateState = foreground;
+        candidateSince = now;
+        return stableState;
+    }
+    if (now - candidateSince >= transitionDelayMs)
+        stableState = candidateState;
+    return stableState;
+}
+
+static bool PublishCompletedAdapterFrame() {
+    AdapterReadbackSlot& slot =
+        g_adapter_readback_slots[g_adapter_readback_read];
+    if (!slot.pending)
+        return false;
+
+    const HRESULT ready = g_gpu_ctx->GetData(
+        slot.completion, nullptr, 0, D3D11_ASYNC_GETDATA_DONOTFLUSH);
+    if (ready == S_FALSE)
+        return false;
+    if (FAILED(ready)) {
+        Log("[adapter-bridge] readback completion query failed: " +
+            std::to_string(static_cast<long>(ready)));
+        g_adapter_force_full_readback = true;
+        slot.pending = false;
+        slot.fullFrame = false;
+        slot.dirtyBoxes.clear();
+        g_adapter_readback_read =
+            (g_adapter_readback_read + 1) % AdapterReadbackSlotCount;
+        return false;
+    }
+
+    D3D11_MAPPED_SUBRESOURCE mapped{};
+    const HRESULT mapResult = g_gpu_ctx->Map(
+        slot.texture, 0, D3D11_MAP_READ, D3D11_MAP_FLAG_DO_NOT_WAIT, &mapped);
+    bool published = false;
+    if (SUCCEEDED(mapResult)) {
+        const HRESULT acquireResult = g_adapter_frame_mutex->AcquireSync(0, 0);
+        if (acquireResult == S_OK) {
+            const auto* mappedBytes =
+                static_cast<const std::uint8_t*>(mapped.pData);
+            for (const D3D11_BOX& box : slot.dirtyBoxes) {
+                const std::size_t offset =
+                    static_cast<std::size_t>(box.top) * mapped.RowPitch +
+                    static_cast<std::size_t>(box.left) * 4;
+                g_adapter_frame_context->UpdateSubresource(
+                    g_adapter_frame_texture, 0, &box, mappedBytes + offset,
+                    mapped.RowPitch, 0);
+            }
+            g_gpu_ctx->Unmap(slot.texture, 0);
+            g_adapter_frame_context->Flush();
+            const HRESULT releaseResult = g_adapter_frame_mutex->ReleaseSync(0);
+            if (SUCCEEDED(releaseResult)) {
+                published = true;
+                if (slot.fullFrame) {
+                    g_adapter_frame_initialized = true;
+                    g_adapter_force_full_readback = false;
+                }
+            } else {
+                g_adapter_force_full_readback = true;
+                Log("[adapter-bridge] shared texture mutex release failed: " +
+                    std::to_string(static_cast<long>(releaseResult)));
+            }
+        } else {
+            g_gpu_ctx->Unmap(slot.texture, 0);
+            if (acquireResult == WAIT_TIMEOUT)
+                return false;
+            g_adapter_force_full_readback = true;
+            Log("[adapter-bridge] shared texture mutex acquire failed: " +
+                std::to_string(static_cast<long>(acquireResult)));
+        }
+    } else if (mapResult == DXGI_ERROR_WAS_STILL_DRAWING) {
+        return false;
+    } else {
+        g_adapter_force_full_readback = true;
+        Log("[adapter-bridge] completed readback map failed: " +
+            std::to_string(static_cast<long>(mapResult)));
+    }
+
+    slot.pending = false;
+    slot.fullFrame = false;
+    slot.dirtyBoxes.clear();
+    g_adapter_readback_read =
+        (g_adapter_readback_read + 1) % AdapterReadbackSlotCount;
+    return published;
+}
+
+static std::vector<D3D11_BOX> MakeAdapterDirtyBoxes(
+    const std::vector<CefRect>& dirtyRects, UINT width, UINT height) {
+    std::vector<D3D11_BOX> boxes;
+    if (!width || !height || dirtyRects.empty())
+        return boxes;
+
+    const auto appendClamped = [&](long long left, long long top,
+        long long right, long long bottom) {
+        left = (std::max)(0LL, (std::min)(left, static_cast<long long>(width)));
+        top = (std::max)(0LL, (std::min)(top, static_cast<long long>(height)));
+        right = (std::max)(left,
+            (std::min)(right, static_cast<long long>(width)));
+        bottom = (std::max)(top,
+            (std::min)(bottom, static_cast<long long>(height)));
+        if (left < right && top < bottom) {
+            boxes.push_back(D3D11_BOX{
+                static_cast<UINT>(left), static_cast<UINT>(top), 0,
+                static_cast<UINT>(right), static_cast<UINT>(bottom), 1 });
+        }
+    };
+
+    if (dirtyRects.size() > 64) {
+        long long left = width;
+        long long top = height;
+        long long right = 0;
+        long long bottom = 0;
+        for (const CefRect& rect : dirtyRects) {
+            left = (std::min)(left, static_cast<long long>(rect.x));
+            top = (std::min)(top, static_cast<long long>(rect.y));
+            right = (std::max)(right,
+                static_cast<long long>(rect.x) + rect.width);
+            bottom = (std::max)(bottom,
+                static_cast<long long>(rect.y) + rect.height);
+        }
+        appendClamped(left, top, right, bottom);
+        return boxes;
+    }
+
+    boxes.reserve(dirtyRects.size());
+    for (const CefRect& rect : dirtyRects) {
+        if (rect.width <= 0 || rect.height <= 0)
+            continue;
+        const long long left = rect.x;
+        const long long top = rect.y;
+        appendClamped(left, top, left + rect.width, top + rect.height);
+    }
+    return boxes;
+}
+
+static bool QueueAdapterFrameReadback(ID3D11Texture2D* sourceTexture,
+    const std::vector<CefRect>& dirtyRects) {
+    AdapterReadbackSlot& slot =
+        g_adapter_readback_slots[g_adapter_readback_write];
+    if (slot.pending) {
+        g_adapter_force_full_readback = true;
+        return false;
+    }
+
+    D3D11_TEXTURE2D_DESC sourceDesc{};
+    sourceTexture->GetDesc(&sourceDesc);
+    slot.dirtyBoxes = MakeAdapterDirtyBoxes(
+        dirtyRects, sourceDesc.Width, sourceDesc.Height);
+    slot.fullFrame = !g_adapter_frame_initialized ||
+        g_adapter_force_full_readback;
+    if (slot.fullFrame && !slot.dirtyBoxes.empty()) {
+        slot.dirtyBoxes.clear();
+        slot.dirtyBoxes.push_back(D3D11_BOX{
+            0, 0, 0, sourceDesc.Width, sourceDesc.Height, 1 });
+    }
+    if (slot.dirtyBoxes.empty()) {
+        slot.fullFrame = false;
+        return false;
+    }
+
+    for (const D3D11_BOX& box : slot.dirtyBoxes)
+        g_gpu_ctx->CopySubresourceRegion(
+            slot.texture, 0, box.left, box.top, 0, sourceTexture, 0, &box);
+    g_gpu_ctx->End(slot.completion);
+    g_gpu_ctx->Flush();
+    slot.pending = true;
+    g_adapter_readback_write =
+        (g_adapter_readback_write + 1) % AdapterReadbackSlotCount;
+    if (g_hwnd)
+        SetTimer(g_hwnd, 6, 16, nullptr);
+    return true;
+}
+
+static bool PublishAdapterFrameMetadata(bool forceHidden = false) {
+    if (!g_frame_bridge) {
+        const DWORD sizeHigh = static_cast<DWORD>(
+            osc_frame_bridge::MappingBytes >> 32);
+        const DWORD sizeLow = static_cast<DWORD>(
+            osc_frame_bridge::MappingBytes & 0xFFFFFFFF);
+        SetLastError(ERROR_SUCCESS);
+        g_frame_bridge_mapping = CreateFileMappingW(
+            INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE,
+            sizeHigh, sizeLow, osc_frame_bridge::MappingName);
+        if (!g_frame_bridge_mapping) {
+            Log("[adapter-bridge] CreateFileMappingW failed: " +
+                std::to_string(GetLastError()));
+            return false;
+        }
+        const bool createdMapping = GetLastError() != ERROR_ALREADY_EXISTS;
+        g_frame_bridge = static_cast<osc_frame_bridge::Frame*>(
+            MapViewOfFile(g_frame_bridge_mapping, FILE_MAP_WRITE, 0, 0,
+                osc_frame_bridge::MappingBytes));
+        if (!g_frame_bridge) {
+            Log("[adapter-bridge] MapViewOfFile failed: " +
+                std::to_string(GetLastError()));
+            CloseHandle(g_frame_bridge_mapping);
+            g_frame_bridge_mapping = nullptr;
+            return false;
+        }
+        if (createdMapping) {
+            g_frame_bridge->sequence = 0;
+            g_frame_bridge->ownerProcessId = 0;
+            g_frame_bridge->frameNumber = 0;
+            g_frame_bridge->version = osc_frame_bridge::Version;
+            std::atomic_thread_fence(std::memory_order_release);
+            g_frame_bridge->magic = osc_frame_bridge::Magic;
+        }
+        Log("[adapter-bridge] shared CEF texture endpoint ready");
+    }
+
+    if (g_frame_bridge->magic != osc_frame_bridge::Magic ||
+        g_frame_bridge->version != osc_frame_bridge::Version)
+        return false;
+
+    const LONG currentProcessId = static_cast<LONG>(GetCurrentProcessId());
+    LONG ownerProcessId = InterlockedCompareExchange(
+        &g_frame_bridge->ownerProcessId, currentProcessId, 0);
+    if (ownerProcessId != 0 && ownerProcessId != currentProcessId) {
+        HANDLE ownerProcess = OpenProcess(SYNCHRONIZE, FALSE,
+            static_cast<DWORD>(ownerProcessId));
+        const DWORD openError = ownerProcess ? ERROR_SUCCESS : GetLastError();
+        const bool ownerExited = ownerProcess
+            ? WaitForSingleObject(ownerProcess, 0) == WAIT_OBJECT_0
+            : openError == ERROR_INVALID_PARAMETER;
+        if (ownerProcess) CloseHandle(ownerProcess);
+        if (!ownerExited ||
+            InterlockedCompareExchange(&g_frame_bridge->ownerProcessId,
+                currentProcessId, ownerProcessId) != ownerProcessId) {
+            static bool loggedOtherOwner = false;
+            if (!loggedOtherOwner) {
+                loggedOtherOwner = true;
+                Log("[adapter-bridge] another OSC process owns the shared-texture endpoint");
+            }
+            return false;
+        }
+    }
+
+    InterlockedIncrement(&g_frame_bridge->sequence);
+    g_frame_bridge->width = g_adapter_frame_width;
+    g_frame_bridge->height = g_adapter_frame_height;
+    g_frame_bridge->processId = GetCurrentProcessId();
+    g_frame_bridge->sharedHandle =
+        reinterpret_cast<std::uintptr_t>(g_adapter_frame_handle);
+    const bool overlayVisible =
+        g_ui_open_snapshot.load(std::memory_order_acquire) ||
+        g_notifier_overlay_visible.load(std::memory_order_acquire);
+    if (!forceHidden && overlayVisible)
+        ++g_frame_bridge->frameNumber;
+    else
+        g_frame_bridge->frameNumber = 0;
+    std::atomic_thread_fence(std::memory_order_release);
+    InterlockedIncrement(&g_frame_bridge->sequence);
+    return true;
+}
+
+static void PublishAdapterFrame(ID3D11Texture2D* sourceTexture,
+    const std::vector<CefRect>& dirtyRects) {
+    if (!EnsureAdapterFrameTexture(sourceTexture))
+        return;
+
+    bool frameReady = false;
+    if (g_adapter_frame_device) {
+        frameReady = PublishCompletedAdapterFrame();
+        QueueAdapterFrameReadback(sourceTexture, dirtyRects);
+    } else {
+        const HRESULT acquireResult = g_adapter_frame_mutex->AcquireSync(0, 0);
+        if (acquireResult != S_OK) {
+            g_adapter_force_full_readback = true;
+            return;
+        }
+        D3D11_TEXTURE2D_DESC sourceDesc{};
+        sourceTexture->GetDesc(&sourceDesc);
+        std::vector<D3D11_BOX> dirtyBoxes = MakeAdapterDirtyBoxes(
+            dirtyRects, sourceDesc.Width, sourceDesc.Height);
+        const bool fullFrame = !g_adapter_frame_initialized ||
+            g_adapter_force_full_readback;
+        if (fullFrame && !dirtyBoxes.empty()) {
+            dirtyBoxes.clear();
+            dirtyBoxes.push_back(D3D11_BOX{
+                0, 0, 0, sourceDesc.Width, sourceDesc.Height, 1 });
+        }
+        for (const D3D11_BOX& box : dirtyBoxes)
+            g_gpu_ctx->CopySubresourceRegion(
+                g_adapter_frame_texture, 0, box.left, box.top, 0,
+                sourceTexture, 0, &box);
+        g_gpu_ctx->Flush();
+        const HRESULT releaseResult = g_adapter_frame_mutex->ReleaseSync(0);
+        if (FAILED(releaseResult)) {
+            g_adapter_force_full_readback = true;
+            Log("[adapter-bridge] shared texture mutex release failed: " +
+                std::to_string(static_cast<long>(releaseResult)));
+            return;
+        }
+        frameReady = !dirtyBoxes.empty();
+        if (frameReady && fullFrame) {
+            g_adapter_frame_initialized = true;
+            g_adapter_force_full_readback = false;
+        }
+    }
+    if (!frameReady)
+        return;
+
+    PublishAdapterFrameMetadata();
+}
 
 // วาดลง RT ของเราเสมอ แล้ว copy ลง back buffer — บังคับทุกเส้นทางผ่านนี้
 static bool EnsureOwnRT(int w, int h) {
     if (g_own_rt && g_own_w == w && g_own_h == h) return true;
-    g_gpu_shared_frame_initialized = false;
     if (g_own_rt) { g_own_rt->Release(); g_own_rt = nullptr; g_gpu_rtv->Release(); g_gpu_rtv = nullptr; }
     D3D11_TEXTURE2D_DESC td{};
     td.Width = w; td.Height = h; td.MipLevels = 1; td.ArraySize = 1;
@@ -337,6 +1013,14 @@ static const char* kQuadVS =
     "VSOut VS(uint id : SV_VertexID) {"
     "  VSOut o;"
     "  float2 p = float2((id << 1) & 2, id & 2);"
+    "  o.uv = p;"
+    "  o.pos = float4(p.x * 2 - 1, 1 - p.y * 2, 0, 1);"
+    "  return o; }";
+static const char* kSharedQuadVS =
+    "struct VSOut { float4 pos : SV_Position; float2 uv : TEXCOORD; };"
+    "VSOut VS(uint id : SV_VertexID) {"
+    "  VSOut o;"
+    "  float2 p = float2((id << 1) & 2, id & 2);"
     "  o.uv = float2(p.x, 1 - p.y);"
     "  o.pos = float4(p.x * 2 - 1, 1 - p.y * 2, 0, 1);"
     "  return o; }";
@@ -353,6 +1037,23 @@ static const char* kPassPS =
     "float4 PS(float4 pos : SV_Position, float2 uv : TEXCOORD) : SV_Target {"
     "  return tex.Sample(samp, uv); }";       // shared texture ของ CEF = premultiplied มาแล้ว ห้ามซ้ำ
 
+static void DrawSharedTexture(ID3D11ShaderResourceView* srv, int w, int h) {
+    if (!srv || !g_gpu_vs_shared || !g_gpu_ps_pass || !EnsureOwnRT(w, h)) return;
+
+    D3D11_VIEWPORT vp{ 0, 0, (float)w, (float)h, 0, 1 };
+    g_gpu_ctx->OMSetRenderTargets(1, &g_gpu_rtv, nullptr);
+    g_gpu_ctx->RSSetViewports(1, &vp);
+    g_gpu_ctx->PSSetShaderResources(0, 1, &srv);
+    g_gpu_ctx->PSSetSamplers(0, 1, &g_gpu_samp);
+    g_gpu_ctx->VSSetShader(g_gpu_vs_shared, nullptr, 0);
+    g_gpu_ctx->PSSetShader(g_gpu_ps_pass, nullptr, 0);
+    g_gpu_ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    g_gpu_ctx->Draw(3, 0);
+    ID3D11ShaderResourceView* null_srv = nullptr;
+    g_gpu_ctx->PSSetShaderResources(0, 1, &null_srv);
+    PresentToSwap(w, h);
+}
+
 static bool GpuCompositorInit(HWND hwnd, int w, int h) {
     UINT flags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
     D3D_FEATURE_LEVEL fl;
@@ -363,7 +1064,8 @@ static bool GpuCompositorInit(HWND hwnd, int w, int h) {
 
     IDXGIDevice2* dxgiDev = nullptr; IDXGIFactory2* fac = nullptr;
     IDXGISwapChain1* swap = nullptr; ID3D11PixelShader* ps = nullptr;
-    ID3D11VertexShader* vs = nullptr; ID3D11SamplerState* samp = nullptr;
+    ID3D11VertexShader* vs = nullptr; ID3D11VertexShader* shared_vs = nullptr;
+    ID3D11SamplerState* samp = nullptr;
 
     if (FAILED(hr = g_gpu_dev->QueryInterface(__uuidof(IDXGIDevice2), (void**)&dxgiDev)))
         { Log("[gpu] step QI dxgiDev hr=" + std::to_string((long)hr)); goto fail; }
@@ -411,6 +1113,20 @@ static bool GpuCompositorInit(HWND hwnd, int w, int h) {
         if (SUCCEEDED(hr)) hr = g_gpu_dev->CreatePixelShader(pb->GetBufferPointer(), pb->GetBufferSize(), nullptr, &ps);
         vb->Release(); pb->Release();
         if (FAILED(hr)) { Log("[gpu] create shaders hr=" + std::to_string((long)hr)); goto fail; }
+        ID3DBlob* shared_vb = nullptr; ID3DBlob* shared_err = nullptr;
+        if (FAILED(hr = D3DCompile(kSharedQuadVS, strlen(kSharedQuadVS), nullptr, nullptr, nullptr,
+                "VS", "vs_5_0", 0, 0, &shared_vb, &shared_err))) {
+            if (shared_err) {
+                Log(std::string("[gpu] shared VS compile: ") + (char*)shared_err->GetBufferPointer());
+                shared_err->Release();
+            }
+            goto fail;
+        }
+        hr = g_gpu_dev->CreateVertexShader(shared_vb->GetBufferPointer(),
+            shared_vb->GetBufferSize(), nullptr, &shared_vs);
+        shared_vb->Release();
+        if (shared_err) shared_err->Release();
+        if (FAILED(hr)) { Log("[gpu] create shared VS hr=" + std::to_string((long)hr)); goto fail; }
         if (GetEnvironmentVariableA("OSC_PSTEST", nullptr, 0) > 0) {
             ID3DBlob* pt = nullptr; ID3DBlob* et = nullptr;
             if (SUCCEEDED(D3DCompile(kTestPS, strlen(kTestPS), nullptr, nullptr, nullptr, "PS", "ps_5_0", 0, 0, &pt, &et))) {
@@ -434,13 +1150,15 @@ static bool GpuCompositorInit(HWND hwnd, int w, int h) {
         sd.ComparisonFunc = D3D11_COMPARISON_NEVER; sd.MaxLOD = D3D11_FLOAT32_MAX;
         if (FAILED(hr = g_gpu_dev->CreateSamplerState(&sd, &samp))) { Log("[gpu] sampler hr=" + std::to_string((long)hr)); goto fail; }
     }
-    g_gpu_swap = swap; g_gpu_vs = vs; g_gpu_ps = ps; g_gpu_samp = samp;
+    g_gpu_swap = swap; g_gpu_vs = vs; g_gpu_vs_shared = shared_vs;
+    g_gpu_ps = ps; g_gpu_samp = samp;
     dxgiDev->Release(); fac->Release();
     g_gpu_ok = true;
     Log("[gpu] D3D11 compositor ready (shared texture + DComp premultiplied)");
     return true;
 fail:
-    if (swap) swap->Release(); if (ps) ps->Release(); if (vs) vs->Release(); if (samp) samp->Release();
+    if (swap) swap->Release(); if (ps) ps->Release(); if (vs) vs->Release();
+    if (shared_vs) shared_vs->Release(); if (samp) samp->Release();
     if (fac) fac->Release(); if (dxgiDev) dxgiDev->Release();
     Log("[gpu] init FAILED → fallback CPU path");
     return false;
@@ -451,9 +1169,9 @@ static std::vector<RECT> g_ui_rects;         // พิกัดจอ (scale แ
 static std::vector<RECT> g_notifier_rects;   // การ์ดที่กดได้ขณะหน้า base คลิกทะลุ
 static std::mutex g_notifier_rects_mutex;
 static double g_css_scale = 1.0;             // css px → จอ px (zoom แท้ fit)
-static int g_disp_w = 0, g_disp_h = 0, g_dst_x = 0, g_dst_y = 0;
+static std::atomic<int> g_disp_w{ 0 }, g_disp_h{ 0 }, g_dst_x{ 0 }, g_dst_y{ 0 };
 static bool g_ui_open = false;
-static std::atomic<bool> g_ui_open_snapshot{ false };
+static std::atomic<bool> g_overlay_keyboard_capture{ false };
 static std::atomic<bool> g_route_clickthrough{ true };
 static bool g_applied_clickthrough = false;
 static bool g_input_mode_initialized = false;
@@ -575,33 +1293,7 @@ static void GpuComposite(uint64_t shared_handle, int w, int h,
             D3D11_TEXTURE2D_DESC desc{};
             source->GetDesc(&desc);
             if ((int)desc.Width == w && (int)desc.Height == h) {
-                if (!g_gpu_shared_frame_initialized) {
-                    g_gpu_ctx->CopyResource(g_own_rt, source);
-                    g_gpu_shared_frame_initialized = true;
-                } else {
-                    bool copied = false;
-                    for (const CefRect& rect : dirty_rects) {
-                        int left = (std::max)(0, rect.x);
-                        int top = (std::max)(0, rect.y);
-                        int right = (int)(std::min)((LONGLONG)w,
-                            (LONGLONG)rect.x + rect.width);
-                        int bottom = (int)(std::min)((LONGLONG)h,
-                            (LONGLONG)rect.y + rect.height);
-                        if (right <= left || bottom <= top) continue;
-                        D3D11_BOX box{
-                            (UINT)left, (UINT)top, 0,
-                            (UINT)right, (UINT)bottom, 1
-                        };
-                        g_gpu_ctx->CopySubresourceRegion(g_own_rt, 0,
-                            (UINT)left, (UINT)top, 0, source, 0, &box);
-                        copied = true;
-                    }
-                    if (!copied) {
-                        source->Release();
-                        return;
-                    }
-                }
-                PresentToSwap(w, h);
+                DrawSharedTexture(srv, w, h);
             } else {
                 Log("[gpu] shared texture size mismatch");
             }
@@ -781,7 +1473,9 @@ static void ApplyOpenShareInputMode() {
     if (changed) SetClickThrough(clickthrough);
     // Keep the CEF host visible in both routes. In GPU mode its layered style
     // provides click-through without replacing the DComp surface with a blank proxy.
-    if (!IsWindowVisible(g_hwnd)) ShowWindow(g_hwnd, SW_SHOWNOACTIVATE);
+    if (!g_game_focused.load(std::memory_order_acquire) &&
+        !IsWindowVisible(g_hwnd))
+        ShowWindow(g_hwnd, SW_SHOWNOACTIVATE);
     if (g_clickthrough_hwnd && IsWindowVisible(g_clickthrough_hwnd))
         ShowWindow(g_clickthrough_hwnd, SW_HIDE);
 }
@@ -844,6 +1538,8 @@ static void ParseDisplayRects(const std::string& req) {
     //   ทั้งที่ overlay ยังไม่แสดง — สถานะเปิด/ปิด = WIN_OPEN_OSC / WIN_CLOSE_OSC เท่านั้น)
 }
 
+static void RequestNotifierFrameRefresh();
+
 static void ParseNotifierRects(const std::string& req) {
     size_t p = req.find("\"displayRects\"");
     if (p == std::string::npos) return;
@@ -867,11 +1563,15 @@ static void ParseNotifierRects(const std::string& req) {
         double w = num("\"width\":"), h = num("\"height\":");
         if (x <= -1e8 || y <= -1e8 || w <= 0 || h <= 0) continue;
         RECT r{};
-        if (g_disp_w > 0 && g_disp_h > 0 && g_view_w > 0 && g_view_h > 0) {
-            r.left = g_dst_x + (LONG)((LONGLONG)x * g_disp_w / g_view_w);
-            r.top = g_dst_y + (LONG)((LONGLONG)y * g_disp_h / g_view_h);
-            r.right = g_dst_x + (LONG)((LONGLONG)(x + w) * g_disp_w / g_view_w);
-            r.bottom = g_dst_y + (LONG)((LONGLONG)(y + h) * g_disp_h / g_view_h);
+        const int displayWidth = g_disp_w.load(std::memory_order_acquire);
+        const int displayHeight = g_disp_h.load(std::memory_order_acquire);
+        const int destinationX = g_dst_x.load(std::memory_order_relaxed);
+        const int destinationY = g_dst_y.load(std::memory_order_relaxed);
+        if (displayWidth > 0 && displayHeight > 0 && g_view_w > 0 && g_view_h > 0) {
+            r.left = destinationX + (LONG)((LONGLONG)x * displayWidth / g_view_w);
+            r.top = destinationY + (LONG)((LONGLONG)y * displayHeight / g_view_h);
+            r.right = destinationX + (LONG)((LONGLONG)(x + w) * displayWidth / g_view_w);
+            r.bottom = destinationY + (LONG)((LONGLONG)(y + h) * displayHeight / g_view_h);
         } else {
             r.left = (LONG)(x * g_css_scale);
             r.top = (LONG)(y * g_css_scale);
@@ -880,19 +1580,58 @@ static void ParseNotifierRects(const std::string& req) {
         }
         if (r.right > r.left && r.bottom > r.top) rects.push_back(r);
     }
+    const bool hasVisibleCards = !rects.empty();
     {
         std::lock_guard<std::mutex> lock(g_notifier_rects_mutex);
         g_notifier_rects = std::move(rects);
+    }
+    const bool wasVisible = g_notifier_overlay_visible.exchange(
+        hasVisibleCards, std::memory_order_acq_rel);
+    if (wasVisible != hasVisibleCards) {
+        Log(std::string("[adapter-bridge] notifier visibility -> ") +
+            (hasVisibleCards ? "visible" : "hidden") +
+            (g_game_focused.load(std::memory_order_acquire)
+                ? " (game focused)" : " (game unfocused)"));
+    }
+    if (hasVisibleCards && !wasVisible)
+        StartAdapterFrameBurst("notifier shown");
+    if (hasVisibleCards && !wasVisible &&
+        g_game_focused.load(std::memory_order_acquire)) {
+        RequestNotifierFrameRefresh();
+    } else if (!hasVisibleCards &&
+        !g_ui_open_snapshot.load(std::memory_order_acquire) &&
+        g_game_focused.load(std::memory_order_acquire)) {
+        PublishAdapterFrameMetadata(true);
     }
 }
 
 static void ClearNotifierRects() {
     std::lock_guard<std::mutex> lock(g_notifier_rects_mutex);
     g_notifier_rects.clear();
+    g_notifier_overlay_visible.store(false, std::memory_order_release);
 }
 
 // view-scale state: ตำแหน่ง/ขนาดภาพที่ถูกวางลงจอ (ใช้แมพเมาส์จอ↔view)
 static std::atomic<double> g_ui_adjust{ 1.0 };   // ปรับสดด้วย Ctrl+ลูกเมาส์
+
+static void UpdateDisplayGeometry(int rasterWidth, int rasterHeight) {
+    const int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+    const int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+    if (rasterWidth <= 0 || rasterHeight <= 0 || screenWidth <= 0 ||
+        screenHeight <= 0)
+        return;
+
+    const double scale = (static_cast<double>(screenWidth) / rasterWidth) *
+        g_cfg.ui_scale * g_ui_adjust.load(std::memory_order_relaxed);
+    const int displayWidth = static_cast<int>(rasterWidth * scale);
+    const int displayHeight = static_cast<int>(rasterHeight * scale);
+    const int destinationX = (screenWidth - displayWidth) / 2;
+    const int destinationY = (screenHeight - displayHeight) / 2;
+    g_dst_x.store(destinationX, std::memory_order_relaxed);
+    g_dst_y.store(destinationY, std::memory_order_relaxed);
+    g_disp_w.store(displayWidth, std::memory_order_release);
+    g_disp_h.store(displayHeight, std::memory_order_release);
+}
 
 // ★ สูตร zoom ของ Share.exe แท้ (วัดสดผ่าน CDP :9222 ของ Share วันที่ 2026-10-07 —
 //   ตรง log แท้ [offscreen_window.cpp(1081)] setting zoom to: -0.732395):
@@ -1003,14 +1742,16 @@ static void CompositeFrame(const void* bgra, int w, int h, const std::vector<Cef
     //   uiScale > 1 = ใหญ่กว่า fit → ภาพล้นจอ ตัดขอบกลางจอ (ขอบ = ผ้าม่านเปล่า ไม่มีองค์ประกอบ)
     //   g_ui_adjust หมุนได้สด ๆ ด้วย Ctrl+ลูกเมาส์ — เห็นผลทันทีไม่ต้องรีสตาร์ท
     int sw = GetSystemMetrics(SM_CXSCREEN), sh = GetSystemMetrics(SM_CYSCREEN);
-    double S = ((double)sw / w) * g_cfg.ui_scale * g_ui_adjust.load();
-    g_disp_w = (int)(w * S); g_disp_h = (int)(h * S);
-    g_dst_x = (sw - g_disp_w) / 2; g_dst_y = (sh - g_disp_h) / 2;   // ≤0 เมื่อขยาย = crop กลางจอ
-    POINT dstpt{ g_dst_x, g_dst_y };
+    UpdateDisplayGeometry(w, h);
+    const int displayWidth = g_disp_w.load(std::memory_order_acquire);
+    const int displayHeight = g_disp_h.load(std::memory_order_acquire);
+    const int destinationX = g_dst_x.load(std::memory_order_relaxed);
+    const int destinationY = g_dst_y.load(std::memory_order_relaxed);
+    POINT dstpt{ destinationX, destinationY };
     // Leave a one-pixel gap at the right edge. UpdateLayeredWindow otherwise resets
     // the HWND to exact monitor width, which makes Windows classify it as full-screen
     // and suppress notifications even while the OSC is closed.
-    SIZE winsz{ (std::max)(1, g_disp_w - 1), g_disp_h };
+    SIZE winsz{ (std::max)(1, displayWidth - 1), displayHeight };
     POINT zerop{ 0, 0 };
     BLENDFUNCTION bf{ AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
     HDC scr2 = GetDC(nullptr);
@@ -1228,6 +1969,26 @@ static void HandleOscQuery(const std::string& req, bool persistent,
         return;
     }
 
+    if (cmd == "QUERY_OSC_SET_KEYBOARD_CAPTURE") {
+        bool capture;
+        if (req.find("\"capture\":true") != std::string::npos) {
+            capture = true;
+        } else if (req.find("\"capture\":false") != std::string::npos) {
+            capture = false;
+        } else {
+            reply("{\"error\":\"capture must be a boolean\"}");
+            return;
+        }
+        const bool wasCapturing = g_overlay_keyboard_capture.exchange(
+            capture, std::memory_order_acq_rel);
+        if (wasCapturing != capture)
+            Log(std::string("[input] keyboard capture ") +
+                (capture ? "enabled (focused text control)" :
+                    "released (game hotkeys pass through)"));
+        reply("{}");
+        return;
+    }
+
     if (cmd == "QUERY_OSC_SET_PICKER_MODE") {
         bool active;
         if (req.find("\"active\":true") != std::string::npos) {
@@ -1325,6 +2086,26 @@ public:
     }
     IMPLEMENT_REFCOUNTING(JsEvalTask);
 };
+
+class InvalidatePageTask : public CefTask {
+public:
+    explicit InvalidatePageTask(CefRefPtr<CefBrowser> browser)
+        : browser_(browser) {}
+    void Execute() override {
+        if (browser_ && browser_->GetHost())
+            browser_->GetHost()->Invalidate(PET_VIEW);
+    }
+private:
+    CefRefPtr<CefBrowser> browser_;
+    IMPLEMENT_REFCOUNTING(InvalidatePageTask);
+};
+
+static void RequestNotifierFrameRefresh() {
+    if (g_browser &&
+        !CefPostTask(TID_UI, new InvalidatePageTask(g_browser))) {
+        Log("[adapter-bridge] failed to schedule notifier frame refresh");
+    }
+}
 
 static void QueueOscPageAction(bool open) {
     if (!g_browser) {
@@ -1560,6 +2341,32 @@ public:
             unsigned attempts = g_page_retry_attempts.exchange(0);
             if (attempts > 0)
                 Log("[load] OSC page recovered after " + std::to_string(attempts) + " retries");
+            frame->ExecuteJavaScript(
+                "(function(){"
+                "if(window.__nvOscKeyboardCaptureInstalled)return;"
+                "window.__nvOscKeyboardCaptureInstalled=true;"
+                "var last=null;"
+                "function sync(target){"
+                "var el=arguments.length?target:document.activeElement;"
+                "var tag=el&&el.tagName?el.tagName.toUpperCase():'';"
+                "var type=el&&el.type?String(el.type).toLowerCase():'text';"
+                "var textInput=tag==='TEXTAREA'||tag==='SELECT'||"
+                "(tag==='INPUT'&&['button','submit','reset','checkbox','radio','file','color','range','image','hidden'].indexOf(type)<0);"
+                "var capture=!!(textInput||(el&&el.isContentEditable));"
+                "if(typeof window.cefQuery!=='function'){last=null;return;}"
+                "if(capture===last)return;last=capture;"
+                "window.cefQuery({"
+                "request:JSON.stringify({command:'QUERY_OSC_SET_KEYBOARD_CAPTURE',capture:capture}),"
+                "onFailure:function(code,message){last=null;console.warn('[osc] keyboard capture query failed',code,message);}});"
+                "}"
+                "document.addEventListener('focusin',function(e){sync(e.target);},true);"
+                "document.addEventListener('focusout',function(){setTimeout(function(){sync(document.activeElement);},0);},true);"
+                "document.addEventListener('click',function(){sync();},true);"
+                "window.addEventListener('blur',function(){sync(null);});"
+                "window.addEventListener('focus',function(){sync();});"
+                "sync();"
+                "})();",
+                frame->GetURL(), 0);
         }
     }
     void OnLoadError(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame> frame, ErrorCode code,
@@ -1645,6 +2452,16 @@ public:
         const RectList& dirtyRects,
         void* shared_handle) override {
         if (type != PET_VIEW) return;
+        const bool hookMode = g_game_focused.load(std::memory_order_acquire);
+        const bool adapterOverlayVisible =
+            g_ui_open_snapshot.load(std::memory_order_acquire) ||
+            g_notifier_overlay_visible.load(std::memory_order_acquire);
+        const bool needFullFrame = hookMode && adapterOverlayVisible &&
+            g_adapter_force_full_readback;
+        if (dirtyRects.empty() && !needFullFrame) return;
+        RectList effectiveDirtyRects = dirtyRects;
+        if (effectiveDirtyRects.empty())
+            effectiveDirtyRects.emplace_back(0, 0, g_view_w, g_view_h);
         static int calls = 0;
         if (calls++ < 3) Log("[gpu] OnAcceleratedPaint #" + std::to_string(calls) +
             " handle=0x" + std::to_string((unsigned long long)(uintptr_t)shared_handle));
@@ -1657,15 +2474,24 @@ public:
             Log("[fps] " + std::to_string(cnt * 1000 / (int)(now - t0)) + " fps (GPU path)");
             cnt = 0; t0 = now;
         }
+        UpdateDisplayGeometry(g_view_w, g_view_h);
         GpuComposite((uint64_t)(uintptr_t)shared_handle, g_view_w, g_view_h,
-            dirtyRects);
+            effectiveDirtyRects);
+        if (hookMode && adapterOverlayVisible)
+            PublishAdapterFrame(g_shared_tex, effectiveDirtyRects);
+        else if (hookMode)
+            g_adapter_force_full_readback = true;
         if (g_gpu_frame.load()) EnsureShownOnce();
     }
     bool GetScreenPoint(CefRefPtr<CefBrowser>, int viewX, int viewY, int& screenX, int& screenY) override {
         // view → จอ (ผ่าผ่านตำแหน่ง/ขนาดภาพบนจอ)
-        if (g_disp_w > 0) {
-            screenX = g_dst_x + (int)((LONGLONG)viewX * g_disp_w / g_view_w);
-            screenY = g_dst_y + (int)((LONGLONG)viewY * g_disp_h / g_view_h);
+        const int displayWidth = g_disp_w.load(std::memory_order_acquire);
+        const int displayHeight = g_disp_h.load(std::memory_order_acquire);
+        if (displayWidth > 0 && displayHeight > 0) {
+            screenX = g_dst_x.load(std::memory_order_relaxed) +
+                (int)((LONGLONG)viewX * displayWidth / g_view_w);
+            screenY = g_dst_y.load(std::memory_order_relaxed) +
+                (int)((LONGLONG)viewY * displayHeight / g_view_h);
         } else {
             screenX = viewX; screenY = viewY;
         }
@@ -1733,7 +2559,10 @@ static void CreateBrowserNow() {
     TouchFlag(L"boot-pending.flag");   // ค้าง = พังตรงนี้ → บูตหน้า sw mode
     auto created = CefBrowserHost::CreateBrowserSync(wi, new OscClient(),
         g_page_url, bs, nullptr);
-    if (created) ClearFlag(L"boot-pending.flag");
+    if (created) {
+        ClearFlag(L"boot-pending.flag");
+        created->GetHost()->WasHidden(false);
+    }
     Log("=== NVIDIA OSC boot (OSR โปร่งใสค้างบนจอ, CEF 73 = engine เดียวกับ Share.exe) === CreateBrowserSync=" +
         std::string(created ? "OK" : "NULL"));
     Log("[cfg] renderScale=" + std::to_string(g_cfg.render_scale) +
@@ -1749,9 +2578,13 @@ static CefMouseEvent MkMouse(LPARAM l) {
     CefMouseEvent e{};
     POINT pt{ GET_X_LPARAM(l), GET_Y_LPARAM(l) };
     // พิกัดจอ → พิกัด view ผ่านตำแหน่ง/ขนาดภาพที่วางลงจอ (รองรับ crop กลางจอ)
-    if (g_disp_w > 0) {
-        int x = (int)((LONGLONG)(pt.x - g_dst_x) * g_view_w / g_disp_w);
-        int y = (int)((LONGLONG)(pt.y - g_dst_y) * g_view_h / g_disp_h);
+    const int displayWidth = g_disp_w.load(std::memory_order_acquire);
+    const int displayHeight = g_disp_h.load(std::memory_order_acquire);
+    if (displayWidth > 0 && displayHeight > 0) {
+        const int destinationX = g_dst_x.load(std::memory_order_relaxed);
+        const int destinationY = g_dst_y.load(std::memory_order_relaxed);
+        int x = (int)((LONGLONG)(pt.x - destinationX) * g_view_w / displayWidth);
+        int y = (int)((LONGLONG)(pt.y - destinationY) * g_view_h / displayHeight);
         e.x = x < 0 ? 0 : (x >= g_view_w ? g_view_w - 1 : x);
         e.y = y < 0 ? 0 : (y >= g_view_h ? g_view_h - 1 : y);
     } else {
@@ -1767,9 +2600,13 @@ static CefMouseEvent MkMouse(LPARAM l) {
 // The exact #/base route passes input through; all other routes capture input.
 static CefMouseEvent MkMousePt(POINT s) {
     CefMouseEvent e{};
-    if (g_disp_w > 0) {
-        int x = (int)((LONGLONG)(s.x - g_dst_x) * g_view_w / g_disp_w);
-        int y = (int)((LONGLONG)(s.y - g_dst_y) * g_view_h / g_disp_h);
+    const int displayWidth = g_disp_w.load(std::memory_order_acquire);
+    const int displayHeight = g_disp_h.load(std::memory_order_acquire);
+    if (displayWidth > 0 && displayHeight > 0) {
+        const int destinationX = g_dst_x.load(std::memory_order_relaxed);
+        const int destinationY = g_dst_y.load(std::memory_order_relaxed);
+        int x = (int)((LONGLONG)(s.x - destinationX) * g_view_w / displayWidth);
+        int y = (int)((LONGLONG)(s.y - destinationY) * g_view_h / displayHeight);
         e.x = x < 0 ? 0 : (x >= g_view_w ? g_view_w - 1 : x);
         e.y = y < 0 ? 0 : (y >= g_view_h ? g_view_h - 1 : y);
     } else { e.x = s.x; e.y = s.y; }
@@ -1779,24 +2616,36 @@ static CefMouseEvent MkMousePt(POINT s) {
     return e;
 }
 static bool ScreenInUiRects(POINT s) {
-    if (g_disp_w <= 0 || g_disp_h <= 0) return false;
+    if (!g_route_clickthrough) {
+        if (!g_ui_open_snapshot.load(std::memory_order_acquire) || !g_hwnd)
+            return false;
+        // Hook mode hides the desktop HWND; keep its screen bounds as the
+        // interactive input region for the in-game CEF surface.
+        RECT windowRect{};
+        return GetWindowRect(g_hwnd, &windowRect) &&
+            PtInRect(&windowRect, s) != FALSE;
+    }
+
+    const int displayWidth = g_disp_w.load(std::memory_order_acquire);
+    const int displayHeight = g_disp_h.load(std::memory_order_acquire);
+    if (displayWidth <= 0 || displayHeight <= 0) return false;
+    const int destinationX = g_dst_x.load(std::memory_order_relaxed);
+    const int destinationY = g_dst_y.load(std::memory_order_relaxed);
     RECT overlay_rect{
-        g_dst_x - 1,
-        g_dst_y - 1,
-        g_dst_x + (std::max)(1, g_disp_w) + 1,
-        g_dst_y + g_disp_h + 1
+        destinationX - 1,
+        destinationY - 1,
+        destinationX + (std::max)(1, displayWidth) + 1,
+        destinationY + displayHeight + 1
     };
     if (!PtInRect(&overlay_rect, s)) return false;
 
-    // ★ แบบของแท้: OSC เปิด = modal — จับเมาส์ทั้งจอส่งเข้า CEF
-    //   (คลิกนอกปุ่ม = เพจปิด overlay เอง / คลิกปุ่ม = action)
-    //   ยุคก่อน hook อยู่บนเธรด UI ที่ตันเลยเคอร์เซอร์แข็ง — ตอนนี้ hook เธรดเฉพาะแล้ว
-    if (!g_route_clickthrough) return true;
     std::lock_guard<std::mutex> lock(g_notifier_rects_mutex);
     return std::any_of(g_notifier_rects.begin(), g_notifier_rects.end(),
         [&](const RECT& rect) { return PtInRect(&rect, s) != FALSE; });
 }
 static HHOOK g_mouse_hook = nullptr;
+static HHOOK g_keyboard_hook = nullptr;
+static bool g_swallowed_keyboard_keys[256]{};
 // ★ บทเรียน 06:36 — hook ต้องอยู่เธรดเฉพาะ (มี pump ของตัวเอง) เพราะ LL hook
 //   อุดตันทั้งระบบเมื่อเธรดเจ้าของไม่ปั๊มข้อความ (CEF UI thread ตันตอน CreateBrowserSync)
 //   event ที่โดน UI จะส่งเข้า CEF ผ่าน post-task ไม่เรียกตรง
@@ -1812,7 +2661,10 @@ public:
         auto host = g_browser->GetHost();
         switch (ev.kind) {
         case WM_MOUSEMOVE:    host->SendMouseMoveEvent(e, false); break;
-        case WM_LBUTTONDOWN:  host->SetFocus(true); host->SendMouseClickEvent(e, MBT_LEFT, false, 1); break;
+        case WM_LBUTTONDOWN:
+            host->SetFocus(true);
+            host->SendMouseClickEvent(e, MBT_LEFT, false, 1);
+            break;
         case WM_LBUTTONUP:    host->SendMouseClickEvent(e, MBT_LEFT, true, 1); break;
         case WM_RBUTTONDOWN:  host->SendMouseClickEvent(e, MBT_RIGHT, false, 1); break;
         case WM_RBUTTONUP:    host->SendMouseClickEvent(e, MBT_RIGHT, true, 1); break;
@@ -1824,11 +2676,18 @@ public:
     IMPLEMENT_REFCOUNTING(HookEventTask);
 };
 static LRESULT CALLBACK LowLevelMouseProc(int code, WPARAM w, LPARAM l) {
+    static bool capturedLeft = false;
+    static bool capturedRight = false;
+    static bool capturedMiddle = false;
     if (code == HC_ACTION && g_browser) {
         MSLLHOOKSTRUCT* m = (MSLLHOOKSTRUCT*)l;
+        const bool overUi = ScreenInUiRects(m->pt);
+        if (!overUi &&
+            (w == WM_LBUTTONDOWN || w == WM_RBUTTONDOWN || w == WM_MBUTTONDOWN))
+            g_overlay_keyboard_capture.store(false, std::memory_order_release);
         // ★ เมาส์ต้องขยับได้เสมอ: WM_MOUSEMOVE ห้ามกืน (return 1 = เคอร์เซอร์แข็ง)
         if (w == WM_MOUSEMOVE) {
-            if (ScreenInUiRects(m->pt)) {
+            if (overUi) {
                 static ULONGLONG last_mv = 0;
                 ULONGLONG now = GetTickCount64();
                 if (now - last_mv >= 16) {           // throttle 60/s
@@ -1841,27 +2700,66 @@ static LRESULT CALLBACK LowLevelMouseProc(int code, WPARAM w, LPARAM l) {
             }
             return CallNextHookEx(nullptr, code, w, l);   // ผ่านเสมอ
         }
-        // คลิก/ล้อ: กลืนเฉพาะเมื่ออยู่ในกรอบปุ่มจริง
-        if (ScreenInUiRects(m->pt)) {
+        bool* capturedButton = nullptr;
+        bool isButtonDown = false;
+        switch (w) {
+        case WM_LBUTTONDOWN: capturedButton = &capturedLeft; isButtonDown = true; break;
+        case WM_LBUTTONUP: capturedButton = &capturedLeft; break;
+        case WM_RBUTTONDOWN: capturedButton = &capturedRight; isButtonDown = true; break;
+        case WM_RBUTTONUP: capturedButton = &capturedRight; break;
+        case WM_MBUTTONDOWN: capturedButton = &capturedMiddle; isButtonDown = true; break;
+        case WM_MBUTTONUP: capturedButton = &capturedMiddle; break;
+        }
+        const bool shouldCapture = overUi ||
+            (capturedButton && !isButtonDown && *capturedButton);
+        // Keep the matching button-up paired when a drag leaves the overlay.
+        if (shouldCapture) {
             HookEv ev{ (int)w, 0, m->pt.x, m->pt.y };
             if (w == WM_MOUSEWHEEL) ev.data = GET_WHEEL_DELTA_WPARAM(m->mouseData);
             auto t = new HookEventTask();
             t->ev = ev;
-            CefPostTask(TID_UI, t);
+            if (!CefPostTask(TID_UI, t)) {
+                if (capturedButton && isButtonDown) *capturedButton = false;
+                Log("[input] failed to queue captured mouse event to CEF");
+                return CallNextHookEx(nullptr, code, w, l);
+            }
+            if (capturedButton)
+                *capturedButton = isButtonDown;
+            static bool logged_game_capture = false;
+            if (!logged_game_capture &&
+                g_game_focused.load(std::memory_order_acquire)) {
+                logged_game_capture = true;
+                Log("[input] first in-game mouse event forwarded to CEF");
+            }
             return 1;   // กลืนคลิก — ไม่ให้ตกลงเกม
         }
     }
     return CallNextHookEx(nullptr, code, w, l);
 }
+static LRESULT CALLBACK LowLevelKeyboardProc(int code, WPARAM w, LPARAM l);
 static DWORD WINAPI HookThreadProc(LPVOID) {
     g_mouse_hook = SetWindowsHookExW(WH_MOUSE_LL, LowLevelMouseProc, GetModuleHandleW(nullptr), 0);
     if (!g_mouse_hook) {
         Log("[ui] ERROR: low-level mouse hook installation failed err=" + std::to_string(GetLastError()));
         return 1;
     }
+    g_keyboard_hook = SetWindowsHookExW(
+        WH_KEYBOARD_LL, LowLevelKeyboardProc, GetModuleHandleW(nullptr), 0);
+    if (!g_keyboard_hook)
+        Log("[input] keyboard capture unavailable err=" + std::to_string(GetLastError()));
+    else
+        Log("[input] low-level keyboard hook installed (overlay-click scoped)");
     Log("[ui] low-level mouse hook installed (dedicated thread)");
     MSG m;
     while (GetMessageW(&m, nullptr, 0, 0) > 0) { TranslateMessage(&m); DispatchMessageW(&m); }
+    if (g_keyboard_hook) {
+        UnhookWindowsHookEx(g_keyboard_hook);
+        g_keyboard_hook = nullptr;
+    }
+    if (g_mouse_hook) {
+        UnhookWindowsHookEx(g_mouse_hook);
+        g_mouse_hook = nullptr;
+    }
     return 0;
 }
 
@@ -1889,6 +2787,84 @@ static void ForwardKey(UINT msg, WPARAM w, LPARAM l) {
     }
 }
 
+class HookKeyboardEventTask : public CefTask {
+public:
+    UINT message = 0;
+    WPARAM key = 0;
+    LPARAM keyData = 0;
+    void Execute() override {
+        if (g_browser && g_browser->GetHost())
+            ForwardKey(message, key, keyData);
+    }
+    IMPLEMENT_REFCOUNTING(HookKeyboardEventTask);
+};
+
+static LRESULT CALLBACK LowLevelKeyboardProc(int code, WPARAM w, LPARAM l) {
+    if (code == HC_ACTION && g_browser) {
+        const auto* key = reinterpret_cast<const KBDLLHOOKSTRUCT*>(l);
+        const bool keyDown = w == WM_KEYDOWN || w == WM_SYSKEYDOWN;
+        const bool keyUp = w == WM_KEYUP || w == WM_SYSKEYUP;
+        if ((keyDown || keyUp) && key->vkCode < std::size(g_swallowed_keyboard_keys)) {
+            const bool hookActive =
+                g_game_focused.load(std::memory_order_acquire) &&
+                g_ui_open_snapshot.load(std::memory_order_acquire);
+            const bool wasSwallowed = keyUp && g_swallowed_keyboard_keys[key->vkCode];
+            if (!hookActive && !wasSwallowed)
+                return CallNextHookEx(nullptr, code, w, l);
+
+            const bool capture =
+                g_overlay_keyboard_capture.load(std::memory_order_acquire);
+            const bool swallow = keyDown ? hookActive && capture : wasSwallowed;
+            if (!swallow) {
+                if (keyDown)
+                    g_swallowed_keyboard_keys[key->vkCode] = false;
+                return CallNextHookEx(nullptr, code, w, l);
+            }
+
+            const bool altDown = (GetAsyncKeyState(VK_MENU) & 0x8000) != 0;
+            const bool protectedShortcut =
+                key->vkCode == VK_LWIN || key->vkCode == VK_RWIN ||
+                (altDown && (key->vkCode == VK_TAB || key->vkCode == VK_F4));
+            if (protectedShortcut) {
+                if (keyDown) g_swallowed_keyboard_keys[key->vkCode] = false;
+                return CallNextHookEx(nullptr, code, w, l);
+            }
+
+            LPARAM keyData = static_cast<LPARAM>(key->scanCode << 16);
+            if (key->flags & LLKHF_EXTENDED) keyData |= (1LL << 24);
+            if (keyUp) keyData |= (1LL << 30) | (1LL << 31);
+            auto* task = new HookKeyboardEventTask();
+            task->message = static_cast<UINT>(w);
+            task->key = key->vkCode;
+            task->keyData = keyData;
+            CefPostTask(TID_UI, task);
+
+            g_swallowed_keyboard_keys[key->vkCode] = keyDown && swallow;
+            if (keyDown && key->vkCode != VK_SHIFT &&
+                key->vkCode != VK_CONTROL && key->vkCode != VK_MENU) {
+                BYTE keyboardState[256]{};
+                if (GetKeyboardState(keyboardState)) {
+                    WCHAR characters[4]{};
+                    const int count = ToUnicodeEx(
+                        key->vkCode, key->scanCode, keyboardState,
+                        characters, static_cast<int>(std::size(characters)), 0,
+                        GetKeyboardLayout(0));
+                    for (int i = 0; i < count; ++i) {
+                        auto* characterTask = new HookKeyboardEventTask();
+                        characterTask->message = WM_CHAR;
+                        characterTask->key = characters[i];
+                        characterTask->keyData = keyData;
+                        CefPostTask(TID_UI, characterTask);
+                    }
+                }
+            }
+            if (swallow)
+                return 1;
+        }
+    }
+    return CallNextHookEx(nullptr, code, w, l);
+}
+
 // ★ ผูก DComp target/visual กับหน้าต่าง "หลังโชว์" — DWM จะจับ visual tree ถูกต้อง
 static void BindDcompTarget() {
     // ★ [P1#2 Copilot] target ต้องมีเจ้าของตลอดอายุที่แสดงผล — เก็บใน g_dcomp_target
@@ -1908,6 +2884,47 @@ static void BindDcompTarget() {
 }
 
 static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM w, LPARAM l) {
+    if (msg == WM_OSC_FOCUS_MODE) {
+        const bool hookMode = w != FALSE;
+        g_game_focused.store(hookMode, std::memory_order_release);
+        g_overlay_keyboard_capture.store(false, std::memory_order_release);
+        ApplyOpenShareInputMode();
+        if (hookMode) {
+            g_adapter_force_full_readback = true;
+            const bool overlayVisible =
+                g_ui_open_snapshot.load(std::memory_order_acquire) ||
+                g_notifier_overlay_visible.load(std::memory_order_acquire);
+            if (overlayVisible && g_shared_tex) {
+                const std::vector<CefRect> fullFrame{
+                    CefRect(0, 0, g_view_w, g_view_h) };
+                PublishAdapterFrame(g_shared_tex, fullFrame);
+                Log("[adapter-bridge] queued retained CEF frame on game focus");
+            } else {
+                Log(std::string("[adapter-bridge] no visible page overlay on game focus; menu=") +
+                    (g_ui_open_snapshot.load(std::memory_order_acquire) ? "1" : "0") +
+                    " notifier=" +
+                    (g_notifier_overlay_visible.load(std::memory_order_acquire)
+                        ? "1" : "0"));
+            }
+        } else {
+            PublishAdapterFrameMetadata();
+        }
+        StartAdapterFrameBurst("OSC focus mode changed", true);
+        if (g_browser) {
+            g_browser->GetHost()->WasHidden(false);
+            g_browser->GetHost()->Invalidate(PET_VIEW);
+        }
+        if (hookMode) {
+            ShowWindow(h, SW_HIDE);
+            if (g_browser) g_browser->GetHost()->SetFocus(false);
+        } else if (g_ui_open) {
+            ShowWindow(h, SW_SHOWNOACTIVATE);
+        }
+        Log(std::string("[focus-mode] ") +
+            (hookMode ? "hook active; desktop OSC hidden" :
+                "desktop OSC active; hook frame publishing paused"));
+        return 0;
+    }
     if ((msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN) &&
         w == VK_F12 && (l & (1LL << 30)) == 0 && g_browser) {
         if (!CefPostTask(TID_UI, new OpenDevToolsTask(g_browser)))
@@ -1962,7 +2979,8 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM w, LPARAM l) {
                 (clickthrough ? "click-through (#/base)" : "interactive"));
         }
         ApplyOpenShareInputMode();
-        if (g_ui_open && !clickthrough) {
+        if (g_ui_open && !clickthrough &&
+            !g_game_focused.load(std::memory_order_acquire)) {
             SetTimer(g_hwnd, 2, 500, nullptr);
             ShowWindow(g_hwnd, SW_SHOW);
             g_osc_activation_attempts = 10;
@@ -1992,11 +3010,19 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         bool external_request = (l != 0);
         if (ns == was) {
             if (external_request) QueueOscPageAction(ns);
+            if (!ns && g_browser &&
+                !CefPostTask(TID_UI, new InvalidatePageTask(g_browser)))
+                Log("[gpu] failed to schedule CEF repaint after OSC close");
             Log("[state] no-op (already " + std::string(ns ? "OPEN" : "CLOSED") + ") — ข้าม stale intent");
             return 0;
         }
         g_ui_open = ns;
         g_ui_open_snapshot.store(ns);
+        StartAdapterFrameBurst("OSC visibility changed");
+        if (!ns)
+            g_overlay_keyboard_capture.store(false, std::memory_order_release);
+        if (!ns && g_game_focused.load(std::memory_order_acquire))
+            PublishAdapterFrameMetadata();
         if (ns) {
             if (!was) {
                 KillTimer(g_hwnd, 3);
@@ -2018,9 +3044,11 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM w, LPARAM l) {
                     mi.rcMonitor.bottom - mi.rcMonitor.top,
                     SWP_NOACTIVATE);
             }
-            ShowWindow(g_hwnd, g_route_clickthrough ? SW_SHOWNOACTIVATE : SW_SHOW);
+            if (!g_game_focused.load(std::memory_order_acquire))
+                ShowWindow(g_hwnd, g_route_clickthrough ? SW_SHOWNOACTIVATE : SW_SHOW);
             ApplyOpenShareInputMode();
-            if (!g_route_clickthrough) {
+            if (!g_route_clickthrough &&
+                !g_game_focused.load(std::memory_order_acquire)) {
                 SetTimer(g_hwnd, 2, 500, nullptr);
                 g_osc_activation_attempts = 10;
                 if (SetForegroundWithInput(g_hwnd)) {
@@ -2053,6 +3081,9 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM w, LPARAM l) {
             KillTimer(g_hwnd, 2);
         }
         if (external_request) QueueOscPageAction(ns);
+        if (!ns && g_browser &&
+            !CefPostTask(TID_UI, new InvalidatePageTask(g_browser)))
+            Log("[gpu] failed to schedule CEF repaint after OSC close");
         Log("[state] " + std::string(ns ? "OPEN" : "CLOSED") + " (was " + std::string(was ? "OPEN" : "CLOSED") + ", intent " + std::to_string(intent) + ")");
         return 0;
     }
@@ -2063,6 +3094,52 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     }
     case WM_TIMER: {
         // WM_TIMER วิ่งบนเธรด UI ของ CEF (หน้าต่างถูกสร้างบนเธรดนั้น) — เรียก browser ได้ตรง ๆ
+        if (w == 5) {
+            const bool hookMode = IsHookGameForegroundStable();
+            const bool wasHookMode = g_game_focused.exchange(
+                hookMode, std::memory_order_acq_rel);
+            if (wasHookMode != hookMode)
+                SendMessageW(g_hwnd, WM_OSC_FOCUS_MODE,
+                    hookMode ? TRUE : FALSE, 0);
+            return 0;
+        }
+        if (w == 6) {
+            if (PublishCompletedAdapterFrame())
+                PublishAdapterFrameMetadata();
+            bool readbackPending = std::any_of(
+                std::begin(g_adapter_readback_slots),
+                std::end(g_adapter_readback_slots),
+                [](const AdapterReadbackSlot& slot) { return slot.pending; });
+            if (!readbackPending && g_adapter_force_full_readback &&
+                g_adapter_frame_device && g_shared_tex) {
+                const std::vector<CefRect> fullFrame{
+                    CefRect(0, 0, g_view_w, g_view_h) };
+                readbackPending = QueueAdapterFrameReadback(
+                    g_shared_tex, fullFrame);
+            }
+            if (!readbackPending)
+                KillTimer(g_hwnd, 6);
+            return 0;
+        }
+        if (w == AdapterFrameBurstTimerId) {
+            const ULONGLONG now = GetTickCount64();
+            const bool overlayVisible =
+                g_ui_open_snapshot.load(std::memory_order_acquire) ||
+                g_notifier_overlay_visible.load(std::memory_order_acquire);
+            const bool stoppedForHiddenOverlay =
+                !overlayVisible && !g_adapter_frame_burst_force_until_deadline;
+            if (now >= g_adapter_frame_burst_deadline || stoppedForHiddenOverlay) {
+                KillTimer(g_hwnd, AdapterFrameBurstTimerId);
+                g_adapter_frame_burst_deadline = 0;
+                g_adapter_frame_burst_force_until_deadline = false;
+                Log(std::string("[adapter-bridge] frame burst stopped: ") +
+                    (stoppedForHiddenOverlay ? "no visible overlay" : "30s elapsed"));
+                return 0;
+            }
+            if (g_adapter_frame_handle && g_adapter_frame_initialized)
+                PublishAdapterFrameMetadata();
+            return 0;
+        }
         if (w == 4) {
             if (g_browser && !g_browser->GetHost()->HasDevTools()) {
                 g_devtools_open = false;
@@ -2519,6 +3596,7 @@ public:
             WS_EX_TOOLWINDOW | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE | WS_EX_TOPMOST,
             L"DulukaOscNative", L"NVIDIA OSC", WS_POPUP,
             0, 0, overlay_w, h, nullptr, nullptr, wc.hInstance, nullptr);
+        g_game_focused.store(IsHookGameForegroundStable(), std::memory_order_release);
         // ★ บทเรียน 03:57 — DComp กับ LAYERED ขัดกัน (DWM ใช้เลเยอร์ GDI ทับ visual)
         //   และ LAYERED ก็ทำให้ DComp มองไม่เห็น → โมเดลใหม่ไม่พึ่งการซ่อนหน้าต่างแล้ว
         //   Click-through/input mode follows the main-frame URL, not the open/closed command.
@@ -2559,6 +3637,7 @@ public:
         ApplyOpenShareInputMode(); // OpenShare starts closed; input mode follows its state.
         Log("[window] boot: click-through until OpenShare opens");
         SetTimer(g_hwnd, 1, 30000, nullptr);   // เฝ้าระวัง: หน้าค้าง about:blank → กู้คืนเอง
+        SetTimer(g_hwnd, 5, 100, nullptr);     // focus can change while the CEF surface is idle
 
         // zoom แท้กำหนด scale css→จอ (ใช้แปลง display rects)
         {

@@ -9,8 +9,25 @@
 
 'use strict'
 
+var fs = require('fs');
+var path = require('path');
+var crypto = require('crypto');
+var os = require('os');
+var execFile = require('child_process').execFile;
 var api = require('./shims/NvGalleryAPINode.js');
+var shadowPlayApi = require('./shims/NvShadowPlayAPINode.js');
 var _logger;
+var thumbnailJobs = {};
+var playbackJobs = {};
+
+var VIDEO_EXTENSIONS = {
+    '.avi': true, '.mkv': true, '.mov': true, '.mp4': true,
+    '.mpeg': true, '.mpg': true, '.webm': true, '.wmv': true
+};
+var IMAGE_EXTENSIONS = {
+    '.bmp': true, '.gif': true, '.jpeg': true, '.jpg': true,
+    '.png': true
+};
 
 //! Helper function that receives body of POST request and calls callback for that data.
 //! @param req      Request object provided by Express.
@@ -132,20 +149,573 @@ function NativeCallbackToPromise(resolve, reject) {
     }
 };
 
+function fallbackFolderListing(options, callback) {
+    var directory = options && typeof options.directory === 'string'
+        ? options.directory.trim()
+        : '';
+    if (!directory) {
+        callback(new Error('Gallery folder listing requires a directory path'));
+        return;
+    }
+    if (/^[a-zA-Z]:$/.test(directory))
+        directory += '\\';
+
+    fs.readdir(path.resolve(directory), { withFileTypes: true }, function (err, entries) {
+        if (err) {
+            callback(err);
+            return;
+        }
+
+        var directories = [];
+        var files = [];
+        var excludeHidden = typeof options.excludeDirectoryType === 'string' &&
+            options.excludeDirectoryType.toLowerCase().indexOf('hidden') !== -1;
+        entries.forEach(function (entry) {
+            if (excludeHidden && (entry.name.charAt(0) === '.' ||
+                entry.name.charAt(0) === '$'))
+                return;
+            if (entry.isDirectory()) {
+                directories.push(entry.name);
+            } else if (entry.isFile()) {
+                files.push({ name: entry.name });
+            }
+        });
+        directories.sort(function (a, b) { return a.localeCompare(b); });
+        files.sort(function (a, b) { return a.name.localeCompare(b.name); });
+        callback(null, { directories: directories, files: files });
+    });
+}
+
+function readMediaFiles(directory, callback) {
+    var normalizedDirectory = typeof directory === 'string' ? directory.trim() : '';
+    if (!normalizedDirectory) {
+        callback(new Error('Gallery media scan requires a directory path'));
+        return;
+    }
+    if (/^[a-zA-Z]:$/.test(normalizedDirectory))
+        normalizedDirectory += '\\';
+
+    fs.readdir(path.resolve(normalizedDirectory), { withFileTypes: true }, function (err, entries) {
+        if (err) {
+            callback(err);
+            return;
+        }
+        var candidates = entries.filter(function (entry) {
+            var ext = path.extname(entry.name).toLowerCase();
+            return entry.isFile() && (VIDEO_EXTENSIONS[ext] || IMAGE_EXTENSIONS[ext]);
+        });
+        if (!candidates.length) {
+            callback(null, []);
+            return;
+        }
+
+        var remaining = candidates.length;
+        var files = [];
+        var failed = false;
+        candidates.forEach(function (entry) {
+            var filename = path.join(normalizedDirectory, entry.name);
+            fs.stat(filename, function (statError, stats) {
+                if (failed) return;
+                if (statError) {
+                    failed = true;
+                    callback(statError);
+                    return;
+                }
+                files.push({
+                    filename: filename,
+                    name: entry.name,
+                    type: VIDEO_EXTENSIONS[path.extname(entry.name).toLowerCase()]
+                        ? 'video'
+                        : 'image',
+                    stats: stats
+                });
+                remaining--;
+                if (remaining === 0) {
+                    files.sort(function (a, b) {
+                        return b.stats.mtimeMs - a.stats.mtimeMs;
+                    });
+                    callback(null, files);
+                }
+            });
+        });
+    });
+}
+
+function fallbackGalleryStats(options, callback) {
+    readMediaFiles(options && options.directory, function (err, files) {
+        if (err) {
+            callback(err);
+            return;
+        }
+        var videos = 0;
+        var screenshots = 0;
+        files.forEach(function (file) {
+            if (file.type === 'video') videos++;
+            else screenshots++;
+        });
+        callback(null, { videos: videos, screenshots: screenshots, thumbnail: null });
+    });
+}
+
+function findFfmpegPath() {
+    var candidates = [];
+    if (process.env.NV_FFMPEG_PATH)
+        candidates.push(process.env.NV_FFMPEG_PATH);
+    candidates.push(path.join(__dirname, 'ffmpeg.exe'));
+    candidates.push(path.resolve(__dirname, '..', '..', '..', 'Project',
+        'ShadowPlay', 'FFmpeg Capture', 'FFmpeg', 'ffmpeg.exe'));
+    candidates.push(path.resolve(__dirname, '..', '..', '..', '..', 'Project',
+        'ShadowPlay', 'FFmpeg Capture', 'FFmpeg', 'ffmpeg.exe'));
+
+    for (var i = 0; i < candidates.length; i++) {
+        try {
+            if (fs.statSync(candidates[i]).isFile())
+                return candidates[i];
+        } catch (err) {
+            if (err.code !== 'ENOENT' && err.code !== 'ENOTDIR')
+                _logger.error('Could not inspect FFmpeg candidate: ' + err.message);
+        }
+    }
+    return null;
+}
+
+function prepareRecordingPlayback(media, callback) {
+    var ffmpegPath = findFfmpegPath();
+    if (!ffmpegPath) {
+        callback(new Error('FFmpeg executable is not available'));
+        return;
+    }
+    var ffprobePath = path.join(path.dirname(ffmpegPath), 'ffprobe.exe');
+    var cacheDir = path.join(os.tmpdir(), 'NVIDIA-ShadowPlay', 'GalleryPlayback');
+    var cacheKey = crypto.createHash('sha256').update([
+        media.filename,
+        media.stats.size,
+        media.stats.mtimeMs
+    ].join('|')).digest('hex');
+    var cacheFile = path.join(cacheDir, cacheKey + '.webm');
+
+    function useCacheOrPrepare() {
+        fs.stat(cacheFile, function (cacheError, cacheStats) {
+            if (!cacheError && cacheStats.isFile() && cacheStats.size > 0) {
+                callback(null, { filename: cacheFile, stats: cacheStats });
+                return;
+            }
+            if (cacheError && cacheError.code !== 'ENOENT') {
+                callback(cacheError);
+                return;
+            }
+            if (playbackJobs[cacheKey]) {
+                playbackJobs[cacheKey].push(callback);
+                return;
+            }
+            playbackJobs[cacheKey] = [callback];
+
+            function finish(err, prepared) {
+                var callbacks = playbackJobs[cacheKey] || [];
+                delete playbackJobs[cacheKey];
+                callbacks.forEach(function (done) {
+                    done(err, prepared);
+                });
+            }
+
+            fs.mkdir(cacheDir, { recursive: true }, function (mkdirError) {
+                if (mkdirError) {
+                    finish(mkdirError);
+                    return;
+                }
+
+                execFile(ffprobePath, [
+                    '-v', 'error',
+                    '-show_entries', 'stream=codec_type,codec_name,pix_fmt',
+                    '-of', 'json',
+                    media.filename
+                ], {
+                    windowsHide: true,
+                    timeout: 30000,
+                    maxBuffer: 1024 * 1024
+                }, function (probeError, stdout) {
+                    if (probeError) {
+                        finish(probeError);
+                        return;
+                    }
+
+                    var streams;
+                    try {
+                        streams = JSON.parse(stdout).streams || [];
+                    } catch (parseError) {
+                        finish(parseError);
+                        return;
+                    }
+                    if (!streams.some(function (stream) {
+                        return stream.codec_type === 'video';
+                    })) {
+                        finish(new Error('FFmpeg found no video stream in recording'));
+                        return;
+                    }
+                    var temporaryFile = path.join(cacheDir, cacheKey + '.' +
+                        process.pid + '.' + Date.now() + '.tmp.webm');
+                    var args = [
+                        '-nostdin', '-v', 'error', '-y',
+                        '-i', media.filename,
+                        '-map', '0:v:0', '-map', '0:a:0?',
+                        '-sn', '-dn',
+                        '-c:v', 'libvpx',
+                        '-deadline', 'realtime',
+                        '-cpu-used', '8',
+                        '-b:v', '4M',
+                        '-c:a', 'libopus',
+                        '-b:a', '128k',
+                        '-f', 'webm',
+                        temporaryFile
+                    ];
+
+                    function startTranscode() {
+                        execFile(ffmpegPath, args, {
+                            windowsHide: true,
+                            timeout: 30 * 60 * 1000,
+                            maxBuffer: 1024 * 1024
+                        }, function (transcodeError) {
+                            if (transcodeError) {
+                                fs.unlink(temporaryFile, function () {});
+                                finish(transcodeError);
+                                return;
+                            }
+                            fs.stat(temporaryFile, function (statError, outputStats) {
+                                if (statError || !outputStats.isFile() ||
+                                    outputStats.size === 0) {
+                                    fs.unlink(temporaryFile, function () {});
+                                    finish(statError || new Error(
+                                        'FFmpeg produced an empty playback file'));
+                                    return;
+                                }
+                                fs.rename(temporaryFile, cacheFile, function (renameError) {
+                                    if (renameError) {
+                                        fs.unlink(temporaryFile, function () {});
+                                        finish(renameError);
+                                        return;
+                                    }
+                                    finish(null, {
+                                        filename: cacheFile,
+                                        stats: outputStats
+                                    });
+                                });
+                            });
+                        });
+                    }
+
+                    fs.unlink(cacheFile, function (unlinkError) {
+                        if (unlinkError && unlinkError.code !== 'ENOENT') {
+                            finish(unlinkError);
+                            return;
+                        }
+                        startTranscode();
+                    });
+                });
+            });
+        });
+    }
+
+    fs.stat(ffprobePath, function (probePathError, probePathStats) {
+        if (probePathError || !probePathStats.isFile()) {
+            callback(probePathError || new Error('FFprobe executable is unavailable'));
+            return;
+        }
+        useCacheOrPrepare();
+    });
+}
+
+function thumbnailDataUri(filename, stats, requestedWidth, callback) {
+    var width = parseInt(requestedWidth, 10);
+    if (!isFinite(width) || width < 64) width = 320;
+    width = Math.min(width, 640);
+    var key = crypto.createHash('sha256').update([
+        path.resolve(filename),
+        stats.size,
+        stats.mtimeMs,
+        width
+    ].join('|')).digest('hex');
+    var cacheDir = path.join(os.tmpdir(), 'NVIDIA-ShadowPlay', 'GalleryThumbnails');
+    var cacheFile = path.join(cacheDir, key + '.png');
+    var mimeType = 'data:image/png;base64,';
+
+    function returnCached() {
+        fs.readFile(cacheFile, function (err, image) {
+            if (err) {
+                callback(err);
+                return;
+            }
+            callback(null, mimeType + image.toString('base64'));
+        });
+    }
+
+    if (thumbnailJobs[key]) {
+        thumbnailJobs[key].push(callback);
+        return;
+    }
+    thumbnailJobs[key] = [callback];
+
+    function finish(err, data) {
+        var callbacks = thumbnailJobs[key] || [];
+        delete thumbnailJobs[key];
+        callbacks.forEach(function (done) {
+            done(err, data);
+        });
+    }
+
+    fs.readFile(cacheFile, function (cacheError, cachedImage) {
+        if (!cacheError) {
+            finish(null, mimeType + cachedImage.toString('base64'));
+            return;
+        }
+        if (cacheError.code !== 'ENOENT') {
+            finish(cacheError);
+            return;
+        }
+
+        var ffmpegPath = findFfmpegPath();
+        if (!ffmpegPath) {
+            finish(new Error('FFmpeg executable is not available'));
+            return;
+        }
+        fs.mkdir(cacheDir, { recursive: true }, function (mkdirError) {
+            if (mkdirError) {
+                finish(mkdirError);
+                return;
+            }
+
+            var tempFile = path.join(cacheDir, key + '.' + process.pid + '.' +
+                Date.now() + '.tmp.png');
+            var isVideo = VIDEO_EXTENSIONS[path.extname(filename).toLowerCase()] === true;
+
+            function generate(seekSeconds) {
+                var args = ['-nostdin', '-v', 'error', '-y'];
+                if (isVideo) args.push('-ss', String(seekSeconds));
+                args.push('-i', filename, '-map', '0:v:0', '-frames:v', '1',
+                    '-vf', 'scale=' + width + ':-2', '-f', 'image2', '-vcodec', 'png',
+                    tempFile);
+                execFile(ffmpegPath, args, {
+                    windowsHide: true,
+                    timeout: 15000,
+                    maxBuffer: 1024 * 1024
+                }, function (runError) {
+                    if (runError) {
+                        fs.unlink(tempFile, function (unlinkError) {
+                            if (unlinkError && unlinkError.code !== 'ENOENT')
+                                _logger.error('Could not remove failed thumbnail: ' + unlinkError.message);
+                            if (isVideo && seekSeconds !== 0) {
+                                generate(0);
+                                return;
+                            }
+                            finish(runError);
+                        });
+                        return;
+                    }
+                    fs.rename(tempFile, cacheFile, function (renameError) {
+                        if (renameError) {
+                            fs.unlink(tempFile, function () {});
+                            finish(renameError);
+                            return;
+                        }
+                        returnCached();
+                    });
+                });
+            }
+
+            generate(isVideo ? 1 : 0);
+        });
+    });
+}
+
+function fallbackRecentFiles(count, callback) {
+    function onPaths(err, paths) {
+        if (err) {
+            callback(err);
+            return;
+        }
+        if (!paths || typeof paths.videos !== 'string' || !paths.videos.trim()) {
+            callback(new Error('Gallery recording path is unavailable'));
+            return;
+        }
+        readMediaFiles(paths.videos, function (scanError, files) {
+            if (scanError) {
+                callback(scanError);
+                return;
+            }
+            var limit = parseInt(count, 10);
+            if (!isFinite(limit) || limit < 0) limit = 0;
+            limit = Math.min(limit, 100);
+            callback(null, {
+                files: files.slice(0, limit).map(function (file) {
+                    return file.filename;
+                })
+            });
+        });
+    }
+
+    try {
+        shadowPlayApi.RecordingPaths(onPaths, false);
+    } catch (err) {
+        callback(err);
+    }
+}
+
+function resolveRecordingMedia(filename, callback) {
+    if (typeof filename !== 'string' || !filename.trim()) {
+        callback({ statusCode: 400, message: 'A recording file path is required' });
+        return;
+    }
+
+    var requestedPath = path.resolve(filename.trim());
+    shadowPlayApi.RecordingPaths(function (settingsError, settings) {
+        if (settingsError) {
+            callback(settingsError);
+            return;
+        }
+        if (!settings || typeof settings.videos !== 'string' || !settings.videos.trim()) {
+            callback({ statusCode: 500, message: 'The recording folder is not configured' });
+            return;
+        }
+
+        fs.realpath(settings.videos, function (rootError, realRoot) {
+            if (rootError) {
+                callback(rootError);
+                return;
+            }
+            fs.realpath(requestedPath, function (fileError, realFilename) {
+                if (fileError) {
+                    callback({ statusCode: fileError.code === 'ENOENT' ? 404 : 403,
+                        message: 'Recording file is unavailable' });
+                    return;
+                }
+                var relative = path.relative(realRoot, realFilename);
+                if (!relative || relative === '..' ||
+                    relative.indexOf('..' + path.sep) === 0 ||
+                    path.isAbsolute(relative)) {
+                    callback({ statusCode: 403, message: 'Playback is limited to files inside the recording folder' });
+                    return;
+                }
+
+                fs.stat(realFilename, function (statError, stats) {
+                    if (statError) {
+                        callback(statError);
+                        return;
+                    }
+                    if (!stats.isFile()) {
+                        callback({ statusCode: 404, message: 'Recording is not a file' });
+                        return;
+                    }
+                    callback(null, { filename: realFilename, stats: stats });
+                });
+            });
+        });
+    });
+}
+
+function fallbackFileMetadata(options, callback) {
+    var filename = options && typeof options.file === 'string' ? options.file.trim() : '';
+    if (!filename) {
+        callback(new Error('Gallery metadata requires a file path'));
+        return;
+    }
+    fs.stat(filename, function (err, stats) {
+        if (err) {
+            callback(err);
+            return;
+        }
+        var ext = path.extname(filename).toLowerCase();
+        var isVideo = VIDEO_EXTENSIONS[ext] === true;
+        if (!isVideo && IMAGE_EXTENSIONS[ext] !== true) {
+            callback(new Error('Unsupported Gallery media file: ' + filename));
+            return;
+        }
+        var metadata = {
+            fileType: isVideo ? 'video' : 'image',
+            fileSubType: 'Normal',
+            fileSource: 'ShadowPlay',
+            date: stats.mtime.toLocaleString('en-US'),
+            duration: '',
+            fileSizeMB: stats.size / (1024 * 1024),
+            audiotype: 'Unknown',
+            hevc: '0',
+            DRSName: '',
+            DRSProfileName: '',
+            thumbnail: null
+        };
+        thumbnailDataUri(filename, stats, options.width, function (thumbnailError, thumbnail) {
+            if (thumbnailError) {
+                _logger.error('Gallery thumbnail generation failed: ' + thumbnailError.message);
+            } else {
+                metadata.thumbnail = thumbnail;
+            }
+            callback(null, metadata);
+        });
+    });
+}
+
+function fallbackDriveEnumeration(callback) {
+    var drives = [];
+    for (var code = 65; code <= 90; code++) {
+        var root = String.fromCharCode(code) + ':\\';
+        try {
+            if (fs.statSync(root).isDirectory()) {
+                drives.push({
+                    name: root,
+                    type: code === 65 || code === 66 ? 'removable' : 'fixed'
+                });
+            }
+        } catch (err) {
+            if (err.code !== 'ENOENT' && err.code !== 'ENOTDIR')
+                _logger.error('Could not enumerate drive ' + root + ': ' + err.message);
+        }
+    }
+    callback(null, { drives: drives });
+}
+
+function fallbackDirectoryWritable(options, callback) {
+    var directory = options && typeof options.directory === 'string'
+        ? options.directory.trim()
+        : '';
+    if (/^[a-zA-Z]:$/.test(directory))
+        directory += '\\';
+    if (!directory) {
+        callback(null, { writable: false });
+        return;
+    }
+    fs.access(path.resolve(directory), fs.constants.W_OK, function (err) {
+        callback(null, { writable: !err });
+    });
+}
+
 function RegisterExpressEndpoints(app, logger) {
     //! Gets all files in a directory. 
     app.post('/Gallery/v.1.2/GetFolderListing', function (req, res) {
+        var options = {};
         function doReply(err, data) {
-            if (err) {
-                replyWithError(res, err);
+            if (err || !data || !Array.isArray(data.directories) ||
+                !Array.isArray(data.files) ||
+                (data.directories.length === 0 && data.files.length === 0)) {
+                if (!err)
+                    logger.info('Gallery native folder listing unavailable; using filesystem listing');
+                else
+                    logger.info('Gallery native folder listing failed; using filesystem listing: ' +
+                        err.message);
+                fallbackFolderListing(options, function (fallbackError, fallbackData) {
+                    if (fallbackError) {
+                        replyWithError(res, fallbackError);
+                        return;
+                    }
+                    logger.info(JSON.stringify(fallbackData));
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify(fallbackData));
+                });
+                return;
             }
-            else {
-                logger.info(JSON.stringify(data));
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify(data));
-            }
+            logger.info(JSON.stringify(data));
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(data));
         }
         getJSONDataAndDo(req, res, function (content) {
+            options = content;
             try {
                 api.GalleryGetFolderListing12(doReply, content);
             }
@@ -158,16 +728,28 @@ function RegisterExpressEndpoints(app, logger) {
 
     // Gets the count of the number of screenshots/videos in a directory
     app.post('/Gallery/v.1.0/GetStats', function (req, res) {
+        var options = {};
         function doReply(err, data) {
-            if (err) {
-                replyWithError(res, err);
-            }
-            else {
+            if (!err && data && typeof data.videos === 'number' &&
+                typeof data.screenshots === 'number' &&
+                (data.videos > 0 || data.screenshots > 0)) {
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify(data));
+                return;
             }
+            logger.info('Gallery native statistics unavailable; using filesystem statistics' +
+                (err ? ': ' + err.message : ''));
+            fallbackGalleryStats(options, function (fallbackError, fallbackData) {
+                if (fallbackError) {
+                    replyWithError(res, fallbackError);
+                    return;
+                }
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(fallbackData));
+            });
         }
         getJSONDataAndDo(req, res, function (content) {
+            options = content;
             try {
                 api.GalleryGetStats(doReply, content);
             }
@@ -181,13 +763,21 @@ function RegisterExpressEndpoints(app, logger) {
     //! Gets "count" most recent items in the gallery.
     app.get('/Gallery/v.1.0/Recent/:count', function (req, res) {
         function doReply(err, data) {
-            if (err) {
-                replyWithError(res, err);
-            }
-            else {
+            if (!err && data && Array.isArray(data.files) && data.files.length > 0) {
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify(data));
+                return;
             }
+            logger.info('Gallery native recent files unavailable; using filesystem scan' +
+                (err ? ': ' + err.message : ''));
+            fallbackRecentFiles(req.params.count, function (fallbackError, fallbackData) {
+                if (fallbackError) {
+                    replyWithError(res, fallbackError);
+                    return;
+                }
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(fallbackData));
+            });
         }
 
         try {
@@ -197,6 +787,82 @@ function RegisterExpressEndpoints(app, logger) {
             replyWithError(res, err);
             console.error(err);
         }
+    });
+
+    app.get('/Gallery/v.1.0/Media', function (req, res) {
+        resolveRecordingMedia(req.query && req.query.file, function (err, media) {
+            if (err) {
+                res.writeHead(err.statusCode || 500, { 'Content-Type': 'text/plain' });
+                res.end(err.message || 'Unable to open recording');
+                return;
+            }
+
+            prepareRecordingPlayback(media, function (prepareError, playback) {
+                if (prepareError) {
+                    _logger.error('Gallery FFmpeg playback preparation failed: ' +
+                        prepareError.message);
+                    res.writeHead(500, { 'Content-Type': 'text/plain' });
+                    res.end('Unable to prepare video playback');
+                    return;
+                }
+
+                var headers = {
+                    'Accept-Ranges': 'bytes',
+                    'Cache-Control': 'no-store',
+                    'Content-Type': 'video/webm'
+                };
+                var range = req.headers && req.headers.range;
+                var start = 0;
+                var end = playback.stats.size - 1;
+                var statusCode = 200;
+
+                if (range) {
+                    var match = /^bytes=(\d*)-(\d*)$/.exec(range);
+                    if (!match || (!match[1] && !match[2]) || playback.stats.size === 0) {
+                        res.writeHead(416, {
+                            'Content-Range': 'bytes */' + playback.stats.size
+                        });
+                        res.end();
+                        return;
+                    }
+                    if (!match[1]) {
+                        var suffixLength = parseInt(match[2], 10);
+                        start = Math.max(playback.stats.size - suffixLength, 0);
+                    } else {
+                        start = parseInt(match[1], 10);
+                        if (match[2]) end = parseInt(match[2], 10);
+                    }
+                    if (start >= playback.stats.size || end < start) {
+                        res.writeHead(416, {
+                            'Content-Range': 'bytes */' + playback.stats.size
+                        });
+                        res.end();
+                        return;
+                    }
+                    end = Math.min(end, playback.stats.size - 1);
+                    statusCode = 206;
+                    headers['Content-Range'] = 'bytes ' + start + '-' + end +
+                        '/' + playback.stats.size;
+                }
+
+                headers['Content-Length'] = end - start + 1;
+                res.writeHead(statusCode, headers);
+                if (req.method === 'HEAD') {
+                    res.end();
+                    return;
+                }
+                var stream = fs.createReadStream(playback.filename, {
+                    start: start,
+                    end: end
+                });
+                stream.on('error', function (streamError) {
+                    _logger.error('Gallery playback stream failed: ' + streamError.message);
+                    if (!res.headersSent) res.writeHead(500);
+                    res.end();
+                });
+                stream.pipe(res);
+            });
+        });
     });
 
     //! Clears the recent list.
@@ -332,17 +998,28 @@ function RegisterExpressEndpoints(app, logger) {
 
     //! Gets metadata about a screenshot/video.
     app.post('/Gallery/v.1.0/GetFileMetaData', function (req, res) {
+        var options = {};
         function doReply(err, data) {
-            if (err) {
-                replyWithError(res, err);
-            }
-            else {
+            if (!err && data && typeof data.fileType === 'string' &&
+                typeof data.fileSubType === 'string' &&
+                typeof data.thumbnail === 'string' && data.thumbnail.length > 0) {
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify(data));
+                return;
             }
+            logger.info('Gallery native file metadata unavailable; using filesystem metadata' +
+                (err ? ': ' + err.message : ''));
+            fallbackFileMetadata(options, function (fallbackError, fallbackData) {
+                if (fallbackError) {
+                    replyWithError(res, fallbackError);
+                    return;
+                }
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(fallbackData));
+            });
         }
-
         getJSONDataAndDo(req, res, function (content) {
+            options = content;
             try {
                 api.GalleryGetMetaData(doReply, content);
             }
@@ -355,17 +1032,28 @@ function RegisterExpressEndpoints(app, logger) {
 
     //! Gets a thumbnail for a file.
     app.post('/Gallery/v.1.0/GetThumbnail', function (req, res) {
+        var options = {};
         function doReply(err, data) {
-            if (err) {
-                replyWithError(res, err);
-            }
-            else {
+            if (!err && data && typeof data.thumbnail === 'string' &&
+                data.thumbnail.length > 0) {
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify(data));
+                return;
             }
+            logger.info('Gallery native thumbnail unavailable; using filesystem thumbnail generation' +
+                (err ? ': ' + err.message : ''));
+            fallbackFileMetadata(options, function (fallbackError, fallbackData) {
+                if (fallbackError) {
+                    replyWithError(res, fallbackError);
+                    return;
+                }
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ thumbnail: fallbackData.thumbnail }));
+            });
         }
 
         getJSONDataAndDo(req, res, function (content) {
+            options = content;
             try {
                 api.GalleryGetThumbnail(doReply, content);
             }
@@ -445,13 +1133,24 @@ function RegisterExpressEndpoints(app, logger) {
     //! Gets system drive information.
     app.get('/Gallery/v.1.0/EnumerateDrives', function (req, res) {
         function doReply(err, data) {
-            if (err) {
-                replyWithError(res, err);
+            if (err || !data || !Array.isArray(data.drives) || data.drives.length === 0) {
+                if (!err)
+                    logger.info('Gallery native drive enumeration unavailable; using filesystem enumeration');
+                else
+                    logger.info('Gallery native drive enumeration failed; using filesystem enumeration: ' +
+                        err.message);
+                fallbackDriveEnumeration(function (fallbackError, fallbackData) {
+                    if (fallbackError) {
+                        replyWithError(res, fallbackError);
+                        return;
+                    }
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify(fallbackData));
+                });
+                return;
             }
-            else {
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify(data));
-            }
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(data));
         }
 
         try {
@@ -511,16 +1210,26 @@ function RegisterExpressEndpoints(app, logger) {
 
     // Check if a directory is writable
     app.post('/Gallery/v.1.0/IsDirectoryWritable', function (req, res) {
+        var options = {};
         function doReply(err, data) {
-            if (err) {
-                replyWithError(res, err);
-            }
-            else {
+            if (!err && data && typeof data.writable === 'boolean') {
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify(data));
+                return;
             }
+            logger.info('Gallery native directory writability unavailable; using filesystem check' +
+                (err ? ': ' + err.message : ''));
+            fallbackDirectoryWritable(options, function (fallbackError, fallbackData) {
+                if (fallbackError) {
+                    replyWithError(res, fallbackError);
+                    return;
+                }
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(fallbackData));
+            });
         }
         getJSONDataAndDo(req, res, function (content) {
+            options = content;
             try {
                 api.GalleryIsDirectoryWritable(doReply, content);
             }

@@ -126,10 +126,12 @@ if ($Clean -and (Test-Path -LiteralPath $BuildRoot)) {
 
 $activeProjects = @(
     @{ Path = 'Overlay OSC\NVIDIA OSC\NVIDIA OSC.vcxproj'; Platform = 'x64' },
+    @{ Path = 'Overlay OSC\NVIDIA OSC Adapter\NVIDIA OSC Adapter.vcxproj'; Platform = 'x64' },
+    @{ Path = 'Overlay OSC\NVIDIA OSC Adapter\NVIDIA OSC Adapter Host.csproj'; Platform = 'x64' },
     @{ Path = 'Overlay OSC\NVIDIA NodeAPI\NVIDIA Web Helper\NVIDIA Web Helper.vbproj'; Platform = 'x64' },
-    @{ Path = 'NvContainer\NvContainer\NvContainer.csproj'; Platform = 'AnyCPU' },
+    @{ Path = 'NvContainer\NvContainer.csproj'; Platform = 'AnyCPU' },
     @{ Path = 'NvGraphics\NvGraphics.App\NvGraphics.csproj'; Platform = 'AnyCPU' },
-    @{ Path = 'NvContainer\NvShadowPlayHelper\nvsphelper.csproj'; Platform = 'AnyCPU' },
+    @{ Path = 'ShadowPlay\NvShadowPlayHelper\nvsphelper.csproj'; Platform = 'AnyCPU' },
     @{ Path = 'Launcher.Cef\Launcher.vcxproj'; Platform = 'x64' },
     @{ Path = 'Launcher.Cef\Launcher Bootstrap.vcxproj'; Platform = 'x64' }
 )
@@ -207,8 +209,8 @@ if (Test-Path -LiteralPath $legacyOverlayConfig) {
 
 # Stage the controller and its hotkey helper from their active Project owners.
 $containerOutput = Join-Path $BuildRoot 'NvContainer'
-Copy-RuntimeFiles (Join-Path $ProjectRoot ("NvContainer\NvContainer\bin\Release\{0}" -f $TargetFramework)) $containerOutput
-Copy-RuntimeFiles (Join-Path $ProjectRoot ("NvContainer\NvShadowPlayHelper\bin\Release\{0}" -f $TargetFramework)) $containerOutput
+Copy-RuntimeFiles (Join-Path $ProjectRoot ("NvContainer\bin\Release\{0}" -f $TargetFramework)) $containerOutput
+Copy-RuntimeFiles (Join-Path $ProjectRoot ("ShadowPlay\NvShadowPlayHelper\bin\Release\{0}" -f $TargetFramework)) $containerOutput
 $graphicsBuildOutput = Join-Path $Repo 'Build\NVIDIA ShadowPlay\NvGraphics'
 $graphicsOutput = Join-Path $BuildRoot 'NvGraphics'
 if ([IO.Path]::GetFullPath($graphicsBuildOutput) -ne [IO.Path]::GetFullPath($graphicsOutput)) {
@@ -218,6 +220,16 @@ $containerGraphicsExe = Join-Path $containerOutput 'NvGraphics.exe'
 if (Test-Path -LiteralPath $containerGraphicsExe) {
     Remove-Item -LiteralPath $containerGraphicsExe -Force
 }
+
+# The OSC Adapter host injects the x64 DXGI Present probe into ontology-matched
+# games. Keep the host and native module together in the adapter runtime folder.
+$adapterOutput = Join-Path $BuildRoot 'NvAdapters'
+$adapterSource = Join-Path $ProjectRoot 'Overlay OSC\NVIDIA OSC Adapter'
+$adapterHostOutput = Join-Path $adapterSource (
+    "bin\x64\Release\{0}\win-x64" -f $TargetFramework)
+$adapterNativeDll = Join-Path $adapterSource 'bin\x64\Release\NVIDIA OSC Adapter Hook.dll'
+Copy-RuntimeFiles $adapterHostOutput $adapterOutput
+Copy-FileSafe $adapterNativeDll (Join-Path $adapterOutput (Split-Path -Leaf $adapterNativeDll))
 
 # Launcher host/UI slot; CEF runtime is shared from the OSC slot below.
 $launcherOutput = Join-Path $ProjectRoot 'Launcher.Cef\bin\x64\Release'

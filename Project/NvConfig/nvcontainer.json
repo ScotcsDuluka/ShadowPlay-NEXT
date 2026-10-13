@@ -3,6 +3,23 @@
   "mode": "ours",
   "$mode_note": "ours = NvContainer ดูแล NvGraphics.exe, NodeAPI ใน Overlay OSC\\NVIDIA NodeAPI :59011, NVIDIA OSC.exe และ nvsphelper.exe | NvCapture.exe ยังไม่ spawn | genuine = NVIDIA Share.exe แท้",
   "controlApiPort": 59012,
+  "applicationOntology": {
+    "baseUrl": "https://nv-ontology.pages.dev/api/",
+    "timeoutSeconds": 5
+  },
+  "gameWatcher": {
+    "enabled": true,
+    "pollIntervalSeconds": 3,
+    "catalogRefreshSeconds": 30,
+    "maxConcurrentResolutions": 4
+  },
+  "oscAdapter": {
+    "enabled": false,
+    "$note": "Initial DXGI shared-texture compositor. Keep disabled until controlled-app compatibility and safe detach behavior are reviewed.",
+    "executable": "NvAdapters\\NVIDIA OSC Adapter.exe",
+    "workingDirectory": "NvAdapters",
+    "stopGraceSeconds": 3
+  },
   "testMode": {
     "enabled": true,
     "$note": "NvContainer simulates supported capture and game-filter actions for UI testing; no capture/filter operation is started."

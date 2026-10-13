@@ -1,0 +1,314 @@
+/* ============================================================================
+   45-notifier.css — New stacked toast notifier
+   ----------------------------------------------------------------------------
+   แหล่ง: docs/osc-genuine/notifier-genuine.css — ดึงจาก GFE installer extract
+          "C:\My Project\GFE\GeForce_Experience_v3.28.0.412\GFExperience\osc\app.js"
+   (app.js ต้นฉบับแท้ไม่แก้ md5 e5382717 — ต่างจากตัวที่เคยใช้ (มี patch port))
+
+   คง choreography และขนาดเดิมของ GFE:
+   - ชั้นการ์ด: absolute, right:-330px พัก, 300×90, top:105px
+   - transition-property: right, duration .25s
+   - สถานะปิด: ดำ delay 0s · เขียว delay .25s
+   - สถานะเปิด (.notifier-open): เขียว delay 0s วิ่งก่อน · ดำ delay .25s ตาม
+     → เข้า: เขียว→ดำ · ออก (ถอด class): กลับ delay ปกติ = ดำ→เขียว
+   - แถบเขียว = border-left:5px solid #76b900 บนตัวดำ (มีตั้งแต่ต้น)
+   - เนื้อหา (.notifier): opacity 0 → เปิด: .5s + delay .5s → 1
+   - ขนาดพิเศษ: large 330×124 top:90 · tall 330×150 top:90
+   - flip: rotateX(180deg) 1s (การ์ด) + rotateX(-180deg) (เนื้อหากลับด้าน)
+   ========================================================================== */
+
+@font-face {
+    font-family: 'nvgcshare';
+    src: url('../../../nvgcshare.woff2') format('woff2');
+    font-display: block;
+}
+
+/* ---- ค่าคงที่ (อ้าง CSS แท้ทุกตัว) ---------------------------------------- */
+:root {
+    --nv-green: #76b900;              /* แท้: #76b900 (พิมพ์เล็กตามต้นฉบับ) */
+    --nv-black: #000;
+    --nv-width: 300px;                /* แท้: width:300px */
+    --nv-height: 90px;                /* แท้: height:90px */
+    --nv-offstage-right: -330px;      /* แท้: right:-330px (จุดพักนอกจอ) */
+    --nv-strip: 5px;                  /* แท้: border-left:5px solid #76b900 */
+    --nv-slide-ms: 250ms;             /* แท้: transition-duration:.25s */
+    --nv-follow-delay: 250ms;         /* แท้: delay ชั้นตาม .25s */
+    --nv-content-ms: 500ms;           /* แท้: เนื้อหา opacity .5s */
+    --nv-content-delay: 500ms;        /* แท้: เนื้อหา delay .5s */
+    --nv-ease: cubic-bezier(0.215, 0.61, 0.355, 1);  /* ease-out cubic ของโปรเจกต์ */
+    --nv-top: 105px;                  /* แท้: top:105px */
+    --nv-glide-ms: 250ms;             /* stack reflow (WinForms T30) */
+    --nv-autoclose-ms: 6000ms;        /* autoClose 6000 (WinForms — แท้ osc ไม่มี timer ใน CSS) */
+}
+
+/* ---- stack container (ของเรา: 3 slots — แท้ osc มีตัวเดียว) ---------------- */
+.nv-notifier-stack {
+    position: fixed;
+    top: var(--nv-top);
+    right: 0;
+    width: var(--nv-width);
+    height: 0;
+    z-index: 1000;                    /* แท้: z-index:1000 */
+    pointer-events: none;
+}
+
+body > nv-osc-notifier.notifier-slider {
+    display: none !important;
+}
+
+/* ============================================================================
+   การ์ด toast — โครงตามแท้: .notifier-base/.notifier-black/.notifier-green
+   ----------------------------------------------------------------------------
+   wrapper ของเราอยู่ที่ slot เสมอ; ชั้นดำ/เขียวด้านในเลื่อนจาก right:-330px → 0
+   ตาม CSS แท้ ส่วน top ถูก set ด้วย JS ตาม slot rank (stack) — transition top ด้วย
+   ========================================================================== */
+.nv-toast {
+    box-sizing: border-box;
+    position: absolute;
+    overflow: visible;
+    right: 0;                                 /* wrapper อยู่กับที่; ชั้นดำ/เขียวเป็นตัวเลื่อน */
+    width: var(--nv-width);
+    height: var(--nv-height);
+    top: 0;                                   /* JS set ตาม slot rank */
+    pointer-events: auto;
+    cursor: pointer;
+    opacity: 0.90;
+    transition: right var(--nv-slide-ms) var(--nv-ease),
+                top var(--nv-glide-ms) var(--nv-ease);
+    border-radius: 0;
+}
+
+/* ---- ชั้นเขียว (.notifier-green แท้) ----------------------------------------
+   แท้: delay .25s (ตอนปิด/ออก) · bg #76b900 · อยู่ล่างซ้อนหลังดำ            */
+.nv-toast__green {
+    box-sizing: border-box;
+    position: absolute;
+    overflow: hidden;
+    right: var(--nv-offstage-right);
+    width: var(--nv-width);
+    height: var(--nv-height);
+    top: 0;
+    transition-property: right;
+    transition-duration: var(--nv-slide-ms);
+    transition-delay: var(--nv-follow-delay);   /* แท้: .25s */
+    background-color: var(--nv-green);
+}
+
+/* ---- ชั้นดำ (.notifier-black แท้) --------------------------------------------
+   แท้: delay 0s · bg #000 · border-left:5px solid #76b900 (แถบเขียวตั้งแต่ต้น) */
+.nv-toast__black {
+    box-sizing: border-box;
+    position: absolute;
+    overflow: hidden;
+    right: var(--nv-offstage-right);
+    width: var(--nv-width);
+    height: var(--nv-height);
+    top: 0;
+    transition-property: right;
+    transition-duration: var(--nv-slide-ms);
+    transition-delay: 0s;                        /* แท้: 0s */
+    background-color: var(--nv-black);
+    border-left: var(--nv-strip) solid var(--nv-green);   /* แท้ — ไม่ใช่ div แยก */
+}
+
+/* ============================================================================
+   เปิด (.notifier-open แท้) — delay สลับ:
+     เขียว delay 0s วิ่งก่อน · ดำ delay .25s ตาม
+   → ลำดับเข้า: เขียว→ดำ · ลำดับออก (ถอด class กลับ delay ปกติ): ดำ→เขียว
+   ========================================================================== */
+.nv-toast.is-open > .nv-toast__green {
+    transition-delay: 0s;
+    right: 0;
+}
+.nv-toast.is-open > .nv-toast__black {
+    transition-delay: var(--nv-follow-delay);
+    right: 0;
+}
+
+/* ---- เนื้อหา (.notifier แท้) --------------------------------------------------
+   แท้: opacity:0 · เปิด: transition .5s + delay .5s → opacity 1
+   ไอคอน: .notifier-icon 88×48, font 48px, padding 0 20px
+   ข้อความ: .notifier-text ขาว 16px/400 · subtext 14px margin-top -25px       */
+.nv-toast__content {
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    opacity: 0;
+    transition-property: opacity;
+    transition-delay: 0s;
+    transition-duration: 0s;                     /* แท้: ปิด = ทันที (0s) */
+}
+.nv-toast.is-open > .nv-toast__black > .nv-toast__content {
+    transition-duration: var(--nv-content-ms);   /* .5s */
+    transition-delay: var(--nv-content-delay);   /* .5s */
+    opacity: 1;
+}
+
+.nv-toast__icon {
+    box-sizing: border-box;
+    padding: 0 20px;                             /* แท้: padding:0 20px */
+    vertical-align: middle;
+    margin: 0;
+    width: 88px;                                 /* แท้: width:88px */
+    height: 48px;                                /* แท้: height:48px */
+    font-size: 48px;                             /* แท้: font-size:48px */
+    font-family: 'nvgcshare', 'Segoe UI', sans-serif;
+    color: #fff;
+    line-height: 48px;
+    flex-shrink: 0;
+}
+.nv-toast__icon.is-highlighted {                 /* แท้: icon-highlighted */
+    color: var(--nv-green);
+}
+
+.nv-toast__icon-image {
+    box-sizing: border-box;
+    display: block;
+    width: 56px;
+    height: 56px;
+    margin: 0 16px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.nv-toast__text-container {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.nv-toast__action {
+    display: none;
+    flex: 0 0 auto;
+    margin: 0 14px 0 8px;
+    padding: 7px 10px;
+    border: 1px solid var(--nv-green);
+    border-radius: 2px;
+    background: transparent;
+    color: #fff;
+    font: 600 13px 'Segoe UI', sans-serif;
+    cursor: pointer;
+}
+.nv-toast__action:hover,
+.nv-toast__action:focus-visible {
+    background: var(--nv-green);
+    color: #111;
+    outline: none;
+}
+
+.nv-toast__text {
+    padding-right: 15px;                         /* แท้ */
+    color: #fff;
+    font-size: 16px;                             /* แท้ */
+    font-weight: 400;                            /* แท้ */
+    font-family: 'Segoe UI', sans-serif;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+}
+
+.nv-toast__subtext {                             /* แท้: .notifier-subtext */
+    margin-top: -25px;                           /* แท้: -25px (ทับบรรทัดบน) */
+    padding-right: 15px;
+    color: #fff;
+    font-size: 14px;                             /* แท้ */
+    font-weight: 400;
+    font-family: 'Segoe UI', sans-serif;
+}
+
+/* ============================================================================
+   ขนาดพิเศษ (แท้: .notifier-large / .notifier-tall)
+   ----------------------------------------------------------------------------
+   large: 330×124 top:90 · tall: 330×150 top:90 (broadcast ใช้)
+   ========================================================================== */
+.nv-toast.is-large { width: 330px; }
+.nv-toast.is-large > .nv-toast__green,
+.nv-toast.is-large > .nv-toast__black {
+    width: 330px !important;
+    height: 124px !important;
+    top: 0 !important;    /* แท้ top:90 (สัมพัทธ์กับ 105) — เรา top อยู่ที่ card แล้ว */
+}
+.nv-toast.is-tall { width: 330px; }
+.nv-toast.is-tall > .nv-toast__green,
+.nv-toast.is-tall > .nv-toast__black {
+    width: 330px !important;
+    height: 150px !important;
+    top: 0 !important;
+}
+.nv-toast.is-large .nv-toast__subtext,
+.nv-toast.is-tall .nv-toast__subtext {
+    margin-top: 2px;
+    line-height: 1.2;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+/* ============================================================================
+   FLIP (แท้: .notifier-flip) — Updater UI ของแท้ ตอนข้อความซ้ำ
+   ----------------------------------------------------------------------------
+   การ์ดทั้งคู่ rotateX(180deg) 1s · เนื้อหา counter-rotate rotateX(-180deg)
+   = การ์ดพลิกแต่ข้อความยังอ่านออก
+   ========================================================================== */
+.nv-toast.is-flip > .nv-toast__black,
+.nv-toast.is-flip > .nv-toast__green {
+    transition: transform 1s;
+    transform-style: preserve-3d;
+    transform: rotateX(180deg);
+}
+.nv-toast.is-flip > .nv-toast__black > .nv-toast__content {
+    transition: transform 1s;
+    transform-style: preserve-3d;
+    transform: rotateX(-180deg);
+}
+.nv-toast__green, .nv-toast__black, .nv-toast__content {
+    perspective: 800px;                          /* แท้: .notifier-slider{perspective:800px} */
+    backface-visibility: hidden;
+}
+
+/* ============================================================================
+   ขนาดพิเศษเฉพาะ NvGraphics (additive — ไม่แตะค่าแท้ใดๆ)
+   ----------------------------------------------------------------------------
+/* ============================================================================
+   ขนาดพิเศษเฉพาะ NvGraphics (additive — ไม่แตะค่าแท้ใดๆ)
+   ----------------------------------------------------------------------------
+   การ์ด GPU ปรับความกว้างตามความยาวข้อความ 3 ระดับ (s/m/l):
+   s=360 · m=460 · l=560 — ความสูงคง var(--nv-height) เดิม เพื่อให้
+   stack layout และ animation (slide/glide) เล่นครบเหมือนการ์ดแท้ทุกประการ
+   offstage ขยายตามความกว้างของแต่ละระดับ ไม่ให้การ์ดโผล่ค้างกลางทาง
+/* ============================================================================
+   ขนาดพิเศษเฉพาะ NvGraphics (additive — ไม่แตะค่าแท้ใดๆ)
+   ----------------------------------------------------------------------------
+   การ์ด GPU ใช้ 2 ความกว้างตามรูปแบบแจ้งเตือน:
+   preference จาก Windows=350 · apply/default=380 — ความสูง/ฟอนต์คงเดิม
+   offstage ขยายตามความกว้างเพื่อให้การ์ดเลื่อนเข้า/ออกพ้นจอครบ
+   ส่วน subtext ของการ์ด GPU เรียงบรรทัดปกติ (ยกเลิก margin-top:-25px ของแท้
+   ที่ใช้ทับบรรทัดหลัก — ใช้กับการ์ด GPU แล้วข้อความชนกัน)
+   ========================================================================== */
+.nv-toast.is-gpu {
+    width: var(--gpu-w);
+    height: var(--nv-height);
+    --nv-offstage-right: calc(var(--gpu-w) * -1 - 30px);
+}
+.nv-toast.is-gpu > .nv-toast__green,
+.nv-toast.is-gpu > .nv-toast__black {
+    width: var(--gpu-w) !important;
+    height: var(--nv-height) !important;
+    top: 0 !important;
+}
+.nv-toast.is-gpu .nv-toast__subtext {
+    margin-top: 2px;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+    max-width: 100%;
+    opacity: 0.85;
+}

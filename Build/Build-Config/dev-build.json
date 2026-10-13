@@ -1,13 +1,15 @@
 ﻿{
-    "buildUtc":  "2026-10-11T19:46:59.5133549Z",
+    "buildUtc":  "2026-10-13T00:43:08.0111753Z",
     "configuration":  "Release",
     "sourceRoot":  "Project",
     "projects":  [
                      "Overlay OSC\\NVIDIA OSC\\NVIDIA OSC.vcxproj",
+                     "Overlay OSC\\NVIDIA OSC Adapter\\NVIDIA OSC Adapter.vcxproj",
+                     "Overlay OSC\\NVIDIA OSC Adapter\\NVIDIA OSC Adapter Host.csproj",
                      "Overlay OSC\\NVIDIA NodeAPI\\NVIDIA Web Helper\\NVIDIA Web Helper.vbproj",
-                     "NvContainer\\NvContainer\\NvContainer.csproj",
+                     "NvContainer\\NvContainer.csproj",
                      "NvGraphics\\NvGraphics.App\\NvGraphics.csproj",
-                     "NvContainer\\NvShadowPlayHelper\\nvsphelper.csproj",
+                     "ShadowPlay\\NvShadowPlayHelper\\nvsphelper.csproj",
                      "Launcher.Cef\\Launcher.vcxproj",
                      "Launcher.Cef\\Launcher Bootstrap.vcxproj"
                  ],
