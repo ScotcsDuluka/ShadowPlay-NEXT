@@ -14,6 +14,10 @@ Please check the app information at https://scotcsduluka.github.io/NVIDIA-Shadow
 
 # NVIDIA ShadowPlay
 
+> **Independent-project notice:** This repository is independently developed and is not affiliated with, endorsed by, sponsored by, or associated with NVIDIA Corporation. NVIDIA, ShadowPlay, and related marks belong to their respective owners. This project is not an official NVIDIA product.
+
+> **Repository structure:** The repository currently contains both the legacy WinForms Overlay system and a newer CEF-based Overlay/platform codebase. The intended destination name for the newer project is **ShadowPlay-NEXT**. See [the repository rebuild plan](docs/REPOSITORY-REBUILD-PLAN.md). This notice documents the plan only; it does not mean source files have already been moved.
+
 > [!NOTE]
 > A custom screen capture utility inspired by NVIDIA ShadowPlay, built primarily in **<img src="https://raw.githubusercontent.com/github/explore/refs/heads/main/topics/visual-basic/visual-basic.png" alt="Visual Basic Logo" width="15"> VB.NET** with a **no-hook** capture design.<br>
 > Recording and encoding are powered by **FFmpeg**, with modular capture and encoder components under active development.
