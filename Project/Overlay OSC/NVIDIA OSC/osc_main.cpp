@@ -3024,6 +3024,12 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         if (!ns && g_game_focused.load(std::memory_order_acquire))
             PublishAdapterFrameMetadata();
         if (ns) {
+            if (g_browser) {
+                auto host = g_browser->GetHost();
+                host->WasHidden(false);
+                host->Invalidate(PET_VIEW);
+                Log("[gpu] CEF view awakened and invalidated on OSC open");
+            }
             if (!was) {
                 KillTimer(g_hwnd, 3);
                 g_prev_fore = GetForegroundWindow();

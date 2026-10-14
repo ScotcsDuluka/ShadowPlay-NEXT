@@ -1,8 +1,0 @@
-{
-  "profiles": {
-    "NVIDIA Share": {
-      "commandName": "Project",
-      "commandLineArgs": "del \"$(TargetDir)*.pdb\"\r\ndel \"$(TargetDir)*.xml\"\r\n"
-    }
-  }
-}
