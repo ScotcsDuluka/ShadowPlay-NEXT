@@ -131,7 +131,7 @@ $activeProjects = @(
     @{ Path = 'Overlay On-Screen Control\NVIDIA NodeAPI\NVIDIA Web Helper\NVIDIA Web Helper.vbproj'; Platform = 'x64' },
     @{ Path = 'NVIDIA Container\NvContainer.csproj'; Platform = 'AnyCPU' },
     @{ Path = 'NVIDIA Graphics\NvGraphics.App\NvGraphics.csproj'; Platform = 'AnyCPU' },
-    @{ Path = 'Overlay On-Screen Control\NVIDIA ShadowPlay Helper\nvsphelper.csproj'; Platform = 'AnyCPU' },
+    @{ Path = 'NVIDIA Container\NVIDIA ShadowPlay Helper\nvsphelper.csproj'; Platform = 'AnyCPU' },
     @{ Path = 'Launcher.Cef\Launcher.vcxproj'; Platform = 'x64' },
     @{ Path = 'Launcher.Cef\Launcher Bootstrap.vcxproj'; Platform = 'x64' }
 )
@@ -210,7 +210,7 @@ if (Test-Path -LiteralPath $legacyOverlayConfig) {
 # Stage the controller and its hotkey helper from their active Project owners.
 $containerOutput = Join-Path $BuildRoot 'NVIDIA Container'
 Copy-RuntimeFiles (Join-Path $ProjectRoot ("NVIDIA Container\bin\Release\{0}" -f $TargetFramework)) $containerOutput
-Copy-RuntimeFiles (Join-Path $ProjectRoot ("Overlay On-Screen Control\NVIDIA ShadowPlay Helper\bin\Release\{0}" -f $TargetFramework)) $containerOutput
+Copy-RuntimeFiles (Join-Path $ProjectRoot ("NVIDIA Container\NVIDIA ShadowPlay Helper\bin\Release\{0}" -f $TargetFramework)) $containerOutput
 $graphicsBuildOutput = Join-Path $Repo 'Build\NVIDIA ShadowPlay\NVIDIA Graphics'
 $graphicsOutput = Join-Path $BuildRoot 'NVIDIA Graphics'
 if ([IO.Path]::GetFullPath($graphicsBuildOutput) -ne [IO.Path]::GetFullPath($graphicsOutput)) {

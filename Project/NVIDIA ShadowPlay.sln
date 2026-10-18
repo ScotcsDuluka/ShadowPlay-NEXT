@@ -5,7 +5,7 @@ VisualStudioVersion = 18.3.11512.155
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "NVIDIA Web Helper", "Overlay On-Screen Control\NVIDIA NodeAPI\NVIDIA Web Helper\NVIDIA Web Helper.vbproj", "{AF59A4AF-726C-4FB1-80D7-74E75094B3A7}"
 EndProject
-Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "nvsphelper", "Overlay On-Screen Control\NVIDIA ShadowPlay Helper\nvsphelper.csproj", "{AF85BD81-55B6-44E8-BD61-81FDF22E0F98}"
+Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "nvsphelper", "NVIDIA Container\NVIDIA ShadowPlay Helper\nvsphelper.csproj", "{AF85BD81-55B6-44E8-BD61-81FDF22E0F98}"
 EndProject
 Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "DulukaEngine", "NVIDIA Capture\EngineCapture\Duluka Capture\Core\DulukaEngine\DulukaEngine.vbproj", "{6C7C0C3F-8142-4806-B1F3-7F216761F531}"
 EndProject

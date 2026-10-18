@@ -4,7 +4,7 @@
     "projects": [
       "Overlay On-Screen Control\\NVIDIA NodeAPI\\NVIDIA Web Helper\\NVIDIA Web Helper.vbproj",
       "NVIDIA Container\\NvContainer.csproj",
-      "Overlay On-Screen Control\\NVIDIA ShadowPlay Helper\\nvsphelper.csproj",
+      "NVIDIA Container\\NVIDIA ShadowPlay Helper\\nvsphelper.csproj",
       "NVIDIA Capture\\EngineCapture\\Duluka Capture\\Core\\DulukaEngine\\DulukaEngine.vbproj",
       "NVIDIA Capture\\EngineCapture\\Duluka Capture\\Audio\\DulukaEngine.Audio\\DulukaEngine.Audio.csproj",
       "NVIDIA Capture\\EngineCapture\\Duluka Capture\\Audio\\DulukaEngine.Audio.Wasapi\\DulukaEngine.Audio.Wasapi.csproj",

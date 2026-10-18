@@ -1,0 +1,11 @@
+# Normal Visual Studio / native build output (repo also ignores these globally)
+/bin/
+/obj/
+/CefCache/
+
+# Isolated test-build output only; keep the PowerShell script and README tracked
+/build_test/NVIDIA OSC_Test/
+/build_test/obj/
+
+# Historical binary output is preserved locally but should not be added to source control
+/archive/legacy-build-output/

@@ -47,7 +47,7 @@
 #include <dcomp.h>
 #include <d3dcompiler.h>
 #include <cstring>
-#include "../../NVIDIA Adapter/OSC Adapter/Duluka Hook/include/osc_frame_bridge.h"
+#include "../../../NVIDIA Adapter/OSC Adapter/Duluka Hook/include/osc_frame_bridge.h"
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "dcomp.lib")

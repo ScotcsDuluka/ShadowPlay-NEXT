@@ -1,7 +1,10 @@
-import re, glob, os
+from pathlib import Path
+import re
 
-dll = r"C:/Users/ScotcsDuluka/.nuget/packages/cefsharp.wpf.netcore/138.0.340/ref/net6.0-windows/CefSharp.Wpf.dll"
-data = open(dll, 'rb').read()
+dll = Path.home() / ".nuget" / "packages" / "cefsharp.wpf.netcore" / "138.0.340" / "ref" / "net6.0-windows" / "CefSharp.Wpf.dll"
+if not dll.is_file():
+    raise SystemExit(f"CefSharp 138 assembly not found: {dll}")
+data = dll.read_bytes()
 for pat in [b'Hardware', b'WpfIsHardwareAccelerationEnabled', b'EnableIsSoftwareRendering',
             b'SoftwareRendering', b'SharedTexture', b'D3DImage', b'IsHardwareAccelerationEnabled']:
     hits = set(m.group().decode(errors='ignore')
