@@ -1,5 +1,0 @@
-﻿GeForce Experience potrebuje podatke za konfiguracijo vaše grafične kartice in nastavitev aplikacije za najboljšo izkušnjo pri igranju iger in ustvarjanju vsebine. Poznati moramo strojno opremo vašega računalnika, programsko opremo za igranje iger in konfiguracijo omrežja, uporabo funkcij GeForce Experience in geografsko območje.
-
-Te podatke uporabljamo za optimizacijo nastavitev vaše aplikacije, izboljšanje naših izdelkov in storitev ter unovčenje kod za brezplačne igre.
-
-Naša politika zasebnosti pojasnjuje, katere podatke zbiramo, kaj z njimi počnemo in pravno podlago za ta dejanja. Vaših podatkov nikoli ne prodamo.

@@ -1,6 +1,6 @@
 ﻿' AppConfigShared.vb — SHARED config.json ACCESS FOR NON-OVERLAY PROCESSES
 '
-' config.json (NvConfig\config.json) is THE single user-facing settings file.
+' config.json (NVIDIA Config\config.json) is THE single user-facing settings file.
 ' The full typed model lives in the Overlay project (AppSettings), but three
 ' other processes need to touch individual keys without owning the schema:
 '
@@ -34,17 +34,17 @@ Public Module AppConfigShared
 
     Private _configPath As String = Nothing
 
-    ''' <summary>Path to the unified config file (NvConfig\config.json).</summary>
+    ''' <summary>Path to the unified config file (NVIDIA Config\config.json).</summary>
     Public Function ConfigPath() As String
         If _configPath Is Nothing Then
-            _configPath = AppLayout.P("NvConfig", "config.json")
+            _configPath = AppLayout.P("NVIDIA Config", "config.json")
         End If
         SyncMirrors()
         Return _configPath
     End Function
 
     ' --- config mirrors: extra config.json copies kept in sync (e.g. the
-    '     Forms overlay own NvConfig folder) so every consumer sees the same
+    '     Forms overlay own NVIDIA Config folder) so every consumer sees the same
     '     settings regardless of which app wrote last. ---
     Private ReadOnly Mirrors As New List(Of String)()
     Private _mirrorSynced As Boolean

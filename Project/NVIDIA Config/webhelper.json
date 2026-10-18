@@ -1,0 +1,8 @@
+{
+  "$comment": "NVIDIA Web Helper.exe (ของเรา) — host ของ node backend :59001",
+  "port": 59001,
+  "nodeExe": "node.exe",
+  "backendEntry": "index.js",
+  "$note": "รายละเอียด contract เต็มอยู่ใน Project\\Overlay On-Screen Control\\NVIDIA ShadowPlay API\\NVIDIA Web Helper\\README (NVSP_PORT / config.json / mutex / job object)",
+  "healthPath": "/Backend/v.1.0/health"
+}

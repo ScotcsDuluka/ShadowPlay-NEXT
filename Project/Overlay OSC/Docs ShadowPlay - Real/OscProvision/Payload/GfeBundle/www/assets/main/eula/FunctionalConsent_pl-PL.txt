@@ -1,5 +1,0 @@
-﻿Oprogramowanie GeForce Experience wymaga danych, aby skonfigurować ustawienia karty graficznej i aplikacji w celu zapewnienia najwyższej jakości rozgrywki i tworzenia treści. Musimy posiadać informacje na temat Twojego komputera, oprogramowania do grania i konfiguracji sieci, sposobu użytkowania funkcji oprogramowania GeForce Experience oraz regionu geograficznego.
-
-Wykorzystujemy te dane do optymalizacji ustawień aplikacji, udoskonalania naszych produktów i usług oraz realizacji kodów na bezpłatne gry.
-
-Nasza polityka prywatności objaśnia, jakie dane gromadzimy, co z nimi robimy i jakie są podstawy prawne tych działań. Nigdy nie sprzedajemy Twoich danych.

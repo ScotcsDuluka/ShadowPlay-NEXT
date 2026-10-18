@@ -40,7 +40,7 @@ IVideoFrame` (+ `Gallery, ffprobe, audio render`).
 | Asset | Where | Why reusable |
 |---|---|---|
 | FFmpeg binary validation | `Common/FFmpegLocator.vb` | MZ-header + `-version` probe + per-file-version cache; directly reusable for locating the playback backend's ffmpeg/ffprobe (link-compile convention — `Common/` has no vbproj, apps `<Compile Include>` it, e.g. `Engine/NVIDIA Capture.vbproj`, `CaptureEngine.Recording.ConsoleDriver.vbproj`) |
-| Vortice D3D11/DXGI stack | `Vortice.Direct3D11` / `Vortice.DXGI` 3.6.2 (`CaptureEngine.Video.Ddagrab.vbproj`) | Proven interop stack in-product; builds on Linux CI (verified 0 errors in this session) |
+| Vortice D3D11/DXGI stack | `Vortice.Direct3D11` / `Vortice.DXGI` 3.6.2 (`DulukaEngine.Video.DXGI.vbproj`) | Proven interop stack in-product; builds on Linux CI (verified 0 errors in this session) |
 | Frame ownership contract | `CaptureEngine.Video/Contract/IVideoFrame.vb`, `Frames/IVideoFrame.vb` | Single-owner, thread-movable, dispose-once semantics — the exact pattern a playback frame queue needs |
 | Dispose-once guard pattern | `CaptureEngine.Video.Ddagrab/D3D11VideoFrame.vb:192` | `Interlocked.CompareExchange` one-shot Dispose + swallow-exceptions-on-dispose + dispose callback for leak-invariant metrics |
 | Bounded handoff semantics | `CaptureEngine.Video/Handoff/BoundedVideoFrameSink.vb` + `Tester/.../BoundedHandoffTests.vb` | Bounded queue + drop-oldest + ownership transfer on push — design precedent for the playback frame queue (capture push-model; playback needs a clock-driven pull — pattern is reused, code is not imported) |

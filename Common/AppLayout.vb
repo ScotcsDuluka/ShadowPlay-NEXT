@@ -1,28 +1,21 @@
 ﻿' AppLayout.vb — ROOT-FIXED LAYOUT SUPPORT (custom app tree, 2026-08-28)
 '
-' The deployed product tree is (owner layout v2, 2026-09-24):
+' Active staging tree (Build/Build-Config/dev-layout.json):
 '
 '   NVIDIA ShadowPlay\
-'     Launcher.*            (root app, exe+dll+runtimeconfig adjacent)
-'     NvContainer\NvContainer.exe    (container supervisor, self-contained dir)
-'     NvOverlay\WinForm\NVIDIA ShadowPlay.* + NVIDIA Notifier.*
-'     NvOverlay\CEF\NVIDIA Share.exe + CEF runtime/resources
-'     NvOverlay\NvOverlay.dll + NvOverlay.IPC.dll
-'     NvCapture\nvsphelper64.exe + nvsphelper64.dll + nvspcap.dll
-'                  + CaptureEngine.*.dll engine libraries
-'     NvBackend\        NvBackend.exe (API hub :5001) and NVIDIA Web Helper.exe/.dll
-'     NvAudio\          NAudio.*
-'     NvGraphics\       Vortice.*
-'     Runtime\          SharpGen/WinRT/SDK.NET/Gallery.Video/NVIDIA Controls/
-'                       Newtonsoft runtime libs
-'     NvConfig\         ShadowPlay/Overlay user-facing config only
-'     .NET Deployment\Nv*\
-'                       centralized *.deps.json by owner; runtimeconfig.json
-'                       remains beside each managed apphost/body DLL
-'     FFmpeg\ NvConfig\ Logs\ Data\ Languages\ Resources\ Flags\
+'     Launcher.exe
+'     NVIDIA Container\NvContainer.exe + nvsphelper.exe
+'     NVIDIA Graphics\NvGraphics.exe
+'     NVIDIA Adapter\NVIDIA OSC Adapter.exe + native hook DLL
+'     Overlay On-Screen Control\NVIDIA OSC\NVIDIA OSC.exe + CEF runtime
+'     Overlay On-Screen Control\NVIDIA NodeAPI\NVIDIA Web Helper.exe + NvNode
+'     NVIDIA Launcher\Cef\Launcher.dll
+'     NVIDIA Config\ config.json + service configuration
+'     Config\ Logs\ Data\ Languages\ Resources\ Flags\
 '
-' Legacy v1 folders (Application\ Overlay\ Engine\ Core\ Libraries\) are
-' still probed/fallback-resolved so older staged trees keep running.
+' Legacy v1/v2 product folders (NvOverlay\, NvCapture\, NvContainer\,
+' NvBackend\, NvGraphics\, NvConfig\, and the older Application/Overlay tree)
+' remain supported as fallbacks for existing staged installations.
 '
 ' This module (one copy LINKED into every app project) provides:
 '
@@ -90,24 +83,40 @@ Public Module AppLayout
                     ' this local deliberately carries a distinct name.
                     Dim exeFolder As String = ExeDir
                     Dim leaf As String = New DirectoryInfo(exeFolder).Name
-                    ' v2 tree: NvOverlay role slots live TWO levels under the root
-                    ' (NvOverlay\{WinForm,CEF}); one-level owners include
-                    ' NvCapture\ and NvContainer\. Legacy dev bins are handled by
-                    ' the fallback paths in ExePath/ProbeFolders.
+                    ' New owner slots (NVIDIA Launcher\Cef and the two Overlay
+                    ' owners) and the nested CaptureEngine live two levels down.
+                    ' Preserve the original NvOverlay role slots for old layouts.
                     Dim parentName As String = ""
                     Try
                         Dim parentDir As DirectoryInfo = New DirectoryInfo(exeFolder).Parent
                         If parentDir IsNot Nothing Then parentName = parentDir.Name
                     Catch
                     End Try
-                    Dim isRoleSlot As Boolean =
+                    Dim isLegacyOverlaySlot As Boolean =
                         String.Equals(parentName, "NvOverlay", StringComparison.OrdinalIgnoreCase) AndAlso
                         (String.Equals(leaf, "WinForm", StringComparison.OrdinalIgnoreCase) OrElse
                          String.Equals(leaf, "CEF", StringComparison.OrdinalIgnoreCase))
+                    Dim isLauncherCefSlot As Boolean =
+                        String.Equals(parentName, "NVIDIA Launcher", StringComparison.OrdinalIgnoreCase) AndAlso
+                        String.Equals(leaf, "Cef", StringComparison.OrdinalIgnoreCase)
+                    Dim isOverlayOwnerSlot As Boolean =
+                        String.Equals(parentName, "Overlay On-Screen Control", StringComparison.OrdinalIgnoreCase) AndAlso
+                        (String.Equals(leaf, "NVIDIA OSC", StringComparison.OrdinalIgnoreCase) OrElse
+                         String.Equals(leaf, "NVIDIA NodeAPI", StringComparison.OrdinalIgnoreCase))
+                    Dim isCaptureEngineSlot As Boolean =
+                        String.Equals(parentName, "NVIDIA Container", StringComparison.OrdinalIgnoreCase) AndAlso
+                        String.Equals(leaf, "CaptureEngine", StringComparison.OrdinalIgnoreCase)
+                    Dim isRoleSlot As Boolean =
+                        isLegacyOverlaySlot OrElse isLauncherCefSlot OrElse
+                        isOverlayOwnerSlot OrElse isCaptureEngineSlot
                     Dim isOneLevelHost As Boolean =
                         String.Equals(leaf, "NvCapture", StringComparison.OrdinalIgnoreCase) OrElse
                         String.Equals(leaf, "NvContainer", StringComparison.OrdinalIgnoreCase) OrElse
                         String.Equals(leaf, "NvBackend", StringComparison.OrdinalIgnoreCase) OrElse
+                        String.Equals(leaf, "NVIDIA Capture", StringComparison.OrdinalIgnoreCase) OrElse
+                        String.Equals(leaf, "NVIDIA Container", StringComparison.OrdinalIgnoreCase) OrElse
+                        String.Equals(leaf, "NVIDIA Graphics", StringComparison.OrdinalIgnoreCase) OrElse
+                        String.Equals(leaf, "NVIDIA Adapter", StringComparison.OrdinalIgnoreCase) OrElse
                         String.Equals(leaf, "Application", StringComparison.OrdinalIgnoreCase) OrElse
                         String.Equals(leaf, "Overlay", StringComparison.OrdinalIgnoreCase) OrElse
                         String.Equals(leaf, "ShadowPlay", StringComparison.OrdinalIgnoreCase)
@@ -144,11 +153,26 @@ Public Module AppLayout
     Public Function ExePath(appExeName As String) As String
         Dim candidates As New List(Of String)(4)
         If String.Equals(appExeName, "nvsphelper64.exe", StringComparison.OrdinalIgnoreCase) Then
+            candidates.Add(P("NVIDIA Container", appExeName))
             candidates.Add(P("NvCapture", appExeName))
+            candidates.Add(P("ShadowPlay", appExeName))
+        ElseIf String.Equals(appExeName, "NvCapture.exe", StringComparison.OrdinalIgnoreCase) Then
+            candidates.Add(P("NVIDIA Container", "CaptureEngine", appExeName))
+            candidates.Add(P("NVIDIA Capture", appExeName))
             candidates.Add(P("ShadowPlay", appExeName))
         ElseIf String.Equals(appExeName, "NVIDIA ShadowPlay Helper.exe", StringComparison.OrdinalIgnoreCase) Then
+            candidates.Add(P("NVIDIA Container", appExeName))
             candidates.Add(P("ShadowPlay", appExeName))
             candidates.Add(P("NvCapture", appExeName))
+        ElseIf String.Equals(appExeName, "NVIDIA OSC.exe", StringComparison.OrdinalIgnoreCase) Then
+            candidates.Add(P("Overlay On-Screen Control", "NVIDIA OSC", appExeName))
+            candidates.Add(P("NvOverlay", "CEF", appExeName))
+            candidates.Add(P("Overlay", appExeName))
+        ElseIf String.Equals(appExeName, "NVIDIA OSC Adapter.exe", StringComparison.OrdinalIgnoreCase) Then
+            candidates.Add(P("NVIDIA Adapter", appExeName))
+        ElseIf String.Equals(appExeName, "NvGraphics.exe", StringComparison.OrdinalIgnoreCase) Then
+            candidates.Add(P("NVIDIA Graphics", appExeName))
+            candidates.Add(P("NvGraphics", appExeName))
         ElseIf String.Equals(appExeName, "NVIDIA Share.exe", StringComparison.OrdinalIgnoreCase) Then
             candidates.Add(P("NvOverlay", "CEF", appExeName))
             candidates.Add(P("NvOverlay", "WinForm", appExeName))
@@ -159,14 +183,16 @@ Public Module AppLayout
             candidates.Add(P("Overlay", appExeName))
             candidates.Add(P("Application", appExeName))
         ElseIf String.Equals(appExeName, "NvContainer.exe", StringComparison.OrdinalIgnoreCase) Then
+            candidates.Add(P("NVIDIA Container", appExeName))
             candidates.Add(P("NvContainer", appExeName))
         ElseIf String.Equals(appExeName, "NvBackend.exe", StringComparison.OrdinalIgnoreCase) Then
             candidates.Add(P("NvBackend", appExeName))
         ElseIf String.Equals(appExeName, "NVIDIA Backend.exe", StringComparison.OrdinalIgnoreCase) Then
             candidates.Add(P("NvBackend", appExeName))
         ElseIf String.Equals(appExeName, "NVIDIA Web Helper.exe", StringComparison.OrdinalIgnoreCase) Then
-            ' NvNode root slot (2026-09-25) — Web Helper + node backend moved
-            ' out of NvBackend\; the old slot stays as a transition fallback.
+            ' Active owner slot first; old NvNode/NvBackend locations remain
+            ' as fallbacks for pre-refactor staged trees.
+            candidates.Add(P("Overlay On-Screen Control", "NVIDIA NodeAPI", appExeName))
             candidates.Add(P("NvNode", appExeName))
             candidates.Add(P("NvBackend", appExeName))
             candidates.Add(P("Application", appExeName))
@@ -234,19 +260,27 @@ Public Module AppLayout
     ''' remain only as dev-bin fallbacks; retired WebView/WebViewHook and the
     ''' Services owner are not part of the production probe map.</summary>
     Private Function ProbeFolders() As List(Of String)
-        Dim folders As New List(Of String)(10)
+        Dim folders As New List(Of String)(18)
+        ' Active owner layout first. Keep these ahead of legacy candidates so
+        ' relocated dependencies cannot accidentally bind to a stale copy.
+        folders.Add(P("NVIDIA Capture"))
+        folders.Add(P("NVIDIA Container", "CaptureEngine"))
+        folders.Add(P("NVIDIA Audio"))
+        folders.Add(P("NVIDIA Graphics"))
+        folders.Add(P("Runtime"))
+        folders.Add(P("Overlay On-Screen Control", "NVIDIA OSC"))
+        folders.Add(P("Overlay On-Screen Control", "NVIDIA NodeAPI"))
+        folders.Add(P("NVIDIA Launcher", "Cef"))
+        folders.Add(P("NVIDIA Container"))
+        folders.Add(P("NVIDIA Adapter"))
+        ' Legacy layout remains a compatibility fallback for existing installs.
         folders.Add(P("NvCapture"))
         folders.Add(P("NvAudio"))
         folders.Add(P("NvGraphics"))
-        folders.Add(P("Runtime"))
         folders.Add(P("NvOverlay", "WinForm"))
         folders.Add(P("NvOverlay", "CEF"))
         folders.Add(P("NvBackend"))
-        ' Dev-layout staging locations (Build\Build-Config\dev-layout.json):
-        ' the capture engine family lives under ShadowPlay\NvCapture, the
-        ' helper/hook payloads under ShadowPlay\, Gallery.Video under
-        ' NvGallery\WinForm. Probed here so the owner dedupe pass can prune
-        ' the leaked copies out of the referencing app folders.
+        ' Legacy dev source locations; harmless when not present in a staged tree.
         folders.Add(P("ShadowPlay"))
         folders.Add(P("ShadowPlay", "NvCapture"))
         folders.Add(P("NvGallery", "WinForm"))

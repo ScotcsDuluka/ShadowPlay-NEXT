@@ -1,0 +1,19 @@
+﻿{
+  "$comment": "nvsphelper.exe — ตัวจับ hotkey (ของเรา)",
+  "hotkeys": [
+    {
+      "id": 1,
+      "name": "OpenShare",
+      "modifiers": "ALT",
+      "vk": "X"
+    },
+    {
+      "id": 2,
+      "name": "OpenShare",
+      "modifiers": "ALT",
+      "vk": "G"
+    }
+  ],
+  "fireUrl": "http://127.0.0.1:59012/v1/hotkey/{name}",
+  "logFile": "NVIDIA Container\\Logs\\nvsphelper.log"
+}

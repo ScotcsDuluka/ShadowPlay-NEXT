@@ -1,0 +1,41 @@
+{
+  "$comment": "NVIDIA OSC.exe — CEF host ของเรา (เลียน NVIDIA Share.exe)",
+  "page": "Overlay On-Screen Control\\NVIDIA NodeAPI\\osc\\index.html",
+  "backend": {
+    "port": 59011,
+    "$note": "หน้า OSC ยิง API ที่ 127.0.0.1:port นี้โดยตรง"
+  },
+  "toggle": 59013,
+  "debugPort": 59099,
+  "window": {
+    "borderless": true,
+    "topMost": true,
+    "showOnBoot": false,
+    "centerToPrimary": true,
+    "sizeToPrimaryMonitor": true,
+    "width": 0,
+    "height": 0,
+    "clickThroughWhenHidden": true,
+    "designWidth": 0,
+    "designHeight": 0,
+    "renderScale": 1.0,
+    "frameRate": 60,
+    "windowed": 0,
+    "maxFps": 60,
+    "showFps": 0,
+    "uiScale": 1.0,
+    "$renderScale_note": "OSR raster buffer scale; screen zoom remains min(screenW/1920, screenH/1080)"
+  },
+  "cef": {
+    "cachePath": "Overlay On-Screen Control\\NVIDIA OSC\\CefCache",
+    "logSeverity": "Warn",
+    "windowlessRendering": false,
+    "remoteDebuggingPort": 0,
+    "subprocessPath": "Overlay On-Screen Control\\NVIDIA OSC\\NVIDIA OSC.exe",
+    "$note": "cachePath/subprocessPath/debugPort = จุดเดียวของ path CEF (Phase 1 path รวมศูนย์) · ย้ายมา deploy ปัจจุบัน 2026-10-07 (แก้ v8_context_snapshot.bin ปน CEF 138 = renderer ตายวน exit=3 V8 snapshot mismatch)"
+  },
+  "logFile": "Logs\\NVIDIA OSC.log",
+  "pagePort": 3000,
+  "compositor": "hybrid",
+  "$compositor_note": "hybrid = GPU DComp compositor with a layered click-through proxy; GPU rendering is preferred"
+}

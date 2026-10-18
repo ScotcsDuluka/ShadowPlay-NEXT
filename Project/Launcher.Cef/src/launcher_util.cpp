@@ -105,10 +105,10 @@ std::wstring GetDllDir() {
 
 std::wstring GetRootDir() {
   // Bootstrap exe at the root -> its dir IS the root. Defensive fallback
-  // for a body DLL launched from NvLauncher\Cef: climb two levels so the
+  // for a body DLL launched from NVIDIA Launcher\Cef: climb two levels so the
   // supervisor still finds NvConfig\ and the family exes.
   std::wstring dir = GetExeDir();
-  const std::wstring launcher_suffix = L"\\NvLauncher\\Cef";
+  const std::wstring launcher_suffix = L"\\NVIDIA Launcher\\Cef";
   size_t tail = dir.rfind(launcher_suffix);
   if (tail != std::wstring::npos &&
       tail + launcher_suffix.size() == dir.size()) {
@@ -509,7 +509,7 @@ bool HttpPostLocal(unsigned port, const std::wstring& path) {
 }
 
 static std::wstring ConfigPath() {
-  return JoinPath(GetRootDir(), L"NvConfig\\config.json");
+  return JoinPath(GetRootDir(), L"NVIDIA Config\\config.json");
 }
 
 bool ReadConfigBool(const wchar_t* section, const wchar_t* key,

@@ -33,7 +33,25 @@ Public Class ObsConfig
 
     Public ReadOnly Property ConfigPath As String
         Get
-            Return AppLayout.P("NvConfig", FileName)
+            Dim activePath As String = AppLayout.P("NVIDIA Config", FileName)
+            If File.Exists(activePath) Then Return activePath
+
+            ' Migrate a legacy config forward once; never keep writing to the old slot.
+            Dim legacyPath As String = AppLayout.P("NvConfig", FileName)
+            If File.Exists(legacyPath) Then
+                Try
+                    AppLayout.EnsureParentDir(activePath)
+                    File.Copy(legacyPath, activePath, False)
+                    Return activePath
+                Catch
+                    ' If another process created the new file first, prefer it.
+                    If File.Exists(activePath) Then Return activePath
+                    ' Preserve availability when the one-time migration is blocked.
+                    Return legacyPath
+                End Try
+            End If
+
+            Return activePath
         End Get
     End Property
 

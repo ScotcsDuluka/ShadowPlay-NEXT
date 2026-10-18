@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace></RootNamespace>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <OptionStrict>On</OptionStrict>
+    <OptionExplicit>On</OptionExplicit>
+    <OptionInfer>On</OptionInfer>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <AssemblyName>DulukaEngine.Recording</AssemblyName>
+    <Description>DulukaEngine.Recording — Phase 12a-5 orchestration (RecordingEngine + CaptureSession)</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Foundation -->
+    <ProjectReference Include="..\..\Core\DulukaEngine\DulukaEngine.vbproj" />
+    <!-- Video contract + ID3D11VideoFrame -->
+    <ProjectReference Include="..\..\Video\Contracts\DulukaEngine.Video\DulukaEngine.Video.vbproj" />
+    <!-- DdagrabBackend (video capture) -->
+    <ProjectReference Include="..\..\Video\DXGI Desktop Duplication\DulukaEngine.Video.DXGI\DulukaEngine.Video.DXGI.vbproj" />
+    <!-- Encoder contract (IEncoderBackend + EncodedPacket) -->
+    <ProjectReference Include="..\..\Encoding\DulukaEngine.Encoder\DulukaEngine.Encoder.vbproj" />
+    <!-- NvencEncoderBackend (H.264 encoding) -->
+    <ProjectReference Include="..\..\Encoding\NVENC\DulukaEngine.Encoder.Nvenc\DulukaEngine.Encoder.Nvenc.vbproj" />
+    <!-- FFmpeg stack (MuxCoordinator + FFmpegProcessHost) -->
+    <ProjectReference Include="..\Backends\FFmpeg\DulukaEngine.FFmpegBackend\DulukaEngine.FFmpegBackend.vbproj" />
+    <!-- Shared Audio Engine: one audio owner for every video engine -->
+    <ProjectReference Include="..\..\Audio\DulukaEngine.Audio\DulukaEngine.Audio.csproj" />
+    <!-- Low-level WASAPI driver remains an implementation dependency -->
+    <ProjectReference Include="..\..\Audio\DulukaEngine.Audio.Wasapi\DulukaEngine.Audio.Wasapi.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- NAudio for WASAPI loopback audio capture (same as spike Phase 10) -->
+    <PackageReference Include="NAudio.Wasapi" Version="2.3.0" />
+  </ItemGroup>
+
+</Project>

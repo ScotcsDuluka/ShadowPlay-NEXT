@@ -1,9 +1,0 @@
-internal/modules/cjs/loader.js:665
-    throw err;
-    ^
-
-Error: Cannot find module 'C:\Program Files (x86)\NVIDIA Corporation\NvNode\index.js'
-    at Function.Module._resolveFilename (internal/modules/cjs/loader.js:663:15)
-    at Function.Module._load (internal/modules/cjs/loader.js:588:25)
-    at Function.Module.runMain (internal/modules/cjs/loader.js:876:12)
-    at internal/main/run_main_module.js:21:11

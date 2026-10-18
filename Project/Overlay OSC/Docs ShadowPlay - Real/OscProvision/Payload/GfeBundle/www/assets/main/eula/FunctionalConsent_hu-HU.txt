@@ -1,5 +1,0 @@
-﻿A GeForce Experience-nek adatokra van szüksége a grafikus kártya és az alkalmazás beállításainak konfigurálásához a lehető legjobb játék- és tartalomkészítési élmény érdekében. Ismernünk kell a számítógép hardverét, a játékhoz használt szoftvert és a hálózati konfigurációt, a GeForce Experience funkcióinak használatát és a földrajzi régiót.
-
-Ezeket az adatokat az alkalmazásbeállítások optimalizálására, termékeink és szolgáltatásaink fejlesztésére, valamint ingyenes játékok kódjainak beváltására használjuk.
-
-Adatvédelmi szabályzatunk ismerteti, hogy milyen adatokat gyűjtünk, mit teszünk azokkal, valamint ismerteti ezeknek a tevékenységeknek a jogalapját. Soha nem adjuk el az Ön adatait.

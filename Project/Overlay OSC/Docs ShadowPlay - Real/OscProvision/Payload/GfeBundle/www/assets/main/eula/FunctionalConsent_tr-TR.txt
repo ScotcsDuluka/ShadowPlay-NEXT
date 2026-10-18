@@ -1,5 +1,0 @@
-﻿GeForce Experience, en iyi oyun ve içerik oluşturma deneyimi için ekran kartı ve uygulama ayarlarınızı yapılandırmak için veriye ihtiyaç duyar. PC donanımınızı, oyunla ilgili yazılımlarınızı ve ağ yapılandırmanızı, GeForce Experience özellik kullanımını ve coğrafi bölgenizi bilmemiz gerekiyor.
-
-Bu verileri uygulama ayarlarınızı optimize etmek, ürünlerimizi ve hizmetlerimizi iyileştirmek ve ücretsiz oyunlar için kod kullanmak için kullanıyoruz.
-
-Gizlilik politikamız, hangi verileri topladığımızı, bunlarla ne yaptığımızı ve bu eylemlerin yasal dayanağını açıklar. Verilerinizi asla satmayız.

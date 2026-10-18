@@ -1,6 +1,0 @@
-[0925/193023.646:ERROR:cache_util_win.cc(19)] Unable to move the cache: 0
-[0925/193023.646:ERROR:cache_util.cc(140)] Unable to move cache folder C:\My Project\NVIDIA-Shadowplay\build\NVIDIA ShadowPlay\NvOverlay\Cef\Data\launcher-cef-cache\Cache to C:\My Project\NVIDIA-Shadowplay\build\NVIDIA ShadowPlay\NvOverlay\Cef\Data\launcher-cef-cache\old_Cache_000
-[0925/193023.646:ERROR:disk_cache.cc(184)] Unable to create cache
-[0925/211156.179:INFO:CONSOLE(34)] "Uncaught TypeError: Cannot set property 'textContent' of null", source: http://127.0.0.1:51732/app.js (34)
-[0925/211403.264:INFO:CONSOLE(34)] "Uncaught TypeError: Cannot set property 'textContent' of null", source: http://127.0.0.1:51139/app.js (34)
-[0925/212042.509:INFO:CONSOLE(34)] "Uncaught TypeError: Cannot set property 'textContent' of null", source: http://127.0.0.1:62793/app.js (34)

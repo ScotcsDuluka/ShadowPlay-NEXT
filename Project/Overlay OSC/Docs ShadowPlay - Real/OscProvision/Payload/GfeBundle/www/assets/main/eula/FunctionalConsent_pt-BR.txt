@@ -1,5 +1,0 @@
-﻿O GeForce Experience requer dados para definir suas configurações de placa de vídeo e aplicações, para oferecer a melhor experiência gamer e de criação de conteúdo. Precisamos saber qual é o hardware, o software para games e a configuração de rede do seu PC, seu uso dos recursos do GeForce Experience e localização geográfica.
-
-Usamos esses dados para otimizar as configurações da aplicação, melhorar nossos produtos e serviços e códigos de resgate para games gratuitos.
-
-Nossa Política de Privacidade explica que dados coletamos, o que fazemos com eles e a base legal para essas ações. Nunca vendemos seus dados.

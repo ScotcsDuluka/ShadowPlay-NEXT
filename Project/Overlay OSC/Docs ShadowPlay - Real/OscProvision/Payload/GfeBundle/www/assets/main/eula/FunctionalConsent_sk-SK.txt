@@ -1,5 +1,0 @@
-﻿Služba GeForce Experience vyžaduje údaje na konfiguráciu vašej grafickej karty a nastavení aplikácií pre čo najlepší zážitok z hry a tvorby obsahu. Potrebujeme poznať hardvér vášho počítača, softvér na hranie hier a konfiguráciu siete, informácie o používaní funkcií služby GeForce Experience a geografickú oblasť.
-
-Tieto údaje používame na optimalizáciu nastavení vašej aplikácie, zlepšenie našich produktov a služieb a uplatnenie kódov na bezplatné hry.
-
-Naše zásady ochrany osobných údajov vysvetľujú, aké údaje zhromažďujeme, čo s nimi robíme a aký je právny základ týchto akcií. Vaše údaje nikdy nepredávame.

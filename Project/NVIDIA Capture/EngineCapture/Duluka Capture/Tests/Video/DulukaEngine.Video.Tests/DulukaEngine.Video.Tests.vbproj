@@ -1,0 +1,19 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace></RootNamespace>
+    <AssemblyName>DulukaEngine.Video.Tests</AssemblyName>
+    <OptionStrict>On</OptionStrict>
+    <OptionExplicit>On</OptionExplicit>
+    <OptionInfer>On</OptionInfer>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <Description>DulukaEngine.Video contract tests — P1-B.1 (FakeVideoCaptureBackend; no xUnit/NUnit)</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Video\Contracts\DulukaEngine.Video\DulukaEngine.Video.vbproj" />
+    <ProjectReference Include="..\..\..\Core\DulukaEngine\DulukaEngine.vbproj" />
+    <ProjectReference Include="..\..\..\Video\DXGI Desktop Duplication\DulukaEngine.Video.DXGI\DulukaEngine.Video.DXGI.vbproj" />
+  </ItemGroup>
+</Project>

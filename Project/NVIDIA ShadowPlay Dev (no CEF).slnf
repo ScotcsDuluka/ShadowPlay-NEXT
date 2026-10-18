@@ -2,21 +2,21 @@
   "solution": {
     "path": "NVIDIA ShadowPlay.sln",
     "projects": [
-      "Overlay OSC\\NVIDIA NodeAPI\\NVIDIA Web Helper\\NVIDIA Web Helper.vbproj",
-      "NvContainer\\NvContainer.csproj",
-      "ShadowPlay\\NvShadowPlayHelper\\nvsphelper.csproj",
-      "ShadowPlay\\Duluka Capture\\Unknown\\CaptureEngine.dll\\CaptureEngine.vbproj",
-      "ShadowPlay\\Duluka Capture\\Unknown\\CaptureEngine.Audio.dll\\CaptureEngine.Audio.csproj",
-      "ShadowPlay\\Duluka Capture\\Unknown\\CaptureEngine.Audio.Wasapi.dll\\CaptureEngine.Audio.Wasapi.csproj",
-      "ShadowPlay\\Duluka Capture\\Unknown\\CaptureEngine.Encoder.dll\\CaptureEngine.Encoder.vbproj",
-      "ShadowPlay\\Duluka Capture\\Unknown\\CaptureEngine.Encoder.Nvenc.dll\\CaptureEngine.Encoder.Nvenc.vbproj",
-      "ShadowPlay\\Duluka Capture\\Unknown\\CaptureEngine.FFmpegBackend.dll\\CaptureEngine.FFmpegBackend.vbproj",
-      "ShadowPlay\\Duluka Capture\\Unknown\\CaptureEngine.Recording.dll\\CaptureEngine.Recording.vbproj",
-      "ShadowPlay\\Duluka Capture\\Unknown\\CaptureEngine.Recording.ConsoleDriver.exe\\CaptureEngine.Recording.ConsoleDriver.vbproj",
-      "ShadowPlay\\Duluka Capture\\Unknown\\CaptureEngine.Video.dll\\CaptureEngine.Video.vbproj",
-      "ShadowPlay\\Duluka Capture\\Unknown\\CaptureEngine.Video.Ddagrab.dll\\CaptureEngine.Video.Ddagrab.vbproj",
-      "ShadowPlay\\Duluka Capture\\Unknown\\WgcCapture.dll\\WgcCapture.csproj",
-      "NvGraphics\\NvGraphics.App\\NvGraphics.csproj"
+      "Overlay On-Screen Control\\NVIDIA NodeAPI\\NVIDIA Web Helper\\NVIDIA Web Helper.vbproj",
+      "NVIDIA Container\\NvContainer.csproj",
+      "Overlay On-Screen Control\\NVIDIA ShadowPlay Helper\\nvsphelper.csproj",
+      "NVIDIA Capture\\EngineCapture\\Duluka Capture\\Core\\DulukaEngine\\DulukaEngine.vbproj",
+      "NVIDIA Capture\\EngineCapture\\Duluka Capture\\Audio\\DulukaEngine.Audio\\DulukaEngine.Audio.csproj",
+      "NVIDIA Capture\\EngineCapture\\Duluka Capture\\Audio\\DulukaEngine.Audio.Wasapi\\DulukaEngine.Audio.Wasapi.csproj",
+      "NVIDIA Capture\\EngineCapture\\Duluka Capture\\Encoding\\DulukaEngine.Encoder\\DulukaEngine.Encoder.vbproj",
+      "NVIDIA Capture\\EngineCapture\\Duluka Capture\\Encoding\\NVENC\\DulukaEngine.Encoder.Nvenc\\DulukaEngine.Encoder.Nvenc.vbproj",
+      "NVIDIA Capture\\EngineCapture\\Duluka Capture\\Recording\\Backends\\FFmpeg\\DulukaEngine.FFmpegBackend\\DulukaEngine.FFmpegBackend.vbproj",
+      "NVIDIA Capture\\EngineCapture\\Duluka Capture\\Recording\\DulukaEngine.Recording\\DulukaEngine.Recording.vbproj",
+      "NVIDIA Capture\\EngineCapture\\Duluka Capture\\Tools\\DulukaEngine.Recording.ConsoleDriver\\DulukaEngine.Recording.ConsoleDriver.vbproj",
+      "NVIDIA Capture\\EngineCapture\\Duluka Capture\\Video\\Contracts\\DulukaEngine.Video\\DulukaEngine.Video.vbproj",
+      "NVIDIA Capture\\EngineCapture\\Duluka Capture\\Video\\DXGI Desktop Duplication\\DulukaEngine.Video.DXGI\\DulukaEngine.Video.DXGI.vbproj",
+      "NVIDIA Capture\\EngineCapture\\Duluka Capture\\Video\\Windows Graphics Capture\\WgcCapture\\WgcCapture.csproj",
+      "NVIDIA Graphics\\NvGraphics.App\\NvGraphics.csproj"
     ]
   }
 }

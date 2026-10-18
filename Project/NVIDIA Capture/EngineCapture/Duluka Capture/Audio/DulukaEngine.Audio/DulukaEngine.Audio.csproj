@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace>DulukaEngine.Audio</RootNamespace>
+    <AssemblyName>DulukaEngine.Audio</AssemblyName>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <Description>DulukaEngine.Audio — shared audio engine for all video engines</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DulukaEngine.Audio.Wasapi\DulukaEngine.Audio.Wasapi.csproj" />
+  </ItemGroup>
+
+</Project>

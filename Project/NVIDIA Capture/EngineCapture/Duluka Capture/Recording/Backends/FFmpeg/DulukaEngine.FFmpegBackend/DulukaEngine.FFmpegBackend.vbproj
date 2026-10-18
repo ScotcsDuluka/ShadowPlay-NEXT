@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace></RootNamespace>
+    <TargetFramework>net10.0</TargetFramework>
+    <OptionStrict>On</OptionStrict>
+    <OptionExplicit>On</OptionExplicit>
+    <OptionInfer>On</OptionInfer>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <AssemblyName>DulukaEngine.FFmpegBackend</AssemblyName>
+    <Description>DulukaEngine.FFmpegBackend — FFmpeg full-pipeline execution backend (P1-C)</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\Core\DulukaEngine\DulukaEngine.vbproj" />
+    <ProjectReference Include="..\..\..\..\Audio\DulukaEngine.Audio.Wasapi\DulukaEngine.Audio.Wasapi.csproj" />
+  </ItemGroup>
+
+</Project>

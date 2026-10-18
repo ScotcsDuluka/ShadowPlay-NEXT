@@ -1,5 +1,0 @@
-﻿GeForce Experience vyžaduje data k nastavení grafické karty a nastavení aplikace. To umožní nejlepší herní zážitek a tvorbu obsahu. Potřebujeme informace o hardwaru PC, herním softwaru a konfiguraci sítě, využití funkcí GeForce Experience a geografické oblasti.
-
-Tato data využíváme k optimalizaci nastavení vaší aplikace, ke zlepšování našich produktů a služeb a k uplatnění kódů na hry zdarma.
-
-Naše zásady ochrany osobních údajů vysvětlují, jaká data shromažďujeme, jak s nimi nakládáme a na základě jakého právního základu postupujeme. Vaše data nikdy neprodáváme.

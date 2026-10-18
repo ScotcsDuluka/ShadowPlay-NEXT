@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>DulukaEngine.Recording.Tests</RootNamespace>
+    <TargetFramework>net10.0</TargetFramework>
+    <OptionStrict>On</OptionStrict>
+    <OptionExplicit>On</OptionExplicit>
+    <OptionInfer>On</OptionInfer>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <AssemblyName>DulukaEngine.Recording.Tests</AssemblyName>
+    <Description>Phase 12b tests — SyncMath + WavSidecarWriter units + real-ffmpeg A/V sync runtime validation (runs on Windows AND Linux)</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Recording\Backends\FFmpeg\DulukaEngine.FFmpegBackend\DulukaEngine.FFmpegBackend.vbproj" />
+    <!-- MuxSinkAccountingTests: the audio mux sink consumes AudioPacket /
+         AudioTrackKind from DulukaEngine.Audio (not transitive via
+         FFmpegBackend). -->
+    <ProjectReference Include="..\..\..\Audio\DulukaEngine.Audio\DulukaEngine.Audio.csproj" />
+    <!-- DisposerTests: the GPU frame disposer links its production source
+         below; the contract types it consumes live in DulukaEngine.Video
+         (pure net10.0 — no D3D11 dependency at this layer). -->
+    <ProjectReference Include="..\..\..\Video\Contracts\DulukaEngine.Video\DulukaEngine.Video.vbproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Real production file, LINKED (not copied) — the disposer regression
+         tests run on the SAME source the recording engine compiles. -->
+    <Compile Include="..\..\..\Recording\DulukaEngine.Recording\DeferredVideoFrameDisposer.vb" Link="DeferredVideoFrameDisposer.vb" />
+    <!-- MuxSinkAccountingTests: same link-compile convention — the audio
+         mux sink's drop accounting is tested against the live production
+         source (pure VB; pulls no D3D11/NAudio dependency). -->
+    <Compile Include="..\..\..\Recording\DulukaEngine.Recording\AudioEngineMuxSink.vb" Link="AudioEngineMuxSink.vb" />
+    <!-- M2-W2 SessionResultContractTests: the Pass contract is tested against
+         the LIVE production source (same link-compile convention; pure VB,
+         no WinForms/hardware). -->
+    <Compile Include="..\..\..\Recording\DulukaEngine.Recording\RecordingDTOs.vb" Link="RecordingDTOs.vb" />
+  </ItemGroup>
+</Project>

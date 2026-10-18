@@ -22,7 +22,7 @@ $Configuration = 'Release'
 $TargetFramework = 'net10.0-windows10.0.26100.0'
 $CefSdk = $env:CEF_ROOT
 $pending = New-Object System.Collections.Generic.List[string]
-$overlayConfig = Join-Path $BuildRoot 'NvConfig\config.json'
+$overlayConfig = Join-Path $BuildRoot 'NVIDIA Config\config.json'
 $legacyOverlayConfig = Join-Path $BuildRoot 'Config\config.json'
 $preservedOverlayConfig = $null
 
@@ -125,13 +125,13 @@ if ($Clean -and (Test-Path -LiteralPath $BuildRoot)) {
 }
 
 $activeProjects = @(
-    @{ Path = 'Overlay OSC\NVIDIA OSC\NVIDIA OSC.vcxproj'; Platform = 'x64' },
-    @{ Path = 'Overlay OSC\NVIDIA OSC Adapter\NVIDIA OSC Adapter.vcxproj'; Platform = 'x64' },
-    @{ Path = 'Overlay OSC\NVIDIA OSC Adapter\NVIDIA OSC Adapter Host.csproj'; Platform = 'x64' },
-    @{ Path = 'Overlay OSC\NVIDIA NodeAPI\NVIDIA Web Helper\NVIDIA Web Helper.vbproj'; Platform = 'x64' },
-    @{ Path = 'NvContainer\NvContainer.csproj'; Platform = 'AnyCPU' },
-    @{ Path = 'NvGraphics\NvGraphics.App\NvGraphics.csproj'; Platform = 'AnyCPU' },
-    @{ Path = 'ShadowPlay\NvShadowPlayHelper\nvsphelper.csproj'; Platform = 'AnyCPU' },
+    @{ Path = 'Overlay On-Screen Control\NVIDIA OSC\NVIDIA OSC.vcxproj'; Platform = 'x64' },
+    @{ Path = 'NVIDIA Adapter\OSC Adapter\Duluka Hook\NVIDIA OSC Adapter.vcxproj'; Platform = 'x64' },
+    @{ Path = 'NVIDIA Adapter\OSC Adapter\Duluka Hook\NVIDIA OSC Adapter Host.csproj'; Platform = 'x64' },
+    @{ Path = 'Overlay On-Screen Control\NVIDIA NodeAPI\NVIDIA Web Helper\NVIDIA Web Helper.vbproj'; Platform = 'x64' },
+    @{ Path = 'NVIDIA Container\NvContainer.csproj'; Platform = 'AnyCPU' },
+    @{ Path = 'NVIDIA Graphics\NvGraphics.App\NvGraphics.csproj'; Platform = 'AnyCPU' },
+    @{ Path = 'Overlay On-Screen Control\NVIDIA ShadowPlay Helper\nvsphelper.csproj'; Platform = 'AnyCPU' },
     @{ Path = 'Launcher.Cef\Launcher.vcxproj'; Platform = 'x64' },
     @{ Path = 'Launcher.Cef\Launcher Bootstrap.vcxproj'; Platform = 'x64' }
 )
@@ -146,7 +146,7 @@ if ($NoBuild) {
     }
 }
 
-$cefOutput = Join-Path $BuildRoot 'NvLauncher\Cef'
+$cefOutput = Join-Path $BuildRoot 'NVIDIA Launcher\Cef'
 $legacyLauncherOutput = Join-Path $BuildRoot 'NvOverlay\Cef'
 if ((Test-Path -LiteralPath $legacyLauncherOutput) -and
     -not (Test-Path -LiteralPath $cefOutput)) {
@@ -161,8 +161,8 @@ Ensure-Dir (Join-Path $BuildRoot 'Logs')
 
 # Stage the NodeAPI runtime as a paired owner, without copying its developer
 # Logs folder or the nested host project's source/build tree.
-$nodeApiSource = Join-Path $ProjectRoot 'Overlay OSC\NVIDIA NodeAPI'
-$nodeApiOutput = Join-Path $BuildRoot 'Overlay OSC\NVIDIA NodeAPI'
+$nodeApiSource = Join-Path $ProjectRoot 'Overlay On-Screen Control\NVIDIA NodeAPI'
+$nodeApiOutput = Join-Path $BuildRoot 'Overlay On-Screen Control\NVIDIA NodeAPI'
 $nodeHostOutput = Join-Path $nodeApiSource ("NVIDIA Web Helper\bin\x64\Release\{0}" -f $TargetFramework)
 Copy-RuntimeFiles $nodeHostOutput $nodeApiOutput
 Get-ChildItem -LiteralPath $nodeApiSource -File -Force |
@@ -179,17 +179,17 @@ foreach ($directory in @('node_modules', 'osc', 'shims')) {
 
 # Service configuration is rooted beside NvContainer; mutable user settings
 # are preserved when already present.
-$nvConfigOutput = Join-Path $BuildRoot 'NvConfig'
+$nvConfigOutput = Join-Path $BuildRoot 'NVIDIA Config'
 Ensure-Dir $nvConfigOutput
-Get-ChildItem -LiteralPath (Join-Path $ProjectRoot 'NvConfig') -File -Filter '*.json' |
+Get-ChildItem -LiteralPath (Join-Path $ProjectRoot 'NVIDIA Config') -File -Filter '*.json' |
     ForEach-Object {
     Copy-FileSafe $_.FullName (Join-Path $nvConfigOutput $_.Name)
     }
-$captureFlag = Join-Path $ProjectRoot 'NvConfig\capture-disabled.flag'
+$captureFlag = Join-Path $ProjectRoot 'NVIDIA Config\capture-disabled.flag'
 if (Test-Path -LiteralPath $captureFlag) {
     Copy-FileSafe $captureFlag (Join-Path $nvConfigOutput 'capture-disabled.flag')
 }
-Copy-Tree (Join-Path $ProjectRoot 'NvConfig\nvnode') (Join-Path $nvConfigOutput 'nvnode')
+Copy-Tree (Join-Path $ProjectRoot 'NVIDIA Config\nvnode') (Join-Path $nvConfigOutput 'nvnode')
 
 if ($preservedOverlayConfig) {
     [System.IO.File]::WriteAllText(
@@ -208,11 +208,11 @@ if (Test-Path -LiteralPath $legacyOverlayConfig) {
 }
 
 # Stage the controller and its hotkey helper from their active Project owners.
-$containerOutput = Join-Path $BuildRoot 'NvContainer'
-Copy-RuntimeFiles (Join-Path $ProjectRoot ("NvContainer\bin\Release\{0}" -f $TargetFramework)) $containerOutput
-Copy-RuntimeFiles (Join-Path $ProjectRoot ("ShadowPlay\NvShadowPlayHelper\bin\Release\{0}" -f $TargetFramework)) $containerOutput
-$graphicsBuildOutput = Join-Path $Repo 'Build\NVIDIA ShadowPlay\NvGraphics'
-$graphicsOutput = Join-Path $BuildRoot 'NvGraphics'
+$containerOutput = Join-Path $BuildRoot 'NVIDIA Container'
+Copy-RuntimeFiles (Join-Path $ProjectRoot ("NVIDIA Container\bin\Release\{0}" -f $TargetFramework)) $containerOutput
+Copy-RuntimeFiles (Join-Path $ProjectRoot ("Overlay On-Screen Control\NVIDIA ShadowPlay Helper\bin\Release\{0}" -f $TargetFramework)) $containerOutput
+$graphicsBuildOutput = Join-Path $Repo 'Build\NVIDIA ShadowPlay\NVIDIA Graphics'
+$graphicsOutput = Join-Path $BuildRoot 'NVIDIA Graphics'
 if ([IO.Path]::GetFullPath($graphicsBuildOutput) -ne [IO.Path]::GetFullPath($graphicsOutput)) {
     Copy-RuntimeFiles $graphicsBuildOutput $graphicsOutput
 }
@@ -223,8 +223,8 @@ if (Test-Path -LiteralPath $containerGraphicsExe) {
 
 # The OSC Adapter host injects the x64 DXGI Present probe into ontology-matched
 # games. Keep the host and native module together in the adapter runtime folder.
-$adapterOutput = Join-Path $BuildRoot 'NvAdapters'
-$adapterSource = Join-Path $ProjectRoot 'Overlay OSC\NVIDIA OSC Adapter'
+$adapterOutput = Join-Path $BuildRoot 'NVIDIA Adapter'
+$adapterSource = Join-Path $ProjectRoot 'NVIDIA Adapter\OSC Adapter\Duluka Hook'
 $adapterHostOutput = Join-Path $adapterSource (
     "bin\x64\Release\{0}\win-x64" -f $TargetFramework)
 $adapterNativeDll = Join-Path $adapterSource 'bin\x64\Release\NVIDIA OSC Adapter Hook.dll'
@@ -238,8 +238,8 @@ Copy-FileSafe (Join-Path $launcherOutput 'Launcher.dll') (Join-Path $cefOutput '
 Copy-Tree (Join-Path $ProjectRoot 'Launcher.Cef\ui') (Join-Path $cefOutput 'Resources\launcher')
 
 # OSC owns the single shared CEF runtime directory used by both hosts.
-$oscOutput = Join-Path $BuildRoot 'Overlay OSC\NVIDIA OSC'
-Copy-RuntimeFiles (Join-Path $ProjectRoot 'Overlay OSC\NVIDIA OSC\bin\x64\Release') $oscOutput
+$oscOutput = Join-Path $BuildRoot 'Overlay On-Screen Control\NVIDIA OSC'
+Copy-RuntimeFiles (Join-Path $ProjectRoot 'Overlay On-Screen Control\NVIDIA OSC\bin\x64\Release') $oscOutput
 $cefRuntimeFiles = @(
     @{ Source = 'Release\libcef.dll'; Destination = 'libcef.dll' },
     @{ Source = 'Release\chrome_elf.dll'; Destination = 'chrome_elf.dll' },

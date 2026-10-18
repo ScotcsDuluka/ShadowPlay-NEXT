@@ -3,33 +3,33 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
 VisualStudioVersion = 18.3.11512.155
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "NVIDIA Web Helper", "Overlay OSC\NVIDIA NodeAPI\NVIDIA Web Helper\NVIDIA Web Helper.vbproj", "{AF59A4AF-726C-4FB1-80D7-74E75094B3A7}"
+Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "NVIDIA Web Helper", "Overlay On-Screen Control\NVIDIA NodeAPI\NVIDIA Web Helper\NVIDIA Web Helper.vbproj", "{AF59A4AF-726C-4FB1-80D7-74E75094B3A7}"
 EndProject
-Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "nvsphelper", "ShadowPlay\NvShadowPlayHelper\nvsphelper.csproj", "{AF85BD81-55B6-44E8-BD61-81FDF22E0F98}"
+Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "nvsphelper", "Overlay On-Screen Control\NVIDIA ShadowPlay Helper\nvsphelper.csproj", "{AF85BD81-55B6-44E8-BD61-81FDF22E0F98}"
 EndProject
-Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "CaptureEngine", "ShadowPlay\Duluka Capture\Unknown\CaptureEngine.dll\CaptureEngine.vbproj", "{6C7C0C3F-8142-4806-B1F3-7F216761F531}"
+Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "DulukaEngine", "NVIDIA Capture\EngineCapture\Duluka Capture\Core\DulukaEngine\DulukaEngine.vbproj", "{6C7C0C3F-8142-4806-B1F3-7F216761F531}"
 EndProject
-Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "CaptureEngine.Video", "ShadowPlay\Duluka Capture\Unknown\CaptureEngine.Video.dll\CaptureEngine.Video.vbproj", "{BF20DECC-D8D4-4894-98C4-F0714CB037C0}"
+Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "DulukaEngine.Video", "NVIDIA Capture\EngineCapture\Duluka Capture\Video\Contracts\DulukaEngine.Video\DulukaEngine.Video.vbproj", "{BF20DECC-D8D4-4894-98C4-F0714CB037C0}"
 EndProject
-Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "CaptureEngine.Encoder", "ShadowPlay\Duluka Capture\Unknown\CaptureEngine.Encoder.dll\CaptureEngine.Encoder.vbproj", "{F7277073-E2DE-43A3-BC32-CE3CE0659125}"
+Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "DulukaEngine.Encoder", "NVIDIA Capture\EngineCapture\Duluka Capture\Encoding\DulukaEngine.Encoder\DulukaEngine.Encoder.vbproj", "{F7277073-E2DE-43A3-BC32-CE3CE0659125}"
 EndProject
-Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "CaptureEngine.Encoder.Nvenc", "ShadowPlay\Duluka Capture\Unknown\CaptureEngine.Encoder.Nvenc.dll\CaptureEngine.Encoder.Nvenc.vbproj", "{688BD02D-92C6-4019-9573-06C9C33A194F}"
+Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "DulukaEngine.Encoder.Nvenc", "NVIDIA Capture\EngineCapture\Duluka Capture\Encoding\NVENC\DulukaEngine.Encoder.Nvenc\DulukaEngine.Encoder.Nvenc.vbproj", "{688BD02D-92C6-4019-9573-06C9C33A194F}"
 EndProject
-Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "CaptureEngine.Video.Ddagrab", "ShadowPlay\Duluka Capture\Unknown\CaptureEngine.Video.Ddagrab.dll\CaptureEngine.Video.Ddagrab.vbproj", "{909D84C6-CD5D-4C29-8AC8-B9210C9A981A}"
+Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "DulukaEngine.Video.DXGI", "NVIDIA Capture\EngineCapture\Duluka Capture\Video\DXGI Desktop Duplication\DulukaEngine.Video.DXGI\DulukaEngine.Video.DXGI.vbproj", "{909D84C6-CD5D-4C29-8AC8-B9210C9A981A}"
 EndProject
-Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "CaptureEngine.FFmpegBackend", "ShadowPlay\Duluka Capture\Unknown\CaptureEngine.FFmpegBackend.dll\CaptureEngine.FFmpegBackend.vbproj", "{E1B60EB4-8C63-4973-82C1-44A72154DFDB}"
+Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "DulukaEngine.FFmpegBackend", "NVIDIA Capture\EngineCapture\Duluka Capture\Recording\Backends\FFmpeg\DulukaEngine.FFmpegBackend\DulukaEngine.FFmpegBackend.vbproj", "{E1B60EB4-8C63-4973-82C1-44A72154DFDB}"
 EndProject
-Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "CaptureEngine.Recording", "ShadowPlay\Duluka Capture\Unknown\CaptureEngine.Recording.dll\CaptureEngine.Recording.vbproj", "{D6E96EF9-8C34-41E2-9B25-C4949B8DFD92}"
+Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "DulukaEngine.Recording", "NVIDIA Capture\EngineCapture\Duluka Capture\Recording\DulukaEngine.Recording\DulukaEngine.Recording.vbproj", "{D6E96EF9-8C34-41E2-9B25-C4949B8DFD92}"
 EndProject
-Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "CaptureEngine.Recording.ConsoleDriver", "ShadowPlay\Duluka Capture\Unknown\CaptureEngine.Recording.ConsoleDriver.exe\CaptureEngine.Recording.ConsoleDriver.vbproj", "{9A19006D-8C77-4BC2-AC7A-446B22CE4BBA}"
+Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "DulukaEngine.Recording.ConsoleDriver", "NVIDIA Capture\EngineCapture\Duluka Capture\Tools\DulukaEngine.Recording.ConsoleDriver\DulukaEngine.Recording.ConsoleDriver.vbproj", "{9A19006D-8C77-4BC2-AC7A-446B22CE4BBA}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CaptureEngine.Audio.Wasapi", "ShadowPlay\Duluka Capture\Unknown\CaptureEngine.Audio.Wasapi.dll\CaptureEngine.Audio.Wasapi.csproj", "{24F2E607-618D-40AC-8BEA-6BA0023F8EA2}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DulukaEngine.Audio.Wasapi", "NVIDIA Capture\EngineCapture\Duluka Capture\Audio\DulukaEngine.Audio.Wasapi\DulukaEngine.Audio.Wasapi.csproj", "{24F2E607-618D-40AC-8BEA-6BA0023F8EA2}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CaptureEngine.Audio", "ShadowPlay\Duluka Capture\Unknown\CaptureEngine.Audio.dll\CaptureEngine.Audio.csproj", "{0CEE1CD0-5DFE-4F80-95DC-07ED90CBF595}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DulukaEngine.Audio", "NVIDIA Capture\EngineCapture\Duluka Capture\Audio\DulukaEngine.Audio\DulukaEngine.Audio.csproj", "{0CEE1CD0-5DFE-4F80-95DC-07ED90CBF595}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NvBackend", "NvBackend", "{8D247158-0BF9-33D4-916E-984FC8956ED8}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NvContainer", "NvContainer\NvContainer.csproj", "{867C98DB-6DB0-4F07-A86C-4775F7090F34}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NvContainer", "NVIDIA Container\NvContainer.csproj", "{867C98DB-6DB0-4F07-A86C-4775F7090F34}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NvContainer", "NvContainer", "{4918A2EB-400D-4F7B-BCA2-51CC080EBBB8}"
 EndProject
@@ -45,7 +45,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Cef", "Cef", "{991B0BF6-9EA
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NvControls", "NvControls", "{F407080F-2BC0-496B-A55E-5C9F09912F86}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WgcCapture", "ShadowPlay\Duluka Capture\Unknown\WgcCapture.dll\WgcCapture.csproj", "{C91D4BED-4F38-4262-9E57-65AD1A0C7E41}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WgcCapture", "NVIDIA Capture\EngineCapture\Duluka Capture\Video\Windows Graphics Capture\WgcCapture\WgcCapture.csproj", "{C91D4BED-4F38-4262-9E57-65AD1A0C7E41}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NvGallery", "NvGallery", "{9316DC86-A9B5-4AC2-8ADE-7D6BB5854554}"
 EndProject
@@ -59,7 +59,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NvGraphics", "NvGraphics", 
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NvGraphics.App", "NvGraphics.App", "{83DCFA32-5507-B730-69BB-81B0ACF33CA1}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NvGraphics", "NvGraphics\NvGraphics.App\NvGraphics.csproj", "{5D9F7FC7-1F1F-468F-B23A-9962B2FF9E25}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NvGraphics", "NVIDIA Graphics\NvGraphics.App\NvGraphics.csproj", "{5D9F7FC7-1F1F-468F-B23A-9962B2FF9E25}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

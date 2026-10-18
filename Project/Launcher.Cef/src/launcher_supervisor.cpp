@@ -48,7 +48,7 @@ bool BackendRunning() {
 }
 
 std::wstring OscExePath() {
-  return RootP(L"Overlay OSC\\NVIDIA OSC", L"NVIDIA OSC.exe");
+  return RootP(L"Overlay On-Screen Control\\NVIDIA OSC", L"NVIDIA OSC.exe");
 }
 
 bool OscRunning() {
@@ -138,7 +138,7 @@ LauncherState LauncherSupervisor::Snapshot() {
                          : launcherutil::FileExists(RootP(L"Flags", L"Ready"));
   st.notifier = launcherutil::ProcessRunning(kNotifier);
   st.container = launcherutil::ProcessRunningFromPath(
-      kContainer, RootP(L"NvContainer", L"NvContainer.exe"));
+      kContainer, RootP(L"NVIDIA Container", L"NvContainer.exe"));
   return st;
 }
 
@@ -201,9 +201,9 @@ void LauncherSupervisor::PollLoop() {
     // Slow lane housekeeping (every 5s): keep the base chain alive.
     if (supervise_ && (++tick % 5) == 0) {
       if (!launcherutil::ProcessRunningFromPath(
-              kContainer, RootP(L"NvContainer", L"NvContainer.exe"))) {
+              kContainer, RootP(L"NVIDIA Container", L"NvContainer.exe"))) {
         LogLine("NvContainer lost - restarting");
-        StartIfMissing(kContainer, RootP(L"NvContainer", L"NvContainer.exe"));
+        StartIfMissing(kContainer, RootP(L"NVIDIA Container", L"NvContainer.exe"));
       }
       const bool winform_mode =
           !launcherutil::ReadConfigBool(L"Overlay", L"EngineOverlayMode", false);
@@ -221,7 +221,7 @@ void LauncherSupervisor::PollLoop() {
 
 void LauncherSupervisor::StartBaseChain() {
   // NvContainer runs in both modes and owns the managed helper/presenter.
-  StartIfMissing(kContainer, RootP(L"NvContainer", L"NvContainer.exe"));
+  StartIfMissing(kContainer, RootP(L"NVIDIA Container", L"NvContainer.exe"));
   // The TCP hub belongs only to the WinForm engine lane.
   if (!launcherutil::ReadConfigBool(L"Overlay", L"EngineOverlayMode", false)) {
     StartIfMissing(kHub, ResolveHubExe());
@@ -231,7 +231,7 @@ void LauncherSupervisor::StartBaseChain() {
 void LauncherSupervisor::StartEngineOverlayChain() {
   LogLine("engine overlay chain: begin");
   // NvContainer is the sole owner of the Node API helper and CEF host.
-  StartIfMissing(kContainer, RootP(L"NvContainer", L"NvContainer.exe"));
+  StartIfMissing(kContainer, RootP(L"NVIDIA Container", L"NvContainer.exe"));
   if (!launcherutil::WaitForTcpPort(59011, 15000)) {
     LogLine("NvContainer API backend did not become ready on port 59011");
     return;
@@ -294,14 +294,14 @@ void LauncherSupervisor::InstallerExit() {
       {L"NVIDIA Notifier", L"NvOverlay\\WinForm\\NVIDIA Notifier.exe"},
       {L"NVIDIA ShadowPlay", L"NvOverlay\\WinForm\\NVIDIA ShadowPlay.exe"},
       {L"nvsphelper64", L"ShadowPlay\\nvsphelper64.exe"},
-      {L"nvsphelper64", L"NvContainer\\nvsphelper64.exe"},
-      {L"NvContainer", L"NvContainer\\NvContainer.exe"},
+      {L"nvsphelper64", L"NVIDIA Container\\nvsphelper64.exe"},
+      {L"NvContainer", L"NVIDIA Container\\NvContainer.exe"},
       {L"NvBackend", L"NvBackend\\NvBackend.exe"},
       {L"NVIDIA Backend", L"NvBackend\\NVIDIA Backend.exe"},
       {L"NVIDIA Backend", L"NVIDIA Backend.exe"},
-      {L"NvCapture", L"NvContainer\\CaptureEngine\\NvCapture.exe"},
-      {L"NVIDIA Web Helper", L"Overlay OSC\\NVIDIA NodeAPI\\NVIDIA Web Helper.exe"},
-      {L"NVIDIA OSC", L"Overlay OSC\\NVIDIA OSC\\NVIDIA OSC.exe"},
+      {L"NvCapture", L"NVIDIA Container\\CaptureEngine\\NvCapture.exe"},
+      {L"NVIDIA Web Helper", L"Overlay On-Screen Control\\NVIDIA NodeAPI\\NVIDIA Web Helper.exe"},
+      {L"NVIDIA OSC", L"Overlay On-Screen Control\\NVIDIA OSC\\NVIDIA OSC.exe"},
   };
   for (size_t i = 0; i < sizeof(owned) / sizeof(owned[0]); ++i) {
     launcherutil::KillProcessFromPath(

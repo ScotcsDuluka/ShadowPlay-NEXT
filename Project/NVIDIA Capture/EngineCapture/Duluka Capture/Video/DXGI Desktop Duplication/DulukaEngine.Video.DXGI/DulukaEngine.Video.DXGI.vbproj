@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace></RootNamespace>
+    <!-- TargetFramework changed from net8.0 to net10.0-windows because
+         DXGI Output Duplication API is Windows-only. Vortice packages
+         require the -windows TFM. -->
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <OptionStrict>On</OptionStrict>
+    <OptionExplicit>On</OptionExplicit>
+    <OptionInfer>On</OptionInfer>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <AssemblyName>DulukaEngine.Video.Ddagrab</AssemblyName>
+    <Description>DulukaEngine.Video.DXGI - Native DXGI Output Duplication backend (legacy assembly identity retained)</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Contracts\DulukaEngine.Video\DulukaEngine.Video.vbproj" />
+    <ProjectReference Include="..\..\..\Core\DulukaEngine\DulukaEngine.vbproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Vortice D3D11 + DXGI for IDXGIOutputDuplication (AcquireNextFrame,
+         ReleaseFrame, DuplicateOutput) and D3D11 device/texture/context
+         types used by D3D11VideoFrame staging texture wrapper.
+
+         Matches spike package versions (spikes/D3D11_NVENC_Spike/DulukaEngine.Video.Spike.D3D11.csproj)
+         for ABI consistency: 3.6.2. -->
+    <PackageReference Include="Vortice.Direct3D11" Version="3.6.2" />
+    <PackageReference Include="Vortice.DXGI" Version="3.6.2" />
+  </ItemGroup>
+
+</Project>

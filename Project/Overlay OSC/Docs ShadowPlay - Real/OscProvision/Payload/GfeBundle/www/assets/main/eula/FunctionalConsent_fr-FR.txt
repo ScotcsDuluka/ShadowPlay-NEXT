@@ -1,5 +1,0 @@
-﻿L’application GeForce Experience collecte des données qui servent à configurer vos paramètres de carte graphique et d’application afin de vous fournir la meilleure expérience de jeu et de création de contenu possible. À cet effet, nous avons besoin de connaître votre matériel PC, vos logiciels de jeu, votre configuration réseau, votre utilisation des fonctionnalités de GeForce Experience et votre région géographique.
-
-Nous utilisons ces données pour optimiser vos paramètres d’application, améliorer nos produits et nos services, mais aussi activer vos codes pour des jeux gratuits.
-
-Notre Déclaration de confidentialité détaille les types de données que nous collectons, ce que nous en faisons et le cadre légal de nos actions. Nous ne vendons jamais vos données.

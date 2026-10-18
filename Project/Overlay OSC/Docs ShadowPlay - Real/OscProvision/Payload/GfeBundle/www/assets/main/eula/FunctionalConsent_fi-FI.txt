@@ -1,5 +1,0 @@
-﻿GeForce Experience tarvitsee tietoja näytönohjaimesi ja sovellustesi asetusten määrittämiseen parasta peli- ja sisällön luontikokemusta varten. Tarvitsemme tietoa PC:si laitteistosta, pelaamiseen käytetyistä ohjelmista, verkon kokoonpanosta ja GeForce Experiencen ominaisuuksien käytöstä sekä tiedon maantieeteellisestä alueestasi.
-
-Käytämme näitä tietoja sovellustesi asetusten optimoimiseen, tuotteidemme ja palvelujemme parantamiseen sekä ilmaispelikoodien lunastamisen toteuttamiseen.
-
-Tietosuojakäytännössämme on kuvattu, mitä tietoja keräämme, mitä teemme niillä ja mitkä ovat oikeusperusteemme tälle. Emme koskaan myy tietojasi.

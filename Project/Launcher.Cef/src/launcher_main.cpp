@@ -1,9 +1,9 @@
-// launcher_main.cpp - DLL entry surface for NvLauncher\Cef\Launcher.dll.
+// launcher_main.cpp - DLL entry surface for NVIDIA Launcher\Cef\Launcher.dll.
 // Exports NvLauncherCefMain: the full CEF process split (subprocess
 // relaunch -> CefExecuteProcess; browser process -> supervisor chain +
 // loopback UI server + CefInitialize + message loop). The ROOT
 // Launcher.exe (thin bootstrap) loads this DLL and calls the export.
-// Layout contract: Launcher.dll and its UI sit in NvLauncher\Cef. The
+// Layout contract: Launcher.dll and its UI sit in NVIDIA Launcher\Cef. The
 // Launcher loads CEF binaries/resources from the shared runtime beside
 // NVIDIA OSC.exe; Launcher cache and user data remain in its own slot.
 // winsock2.h MUST precede any windows.h include (cef headers pull it in).
@@ -64,7 +64,7 @@ int ParseInt(const std::string& s, int def) {
 }
 
 // Resolves the launcher UI bundle root: --ui-root=... >
-// <root>\NvLauncher\Cef\Resources\launcher (production) > <exeDir>\ui
+// <root>\NVIDIA Launcher\Cef\Resources\launcher (production) > <exeDir>\ui
 // (dev run from the project bin). Returns "" when none exists (logged).
 std::string ResolveUiRoot(CefRefPtr<CefCommandLine> cl) {
   std::vector<std::wstring> candidates;
@@ -73,7 +73,7 @@ std::string ResolveUiRoot(CefRefPtr<CefCommandLine> cl) {
         launcherutil::Utf8ToWide(cl->GetSwitchValue("ui-root").ToString()));
   }
   candidates.push_back(launcherutil::JoinPath(
-      launcherutil::GetRootDir(), L"NvLauncher\\Cef\\Resources\\launcher"));
+      launcherutil::GetRootDir(), L"NVIDIA Launcher\\Cef\\Resources\\launcher"));
   candidates.push_back(launcherutil::JoinPath(launcherutil::GetExeDir(),
                                               L"ui"));
   for (size_t i = 0; i < candidates.size(); ++i) {
@@ -142,7 +142,7 @@ int NvLauncherCefMain(void) {
   static LauncherHttpServer server;
   if (ui_root.empty()) {
     launcherutil::LogLine("launcher ui root missing (tried --ui-root, "
-                          "NvLauncher\\Cef\\Resources\\launcher, exeDir\\ui)");
+                          "NVIDIA Launcher\\Cef\\Resources\\launcher, exeDir\\ui)");
     return 2;
   }
   std::string err;
@@ -178,9 +178,9 @@ int NvLauncherCefMain(void) {
   const std::wstring exe_dir = launcherutil::GetExeDir();
   const std::wstring root = launcherutil::GetRootDir();
   const std::wstring launcher_dir =
-      launcherutil::JoinPath(root, L"NvLauncher\\Cef");
+      launcherutil::JoinPath(root, L"NVIDIA Launcher\\Cef");
   const std::wstring cef_runtime_dir =
-      launcherutil::JoinPath(root, L"Overlay OSC\\NVIDIA OSC");
+      launcherutil::JoinPath(root, L"Overlay On-Screen Control\\NVIDIA OSC");
 
   // Subprocess: this same exe (root bootstrap). It re-enters
   // NvLauncherCefMain, loads Launcher.dll by ABSOLUTE path and hands the
