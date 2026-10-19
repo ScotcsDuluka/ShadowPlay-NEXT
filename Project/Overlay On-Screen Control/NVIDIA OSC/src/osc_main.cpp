@@ -1,4 +1,4 @@
-// osc_main.cpp — NVIDIA OSC (ของเรา): host C++ เหมือน NVIDIA Share.exe
+﻿// osc_main.cpp — NVIDIA OSC (ของเรา): host C++ เหมือน NVIDIA Share.exe
 //
 // เฟส B+C: OSR (offscreen) + layered compositor per-pixel alpha + input forwarding
 // + page server :3000 + toggle :59003 + อ่าน NVIDIA Config\nvidia-osc.json — ใช้แทน CefSharp
@@ -48,6 +48,9 @@
 #include <d3dcompiler.h>
 #include <cstring>
 #include "../../../NVIDIA Adapter/OSC Adapter/Duluka Hook/include/osc_frame_bridge.h"
+#include "OscFramePublisher/OscD3D9FramePublisher/OscD3D9FramePublisher.h"
+#include "OscFramePublisher/OscD3D11FramePublisher/OscD3D11FramePublisher.h"
+#include "OscFramePublisher/Common/OscFrameUtilities.h"
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "dcomp.lib")
@@ -75,6 +78,7 @@ struct OscConfig {
     int max_fps = 60;
     bool show_fps = true;          // ★ FPS meter บน overlay (นับเฟรมที่แสดงจริง)
     bool gdi_compositor = false;   // true = UpdateLayeredWindow (แสดงผลชัวร์) แทน DComp
+    int render_mode = 0;           // "renderMode": 0=auto (GPU หลัก) 1=บังคับ gpu 2=บังคับ cpu
 };
 static OscConfig g_cfg;
 static std::wstring g_build_root;
@@ -190,6 +194,10 @@ static void LoadConfig() {
     g_cfg.max_fps = (int)CfgNum(json, "maxFps", 60);
     if (g_cfg.max_fps < 1 || g_cfg.max_fps > 240) g_cfg.max_fps = 240;
     g_cfg.show_fps = CfgNum(json, "showFps", 1) != 0;
+    std::wstring renderModeStr = CfgStr(json, "renderMode");
+    if (renderModeStr == L"gpu") g_cfg.render_mode = 1;
+    else if (renderModeStr == L"cpu") g_cfg.render_mode = 2;
+    else g_cfg.render_mode = 0;
 }
 
 static HANDLE g_log = INVALID_HANDLE_VALUE;
@@ -199,7 +207,7 @@ static void LogInit() {
     g_log = CreateFileW(g_cfg.log_file.c_str(), FILE_APPEND_DATA,
         FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_ALWAYS, 0, nullptr);
 }
-static void Log(const char* msg) {
+void Log(const char* msg) {
     HANDLE f = g_log;
     if (f == INVALID_HANDLE_VALUE || !msg) return;
     SYSTEMTIME st; GetLocalTime(&st);
@@ -216,12 +224,40 @@ static void Log(const std::string& msg) {
     Log(msg.c_str());
 }
 
+// ═══ RENDER MODE (สเปก OWNER: GPU เป็นหลัก, fallback ต้องรายงานเสมอ — หลักการ 4.3) ═══
+// GPU_SHARED = CEF shared D3D11 texture เต็ม GPU (OnAcceleratedPaint) — โหมดหลัก
+// GPU_UPLOAD = CPU paint + GPU upload/shader (CompositeFrame/GpuUploadComposite)
+// CPU_GDI    = GDI UpdateLayeredWindow (ทางสุดท้าย เมื่อ GPU ใช้ไม่ได้จริง)
+static constexpr int OscRmGpuShared = 0;
+static constexpr int OscRmGpuUpload = 1;
+static constexpr int OscRmCpuGdi = 2;
+static std::atomic<int> g_render_state{ OscRmGpuShared };
+static const char* OscRenderStateName(int s) {
+    switch (s) {
+        case OscRmGpuShared: return "GPU_SHARED";
+        case OscRmGpuUpload: return "GPU_UPLOAD";
+        default: return "CPU_GDI";
+    }
+}
+static void SetRenderState(int s, const char* reason) {
+    const int prev = g_render_state.exchange(s, std::memory_order_relaxed);
+    if (prev != s)
+        Log(std::string("[mode] SWITCH ") + OscRenderStateName(prev) + " -> " +
+            OscRenderStateName(s) + " reason=" + reason);
+}
+static void LogRenderMode(const char* event, const std::string& detail) {
+    Log(std::string("[mode] ") + event + " RENDER_MODE=" +
+        OscRenderStateName(g_render_state.load(std::memory_order_relaxed)) +
+        (detail.empty() ? std::string() : (" " + detail)));
+}
+
 // Low-overhead OSC producer telemetry. Durations are CPU-side elapsed time;
 // CopyResource timing measures command submission, not completion on the GPU.
 struct OscPerfCounters {
     std::atomic<unsigned long long> viewCallbacks{ 0 };
     std::atomic<unsigned long long> emptyDirtyRects{ 0 };
     std::atomic<unsigned long long> skippedEmptyRects{ 0 };
+    std::atomic<unsigned long long> rateLimitedPaints{ 0 };
     std::atomic<unsigned long long> processedPaints{ 0 };
     std::atomic<unsigned long long> callbackTotalUs{ 0 };
     std::atomic<unsigned long long> callbackMaxUs{ 0 };
@@ -328,6 +364,7 @@ static void OscPerfFinishCallback(unsigned long long startUs) {
     const auto callbacks = g_osc_perf.viewCallbacks.exchange(0, std::memory_order_relaxed);
     const auto empty = g_osc_perf.emptyDirtyRects.exchange(0, std::memory_order_relaxed);
     const auto skipped = g_osc_perf.skippedEmptyRects.exchange(0, std::memory_order_relaxed);
+    const auto rateLimited = g_osc_perf.rateLimitedPaints.exchange(0, std::memory_order_relaxed);
     const auto processed = g_osc_perf.processedPaints.exchange(0, std::memory_order_relaxed);
     const auto callbackTotal = g_osc_perf.callbackTotalUs.exchange(0, std::memory_order_relaxed);
     const auto callbackMax = g_osc_perf.callbackMaxUs.exchange(0, std::memory_order_relaxed);
@@ -351,21 +388,23 @@ static void OscPerfFinishCallback(unsigned long long startUs) {
 
     char line[900];
     sprintf_s(line, sizeof(line),
-        "[oscperf] window_ms=%llu view_cb/s=%llu empty_dirty/s=%llu skipped_empty/s=%llu processed/s=%llu "
+        "[oscperf] window_ms=%llu view_cb/s=%llu empty_dirty/s=%llu skipped_empty/s=%llu rate_limited/s=%llu processed/s=%llu "
         "callback_us(avg/max)=%llu/%llu composite_n=%llu composite_us(avg/max)=%llu/%llu "
         "publish_n=%llu publish_us(avg/max)=%llu/%llu present_n=%llu present_ok=%llu "
         "present_busy_retries=%llu present_busy_drops=%llu copy_n=%llu copy_call_us(avg/max)=%llu/%llu "
-        "present_us(avg/max)=%llu/%llu commit_us(avg/max)=%llu/%llu",
+        "present_us(avg/max)=%llu/%llu commit_us(avg/max)=%llu/%llu mode=%s",
         static_cast<unsigned long long>(windowMs),
         callbacks * 1000ULL / windowMs, empty * 1000ULL / windowMs,
-        skipped * 1000ULL / windowMs, processed * 1000ULL / windowMs,
+        skipped * 1000ULL / windowMs,
+        rateLimited * 1000ULL / windowMs, processed * 1000ULL / windowMs,
         OscPerfAverage(callbackTotal, callbacks), callbackMax,
         composites, OscPerfAverage(compositeTotal, composites), compositeMax,
         publishes, OscPerfAverage(publishTotal, publishes), publishMax,
         presents, presentSuccesses, presentBusyRetries, presentBusyDrops,
         copyCalls, OscPerfAverage(copyTotal, copyCalls), copyMax,
         OscPerfAverage(presentTotal, presents), presentMax,
-        OscPerfAverage(commitTotal, presents), commitMax);
+        OscPerfAverage(commitTotal, presents), commitMax,
+        OscRenderStateName(g_render_state.load(std::memory_order_relaxed)));
     Log(line);
 }
 
@@ -458,29 +497,15 @@ static IDXGIDevice2* g_dxgi_dev2 = nullptr;
 static bool g_dcomp_bound = false;
 static ID3D11Texture2D* g_own_rt = nullptr;   // RT ของเรา (back buffer ของ swapchain เครื่องนี้ bind=0 วาดไม่ได้)
 static int g_own_w = 0, g_own_h = 0;
-static HANDLE g_frame_bridge_mapping = nullptr;
-static osc_frame_bridge::Frame* g_frame_bridge = nullptr;
-static HANDLE g_consumer_adapter_mapping = nullptr;
-static osc_frame_bridge::ConsumerAdapterInfo* g_consumer_adapter_info = nullptr;
-static std::mutex g_consumer_adapter_info_mutex;
-static HANDLE g_d3d9_frame_mapping = nullptr;
-static osc_frame_bridge::D3D9Frame* g_d3d9_frame = nullptr;
-static LONG64 g_d3d9_frame_number = 0;
 static std::atomic<bool> g_game_focused{ false };
 static std::atomic<bool> g_ui_open_snapshot{ false };
 static std::atomic<bool> g_notifier_overlay_visible{ false };
+static bool OscFramePublisherOverlayVisible() {
+    return g_ui_open_snapshot.load(std::memory_order_acquire) ||
+        g_notifier_overlay_visible.load(std::memory_order_acquire);
+}
 static constexpr UINT WM_OSC_FOCUS_MODE = WM_APP + 0x41;
 static constexpr UINT WM_OSC_GPU_FRAME_READY = WM_APP + 0x42;
-static ID3D11Texture2D* g_adapter_frame_texture = nullptr;
-static IDXGIKeyedMutex* g_adapter_frame_mutex = nullptr;
-static HANDLE g_adapter_frame_handle = nullptr;
-static std::uint64_t g_adapter_frame_resource_id = 0;
-static std::uint64_t g_adapter_frame_resource_generation = 0;
-static ID3D11Device* g_adapter_frame_device = nullptr;
-static ID3D11DeviceContext* g_adapter_frame_context = nullptr;
-// CEF paint callbacks and window timers both publish through these D3D11 resources.
-static std::mutex g_adapter_publish_mutex;
-
 // Desktop shared-texture rendering stays on the CEF callback; only Present is queued.
 static std::mutex g_desktop_present_queue_mutex;
 static HANDLE g_desktop_present_frame_event = nullptr; // auto-reset
@@ -488,26 +513,6 @@ static HANDLE g_desktop_present_stop_event = nullptr;  // manual-reset
 static HANDLE g_desktop_present_thread = nullptr;
 static std::atomic<bool> g_desktop_present_shutting_down{ false };
 
-static constexpr size_t AdapterReadbackSlotCount = 3;
-struct AdapterReadbackSlot {
-    ID3D11Texture2D* texture = nullptr;
-    ID3D11Query* completion = nullptr;
-    bool pending = false;
-    bool fullFrame = false;
-    std::vector<D3D11_BOX> dirtyBoxes;
-};
-static AdapterReadbackSlot g_adapter_readback_slots[AdapterReadbackSlotCount]{};
-static size_t g_adapter_readback_write = 0;
-static size_t g_adapter_readback_read = 0;
-static LUID g_adapter_frame_target_luid{};
-static bool g_adapter_frame_target_selected = false;
-static std::uint32_t g_adapter_frame_consumer_api = 0;
-static UINT g_adapter_frame_width = 0;
-static UINT g_adapter_frame_height = 0;
-static DXGI_FORMAT g_adapter_frame_format = DXGI_FORMAT_UNKNOWN;
-static bool g_adapter_frame_initialized = false;
-static bool g_adapter_force_full_readback = false;
-static std::vector<CefRect> g_adapter_deferred_dirty_rects;
 static ULONGLONG g_adapter_frame_burst_deadline = 0;
 static bool g_adapter_frame_burst_force_until_deadline = false;
 static constexpr UINT AdapterFrameBurstTimerId = 7;
@@ -534,507 +539,6 @@ static void StartAdapterFrameBurst(const char* reason,
         AdapterFrameBurstIntervalMs, nullptr);
     Log(std::string("[adapter-bridge] 60fps frame refresh burst started for 10s: ") +
         reason);
-}
-
-static void ReleaseAdapterFrameTexture() {
-    for (auto& slot : g_adapter_readback_slots) {
-        if (slot.texture) {
-            slot.texture->Release();
-            slot.texture = nullptr;
-        }
-        if (slot.completion) {
-            slot.completion->Release();
-            slot.completion = nullptr;
-        }
-        slot.pending = false;
-        slot.fullFrame = false;
-        slot.dirtyBoxes.clear();
-    }
-    g_adapter_readback_write = 0;
-    g_adapter_readback_read = 0;
-    if (g_adapter_frame_mutex) {
-        g_adapter_frame_mutex->Release();
-        g_adapter_frame_mutex = nullptr;
-    }
-    if (g_adapter_frame_texture) {
-        g_adapter_frame_texture->Release();
-        g_adapter_frame_texture = nullptr;
-    }
-    if (g_adapter_frame_handle) {
-        CloseHandle(g_adapter_frame_handle);
-        g_adapter_frame_handle = nullptr;
-    }
-    g_adapter_frame_resource_id = 0;
-    if (g_adapter_frame_context) {
-        g_adapter_frame_context->Release();
-        g_adapter_frame_context = nullptr;
-    }
-    if (g_adapter_frame_device) {
-        g_adapter_frame_device->Release();
-        g_adapter_frame_device = nullptr;
-    }
-    g_adapter_frame_target_luid = {};
-    g_adapter_frame_target_selected = false;
-    g_adapter_frame_consumer_api = 0;
-    g_adapter_frame_width = 0;
-    g_adapter_frame_height = 0;
-    g_adapter_frame_format = DXGI_FORMAT_UNKNOWN;
-    g_adapter_frame_initialized = false;
-    g_adapter_force_full_readback = false;
-    g_adapter_deferred_dirty_rects.clear();
-}
-
-static bool EnsureD3D9FrameMapping() {
-    if (g_d3d9_frame)
-        return g_d3d9_frame->magic == osc_frame_bridge::D3D9FrameMagic &&
-            g_d3d9_frame->version == osc_frame_bridge::D3D9FrameVersion;
-
-    const DWORD sizeHigh = static_cast<DWORD>(
-        osc_frame_bridge::D3D9FrameMappingBytes >> 32);
-    const DWORD sizeLow = static_cast<DWORD>(
-        osc_frame_bridge::D3D9FrameMappingBytes & 0xFFFFFFFF);
-    SetLastError(ERROR_SUCCESS);
-    g_d3d9_frame_mapping = CreateFileMappingW(
-        INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE,
-        sizeHigh, sizeLow, osc_frame_bridge::D3D9FrameMappingName);
-    if (!g_d3d9_frame_mapping) {
-        Log("[d3d9-bridge] CreateFileMappingW failed: " +
-            std::to_string(GetLastError()));
-        return false;
-    }
-
-    const bool created = GetLastError() != ERROR_ALREADY_EXISTS;
-    g_d3d9_frame = static_cast<osc_frame_bridge::D3D9Frame*>(
-        MapViewOfFile(g_d3d9_frame_mapping, FILE_MAP_WRITE, 0, 0,
-            osc_frame_bridge::D3D9FrameMappingBytes));
-    if (!g_d3d9_frame) {
-        Log("[d3d9-bridge] MapViewOfFile failed: " +
-            std::to_string(GetLastError()));
-        CloseHandle(g_d3d9_frame_mapping);
-        g_d3d9_frame_mapping = nullptr;
-        return false;
-    }
-
-    if (created || g_d3d9_frame->magic != osc_frame_bridge::D3D9FrameMagic ||
-        g_d3d9_frame->version != osc_frame_bridge::D3D9FrameVersion) {
-        g_d3d9_frame->sequence = 0;
-        g_d3d9_frame->ownerProcessId = 0;
-        g_d3d9_frame->width = 0;
-        g_d3d9_frame->height = 0;
-        g_d3d9_frame->rowPitch = 0;
-        g_d3d9_frame->pixelBytes = 0;
-        g_d3d9_frame->frameNumber = 0;
-        g_d3d9_frame->version = osc_frame_bridge::D3D9FrameVersion;
-        std::atomic_thread_fence(std::memory_order_release);
-        g_d3d9_frame->magic = osc_frame_bridge::D3D9FrameMagic;
-        g_d3d9_frame_number = 0;
-    }
-
-    const LONG currentProcessId = static_cast<LONG>(GetCurrentProcessId());
-    LONG ownerProcessId = InterlockedCompareExchange(
-        &g_d3d9_frame->ownerProcessId, currentProcessId, 0);
-    if (ownerProcessId != 0 && ownerProcessId != currentProcessId) {
-        HANDLE ownerProcess = OpenProcess(SYNCHRONIZE, FALSE,
-            static_cast<DWORD>(ownerProcessId));
-        const DWORD openError = ownerProcess ? ERROR_SUCCESS : GetLastError();
-        const bool ownerExited = ownerProcess
-            ? WaitForSingleObject(ownerProcess, 0) == WAIT_OBJECT_0
-            : openError == ERROR_INVALID_PARAMETER;
-        if (ownerProcess) CloseHandle(ownerProcess);
-        if (!ownerExited ||
-            InterlockedCompareExchange(&g_d3d9_frame->ownerProcessId,
-                currentProcessId, ownerProcessId) != ownerProcessId) {
-            Log("[d3d9-bridge] another OSC process owns the pixel endpoint");
-            UnmapViewOfFile(g_d3d9_frame);
-            CloseHandle(g_d3d9_frame_mapping);
-            g_d3d9_frame = nullptr;
-            g_d3d9_frame_mapping = nullptr;
-            return false;
-        }
-    }
-    Log("[d3d9-bridge] CPU pixel endpoint ready");
-    return true;
-}
-
-static void SetD3D9FrameVisibility(bool visible) {
-    if (!g_d3d9_frame ||
-        g_d3d9_frame->magic != osc_frame_bridge::D3D9FrameMagic ||
-        g_d3d9_frame->version != osc_frame_bridge::D3D9FrameVersion)
-        return;
-    InterlockedIncrement(&g_d3d9_frame->sequence);
-    InterlockedExchange64(&g_d3d9_frame->frameNumber,
-        visible ? g_d3d9_frame_number : 0);
-    std::atomic_thread_fence(std::memory_order_release);
-    InterlockedIncrement(&g_d3d9_frame->sequence);
-}
-
-static bool PublishD3D9FramePixels(const std::uint8_t* source,
-    UINT sourceRowPitch, const std::vector<D3D11_BOX>& dirtyBoxes,
-    UINT width, UINT height, bool fullFrame) {
-    if (!source || !width || !height ||
-        static_cast<std::uint64_t>(width) * height * 4 >
-            osc_frame_bridge::MaxFrameBytes ||
-        sourceRowPitch < width * 4 ||
-        !EnsureD3D9FrameMapping())
-        return false;
-
-    const bool dimensionsChanged =
-        g_d3d9_frame->width != width || g_d3d9_frame->height != height ||
-        g_d3d9_frame->rowPitch != width * 4;
-    if (dimensionsChanged && !fullFrame) {
-        Log("[d3d9-bridge] waiting for full frame after a size change");
-        return false;
-    }
-
-    InterlockedIncrement(&g_d3d9_frame->sequence);
-    if (fullFrame) {
-        const std::size_t rowBytes = static_cast<std::size_t>(width) * 4;
-        auto* destination = g_d3d9_frame->pixels;
-        for (UINT row = 0; row < height; ++row)
-            std::memcpy(destination + static_cast<std::size_t>(row) * rowBytes,
-                source + static_cast<std::size_t>(row) * sourceRowPitch, rowBytes);
-    } else {
-        const std::size_t destinationPitch = static_cast<std::size_t>(width) * 4;
-        for (const D3D11_BOX& box : dirtyBoxes) {
-            const UINT boxWidth = box.right - box.left;
-            const std::size_t rowBytes = static_cast<std::size_t>(boxWidth) * 4;
-            for (UINT row = box.top; row < box.bottom; ++row) {
-                const std::size_t sourceOffset =
-                    static_cast<std::size_t>(row) * sourceRowPitch +
-                    static_cast<std::size_t>(box.left) * 4;
-                const std::size_t destinationOffset =
-                    static_cast<std::size_t>(row) * destinationPitch +
-                    static_cast<std::size_t>(box.left) * 4;
-                std::memcpy(g_d3d9_frame->pixels + destinationOffset,
-                    source + sourceOffset, rowBytes);
-            }
-        }
-    }
-
-    g_d3d9_frame->width = width;
-    g_d3d9_frame->height = height;
-    g_d3d9_frame->rowPitch = width * 4;
-    g_d3d9_frame->pixelBytes = width * height * 4;
-    const bool visible =
-        g_ui_open_snapshot.load(std::memory_order_acquire) ||
-        g_notifier_overlay_visible.load(std::memory_order_acquire);
-    const LONG64 frameNumber = visible
-        ? InterlockedIncrement64(&g_d3d9_frame_number) : 0;
-    InterlockedExchange64(&g_d3d9_frame->frameNumber, frameNumber);
-    std::atomic_thread_fence(std::memory_order_release);
-    InterlockedIncrement(&g_d3d9_frame->sequence);
-    return true;
-}
-
-static bool GetDeviceAdapterLuid(ID3D11Device* device, LUID& luid) {
-    IDXGIDevice* dxgiDevice = nullptr;
-    IDXGIAdapter* adapter = nullptr;
-    DXGI_ADAPTER_DESC adapterDesc{};
-    HRESULT result = device->QueryInterface(
-        __uuidof(IDXGIDevice), reinterpret_cast<void**>(&dxgiDevice));
-    if (SUCCEEDED(result))
-        result = dxgiDevice->GetAdapter(&adapter);
-    if (SUCCEEDED(result))
-        result = adapter->GetDesc(&adapterDesc);
-    if (adapter) adapter->Release();
-    if (dxgiDevice) dxgiDevice->Release();
-    if (FAILED(result))
-        return false;
-    luid = adapterDesc.AdapterLuid;
-    return true;
-}
-
-static osc_frame_bridge::ConsumerAdapterInfo* GetConsumerAdapterInfo() {
-    std::lock_guard<std::mutex> lock(g_consumer_adapter_info_mutex);
-    if (g_consumer_adapter_info)
-        return g_consumer_adapter_info;
-
-    HANDLE mapping = OpenFileMappingW(
-        FILE_MAP_READ, FALSE, osc_frame_bridge::ConsumerAdapterMappingName);
-    if (!mapping)
-        return nullptr;
-
-    auto* info =
-        static_cast<osc_frame_bridge::ConsumerAdapterInfo*>(
-            MapViewOfFile(mapping, FILE_MAP_READ,
-                0, 0, sizeof(osc_frame_bridge::ConsumerAdapterInfo)));
-    if (!info) {
-        CloseHandle(mapping);
-        return nullptr;
-    }
-
-    g_consumer_adapter_mapping = mapping;
-    g_consumer_adapter_info = info;
-    return g_consumer_adapter_info;
-}
-
-static void WaitPublishWorkerDrained();
-static void StartPublishWorker();
-static void StopPublishWorker();
-
-// [FIX-B] publish-worker shared state (early: EnsureAdapterFrameTexture and
-// the mirror-enable path touch these before the worker block below).
-static HANDLE g_publish_worker_stop_event = nullptr;
-static HANDLE g_publish_worker_thread = nullptr;
-static std::atomic<long> g_publish_inflight{ 0 };
-static std::atomic<bool> g_publish_worker_paused{ false };
-
-struct PublishWorkerPauseGuard {
-    PublishWorkerPauseGuard() {
-        g_publish_worker_paused.store(true, std::memory_order_release);
-    }
-    ~PublishWorkerPauseGuard() {
-        g_publish_worker_paused.store(false, std::memory_order_release);
-    }
-};
-
-static void WaitPublishWorkerDrained() {
-    // Bounded: one publish pass costs at most ~20 ms.
-    g_publish_worker_paused.store(true, std::memory_order_release);
-    for (int i = 0; i < 200 && g_publish_inflight.load() > 0; ++i)
-        Sleep(1);
-}
-
-static bool EnsureAdapterFrameDevice() {
-    LUID targetLuid{};
-    bool hasTargetAdapter = false;
-    std::uint32_t consumerApi = osc_frame_bridge::ConsumerRenderApiD3D11;
-    const auto* consumerAdapterInfo = GetConsumerAdapterInfo();
-    if (consumerAdapterInfo &&
-        consumerAdapterInfo->magic == osc_frame_bridge::ConsumerAdapterMagic &&
-        consumerAdapterInfo->version == osc_frame_bridge::ConsumerAdapterVersion) {
-        const LONG ownerPid = consumerAdapterInfo->ownerProcessId;
-        const LONG64 packedLuid = consumerAdapterInfo->adapterLuid;
-        const LONG publishedApi =
-            osc_frame_bridge::LoadConsumerRenderApi(*consumerAdapterInfo);
-        if (publishedApi == static_cast<LONG>(
-                osc_frame_bridge::ConsumerRenderApiD3D9))
-            consumerApi = osc_frame_bridge::ConsumerRenderApiD3D9;
-        if (ownerPid > 0 && packedLuid != 0) {
-            HANDLE ownerProcess = OpenProcess(SYNCHRONIZE, FALSE,
-                static_cast<DWORD>(ownerPid));
-            const bool ownerAlive = ownerProcess &&
-                WaitForSingleObject(ownerProcess, 0) == WAIT_TIMEOUT;
-            if (ownerProcess) CloseHandle(ownerProcess);
-            if (ownerAlive) {
-                targetLuid.LowPart = static_cast<DWORD>(packedLuid);
-                targetLuid.HighPart = static_cast<LONG>(
-                    static_cast<std::uint64_t>(packedLuid) >> 32);
-                hasTargetAdapter = true;
-            }
-        }
-    }
-
-    LUID sourceLuid{};
-    if (!GetDeviceAdapterLuid(g_gpu_dev, sourceLuid))
-        return false;
-    if (!hasTargetAdapter)
-        targetLuid = sourceLuid;
-    if (g_adapter_frame_target_selected &&
-        g_adapter_frame_target_luid.LowPart == targetLuid.LowPart &&
-        g_adapter_frame_target_luid.HighPart == targetLuid.HighPart &&
-        g_adapter_frame_consumer_api == consumerApi)
-        return g_adapter_frame_device != nullptr ||
-            (sourceLuid.LowPart == targetLuid.LowPart &&
-             sourceLuid.HighPart == targetLuid.HighPart &&
-             consumerApi != osc_frame_bridge::ConsumerRenderApiD3D9);
-
-    ReleaseAdapterFrameTexture();
-    if (sourceLuid.LowPart == targetLuid.LowPart &&
-        sourceLuid.HighPart == targetLuid.HighPart &&
-        consumerApi != osc_frame_bridge::ConsumerRenderApiD3D9) {
-        g_adapter_frame_target_luid = targetLuid;
-        g_adapter_frame_target_selected = true;
-        g_adapter_frame_consumer_api = consumerApi;
-        Log("[adapter-bridge] game adapter matches the CEF device; using direct GPU copy");
-        return true;
-    }
-
-    IDXGIFactory1* factory = nullptr;
-    HRESULT result = CreateDXGIFactory1(
-        __uuidof(IDXGIFactory1), reinterpret_cast<void**>(&factory));
-    if (FAILED(result) || !factory) {
-        g_adapter_frame_target_luid = targetLuid;
-        g_adapter_frame_target_selected = true;
-        g_adapter_frame_consumer_api = consumerApi;
-        Log("[adapter-bridge] DXGI factory creation for game adapter failed: " +
-            std::to_string(static_cast<long>(result)));
-        return false;
-    }
-
-    IDXGIAdapter1* matchingAdapter = nullptr;
-    for (UINT index = 0; ; ++index) {
-        IDXGIAdapter1* adapter = nullptr;
-        result = factory->EnumAdapters1(index, &adapter);
-        if (result == DXGI_ERROR_NOT_FOUND)
-            break;
-        if (FAILED(result))
-            break;
-        DXGI_ADAPTER_DESC1 desc{};
-        const HRESULT descResult = adapter->GetDesc1(&desc);
-        if (SUCCEEDED(descResult) &&
-            desc.AdapterLuid.LowPart == targetLuid.LowPart &&
-            desc.AdapterLuid.HighPart == targetLuid.HighPart) {
-            matchingAdapter = adapter;
-            break;
-        }
-        adapter->Release();
-    }
-    factory->Release();
-    if (!matchingAdapter) {
-        g_adapter_frame_target_luid = targetLuid;
-        g_adapter_frame_target_selected = true;
-        g_adapter_frame_consumer_api = consumerApi;
-        Log("[adapter-bridge] game adapter LUID is not available to the OSC process");
-        return false;
-    }
-
-    D3D_FEATURE_LEVEL featureLevel{};
-    result = D3D11CreateDevice(matchingAdapter, D3D_DRIVER_TYPE_UNKNOWN,
-        nullptr, D3D11_CREATE_DEVICE_BGRA_SUPPORT, nullptr, 0,
-        D3D11_SDK_VERSION, &g_adapter_frame_device, &featureLevel,
-        &g_adapter_frame_context);
-    matchingAdapter->Release();
-    if (FAILED(result) || !g_adapter_frame_device ||
-        !g_adapter_frame_context) {
-        char diagnostic[128]{};
-        sprintf_s(diagnostic,
-            "[adapter-bridge] game-adapter D3D11 device creation failed: 0x%08lX",
-            static_cast<unsigned long>(result));
-        Log(diagnostic);
-        ReleaseAdapterFrameTexture();
-        g_adapter_frame_target_luid = targetLuid;
-        g_adapter_frame_target_selected = true;
-        g_adapter_frame_consumer_api = consumerApi;
-        return false;
-    }
-
-    {
-        // [FIX-B] the publish worker touches this context off-thread.
-        ID3D11Multithread* mt = nullptr;
-        if (SUCCEEDED(g_adapter_frame_context->QueryInterface(
-                __uuidof(ID3D11Multithread),
-                reinterpret_cast<void**>(&mt)))) {
-            mt->SetMultithreadProtected(TRUE);
-            mt->Release();
-        }
-    }
-    g_adapter_frame_target_luid = targetLuid;
-    g_adapter_frame_target_selected = true;
-    g_adapter_frame_consumer_api = consumerApi;
-    char diagnostic[192]{};
-    sprintf_s(diagnostic, sizeof(diagnostic),
-        "[adapter-bridge] enabled CPU readback mirror for render API %lu "
-        "on adapter %08lX:%08lX",
-        static_cast<unsigned long>(consumerApi),
-        static_cast<unsigned long>(targetLuid.HighPart),
-        static_cast<unsigned long>(targetLuid.LowPart));
-    Log(diagnostic);
-    StartPublishWorker();
-    return true;
-}
-
-static bool EnsureAdapterFrameTexture(ID3D11Texture2D* sourceTexture) {
-    if (!sourceTexture || !EnsureAdapterFrameDevice())
-        return false;
-    D3D11_TEXTURE2D_DESC sourceDesc{};
-    sourceTexture->GetDesc(&sourceDesc);
-    if (!sourceDesc.Width || !sourceDesc.Height ||
-        sourceDesc.SampleDesc.Count != 1 ||
-        static_cast<std::uint64_t>(sourceDesc.Width) * sourceDesc.Height * 4 >
-            osc_frame_bridge::MaxFrameBytes)
-        return false;
-
-    if (g_adapter_frame_texture &&
-        g_adapter_frame_width == sourceDesc.Width &&
-        g_adapter_frame_height == sourceDesc.Height &&
-        g_adapter_frame_format == sourceDesc.Format)
-        return true;
-
-    // [FIX-B] pause + drain the publish worker while textures are rebuilt.
-    // RAII: every exit below (rebuild success or failure) resumes the worker.
-    PublishWorkerPauseGuard publishWorkerPause;
-    WaitPublishWorkerDrained();
-    ReleaseAdapterFrameTexture();
-    if (!EnsureAdapterFrameDevice())
-        return false;
-    ID3D11Device* targetDevice = g_adapter_frame_device
-        ? g_adapter_frame_device : g_gpu_dev;
-    D3D11_TEXTURE2D_DESC sharedDesc = sourceDesc;
-    sharedDesc.Usage = D3D11_USAGE_DEFAULT;
-    sharedDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-    sharedDesc.CPUAccessFlags = 0;
-    sharedDesc.MiscFlags = D3D11_RESOURCE_MISC_SHARED_NTHANDLE |
-        D3D11_RESOURCE_MISC_SHARED_KEYEDMUTEX;
-
-    HRESULT result = targetDevice->CreateTexture2D(
-        &sharedDesc, nullptr, &g_adapter_frame_texture);
-    if (FAILED(result)) {
-        Log("[adapter-bridge] CreateTexture2D failed: " +
-            std::to_string(static_cast<long>(result)));
-        ReleaseAdapterFrameTexture();
-        return false;
-    }
-
-    IDXGIResource1* sharedResource = nullptr;
-    const std::uint64_t resourceId = ++g_adapter_frame_resource_generation;
-    wchar_t sharedResourceName[MAX_PATH]{};
-    const bool hasSharedResourceName = osc_frame_bridge::MakeSharedTextureName(
-        GetCurrentProcessId(), resourceId, sharedResourceName,
-        ARRAYSIZE(sharedResourceName));
-    if (!hasSharedResourceName)
-        result = E_INVALIDARG;
-    else
-        result = g_adapter_frame_texture->QueryInterface(
-            __uuidof(IDXGIResource1), reinterpret_cast<void**>(&sharedResource));
-    if (SUCCEEDED(result))
-        result = sharedResource->CreateSharedHandle(
-            nullptr, DXGI_SHARED_RESOURCE_READ, sharedResourceName,
-            &g_adapter_frame_handle);
-    if (sharedResource) sharedResource->Release();
-    if (SUCCEEDED(result))
-        result = g_adapter_frame_texture->QueryInterface(
-            __uuidof(IDXGIKeyedMutex),
-            reinterpret_cast<void**>(&g_adapter_frame_mutex));
-    if (SUCCEEDED(result) && g_adapter_frame_device) {
-        D3D11_TEXTURE2D_DESC stagingDesc = sourceDesc;
-        stagingDesc.Usage = D3D11_USAGE_STAGING;
-        stagingDesc.BindFlags = 0;
-        stagingDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-        stagingDesc.MiscFlags = 0;
-        D3D11_QUERY_DESC queryDesc{};
-        queryDesc.Query = D3D11_QUERY_EVENT;
-        for (auto& slot : g_adapter_readback_slots) {
-            result = g_gpu_dev->CreateTexture2D(
-                &stagingDesc, nullptr, &slot.texture);
-            if (SUCCEEDED(result))
-                result = g_gpu_dev->CreateQuery(&queryDesc, &slot.completion);
-            if (FAILED(result))
-                break;
-        }
-    }
-    if (FAILED(result) || !g_adapter_frame_handle || !g_adapter_frame_mutex) {
-        Log("[adapter-bridge] shared-handle or keyed-mutex setup failed: " +
-            std::to_string(static_cast<long>(result)));
-        ReleaseAdapterFrameTexture();
-        return false;
-    }
-
-    g_adapter_frame_width = sourceDesc.Width;
-    g_adapter_frame_height = sourceDesc.Height;
-    g_adapter_frame_format = sourceDesc.Format;
-    g_adapter_frame_resource_id = resourceId;
-    char diagnostic[256]{};
-    sprintf_s(diagnostic, sizeof(diagnostic),
-        "[adapter-bridge] created named NT shared texture id=%llu %ux%u format=%u "
-        "adapterLuid=%08lX:%08lX",
-        static_cast<unsigned long long>(g_adapter_frame_resource_id),
-        sourceDesc.Width, sourceDesc.Height,
-        static_cast<unsigned>(sourceDesc.Format),
-        static_cast<unsigned long>(g_adapter_frame_target_luid.HighPart),
-        static_cast<unsigned long>(g_adapter_frame_target_luid.LowPart));
-    Log(diagnostic);
-    return true;
 }
 
 struct HookFullscreenWindowSearch {
@@ -1100,7 +604,7 @@ static bool IsHookGameFullscreen(DWORD gamePid) {
 }
 
 static bool IsHookGameForeground() {
-    const auto* consumerAdapterInfo = GetConsumerAdapterInfo();
+    const auto* consumerAdapterInfo = osc::d3d11_frame_publisher::GetConsumerAdapterInfo();
     if (!consumerAdapterInfo ||
         consumerAdapterInfo->magic != osc_frame_bridge::ConsumerAdapterMagic ||
         consumerAdapterInfo->version != osc_frame_bridge::ConsumerAdapterVersion)
@@ -1148,426 +652,6 @@ static bool IsHookGameForegroundStable() {
     if (now - candidateSince >= transitionDelayMs)
         stableState = candidateState;
     return stableState;
-}
-
-static std::uint64_t ComputeAdapterFrameFingerprint(
-    const std::uint8_t* bytes, UINT rowPitch, UINT width, UINT height) {
-    if (!bytes || !rowPitch || !width || !height)
-        return 0;
-
-    // A small spatial sample proves the readback contains changing pixels
-    // without hashing/copying the entire 7 MB overlay on every frame.
-    constexpr UINT sampleColumns = 32;
-    constexpr UINT sampleRows = 18;
-    std::uint64_t hash = 14695981039346656037ULL;
-    for (UINT row = 0; row < sampleRows; ++row) {
-        const UINT y = sampleRows > 1
-            ? row * (height - 1) / (sampleRows - 1) : 0;
-        const auto* scanline = bytes + static_cast<std::size_t>(y) * rowPitch;
-        for (UINT column = 0; column < sampleColumns; ++column) {
-            const UINT x = sampleColumns > 1
-                ? column * (width - 1) / (sampleColumns - 1) : 0;
-            const auto* pixel = scanline + static_cast<std::size_t>(x) * 4;
-            for (UINT channel = 0; channel < 4; ++channel) {
-                hash ^= pixel[channel];
-                hash *= 1099511628211ULL;
-            }
-        }
-    }
-    return hash;
-}
-
-static void LogAdapterFramePixelProof(std::uint64_t fingerprint) {
-    static ULONGLONG windowStart = 0;
-    static std::uint64_t fullReadbacks = 0;
-    static std::uint64_t contentFingerprintChanges = 0;
-    static std::uint64_t lastFingerprint = 0;
-    static bool haveLastFingerprint = false;
-
-    const ULONGLONG now = GetTickCount64();
-    if (!windowStart)
-        windowStart = now;
-    ++fullReadbacks;
-    if (haveLastFingerprint && fingerprint != lastFingerprint)
-        ++contentFingerprintChanges;
-    lastFingerprint = fingerprint;
-    haveLastFingerprint = true;
-
-    if (now - windowStart >= 1000) {
-        char diagnostic[256]{};
-        sprintf_s(diagnostic, sizeof(diagnostic),
-            "[adapter-bridge] pixel proof: fullReadbacks=%llu "
-            "sampledContentChanges=%llu fingerprint=0x%016llX",
-            static_cast<unsigned long long>(fullReadbacks),
-            static_cast<unsigned long long>(contentFingerprintChanges),
-            static_cast<unsigned long long>(fingerprint));
-        Log(diagnostic);
-        windowStart = now;
-        fullReadbacks = 0;
-        contentFingerprintChanges = 0;
-    }
-}
-
-static bool PublishCompletedAdapterFrame() {
-    AdapterReadbackSlot& slot =
-        g_adapter_readback_slots[g_adapter_readback_read];
-    {
-        // [FIX-B] brief lock for slot state only; the heavy D3D work below
-        // runs lock-free on the publish worker (contexts are MT-protected).
-        std::lock_guard<std::mutex> lock(g_adapter_publish_mutex);
-        if (!slot.pending)
-            return false;
-    }
-
-    const HRESULT ready = g_gpu_ctx->GetData(
-        slot.completion, nullptr, 0, D3D11_ASYNC_GETDATA_DONOTFLUSH);
-    if (ready == S_FALSE)
-        return false;
-    if (FAILED(ready)) {
-        Log("[adapter-bridge] readback completion query failed: " +
-            std::to_string(static_cast<long>(ready)));
-        std::lock_guard<std::mutex> lock(g_adapter_publish_mutex);
-        g_adapter_force_full_readback = true;
-        slot.pending = false;
-        slot.fullFrame = false;
-        slot.dirtyBoxes.clear();
-        g_adapter_readback_read =
-            (g_adapter_readback_read + 1) % AdapterReadbackSlotCount;
-        return false;
-    }
-
-    D3D11_MAPPED_SUBRESOURCE mapped{};
-    const HRESULT mapResult = g_gpu_ctx->Map(
-        slot.texture, 0, D3D11_MAP_READ, D3D11_MAP_FLAG_DO_NOT_WAIT, &mapped);
-    bool published = false;
-    if (SUCCEEDED(mapResult)) {
-        const HRESULT acquireResult = g_adapter_frame_mutex->AcquireSync(0, 0);
-        if (acquireResult == S_OK) {
-            const auto* mappedBytes =
-                static_cast<const std::uint8_t*>(mapped.pData);
-            const std::uint64_t pixelFingerprint = slot.fullFrame
-                ? ComputeAdapterFrameFingerprint(mappedBytes, mapped.RowPitch,
-                    g_adapter_frame_width, g_adapter_frame_height)
-                : 0;
-            for (const D3D11_BOX& box : slot.dirtyBoxes) {
-                const std::size_t offset =
-                    static_cast<std::size_t>(box.top) * mapped.RowPitch +
-                    static_cast<std::size_t>(box.left) * 4;
-                g_adapter_frame_context->UpdateSubresource(
-                    g_adapter_frame_texture, 0, &box, mappedBytes + offset,
-                    mapped.RowPitch, 0);
-            }
-            bool d3d9Published =
-                g_adapter_frame_consumer_api !=
-                    osc_frame_bridge::ConsumerRenderApiD3D9;
-            if (!d3d9Published) {
-                D3D11_TEXTURE2D_DESC sourceDesc{};
-                slot.texture->GetDesc(&sourceDesc);
-                d3d9Published = PublishD3D9FramePixels(mappedBytes,
-                    mapped.RowPitch, slot.dirtyBoxes, sourceDesc.Width,
-                    sourceDesc.Height, slot.fullFrame);
-                if (!d3d9Published)
-                    Log("[d3d9-bridge] CPU frame publication failed");
-            }
-            g_gpu_ctx->Unmap(slot.texture, 0);
-            g_adapter_frame_context->Flush();
-            const HRESULT releaseResult = g_adapter_frame_mutex->ReleaseSync(0);
-            if (SUCCEEDED(releaseResult)) {
-                published = true;
-                if (slot.fullFrame)
-                    LogAdapterFramePixelProof(pixelFingerprint);
-                if (!d3d9Published)
-                    g_adapter_force_full_readback = true;
-                else if (slot.fullFrame) {
-                    g_adapter_frame_initialized = true;
-                    g_adapter_force_full_readback = false;
-                }
-            } else {
-                g_adapter_force_full_readback = true;
-                Log("[adapter-bridge] shared texture mutex release failed: " +
-                    std::to_string(static_cast<long>(releaseResult)));
-            }
-        } else {
-            g_gpu_ctx->Unmap(slot.texture, 0);
-            if (acquireResult == WAIT_TIMEOUT)
-                return false;
-            g_adapter_force_full_readback = true;
-            Log("[adapter-bridge] shared texture mutex acquire failed: " +
-                std::to_string(static_cast<long>(acquireResult)));
-        }
-    } else if (mapResult == DXGI_ERROR_WAS_STILL_DRAWING) {
-        return false;
-    } else {
-        g_adapter_force_full_readback = true;
-        Log("[adapter-bridge] completed readback map failed: " +
-            std::to_string(static_cast<long>(mapResult)));
-    }
-
-    {
-        // [FIX-B] publish back the slot so the UI thread may reuse it.
-        std::lock_guard<std::mutex> lock(g_adapter_publish_mutex);
-        slot.pending = false;
-        slot.fullFrame = false;
-        slot.dirtyBoxes.clear();
-        g_adapter_readback_read =
-            (g_adapter_readback_read + 1) % AdapterReadbackSlotCount;
-    }
-    return published;
-}
-
-static std::vector<D3D11_BOX> MakeAdapterDirtyBoxes(
-    const std::vector<CefRect>& dirtyRects, UINT width, UINT height) {
-    std::vector<D3D11_BOX> boxes;
-    if (!width || !height || dirtyRects.empty())
-        return boxes;
-
-    const auto appendClamped = [&](long long left, long long top,
-        long long right, long long bottom) {
-        left = (std::max)(0LL, (std::min)(left, static_cast<long long>(width)));
-        top = (std::max)(0LL, (std::min)(top, static_cast<long long>(height)));
-        right = (std::max)(left,
-            (std::min)(right, static_cast<long long>(width)));
-        bottom = (std::max)(top,
-            (std::min)(bottom, static_cast<long long>(height)));
-        if (left < right && top < bottom) {
-            boxes.push_back(D3D11_BOX{
-                static_cast<UINT>(left), static_cast<UINT>(top), 0,
-                static_cast<UINT>(right), static_cast<UINT>(bottom), 1 });
-        }
-    };
-
-    if (dirtyRects.size() > 64) {
-        long long left = width;
-        long long top = height;
-        long long right = 0;
-        long long bottom = 0;
-        for (const CefRect& rect : dirtyRects) {
-            left = (std::min)(left, static_cast<long long>(rect.x));
-            top = (std::min)(top, static_cast<long long>(rect.y));
-            right = (std::max)(right,
-                static_cast<long long>(rect.x) + rect.width);
-            bottom = (std::max)(bottom,
-                static_cast<long long>(rect.y) + rect.height);
-        }
-        appendClamped(left, top, right, bottom);
-        return boxes;
-    }
-
-    boxes.reserve(dirtyRects.size());
-    for (const CefRect& rect : dirtyRects) {
-        if (rect.width <= 0 || rect.height <= 0)
-            continue;
-        const long long left = rect.x;
-        const long long top = rect.y;
-        appendClamped(left, top, left + rect.width, top + rect.height);
-    }
-    return boxes;
-}
-
-static bool QueueAdapterFrameReadback(ID3D11Texture2D* sourceTexture,
-    const std::vector<CefRect>& dirtyRects) {
-    AdapterReadbackSlot& slot =
-        g_adapter_readback_slots[g_adapter_readback_write];
-    D3D11_TEXTURE2D_DESC sourceDesc{};
-    sourceTexture->GetDesc(&sourceDesc);
-    if (slot.pending) {
-        if (!g_adapter_force_full_readback) {
-            g_adapter_deferred_dirty_rects.insert(
-                g_adapter_deferred_dirty_rects.end(),
-                dirtyRects.begin(), dirtyRects.end());
-            if (g_adapter_deferred_dirty_rects.size() > 64) {
-                const auto boxes = MakeAdapterDirtyBoxes(
-                    g_adapter_deferred_dirty_rects,
-                    sourceDesc.Width, sourceDesc.Height);
-                g_adapter_deferred_dirty_rects.clear();
-                for (const D3D11_BOX& box : boxes)
-                    g_adapter_deferred_dirty_rects.emplace_back(
-                        static_cast<int>(box.left),
-                        static_cast<int>(box.top),
-                        static_cast<int>(box.right - box.left),
-                        static_cast<int>(box.bottom - box.top));
-            }
-        }
-        return false;
-    }
-
-    std::vector<CefRect> combinedDirtyRects;
-    combinedDirtyRects.reserve(
-        g_adapter_deferred_dirty_rects.size() + dirtyRects.size());
-    combinedDirtyRects.insert(combinedDirtyRects.end(),
-        g_adapter_deferred_dirty_rects.begin(),
-        g_adapter_deferred_dirty_rects.end());
-    combinedDirtyRects.insert(combinedDirtyRects.end(),
-        dirtyRects.begin(), dirtyRects.end());
-    slot.dirtyBoxes = MakeAdapterDirtyBoxes(
-        combinedDirtyRects, sourceDesc.Width, sourceDesc.Height);
-    slot.fullFrame = !g_adapter_frame_initialized ||
-        g_adapter_force_full_readback;
-    if (slot.fullFrame && !slot.dirtyBoxes.empty()) {
-        slot.dirtyBoxes.clear();
-        slot.dirtyBoxes.push_back(D3D11_BOX{
-            0, 0, 0, sourceDesc.Width, sourceDesc.Height, 1 });
-    }
-    if (slot.dirtyBoxes.empty()) {
-        slot.fullFrame = false;
-        return false;
-    }
-
-    for (const D3D11_BOX& box : slot.dirtyBoxes)
-        g_gpu_ctx->CopySubresourceRegion(
-            slot.texture, 0, box.left, box.top, 0, sourceTexture, 0, &box);
-    g_gpu_ctx->End(slot.completion);
-    g_gpu_ctx->Flush();
-    slot.pending = true;
-    g_adapter_readback_write =
-        (g_adapter_readback_write + 1) % AdapterReadbackSlotCount;
-    g_adapter_deferred_dirty_rects.clear();
-    if (g_hwnd)
-        SetTimer(g_hwnd, 6, 16, nullptr);
-    return true;
-}
-
-static bool PublishAdapterFrameMetadataLocked(bool forceHidden = false) {
-    // [FIX-B] serialize bridge seqlock writes: the UI thread (visibility
-    // changes) and the publish worker both push metadata now.
-    static std::mutex g_bridge_metadata_mutex;
-    std::lock_guard<std::mutex> metadata_lock(g_bridge_metadata_mutex);
-    if (!g_frame_bridge) {
-        const DWORD sizeHigh = static_cast<DWORD>(
-            osc_frame_bridge::MappingBytes >> 32);
-        const DWORD sizeLow = static_cast<DWORD>(
-            osc_frame_bridge::MappingBytes & 0xFFFFFFFF);
-        SetLastError(ERROR_SUCCESS);
-        g_frame_bridge_mapping = CreateFileMappingW(
-            INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE,
-            sizeHigh, sizeLow, osc_frame_bridge::MappingName);
-        if (!g_frame_bridge_mapping) {
-            Log("[adapter-bridge] CreateFileMappingW failed: " +
-                std::to_string(GetLastError()));
-            return false;
-        }
-        const bool createdMapping = GetLastError() != ERROR_ALREADY_EXISTS;
-        g_frame_bridge = static_cast<osc_frame_bridge::Frame*>(
-            MapViewOfFile(g_frame_bridge_mapping, FILE_MAP_WRITE, 0, 0,
-                osc_frame_bridge::MappingBytes));
-        if (!g_frame_bridge) {
-            Log("[adapter-bridge] MapViewOfFile failed: " +
-                std::to_string(GetLastError()));
-            CloseHandle(g_frame_bridge_mapping);
-            g_frame_bridge_mapping = nullptr;
-            return false;
-        }
-        if (createdMapping) {
-            g_frame_bridge->sequence = 0;
-            g_frame_bridge->ownerProcessId = 0;
-            g_frame_bridge->frameNumber = 0;
-            g_frame_bridge->version = osc_frame_bridge::Version;
-            std::atomic_thread_fence(std::memory_order_release);
-            g_frame_bridge->magic = osc_frame_bridge::Magic;
-        }
-        Log("[adapter-bridge] shared CEF texture endpoint ready");
-    }
-
-    if (g_frame_bridge->magic != osc_frame_bridge::Magic ||
-        g_frame_bridge->version != osc_frame_bridge::Version)
-        return false;
-
-    const LONG currentProcessId = static_cast<LONG>(GetCurrentProcessId());
-    LONG ownerProcessId = InterlockedCompareExchange(
-        &g_frame_bridge->ownerProcessId, currentProcessId, 0);
-    if (ownerProcessId != 0 && ownerProcessId != currentProcessId) {
-        HANDLE ownerProcess = OpenProcess(SYNCHRONIZE, FALSE,
-            static_cast<DWORD>(ownerProcessId));
-        const DWORD openError = ownerProcess ? ERROR_SUCCESS : GetLastError();
-        const bool ownerExited = ownerProcess
-            ? WaitForSingleObject(ownerProcess, 0) == WAIT_OBJECT_0
-            : openError == ERROR_INVALID_PARAMETER;
-        if (ownerProcess) CloseHandle(ownerProcess);
-        if (!ownerExited ||
-            InterlockedCompareExchange(&g_frame_bridge->ownerProcessId,
-                currentProcessId, ownerProcessId) != ownerProcessId) {
-            static bool loggedOtherOwner = false;
-            if (!loggedOtherOwner) {
-                loggedOtherOwner = true;
-                Log("[adapter-bridge] another OSC process owns the shared-texture endpoint");
-            }
-            return false;
-        }
-    }
-
-    InterlockedIncrement(&g_frame_bridge->sequence);
-    g_frame_bridge->width = g_adapter_frame_width;
-    g_frame_bridge->height = g_adapter_frame_height;
-    g_frame_bridge->processId = GetCurrentProcessId();
-    g_frame_bridge->sharedResourceId = g_adapter_frame_resource_id;
-    const bool overlayVisible =
-        g_ui_open_snapshot.load(std::memory_order_acquire) ||
-        g_notifier_overlay_visible.load(std::memory_order_acquire);
-    if (!forceHidden && overlayVisible)
-        ++g_frame_bridge->frameNumber;
-    else
-        g_frame_bridge->frameNumber = 0;
-    std::atomic_thread_fence(std::memory_order_release);
-    InterlockedIncrement(&g_frame_bridge->sequence);
-    SetD3D9FrameVisibility(overlayVisible && !forceHidden);
-    return true;
-}
-
-static bool PublishAdapterFrameMetadata(bool forceHidden = false) {
-    std::lock_guard<std::mutex> lock(g_adapter_publish_mutex);
-    return PublishAdapterFrameMetadataLocked(forceHidden);
-}
-
-static void PublishAdapterFrameLocked(ID3D11Texture2D* sourceTexture,
-    const std::vector<CefRect>& dirtyRects) {
-    if (!EnsureAdapterFrameTexture(sourceTexture))
-        return;
-
-    bool frameReady = false;
-    if (g_adapter_frame_device) {
-        // [FIX-B] UI thread only queues the GPU-side copy; the publish
-        // worker completes readbacks + pushes bridge metadata off-thread.
-        QueueAdapterFrameReadback(sourceTexture, dirtyRects);
-        return;
-    } else {
-        const HRESULT acquireResult = g_adapter_frame_mutex->AcquireSync(0, 0);
-        if (acquireResult != S_OK) {
-            g_adapter_force_full_readback = true;
-            return;
-        }
-        D3D11_TEXTURE2D_DESC sourceDesc{};
-        sourceTexture->GetDesc(&sourceDesc);
-        std::vector<D3D11_BOX> dirtyBoxes = MakeAdapterDirtyBoxes(
-            dirtyRects, sourceDesc.Width, sourceDesc.Height);
-        const bool fullFrame = !g_adapter_frame_initialized ||
-            g_adapter_force_full_readback;
-        if (fullFrame && !dirtyBoxes.empty()) {
-            dirtyBoxes.clear();
-            dirtyBoxes.push_back(D3D11_BOX{
-                0, 0, 0, sourceDesc.Width, sourceDesc.Height, 1 });
-        }
-        for (const D3D11_BOX& box : dirtyBoxes)
-            g_gpu_ctx->CopySubresourceRegion(
-                g_adapter_frame_texture, 0, box.left, box.top, 0,
-                sourceTexture, 0, &box);
-        g_gpu_ctx->Flush();
-        const HRESULT releaseResult = g_adapter_frame_mutex->ReleaseSync(0);
-        if (FAILED(releaseResult)) {
-            g_adapter_force_full_readback = true;
-            Log("[adapter-bridge] shared texture mutex release failed: " +
-                std::to_string(static_cast<long>(releaseResult)));
-            return;
-        }
-        frameReady = !dirtyBoxes.empty();
-        if (frameReady && fullFrame) {
-            g_adapter_frame_initialized = true;
-            g_adapter_force_full_readback = false;
-        }
-    }
-    if (!frameReady)
-        return;
-
-    PublishAdapterFrameMetadataLocked();
 }
 
 // วาดลง RT ของเราเสมอ แล้ว copy ลง back buffer — บังคับทุกเส้นทางผ่านนี้
@@ -1871,105 +955,15 @@ static ID3D11Texture2D* g_shared_tex = nullptr;   // ★ cache: handle เดิ
 static ID3D11ShaderResourceView* g_shared_srv = nullptr;
 static uint64_t g_shared_handle_cached = 0;
 
-// [FIX-B] dedicated publish worker -------------------------------------
-// The CPU readback mirror (GPU A staging copy -> CPU map -> GPU B upload)
-// used to run inline on the CEF UI thread (OnAcceleratedPaint + timer 6)
-// and throttled CEF's compositor to 1-11 fps whenever the game was
-// focused (112 fps when not). The worker owns all heavy steps now.
-static DWORD WINAPI OscPublishWorkerProc(LPVOID) {
-    for (;;) {
-        if (g_publish_worker_paused.load(std::memory_order_acquire)) {
-            if (WaitForSingleObject(g_publish_worker_stop_event, 2) ==
-                WAIT_OBJECT_0)
-                break;
-            continue;
-        }
-        const DWORD wait =
-            WaitForSingleObject(g_publish_worker_stop_event, 4);
-        if (wait == WAIT_OBJECT_0) break;
-        if (!g_adapter_frame_device) continue;
-
-        bool hasPending = false;
-        {
-            std::lock_guard<std::mutex> lock(g_adapter_publish_mutex);
-            hasPending = std::any_of(
-                std::begin(g_adapter_readback_slots),
-                std::end(g_adapter_readback_slots),
-                [](const AdapterReadbackSlot& slot) {
-                    return slot.pending;
-                });
-        }
-        if (!hasPending) {
-            // Idle maintenance (was timer 6's job): requeue deferred dirty
-            // rects or a forced full readback while the overlay is visible.
-            const bool hookMode =
-                g_game_focused.load(std::memory_order_acquire);
-            const bool overlayVisible =
-                g_ui_open_snapshot.load(std::memory_order_acquire) ||
-                g_notifier_overlay_visible.load(std::memory_order_acquire);
-            const bool allowVisibleFrame = hookMode && overlayVisible;
-            if (!g_adapter_frame_device || !g_shared_tex) continue;
-            std::lock_guard<std::mutex> lock(g_adapter_publish_mutex);
-            const bool stillPending = std::any_of(
-                std::begin(g_adapter_readback_slots),
-                std::end(g_adapter_readback_slots),
-                [](const AdapterReadbackSlot& slot) {
-                    return slot.pending;
-                });
-            if (stillPending) continue;
-            if (allowVisibleFrame && g_adapter_force_full_readback) {
-                const std::vector<CefRect> fullFrame{
-                    CefRect(0, 0, g_view_w, g_view_h) };
-                QueueAdapterFrameReadback(g_shared_tex, fullFrame);
-            } else if (!g_adapter_deferred_dirty_rects.empty()) {
-                if (allowVisibleFrame) {
-                    QueueAdapterFrameReadback(g_shared_tex, {});
-                } else {
-                    g_adapter_deferred_dirty_rects.clear();
-                    g_adapter_force_full_readback = true;
-                }
-            }
-            continue;
-        }
-
-        g_publish_inflight.fetch_add(1, std::memory_order_acq_rel);
-        const bool hookMode =
-            g_game_focused.load(std::memory_order_acquire);
-        const bool overlayVisible =
-            g_ui_open_snapshot.load(std::memory_order_acquire) ||
-            g_notifier_overlay_visible.load(std::memory_order_acquire);
-        bool published = false;
-        if (!g_publish_worker_paused.load(std::memory_order_acquire))
-            published = PublishCompletedAdapterFrame();
-        g_publish_inflight.fetch_sub(1, std::memory_order_acq_rel);
-        if (published)
-            PublishAdapterFrameMetadataLocked(
-                !(hookMode && overlayVisible));
-    }
-    return 0;
-}
-
-static void StartPublishWorker() {
-    if (g_publish_worker_thread) return;
-    if (!g_publish_worker_stop_event)
-        g_publish_worker_stop_event =
-            CreateEventW(nullptr, TRUE, FALSE, nullptr);
-    if (!g_publish_worker_stop_event) return;
-    g_publish_worker_thread = CreateThread(nullptr, 0,
-        OscPublishWorkerProc, nullptr, 0, nullptr);
-    if (g_publish_worker_thread)
-        Log("[adapter-bridge] publish worker started (off CEF UI thread)");
-}
-
-static void StopPublishWorker() {
-    if (!g_publish_worker_thread) return;
-    g_publish_worker_paused.store(true, std::memory_order_release);
-    if (g_publish_worker_stop_event)
-        SetEvent(g_publish_worker_stop_event);
-    WaitForSingleObject(g_publish_worker_thread, 1000);
-    CloseHandle(g_publish_worker_thread);
-    g_publish_worker_thread = nullptr;
-}
+static ID3D11Device* OscHostGpuDevice() { return g_gpu_dev; }
+static ID3D11DeviceContext* OscHostGpuContext() { return g_gpu_ctx; }
+static ID3D11Texture2D* OscHostSharedTexture() { return g_shared_tex; }
+static HWND OscHostWindow() { return g_hwnd; }
+static UINT OscHostViewWidth() { return g_view_w > 0 ? static_cast<UINT>(g_view_w) : 0; }
+static UINT OscHostViewHeight() { return g_view_h > 0 ? static_cast<UINT>(g_view_h) : 0; }
+static bool OscHostGameFocused() { return g_game_focused.load(std::memory_order_acquire); }
+static bool OscHostOverlayVisible() { return OscFramePublisherOverlayVisible(); }
+static void OscHostD3D11PublisherLog(const std::string& message) { Log(message); }
 
 static OscPresentResult GpuComposite(uint64_t shared_handle, int w, int h,
     const std::vector<CefRect>& dirty_rects) {
@@ -2187,7 +1181,7 @@ static DWORD WINAPI OscDesktopPresentWorkerProc(LPVOID) {
 
             OscPresentResult result = OscPresentResult::Failed;
             {
-                std::lock_guard<std::mutex> gpuLock(g_adapter_publish_mutex);
+                std::lock_guard<std::mutex> gpuLock(osc::d3d11_frame_publisher::Mutex());
                 if (g_game_focused.load(std::memory_order_acquire))
                     break;
                 result = PresentCurrentBackBuffer(true);
@@ -2562,7 +1556,7 @@ static void ParseNotifierRects(const std::string& req) {
     } else if (!hasVisibleCards &&
         !g_ui_open_snapshot.load(std::memory_order_acquire) &&
         g_game_focused.load(std::memory_order_acquire)) {
-        PublishAdapterFrameMetadata(true);
+        osc::d3d11_frame_publisher::PublishMetadata(true);
     }
 }
 
@@ -2642,10 +1636,15 @@ static void CompositeFrame(const void* bgra, int w, int h, const std::vector<Cef
     if (g_gpu_ok) {
         {
             // CPU-paint upload shares the immediate context with other paint/timer paths.
-            std::lock_guard<std::mutex> lock(g_adapter_publish_mutex);
+            std::lock_guard<std::mutex> lock(osc::d3d11_frame_publisher::Mutex());
             GpuUploadComposite(bgra, w, h, dirty);
         }
-        if (g_gpu_frame.load()) { EnsureShownOnce(); return; }
+        if (g_gpu_frame.load()) {
+            if (g_render_state.load(std::memory_order_relaxed) != OscRmGpuShared)
+                SetRenderState(OscRmGpuUpload, "GPU upload composite healthy");
+            EnsureShownOnce(); return;
+        }
+        SetRenderState(OscRmCpuGdi, "GPU upload failed -> GDI composite this frame");
     }
     if (!g_hdc_mem || g_bmp_w != w || g_bmp_h != h) {
         if (g_hdc_mem) {
@@ -2934,6 +1933,19 @@ static void HandleOscQuery(const std::string& req, bool persistent,
         return;
     }
 
+    if (cmd == "QUERY_OSC_GET_RENDER_MODE") {
+        // สเปก 4.3: หน้า/UI ตรวจสอบโหมดเรนเดอร์จริงได้ทุกเมื่อ
+        const char* cfgName = g_cfg.render_mode == 1 ? "gpu" :
+            g_cfg.render_mode == 2 ? "cpu" : "auto";
+        std::string json = std::string("{\"mode\":\"") +
+            OscRenderStateName(g_render_state.load(std::memory_order_relaxed)) +
+            "\",\"config\":\"" + cfgName +
+            "\",\"gpuOk\":" + std::string(g_gpu_ok ? "true" : "false") +
+            ",\"sharedRequested\":" + std::string(g_gpu_shared ? "true" : "false") + "}";
+        reply(json);
+        return;
+    }
+
     if (cmd == "QUERY_OSC_SET_KEYBOARD_CAPTURE") {
         bool capture;
         if (req.find("\"capture\":true") != std::string::npos) {
@@ -3001,6 +2013,16 @@ static void HandleOscQuery(const std::string& req, bool persistent,
     if (cmd == "QUERY_WIN_OPEN_OSC") {
         // UI เปิดได้ = render ใช้ได้ → ให้บูตหน้าลอง GPU เต็มรูปแบบอีกครั้ง
         ClearFlag(L"sw-render.flag");
+        // [FIX-ROUTE-SYNC] The page also fires this from its boot path while
+        // sitting on #/base. Honoring it there re-opens the UI right after
+        // the page auto-closed itself — the other half of the base <->
+        // main-menu ping-pong. Only honor it when the page actually left
+        // the base route (a real open), or when we are already open (no-op
+        // anyway). A boot ask on #/base while closed is just an ack.
+        if (!g_ui_open && g_route_clickthrough.load(std::memory_order_acquire)) {
+            reply("{}");
+            return;
+        }
         // [P1#1 Copilot] ส่งแค่ intent — สถานะให้ UI thread เป็นผู้เขียน
         if (g_hwnd) PostMessageW(g_hwnd, WM_OSC_VIS, 1, 0);
         reply("{}");
@@ -3428,8 +2450,8 @@ public:
         const ULONGLONG now = GetTickCount64();
         bool forceFullReadback = false;
         if (hookMode && adapterOverlayVisible) {
-            std::lock_guard<std::mutex> lock(g_adapter_publish_mutex);
-            forceFullReadback = g_adapter_force_full_readback;
+            std::lock_guard<std::mutex> lock(osc::d3d11_frame_publisher::Mutex());
+            forceFullReadback = osc::d3d11_frame_publisher::ForceFullReadbackLocked();
         }
         // CEF 73 can deliver compositor-driven frames (impl-side CSS
         // opacity/transform animation) with EMPTY dirty rects. The shared
@@ -3444,7 +2466,28 @@ public:
             OscPerfFinishCallback(perfCallbackStartUs);
             return;
         }
+        // Desktop callbacks can arrive faster than the configured display budget
+        // (observed >120/s with maxFps=75). Keep the GPU-only path, but composite
+        // only the newest available CEF texture at the requested desktop rate.
+        // Hook Mode is intentionally excluded: its frame bridge has separate timing.
+        if (!hookMode) {
+            const auto targetFps = static_cast<unsigned long long>(
+                (std::max)(1, g_cfg.max_fps));
+            const auto minimumFrameIntervalUs = 1000000ULL / targetFps;
+            const auto callbackNowUs = OscPerfNowUs();
+            static unsigned long long lastDesktopCompositeUs = 0;
+            if (lastDesktopCompositeUs != 0 &&
+                callbackNowUs - lastDesktopCompositeUs < minimumFrameIntervalUs) {
+                g_osc_perf.rateLimitedPaints.fetch_add(1, std::memory_order_relaxed);
+                OscPerfFinishCallback(perfCallbackStartUs);
+                return;
+            }
+            lastDesktopCompositeUs = callbackNowUs;
+        }
         g_osc_perf.processedPaints.fetch_add(1, std::memory_order_relaxed);
+        // เฟรม GPU วิ่งปกติ → กลับเป็น GPU_SHARED (รายงานเฉพาะตอนเปลี่ยนจริง)
+        if (g_render_state.load(std::memory_order_relaxed) != OscRmGpuShared)
+            SetRenderState(OscRmGpuShared, "accelerated paint frame processed");
         // [FIX-B] always-on production counters (1 Hz) to prove the overlay
         // frame rate from real logs: empty = impl-anim frames rescued.
         {
@@ -3481,17 +2524,17 @@ public:
         // Keep shared-texture access and draw submission inside CEF's callback;
         // PresentToSwap queues only the already-copied back buffer for Desktop.
         {
-            std::lock_guard<std::mutex> lock(g_adapter_publish_mutex);
+            std::lock_guard<std::mutex> lock(osc::d3d11_frame_publisher::Mutex());
             const auto compositeStartUs = OscPerfNowUs();
             GpuComposite((uint64_t)(uintptr_t)shared_handle, g_view_w, g_view_h,
                 effectiveDirtyRects);
             OscPerfRecordComposite(OscPerfNowUs() - compositeStartUs);
             if (hookMode && adapterOverlayVisible) {
                 const auto publishStartUs = OscPerfNowUs();
-                PublishAdapterFrameLocked(g_shared_tex, effectiveDirtyRects);
+                osc::d3d11_frame_publisher::PublishFrameLocked(g_shared_tex, effectiveDirtyRects);
                 OscPerfRecordPublish(OscPerfNowUs() - publishStartUs);
             } else if (hookMode) {
-                g_adapter_force_full_readback = true;
+                osc::d3d11_frame_publisher::SetForceFullReadbackLocked(true);
             }
         }
         if (g_gpu_frame.load()) EnsureShownOnce();
@@ -3556,11 +2599,35 @@ static void CreateBrowserNow() {
     }
     char nsh[4] = { 0 };
     DWORD nshlen = GetEnvironmentVariableA("OSC_NOSHARED", nsh, 4);
-    wi.shared_texture_enabled = (g_gpu_ok && g_gpu_shared && !(nshlen > 0 && nsh[0] == '1')) ? 1 : 0;
+    const bool envNoShared = (nshlen > 0 && nsh[0] == '1');
+    // สเปก 2 โหมด (GPU เป็นหลัก): renderMode ใน nvidia-osc.json = auto|gpu|cpu
+    //  cpu → ปิด shared texture ขึ้น CPU path ทั้งที่ GPU พร้อม (ทดสอบ/เครื่องปัญหา)
+    //  gpu → ยึด GPU แม้ gpu-off.flag เก่าจากรอบก่อน (watchdog ไม่รีสตาร์ทวนลูป)
+    if (g_cfg.render_mode == 2) g_gpu_shared = false;
+    else if (g_cfg.render_mode == 1 && !g_gpu_shared) {
+        g_gpu_shared = true;
+        Log("[mode] renderMode=gpu overrides gpu-off.flag (old fallback)");
+    }
+    wi.shared_texture_enabled = (g_gpu_ok && g_gpu_shared && !envNoShared) ? 1 : 0;
     Log("[cfg] shared_texture_enabled=" + std::to_string(wi.shared_texture_enabled) +
         " gpu_ok=" + std::to_string(g_gpu_ok) +
         " gpu_shared=" + std::to_string(g_gpu_shared) +
         " OSC_NOSHARED=" + std::string(nshlen > 0 ? nsh : "<unset>"));
+    // รายงานโหมดตอนบูต (4.3) — state นี้คือโหมดที่ใช้จริง
+    if (!g_gpu_ok) {
+        SetRenderState(OscRmCpuGdi, "gpu device unavailable at boot");
+    } else if (!wi.shared_texture_enabled) {
+        SetRenderState(OscRmGpuUpload,
+            g_cfg.render_mode == 2 ? "renderMode=cpu" :
+            envNoShared ? "OSC_NOSHARED=1" : "gpu-off.flag present");
+    } else {
+        SetRenderState(OscRmGpuShared, "default (GPU primary)");
+    }
+    LogRenderMode("BOOT",
+        std::string("cfg=") +
+        (g_cfg.render_mode == 1 ? "gpu" : g_cfg.render_mode == 2 ? "cpu" : "auto") +
+        " gpu_ok=" + std::to_string(g_gpu_ok ? 1 : 0) +
+        " sharedTexture=" + std::to_string(wi.shared_texture_enabled));
     CefBrowserSettings bs;
     bs.background_color = CefColorSetARGB(0, 0, 0, 0);
     bs.windowless_frame_rate = g_cfg.max_fps;
@@ -3688,7 +2755,7 @@ static bool GetHookGameClientBounds(RECT& bounds) {
     if (!g_game_focused.load(std::memory_order_acquire))
         return false;
 
-    const auto* info = GetConsumerAdapterInfo();
+    const auto* info = osc::d3d11_frame_publisher::GetConsumerAdapterInfo();
     if (!info || info->magic != osc_frame_bridge::ConsumerAdapterMagic ||
         info->version != osc_frame_bridge::ConsumerAdapterVersion ||
         info->ownerProcessId <= 0)
@@ -4064,12 +3131,12 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM w, LPARAM l) {
                 g_notifier_overlay_visible.load(std::memory_order_acquire);
             bool retainedFrameQueued = false;
             {
-                std::lock_guard<std::mutex> lock(g_adapter_publish_mutex);
-                g_adapter_force_full_readback = true;
+                std::lock_guard<std::mutex> lock(osc::d3d11_frame_publisher::Mutex());
+                osc::d3d11_frame_publisher::SetForceFullReadbackLocked(true);
                 if (overlayVisible && g_shared_tex) {
                     const std::vector<CefRect> fullFrame{
                         CefRect(0, 0, g_view_w, g_view_h) };
-                    PublishAdapterFrameLocked(g_shared_tex, fullFrame);
+                    osc::d3d11_frame_publisher::PublishFrameLocked(g_shared_tex, fullFrame);
                     retainedFrameQueued = true;
                 }
             }
@@ -4085,8 +3152,8 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         } else {
             // Desktop OSC must never leave an old in-game frame visible.
             // Publish an explicit hidden frame so every consumer drops its cache.
-            std::lock_guard<std::mutex> lock(g_adapter_publish_mutex);
-            PublishAdapterFrameMetadataLocked(true);
+            std::lock_guard<std::mutex> lock(osc::d3d11_frame_publisher::Mutex());
+            osc::d3d11_frame_publisher::PublishMetadataLocked(true);
         }
         StartAdapterFrameBurst("OSC focus mode changed", true);
         if (g_browser) {
@@ -4157,6 +3224,23 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM w, LPARAM l) {
             Log(std::string("[route] input mode -> ") +
                 (clickthrough ? "click-through (#/base)" : "interactive"));
         }
+        // [FIX-ROUTE-SYNC] The page owns its visibility: the genuine UI
+        // auto-closes on inactivity (Hook Mode) by navigating back to
+        // #/base, and boots by resolving to a real route when it opens.
+        // If g_ui_open disagrees with the route, every page boot sees the
+        // stale "open" state and re-opens — base <-> main-menu ping-pong
+        // with input styles flapping (clicks fall through mid-interaction).
+        // Follow the page: #/base closes, a real route opens.
+        if (clickthrough && g_ui_open) {
+            Log("[route] page navigated to #/base while open -> following close");
+            PostMessageW(g_hwnd, WM_OSC_VIS, 0, 0);
+            return 0;
+        }
+        if (!clickthrough && !g_ui_open) {
+            Log("[route] page navigated off #/base while closed -> following open");
+            PostMessageW(g_hwnd, WM_OSC_VIS, 1, 0);
+            return 0;
+        }
         ApplyOpenShareInputMode();
         const bool inputClickthrough = IsOverlayInputClickThrough();
         if (g_ui_open && !inputClickthrough &&
@@ -4202,7 +3286,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         if (!ns)
             g_overlay_keyboard_capture.store(false, std::memory_order_release);
         if (!ns && g_game_focused.load(std::memory_order_acquire))
-            PublishAdapterFrameMetadata();
+            osc::d3d11_frame_publisher::PublishMetadata();
 
         // When the game is already fullscreen and foreground, do not let an
         // opening OSC request steal focus during the stable-gate transition.
@@ -4358,20 +3442,17 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM w, LPARAM l) {
                         //   [fps] collapsed to 0-28 - the stutter. One full
                         //   refresh per second is enough for transition
                         //   recovery; steady-state uses the dirty-rect path.
-                        std::lock_guard<std::mutex> lock(g_adapter_publish_mutex);
+                        std::lock_guard<std::mutex> lock(osc::d3d11_frame_publisher::Mutex());
                         static ULONGLONG lastBurstFull = 0;
-                        const bool readbackPending = std::any_of(
-                            std::begin(g_adapter_readback_slots),
-                            std::end(g_adapter_readback_slots),
-                            [](const AdapterReadbackSlot& slot) { return slot.pending; });
+                        const bool readbackPending = osc::d3d11_frame_publisher::HasPendingReadbackLocked();
                         if (!readbackPending &&
                             now - lastBurstFull >= 1000 &&
-                            g_adapter_frame_device && g_gpu_dev && g_gpu_ctx &&
+                            osc::d3d11_frame_publisher::HasCrossAdapterDeviceLocked() && g_gpu_dev && g_gpu_ctx &&
                             g_shared_tex && g_view_w > 0 && g_view_h > 0) {
                             lastBurstFull = now;
                             const std::vector<CefRect> fullFrame{
                                 CefRect(0, 0, g_view_w, g_view_h) };
-                            queuedFullReadback = QueueAdapterFrameReadback(
+                            queuedFullReadback = osc::d3d11_frame_publisher::QueueFrameReadbackLocked(
                                 g_shared_tex, fullFrame);
                         }
                     }
@@ -4469,12 +3550,23 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM w, LPARAM l) {
             //      ตามธรรมชาติ เดิมเงื่อนไขหลุด → ฆ่าตัวเองทุก 10 วิแม้ ULW วาดปกติ
             if (g_gpu_ok && g_gpu_shared && !g_gpu_frame.load() && g_page_loaded_ms &&
                 GetTickCount64() - g_page_loaded_ms > 10000) {
-                Log("[gpu] shared texture ไม่ส่งเฟรม 10 วิ → สลับโหมด upload (รีสตาร์ท)");
-                HANDLE f = CreateFileW((StorePath().substr(0, StorePath().find_last_of(L'\\')) +
-                    L"\\gpu-off.flag").c_str(), GENERIC_WRITE, 0, nullptr,
-                    CREATE_ALWAYS, 0, nullptr);
-                if (f != INVALID_HANDLE_VALUE) CloseHandle(f);
-                ExitProcess(0);   // แม่เลี้ยงใหม่ → boot ถัดไปอ่าน flag
+                if (g_cfg.render_mode == 1) {
+                    // renderMode=gpu: ห้ามรีสตาร์ทวนลูป (config ทับ flag ทุก boot) — รายงานค้างไว้ (4.3)
+                    static ULONGLONG last_stay_ms = 0;
+                    const ULONGLONG now_ms = GetTickCount64();
+                    if (now_ms - last_stay_ms > 60000) {
+                        last_stay_ms = now_ms;
+                        Log("[mode] STAY GPU_SHARED reason=no-shared-frame-10s (renderMode=gpu, no auto downgrade)");
+                    }
+                } else {
+                    Log("[gpu] shared texture ไม่ส่งเฟรม 10 วิ → สลับโหมด upload (รีสตาร์ท)");
+                    LogRenderMode("SWITCH-RESTART", "reason=no-shared-frame-10s; next boot = GPU_UPLOAD");
+                    HANDLE f = CreateFileW((StorePath().substr(0, StorePath().find_last_of(L'\\')) +
+                        L"\\gpu-off.flag").c_str(), GENERIC_WRITE, 0, nullptr,
+                        CREATE_ALWAYS, 0, nullptr);
+                    if (f != INVALID_HANDLE_VALUE) CloseHandle(f);
+                    ExitProcess(0);   // แม่เลี้ยงใหม่ → boot ถัดไปอ่าน flag
+                }
             }
         }
         return 0;
@@ -4489,7 +3581,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         Log("[window] WM_CLOSE ignored (never close — spec 2026-10-07)");
         return 0;
     case WM_DESTROY:
-        StopPublishWorker();
+        osc::d3d11_frame_publisher::Stop();
         PostQuitMessage(0);
         return 0;
     }
@@ -4844,6 +3936,16 @@ public:
             if (!(GetEnvironmentVariableA("OSC_NOGPU_SW", gsw, 4) > 0 && gsw[0] == '1')) {
                 cmd->AppendSwitch("enable-gpu");   // OSR shared texture ต้องการ GPU compositing จริง
                 cmd->AppendSwitchWithValue("use-angle", "d3d11");
+
+                // CEF can GPU-composite a shared texture while still CPU-rasterizing
+                // page tiles. Force Chromium 73's Skia GPU raster path when GPU is
+                // enabled; set OSC_NO_GPU_RASTER=1 to roll back if a driver/page regresses.
+                char noGpuRaster[4] = { 0 };
+                DWORD noGpuRasterLen = GetEnvironmentVariableA(
+                    "OSC_NO_GPU_RASTER", noGpuRaster, sizeof(noGpuRaster));
+                if (!(noGpuRasterLen > 0 && noGpuRaster[0] == '1')) {
+                    cmd->AppendSwitch("force-gpu-rasterization");
+                }
             }
         }
         // ตัด endpoint ภายนอกให้ fail ทันที (ไม่งั้น main-frame load ค้าง)
@@ -4974,6 +4076,12 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int) {
 
     LoadConfig();
     LogInit();
+    osc::d3d9_frame_publisher::SetVisibilityProvider(&OscFramePublisherOverlayVisible);
+    osc::d3d11_frame_publisher::Initialize(osc::d3d11_frame_publisher::HostBindings{
+        &OscHostGpuDevice, &OscHostGpuContext, &OscHostSharedTexture, &OscHostWindow,
+        &OscHostViewWidth, &OscHostViewHeight, &OscHostGameFocused,
+        &OscHostOverlayVisible, &OscHostD3D11PublisherLog
+    });
     AddVectoredExceptionHandler(1, CrashVecHandler);
 
     // flag จากรอบก่อน: shared texture ไม่เวิร์กบนเครื่องนี้ → ใช้ GPU-assisted upload

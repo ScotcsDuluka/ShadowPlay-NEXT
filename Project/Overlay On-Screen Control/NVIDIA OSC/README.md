@@ -18,7 +18,11 @@ Native Host โหลดหน้า UI นั้นผ่าน CEF และ�
 
 | ไฟล์ | หน้าที่ |
 |---|---|
-| `src/osc_main.cpp` | **Source หลักที่โปรเจกต์นี้คอมไพล์**: CEF Host, Desktop/Hook state, GPU compositor/Present, frame bridge, input, query handler, window procedure |
+| `src/osc_main.cpp` | CEF Host, Desktop/Hook state, GPU compositor/Present, input, query handler, worker/window procedure และจุดประสาน frame publisher |
+| `src/OscFramePublisher/OscD3D9FramePublisher/` | D3D9 consumer backend: shared-memory BGRA pixel bridge, version/owner checks, seqlock และ frame visibility |
+| `src/OscFramePublisher/OscD3D11FramePublisher/` | D3D11 publisher backend: shared NT texture, adapter/device selection, keyed mutex, cross-adapter staging/readback worker และ metadata bridge |
+| `src/OscFramePublisher/OscD3D10FramePublisher/` | โฟลเดอร์เตรียมไว้; bridge ปัจจุบันยังไม่มี ConsumerRenderApiD3D10 |
+| `src/OscFramePublisher/Common/` | ยูทิลิตีส่วนกลาง: Dirty-Rect clipping/coalescing และ readback fingerprint diagnostics |
 | `NVIDIA OSC.vcxproj` | กฎ Build ของ MSBuild/Visual Studio; ระบุ Source ที่คอมไพล์และชื่อ EXE |
 | `app.rc` | Windows resource และ version metadata |
 | `NVIDIA ShadowPlay.ico` | ไอคอนที่ `app.rc` อ้างถึง |
@@ -35,7 +39,18 @@ NVIDIA OSC/
 ├── app.rc                            Windows resource
 ├── NVIDIA ShadowPlay.ico             ไอคอน
 ├── src/
-│   └── osc_main.cpp                  Source ที่ใช้ Build จริง
+│   ├── osc_main.cpp
+│   └── OscFramePublisher/
+│       ├── OscD3D9FramePublisher/
+│       │   ├── OscD3D9FramePublisher.cpp
+│       │   └── OscD3D9FramePublisher.h
+│       ├── OscD3D10FramePublisher/   เตรียมโฟลเดอร์ไว้; ยังไม่มี backend
+│       ├── OscD3D11FramePublisher/
+│       │   ├── OscD3D11FramePublisher.cpp
+│       │   └── OscD3D11FramePublisher.h
+│       └── Common/
+│           ├── OscFrameUtilities.cpp
+│           └── OscFrameUtilities.h
 ├── tools/
 │   ├── cef-inspection/               สคริปต์ตรวจ CEF/query (ไม่ใช่ตัวโปรแกรม)
 │   └── child-process-diagnostics/    เครื่องมือวินิจฉัย child process แยกต่างหาก
@@ -59,7 +74,9 @@ NVIDIA OSC/
 | เรื่อง | จุดเริ่มอ่านใน `src/osc_main.cpp` |
 |---|---|
 | ค้นตำแหน่ง Config, หน้า UI และ Cache | `InitBuildPaths` |
-| สร้าง/ส่งเฟรมผ่าน bridge ไป Adapter | `PublishAdapterFrameLocked`, `PublishCompletedAdapterFrame`, `PublishD3D9FramePixels` |
+| ประสานการส่งเฟรมไป Adapter (D3D11 shared texture/readback path) | `PublishFrameLocked`, `PublishCompletedAdapterFrame`, `QueueFrameReadbackLocked` ใน `src/OscFramePublisher/OscD3D11FramePublisher/OscD3D11FramePublisher.cpp` |
+| ส่ง CPU BGRA เข้า D3D9 consumer bridge | `PublishD3D9FramePixels`, `SetD3D9FrameVisibility` ใน `src/OscFramePublisher/OscD3D9FramePublisher/OscD3D9FramePublisher.cpp` |
+| Dirty rect clipping และ pixel fingerprint | `MakeAdapterDirtyBoxes`, `ComputeAdapterFrameFingerprint`, `LogAdapterFramePixelProof` ใน `src/OscFramePublisher/Common/OscFrameUtilities.cpp` |
 | วาด texture และเรียก Present | `PresentToSwap`, `PresentCurrentBackBuffer`, `DrawSharedTexture` |
 | ประกอบเฟรม GPU และจัดการภาพ CEF | `GpuComposite`, `OnAcceleratedPaint`, `GpuUploadComposite` |
 | Worker ของ Desktop Present | `OscStartDesktopPresentWorker`, `OscQueueDesktopPresentFrame` |
@@ -67,7 +84,7 @@ NVIDIA OSC/
 | ป้อนเมาส์/คีย์บอร์ดและ Window messages | `ForwardKey`, `WndProc` |
 | เปิด CEF และเริ่มโปรแกรม | `OnContextInitialized`, `wWinMain` |
 
-ปัจจุบัน Source หลักยังเป็นไฟล์ C++ ขนาดใหญ่ไฟล์เดียว การแยก logic เป็นหลาย `.cpp/.h` ต้องทำเป็นงาน refactor แยกต่างหาก เพราะตัวแปร global และลำดับการเรียกกันเชื่อมโยงหลายส่วนอยู่ การย้ายในรอบนี้จัดระเบียบตำแหน่งไฟล์และทำให้ Build อ้างถึง Source ตัวจริงอย่างชัดเจน โดยยังไม่แยก logic เสี่ยง ๆ ข้าม translation unit
+D3D9 shared-memory pixel bridge, D3D11 shared-texture/readback backend และ Dirty-Rect/Fingerprint utilities ถูกแยกเป็น translation units แล้ว D3D11 เชื่อม Host ผ่าน `HostBindings` และ public API ที่กำหนดชัดเจน โดยคง protocol ของ shared texture/metadata และ D3D9 CPU bridge เดิมไว้ ส่วน D3D10 เป็นโฟลเดอร์เตรียมไว้ เพราะ consumer bridge ปัจจุบันยังไม่ประกาศหรือ implement D3D10
 
 ## Build แยกกันอย่างไร
 

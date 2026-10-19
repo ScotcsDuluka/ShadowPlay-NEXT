@@ -29,7 +29,8 @@
 ## แยกอาการก่อนแก้
 
 - **หน้า UI/Mods:** เริ่มจาก `NVIDIA NodeAPI/osc/` และ backend `NVIDIA Web Helper/`.
-- **Desktop overlay / CEF rendering:** เริ่มจาก `NVIDIA OSC/src/osc_main.cpp`.
+- **Desktop overlay / CEF rendering:** `NVIDIA OSC/src/osc_main.cpp` (CEF + Desktop compositor/Present).
+- **OSC → Hook frame bridge:** API-oriented layout อยู่ใน `NVIDIA OSC/src/OscFramePublisher/`; D3D9 CPU bridge อยู่ใน `OscD3D9FramePublisher/`, D3D11 shared-texture/readback/worker/metadata อยู่ใน `OscD3D11FramePublisher/`, และ utilities อยู่ใน `Common/`. `OscD3D10FramePublisher/` เป็นโฟลเดอร์เตรียมไว้เท่านั้น เพราะ bridge ปัจจุบันประกาศ consumer API แค่ D3D9/D3D11.
 - **เกม Hook / DXGI / D3D9-D3D11:** เริ่มจาก `NVIDIA Adapter/OSC Adapter/Duluka Hook/`.
 - **การประกอบ runtime หรือ path ที่ deploy:** ตรวจ `Scripts/build-dev.ps1`, Config และ output ใต้ `Build/NVIDIA ShadowPlay/`.
 
