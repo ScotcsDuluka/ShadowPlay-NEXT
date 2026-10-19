@@ -37,6 +37,8 @@
 #include <vector>
 #include <functional>
 #include <mutex>
+#include <thread>
+#include <condition_variable>
 // ★ GPU compositor ทั้งสายแบบของแท้ (offscreen_renderer_d3d11.cpp):
 //   CEF shared texture (D3D11) → shader premultiply → swapchain alpha → DComp
 //   ไม่มีพิกเซลแตะ CPU เลย (เดิม: premultiply 7MB/เฟรมใน C++ = กระตุก + กิน CPU)
@@ -1602,12 +1604,20 @@ static void ApplyGenuineZoom(bool force_log = false) {
     double fh = (double)h / 1080.0;
     if (fh < fit) fit = fh;
     g_render_dsf = 1.0;
-    double level = log(fit) / log(1.2);
+    // ★ 2026-10-19 Desktop Mode = เรนเดอร์เหมือน Chrome เป๊ะ: zoom 100% (level 0)
+    //   + css 1:1 กับพิกเซลจอ — เดิมคูณ fit (0.875) ทั้งหน้า → ตัวหนังสือ/การ์ด
+    //   notifier raster ที่สเกลเศษส่วน = เบลอ + เล็กกว่า Chrome 12.5% (Zoom ผิดวิธี)
+    //   Hook Mode = คง zoom แท้ของ Share.exe (fit) ให้ OSD ในเกมขนาดเท่าเดิม
+    const bool hookMode = g_game_focused.load(std::memory_order_acquire);
+    const double level = hookMode ? (log(fit) / log(1.2)) : 0.0;
+    g_css_scale = hookMode ? fit : 1.0;   // แมพ rect หน้าเว็บ (css px) → พิกเซลจอ
     g_browser->GetHost()->SetZoomLevel(level);
     if (force_log || level != last) {
         last = level;
-        Log("[zoom] zoom path: fit=" + std::to_string(fit) +
-            " level=" + std::to_string(level));
+        Log(std::string("[zoom] ") + (hookMode ? "hook" : "desktop") +
+            " mode: fit=" + std::to_string(fit) +
+            " level=" + std::to_string(level) +
+            " cssScale=" + std::to_string(g_css_scale));
     }
 }
 
@@ -1757,7 +1767,7 @@ static std::string ExtractStringTable(const std::string& req) {
 
 // ---- shared storage จริง: key=path join '/' value=JSON ดิบ (ไฟล์ .kv คู่กันแก้ไข) ----
 static std::map<std::string, std::string> g_store;
-static bool g_store_dirty = false;
+static std::atomic<bool> g_store_dirty{ false };
 
 // ★ auto-fallback: เกม exclusive fullscreen → GPU process ของ CEF CHECK ตาย
 //   boot-pending.flag ค้าง = บูตก่อนพังตอนสร้าง browser → บูตนี้ใช้ --disable-gpu
@@ -1785,8 +1795,10 @@ static std::wstring StorePath() {
     std::wstring dir(exe); dir.resize(dir.find_last_of(L'\\'));
     return dir + L"\\appdata\\sharedstorage.kv";
 }
+static bool g_store_loaded = false;
 static void StoreLoad() {
-    if (!g_store.empty()) return;
+    if (g_store_loaded) return;
+    g_store_loaded = true;
     HANDLE f = CreateFileW(StorePath().c_str(), GENERIC_READ, FILE_SHARE_READ,
         nullptr, OPEN_ALWAYS, 0, nullptr);
     if (f != INVALID_HANDLE_VALUE) {
@@ -1806,18 +1818,59 @@ static void StoreLoad() {
         }
     }
 }
-static void StoreSave() {
+static void StoreWriteFileRaw(const std::string& out) {
     std::wstring dir = StorePath(); dir.resize(dir.find_last_of(L'\\'));
     CreateDirectoryW(dir.c_str(), nullptr);   // idempotent
     HANDLE f = CreateFileW(StorePath().c_str(), GENERIC_WRITE, FILE_SHARE_READ,
         nullptr, CREATE_ALWAYS, 0, nullptr);
     if (f != INVALID_HANDLE_VALUE) {
-        std::string out;
-        for (auto& kv : g_store) out += kv.first + "\t" + kv.second + "\n";
         DWORD w = 0; WriteFile(f, out.data(), (DWORD)out.size(), &w, nullptr);
         CloseHandle(f);
     }
-    g_store_dirty = false;
+}
+// ★ 2026-10-19 แก้ Desktop Mode หน่วง: เดิม StoreSave() เขียนไฟล์ซิงก์บนเธรด UI
+//   ของ CEF ทุกครั้งที่หน้าเว็บเซฟ state (log พิสูจน์ ~1-2 ครั้ง/วินาที) — ดิสก์/
+//   Defender สะดุดช่วงหนึ่ง = เธรด UI ค้าง >100ms = begin-frame หลุดจังหวะ
+//   (rhythm >100:3) = ภาพกระตุกเป็นจังหวะ · snapshot บน UI (เร็ว) + เขียนจริง
+//   ในเธรดหลังบ้าน
+static std::mutex g_store_snap_mutex;
+static std::string g_store_snap;
+static std::condition_variable g_store_cv;
+static std::mutex g_store_cv_mutex;
+static std::thread g_store_worker;
+static void StoreWorkerLoop() {
+    for (;;) {
+        std::unique_lock<std::mutex> lk(g_store_cv_mutex);
+        g_store_cv.wait(lk, [] {
+            return g_store_dirty.load(std::memory_order_acquire); });
+        std::string out;
+        {
+            std::lock_guard<std::mutex> s(g_store_snap_mutex);
+            out = g_store_snap;
+        }
+        g_store_dirty.store(false, std::memory_order_release);
+        lk.unlock();
+        StoreWriteFileRaw(out);
+        lk.lock();
+    }
+}
+static void StoreSaveAsync() {
+    {
+        std::lock_guard<std::mutex> s(g_store_snap_mutex);
+        g_store_snap.clear();
+        for (auto& kv : g_store) g_store_snap += kv.first + "\t" + kv.second + "\n";
+    }
+    {
+        std::lock_guard<std::mutex> lk(g_store_cv_mutex);
+        g_store_dirty.store(true, std::memory_order_release);
+    }
+    if (!g_store_worker.joinable()) {
+        static int once = 0;
+        if (once++ == 0)
+            Log("[store] async save worker started (UI thread freed from file I/O)");
+        g_store_worker = std::thread(StoreWorkerLoop);
+    }
+    g_store_cv.notify_one();
 }
 
 // ดึง array ของ string หลัง "path":[ ... ] → join '/'
@@ -1917,7 +1970,7 @@ static void HandleOscQuery(const std::string& req, bool persistent,
     if (cmd == "QUERY_WRITE_SHARED_STORAGE") {
         StoreLoad();
         g_store[ExtractPathKey(req)] = ExtractDataValue(req);
-        StoreSave();
+        StoreSaveAsync();
         reply("{}");
         return;
     }
@@ -3125,6 +3178,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         g_game_focused.store(hookMode, std::memory_order_release);
         g_overlay_keyboard_capture.store(false, std::memory_order_release);
         ApplyOpenShareInputMode();
+        ApplyGenuineZoom();   // โหมดเปลี่ยน (desktop↔hook) → สูตร zoom เปลี่ยนตาม
         if (hookMode) {
             const bool overlayVisible =
                 g_ui_open_snapshot.load(std::memory_order_acquire) ||
@@ -4036,12 +4090,13 @@ public:
         {
             double fit = (double)w / 1920.0, fh = (double)h / 1080.0;
             if (fh < fit) fit = fh;
-            g_css_scale = fit;
+            g_css_scale = g_game_focused.load(std::memory_order_acquire) ? fit : 1.0;
         }
 
         // ★ บทเรียน 06:25 — ห้าม CreateBrowserSync ใน OnContextInitialized
         //   (CEF เองเตือน: "Always execute asynchronously ... during app initialization")
         //   init ของ global browser context แข่งกัน → NOTREACHED ud2 ~25-50%
+        StoreLoad();   // โหลดครั้งเดียวตอนบูต — READ หลังจากนี้เป็น memory-only
         CefPostDelayedTask(TID_UI, new CreateBrowserTask(), 400);
     }
     IMPLEMENT_REFCOUNTING(OscApp);
