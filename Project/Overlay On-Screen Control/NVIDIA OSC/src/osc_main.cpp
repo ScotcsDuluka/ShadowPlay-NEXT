@@ -849,7 +849,11 @@ static bool GpuCompositorInit(HWND hwnd, int w, int h) {
     {
         DXGI_SWAP_CHAIN_DESC1 sc{}; sc.Width = w; sc.Height = h;
         sc.Format = DXGI_FORMAT_B8G8R8A8_UNORM; sc.SampleDesc.Count = 1;
-        sc.BufferCount = 2; sc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
+        // ★ 3 buffers (เดิม 2): วัดผลจริง 2026-10-20 — เมื่อ DWM ยังถือ buffer เก่าอยู่
+        //   (เครื่องยุ่ง/เกมโหลด) GetBuffer+CopyResource ใน CEF callback บล็อก 40-136ms
+        //   (log: comp_max≈pres_max≈cb_max) = สะดุดเห็นได้ชัด buffer ที่ 3 ให้ DXGI มี
+        //   ตัวสำรองพองานยังไม่เสร็จ โดยไม่เพิ่มเวลาแฝงจริง (DWM sync จังหวะสร้างเอง)
+        sc.BufferCount = 3; sc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
         sc.AlphaMode = DXGI_ALPHA_MODE_PREMULTIPLIED;
         if (FAILED(hr = fac->CreateSwapChainForComposition(g_gpu_dev, &sc, nullptr, &swap)))
             { Log("[gpu] step swapchain hr=" + std::to_string((long)hr)); goto fail; }
@@ -1175,6 +1179,7 @@ static DWORD WINAPI OscDesktopPresentWorkerProc(LPVOID) {
         if (g_game_focused.load(std::memory_order_acquire)) continue;
 
         const ULONGLONG retryStartedMs = GetTickCount64();
+        int consecutiveBusy = 0;   // ★ backoff: ยิ่ง Busy ซ้ำ ยิ่งยืดช่วงรอ (ลดการชิง mutex)
         for (;;) {
             if (WaitForSingleObject(g_desktop_present_stop_event, 0) == WAIT_OBJECT_0)
                 return 0;
@@ -1190,6 +1195,7 @@ static DWORD WINAPI OscDesktopPresentWorkerProc(LPVOID) {
             }
 
             if (result == OscPresentResult::Presented) {
+                consecutiveBusy = 0;
                 if (g_hwnd) PostMessageW(g_hwnd, WM_OSC_GPU_FRAME_READY, 0, 0);
                 break;
             }
@@ -1204,9 +1210,21 @@ static DWORD WINAPI OscDesktopPresentWorkerProc(LPVOID) {
 
             // New CEF frames signal the same auto-reset event after updating the
             // back buffer. Retry promptly on a new frame, otherwise poll gently.
-            const DWORD retryWait = WaitForMultipleObjects(2, waits, FALSE, 2);
+            // ★ 2026-10-20: วัดผลจริง — GPU ติดช่วงสั้น retry 2ms โอเค แต่ GPU ติดนาน
+            //   (WAS_STILL_DRAWING ยาว) วน 500 ครั้ง/วินาที = 5,443 retries ใน log ที่
+            //   แต่ละครั้งแย่ง publisher mutex กับ CEF callback (ที่ต้องใช้ composite)
+            //   → หน่วงไล่ระดับ 2→5→8ms (event สัญญาณเฟรมใหม่ปลุกได้ทันทีเสมอ)
+            const DWORD busyWaitMs =
+                consecutiveBusy < 3 ? 2 : (consecutiveBusy < 6 ? 5 : 8);
+            if (result == OscPresentResult::Busy &&
+                consecutiveBusy < 100) ++consecutiveBusy;
+            const DWORD retryWait = WaitForMultipleObjects(2, waits, FALSE, busyWaitMs);
             if (retryWait == WAIT_OBJECT_0 || retryWait == WAIT_FAILED)
                 return 0;
+            if (retryWait == WAIT_OBJECT_0 + 1) {
+                // เฟรมใหม่มาถึงระหว่างรอ — รีเซ็ต backoff เพื่อไล่ตามจังหวะ CEF
+                consecutiveBusy = 0;
+            }
             // WAIT_TIMEOUT and a new-frame signal both retry the current back buffer.
         }
     }
