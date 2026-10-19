@@ -1596,29 +1596,60 @@ static void UpdateDisplayGeometry(int rasterWidth, int rasterHeight) {
 // ★ สรุปการทดลอง (2026-10-07 ลึก): zoom path = เส้นทางเดียวกับแท้ — ring 3px แบบแท้
 //   (DSF path ทดลองแล้ว: outline คำนวณ 2.28571 → วาด 2px = บางกว่าแท้ จึงยกเลิก)
 //   ส่วน "เหลื่อม 1px ตอน hover" แก้ที่ CSS โดยฉีด outline แทน border-swap (ดู injection)
-static void ApplyGenuineZoom(bool force_log = false) {
+static void ApplyGenuineZoomOnUi(bool force_log) {
+    CEF_REQUIRE_UI_THREAD();
     if (!g_browser) return;
     static double last = 999.0;
     int w = GetSystemMetrics(SM_CXSCREEN), h = GetSystemMetrics(SM_CYSCREEN);
+    if (w <= 0 || h <= 0) return;
+    const double previousDsf = g_render_dsf;
+    const int previousWidth = g_view_w, previousHeight = g_view_h;
     double fit = (double)w / 1920.0;
     double fh = (double)h / 1080.0;
     if (fh < fit) fit = fh;
-    g_render_dsf = 1.0;
-    // ★ 2026-10-19 Desktop Mode = เรนเดอร์เหมือน Chrome เป๊ะ: zoom 100% (level 0)
-    //   + css 1:1 กับพิกเซลจอ — เดิมคูณ fit (0.875) ทั้งหน้า → ตัวหนังสือ/การ์ด
-    //   notifier raster ที่สเกลเศษส่วน = เบลอ + เล็กกว่า Chrome 12.5% (Zoom ผิดวิธี)
-    //   Hook Mode = คง zoom แท้ของ Share.exe (fit) ให้ OSD ในเกมขนาดเท่าเดิม
+    // ★ 2026-10-20 OWNER สั่ง: กลับมา "จำลอง Share.exe แท้ของ NVIDIA" ทุกโหมด
+    //   สูตรเดียวกับของแท้ (วัดสดผ่าน CDP 2026-10-07: log แท้
+    //   [offscreen_window.cpp(1081)] setting zoom to: -0.732395):
+    //   view = ขนาดจอ (css = device px) · dsf = 1.0 · SetZoomLevel(fit) เป็นตัวย่อเดียว
+    //   ตัดระบบ dsf/desktop-branch ทั้งหมด — path เดียว ไม่มีทางแยก เหมือนแท้เป๊ะ
+    //   (โน้ต: ตัวหนังสือ raster ที่ 87.5% = เหมือนของแท้ทุกประการ — ของแท้ก็นุ่มเท่ากัน)
     const bool hookMode = g_game_focused.load(std::memory_order_acquire);
-    const double level = hookMode ? (log(fit) / log(1.2)) : 0.0;
-    g_css_scale = hookMode ? fit : 1.0;   // แมพ rect หน้าเว็บ (css px) → พิกเซลจอ
-    g_browser->GetHost()->SetZoomLevel(level);
+    g_render_dsf = 1.0;
+    g_view_w = w;
+    g_view_h = h;
+    const double level = log(fit) / log(1.2);
+    g_css_scale = fit;               // แมพ rect หน้าเว็บ (css px) → พิกเซลจอ
+    auto host = g_browser->GetHost();
+    if (std::abs(host->GetZoomLevel() - level) > 0.000001)
+        host->SetZoomLevel(level);
+    if (!g_cfg.windowed && (previousDsf != g_render_dsf ||
+        previousWidth != g_view_w || previousHeight != g_view_h))
+        host->WasResized();
     if (force_log || level != last) {
         last = level;
         Log(std::string("[zoom] ") + (hookMode ? "hook" : "desktop") +
             " mode: fit=" + std::to_string(fit) +
             " level=" + std::to_string(level) +
+            " dsf=" + std::to_string(g_render_dsf) +
+            " view=" + std::to_string(g_view_w) + "x" + std::to_string(g_view_h) +
             " cssScale=" + std::to_string(g_css_scale));
     }
+}
+
+class ApplyGenuineZoomTask : public CefTask {
+    bool force_log_;
+public:
+    explicit ApplyGenuineZoomTask(bool force_log) : force_log_(force_log) {}
+    void Execute() override { ApplyGenuineZoomOnUi(force_log_); }
+    IMPLEMENT_REFCOUNTING(ApplyGenuineZoomTask);
+};
+
+static void ApplyGenuineZoom(bool force_log = false) {
+    // OnLoadingStateChange is inside Chromium navigation dispatch. Unwind it
+    // before touching zoom/screen geometry; focus/watchdog callers also enter
+    // here from the native window thread with CEF's multi-threaded message loop.
+    if (!CefPostTask(TID_UI, new ApplyGenuineZoomTask(force_log)))
+        Log("[zoom] failed to schedule geometry update on CEF UI thread");
 }
 
 // buffer premultiplied ถาวร — เฟรมที่แล้วค้างไว้ อัปเดตเฉพาะ dirty rects ของเฟรมนี้
@@ -2519,24 +2550,11 @@ public:
             OscPerfFinishCallback(perfCallbackStartUs);
             return;
         }
-        // Desktop callbacks can arrive faster than the configured display budget
-        // (observed >120/s with maxFps=75). Keep the GPU-only path, but composite
-        // only the newest available CEF texture at the requested desktop rate.
-        // Hook Mode is intentionally excluded: its frame bridge has separate timing.
-        if (!hookMode) {
-            const auto targetFps = static_cast<unsigned long long>(
-                (std::max)(1, g_cfg.max_fps));
-            const auto minimumFrameIntervalUs = 1000000ULL / targetFps;
-            const auto callbackNowUs = OscPerfNowUs();
-            static unsigned long long lastDesktopCompositeUs = 0;
-            if (lastDesktopCompositeUs != 0 &&
-                callbackNowUs - lastDesktopCompositeUs < minimumFrameIntervalUs) {
-                g_osc_perf.rateLimitedPaints.fetch_add(1, std::memory_order_relaxed);
-                OscPerfFinishCallback(perfCallbackStartUs);
-                return;
-            }
-            lastDesktopCompositeUs = callbackNowUs;
-        }
+        // CEF already owns the OSR frame budget. Never discard a shared-texture
+        // callback by wall-clock interval: small scheduling jitter otherwise
+        // halves the cadence, and dropping incremental dirty rects loses updates.
+        // The desktop Present worker coalesces pending frames without dropping
+        // the texture copies that keep our composited surface current.
         g_osc_perf.processedPaints.fetch_add(1, std::memory_order_relaxed);
         // เฟรม GPU วิ่งปกติ → กลับเป็น GPU_SHARED (รายงานเฉพาะตอนเปลี่ยนจริง)
         if (g_render_state.load(std::memory_order_relaxed) != OscRmGpuShared)
@@ -2573,13 +2591,18 @@ public:
             Log("[cef-frame] callback rate " + std::to_string(cnt * 1000 / (int)(now - t0)) + " fps (GPU path; not display FPS)");
             cnt = 0; t0 = now;
         }
-        UpdateDisplayGeometry(g_view_w, g_view_h);
+        // ★ buffer ของ accelerated frame = view(css) × dsf — ต้องแมตช์ texture จริงเป๊ะ
+        //   (GpuComposite ตรวจขนาดเข้มงวด: ผิด = "shared texture size mismatch" ทิ้งเฟรม)
+        //   จอ 1680×1050: view 1920×1200 × dsf 0.875 = 1680×1050 = ขนาดจอ (วิธี Chrome)
+        const int frameW = (int)lround((double)g_view_w * g_render_dsf);
+        const int frameH = (int)lround((double)g_view_h * g_render_dsf);
+        UpdateDisplayGeometry(frameW, frameH);
         // Keep shared-texture access and draw submission inside CEF's callback;
         // PresentToSwap queues only the already-copied back buffer for Desktop.
         {
             std::lock_guard<std::mutex> lock(osc::d3d11_frame_publisher::Mutex());
             const auto compositeStartUs = OscPerfNowUs();
-            GpuComposite((uint64_t)(uintptr_t)shared_handle, g_view_w, g_view_h,
+            GpuComposite((uint64_t)(uintptr_t)shared_handle, frameW, frameH,
                 effectiveDirtyRects);
             OscPerfRecordComposite(OscPerfNowUs() - compositeStartUs);
             if (hookMode && adapterOverlayVisible) {
