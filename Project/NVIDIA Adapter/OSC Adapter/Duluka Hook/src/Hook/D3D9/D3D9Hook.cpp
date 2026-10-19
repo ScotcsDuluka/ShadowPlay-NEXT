@@ -20,6 +20,10 @@
 #pragma comment(lib, "d3d9.lib")
 #pragma comment(lib, "dxgi.lib")
 
+// Defined in D3D11Hook.cpp; true once ReShade add-on composition is active
+// and the raw D3D9 hook must stop drawing (single draw site, after effects).
+bool ReShadeAddonDrawActive();
+
 namespace
 {
     using PresentFunction = HRESULT(STDMETHODCALLTYPE *)(
@@ -229,7 +233,8 @@ namespace
     {
         const auto count = g_presentCount.fetch_add(
             1, std::memory_order_relaxed) + 1;
-        if (osc_frame_bridge::IsGameOrNvidiaOverlayForeground(
+        if (!ReShadeAddonDrawActive() &&
+            osc_frame_bridge::IsGameOrNvidiaOverlayForeground(
                 GetCurrentProcessId()))
         {
             LARGE_INTEGER overlayStart{}, overlayEnd{};
@@ -262,7 +267,8 @@ namespace
     {
         const auto count = g_presentCount.fetch_add(
             1, std::memory_order_relaxed) + 1;
-        if (osc_frame_bridge::IsGameOrNvidiaOverlayForeground(
+        if (!ReShadeAddonDrawActive() &&
+            osc_frame_bridge::IsGameOrNvidiaOverlayForeground(
                 GetCurrentProcessId()))
         {
             LARGE_INTEGER overlayStart{}, overlayEnd{};
@@ -587,6 +593,10 @@ namespace
 void InitializeD3D9PresentHook(HMODULE module)
 {
     g_module = module;
+    Log("[compositor-d3d9] mode=raw-present (primary; ReShade-independent)");
+    if (ReShadeAddonDrawActive())
+        Log("[compositor-d3d9] enhancement=reshade-addon active; raw D3D9 "
+            "hook stays as pass-through (single draw after ReShade effects).");
     if (!InstallD3D9PresentHook())
         Log("D3D9 hook initialization did not install.");
 }

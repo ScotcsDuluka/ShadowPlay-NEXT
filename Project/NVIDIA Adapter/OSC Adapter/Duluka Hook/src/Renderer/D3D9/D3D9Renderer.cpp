@@ -386,7 +386,7 @@ namespace
         return true;
     }
 
-    void DrawOverlay(IDirect3DDevice9 *device)
+    void DrawOverlay(IDirect3DDevice9 *device, bool sceneMayBeActive)
     {
         if (g_resourceDevice != device)
         {
@@ -468,15 +468,25 @@ namespace
         device->SetSamplerState(0, D3DSAMP_MIPFILTER, D3DTEXF_NONE);
         device->SetSamplerState(0, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP);
         device->SetSamplerState(0, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP);
-        const HRESULT beginResult = device->BeginScene();
-        if (FAILED(beginResult))
+        bool openedScene = false;
+        if (sceneMayBeActive)
         {
-            g_stateBlock->Apply();
-            return;
+            // Inside the ReShade present event a scene is usually already
+            // active; BeginScene failing means we draw into that open scene.
+            openedScene = SUCCEEDED(device->BeginScene());
+        }
+        else
+        {
+            if (FAILED(device->BeginScene()))
+            {
+                g_stateBlock->Apply();
+                return;
+            }
+            openedScene = true;
         }
         const HRESULT drawResult = device->DrawPrimitiveUP(
             D3DPT_TRIANGLESTRIP, 2, vertices, sizeof(Vertex));
-        const HRESULT endResult = device->EndScene();
+        const HRESULT endResult = openedScene ? device->EndScene() : S_OK;
         g_stateBlock->Apply();
         if (SUCCEEDED(drawResult) && SUCCEEDED(endResult))
             g_drawCount.fetch_add(1, std::memory_order_relaxed);
@@ -488,7 +498,23 @@ namespace duluka::d3d9
     {
         if (!device) return;
         std::lock_guard<std::mutex> lock(g_renderMutex);
-        DrawOverlay(device);
+        DrawOverlay(device, false);
+    }
+    void OnReShadePresent(IDirect3DDevice9 *device,
+        IDirect3DSurface9 *backBuffer, bool gameForeground)
+    {
+        if (!device || !backBuffer || !gameForeground) return;
+        std::lock_guard<std::mutex> lock(g_renderMutex);
+        IDirect3DSurface9 *previousTarget = nullptr;
+        if (FAILED(device->GetRenderTarget(0, &previousTarget)) ||
+            !previousTarget)
+            return;
+        const bool switched = previousTarget != backBuffer &&
+            SUCCEEDED(device->SetRenderTarget(0, backBuffer));
+        DrawOverlay(device, true);
+        if (switched)
+            device->SetRenderTarget(0, previousTarget);
+        previousTarget->Release();
     }
     void OnReset()
     {
@@ -499,7 +525,7 @@ namespace duluka::d3d9
     {
         if (!device) return;
         std::lock_guard<std::mutex> lock(g_renderMutex);
-        DrawOverlay(device);
+        DrawOverlay(device, false);
     }
     std::uint64_t GetDrawCount()
     {

@@ -16,6 +16,7 @@
 #include <string>
 #include "../../../include/osc_frame_bridge.h"
 #include "../../Renderer/D3D11/D3D11Renderer.h"
+#include "../../Renderer/D3D9/D3D9Renderer.h"
 #include <reshade.hpp>
 
 #pragma comment(lib, "d3d11.lib")
@@ -304,8 +305,25 @@ namespace
         if (!runtime)
             return;
         reshade::api::device *reshadeDevice = runtime->get_device();
-        if (!reshadeDevice ||
-            reshadeDevice->get_api() != reshade::api::device_api::d3d11)
+        if (!reshadeDevice)
+            return;
+        if (reshadeDevice->get_api() == reshade::api::device_api::d3d9)
+        {
+            auto *device = reinterpret_cast<IDirect3DDevice9 *>(
+                static_cast<std::uintptr_t>(reshadeDevice->get_native()));
+            auto *backBuffer = reinterpret_cast<IDirect3DSurface9 *>(
+                static_cast<std::uintptr_t>(
+                    runtime->get_current_back_buffer().handle));
+            static std::atomic<bool> d3d9PathLogged{ false };
+            if (!d3d9PathLogged.exchange(true, std::memory_order_relaxed))
+                Log("[compositor-d3d9] enhancement=reshade-addon active; OSC "
+                    "renders after ReShade effects (raw D3D9 hook is "
+                    "pass-through).");
+            duluka::d3d9::OnReShadePresent(device, backBuffer,
+                IsGameProcessForeground());
+            return;
+        }
+        if (reshadeDevice->get_api() != reshade::api::device_api::d3d11)
             return;
         auto *device = reinterpret_cast<ID3D11Device *>(
             static_cast<std::uintptr_t>(reshadeDevice->get_native()));
@@ -734,6 +752,13 @@ namespace
             reinterpret_cast<void *>(g_originalPresent));
         Log("DXGI Present hook removed (ResizeBuffers was left untouched).");
     }
+}
+
+// Raw D3D9 hooks consult this so the add-on path stays the single draw site
+// once ReShade owns composition (mirrors the DXGI raw hook behavior).
+bool ReShadeAddonDrawActive()
+{
+    return g_reshadeAddonRegistered.load(std::memory_order_acquire);
 }
 
 extern "C" __declspec(dllexport) BOOL WINAPI NvOscAdapterGetStatus(
