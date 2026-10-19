@@ -5,6 +5,7 @@
 #include <dxgi1_2.h>
 #include <d3dcompiler.h>
 #include <strsafe.h>
+#include <psapi.h>
 
 #include <atomic>
 #include <cstdio>
@@ -318,18 +319,35 @@ namespace
         duluka::d3d11::OnReShadePresent(device, backBuffer, IsGameProcessForeground());
     }
 
+    // Defined below UnregisterReShadeAddon; declared here so the failure
+    // reporting inside RegisterReShadeAddon can classify the reason (4.3).
+    bool ProbeReShadeModule(bool *moduleFound, bool *addonApiAvailable);
+
     bool RegisterReShadeAddon()
     {
+        if (g_reshadeAddonRegistered.exchange(true, std::memory_order_acq_rel))
+            return true;
         if (!reshade::register_addon(g_module))
         {
-            Log("ReShade add-on API unavailable; using the regular DXGI Present compositor.");
+            g_reshadeAddonRegistered.store(false, std::memory_order_release);
+            bool moduleFound = false, addonApiAvailable = false;
+            ProbeReShadeModule(&moduleFound, &addonApiAvailable);
+            if (!moduleFound)
+                Log("ReShade not present in this process; staying on the "
+                    "ReShade-independent DXGI compositor.");
+            else if (!addonApiAvailable)
+                Log("ReShade present but without the add-on/ImGui exports; staying "
+                    "on the ReShade-independent DXGI compositor.");
+            else
+                Log("ReShade add-on registration failed unexpectedly; staying on "
+                    "the ReShade-independent DXGI compositor.");
             return false;
         }
 
         reshade::register_event<reshade::addon_event::reshade_present>(
             &OnReShadePresent);
-        g_reshadeAddonRegistered.store(true, std::memory_order_release);
-        Log("Registered ReShade post-overlay compositor; OSC will render after ReShade effects.");
+        Log("[compositor] enhancement=reshade-addon active; OSC renders after "
+            "ReShade effects (raw hook is pass-through).");
         return true;
     }
 
@@ -341,6 +359,96 @@ namespace
         reshade::unregister_event<reshade::addon_event::reshade_present>(
             &OnReShadePresent);
         reshade::unregister_addon(g_module);
+    }
+
+    // ReShade independence: probe loaded modules without going through the
+    // add-on registration itself, so the reason can be reported (4.3).
+    bool ProbeReShadeModule(bool *moduleFound, bool *addonApiAvailable)
+    {
+        HMODULE modules[1024]{};
+        DWORD needed = 0;
+        *moduleFound = false;
+        *addonApiAvailable = false;
+        if (!EnumProcessModules(GetCurrentProcess(), modules,
+                sizeof(modules), &needed))
+            return false;
+        const DWORD loaded = needed / sizeof(HMODULE);
+        const DWORD count = loaded < 1024u ? loaded : 1024u;
+        for (DWORD i = 0; i < count; ++i)
+        {
+            const bool hasRegister =
+                GetProcAddress(modules[i], "ReShadeRegisterAddon") != nullptr;
+            const bool hasImGui =
+                GetProcAddress(modules[i], "ReShadeGetImGuiFunctionTable") != nullptr;
+            if (hasRegister && hasImGui)
+            {
+                *moduleFound = true;
+                *addonApiAvailable = true;
+                return true;
+            }
+            if (hasRegister)
+            {
+                *moduleFound = true;
+                return true;
+            }
+            char path[MAX_PATH]{};
+            if (GetModuleFileNameA(modules[i], path, MAX_PATH))
+            {
+                const char *name = std::strrchr(path, '\\');
+                name = name ? name + 1 : path;
+                if (_stricmp(name, "ReShade64.dll") == 0 ||
+                    _stricmp(name, "ReShade32.dll") == 0)
+                {
+                    *moduleFound = true;
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    std::atomic<bool> g_reshadeLateWatchStarted{ false };
+
+    DWORD WINAPI ReShadeLateRegisterWatch(void *)
+    {
+        for (int attempt = 1; attempt <= 30; ++attempt)
+        {
+            Sleep(2000);
+            if (g_reshadeAddonRegistered.load(std::memory_order_acquire))
+                return 0;
+            bool moduleFound = false, addonApiAvailable = false;
+            ProbeReShadeModule(&moduleFound, &addonApiAvailable);
+            if (!moduleFound)
+                continue; // ReShade still not loaded; keep waiting
+            if (!addonApiAvailable)
+            {
+                Log("ReShade present but built without add-on support; staying on "
+                    "the ReShade-independent DXGI compositor.");
+                return 0;
+            }
+            if (RegisterReShadeAddon())
+            {
+                Log("[compositor] enhancement=reshade-addon active (late register); "
+                    "raw hook stays as pass-through.");
+            }
+            return 0;
+        }
+        Log("[compositor] no ReShade module appeared within 60s; staying on the "
+            "ReShade-independent DXGI compositor.");
+        return 0;
+    }
+
+    void StartReShadeLateRegisterWatch()
+    {
+        if (g_reshadeLateWatchStarted.exchange(true, std::memory_order_acq_rel))
+            return;
+        HANDLE thread = CreateThread(
+            nullptr, 0, ReShadeLateRegisterWatch, nullptr, 0, nullptr);
+        if (thread)
+            CloseHandle(thread);
+        else
+            OutputDebugStringA("[NVIDIA OSC Adapter] Failed to start the ReShade "
+                "late register watch thread.\n");
     }
 
     HRESULT STDMETHODCALLTYPE HookPresent(
@@ -550,19 +658,15 @@ namespace
             : nullptr;
         originalOwnerName = originalOwnerName ? originalOwnerName + 1
             : (hasOriginalOwner ? originalOwnerPath : "");
-        if (!g_reshadeAddonRegistered.load(std::memory_order_acquire) &&
-            _stricmp(originalOwnerName, "dxgi.dll") == 0 &&
-            !IsSystemDxgiModulePath(originalOwnerPath))
+        if (!IsSystemDxgiModulePath(originalOwnerPath))
         {
-            Log("Refusing to patch a non-system dxgi.dll proxy because ReShade add-on registration failed.");
-            g_originalPresent = nullptr;
-            g_presentSlot = nullptr;
-            swapChain->Release();
-            context->Release();
-            device->Release();
-            DestroyWindow(window);
-            if (classAtom) UnregisterClassW(WindowClassName, g_module);
-            return false;
+            char ownershipDiagnostic[512]{};
+            sprintf_s(ownershipDiagnostic, sizeof(ownershipDiagnostic),
+                "[compositor] Present entry is owned by a non-system module (%s); "
+                "hooking with steal-and-forward so the previous owner keeps running "
+                "through the saved original (ReShade-independent).",
+                hasOriginalOwner ? originalOwnerName : "unknown");
+            Log(ownershipDiagnostic);
         }
 
         if (!PatchVtableSlot(
@@ -599,13 +703,21 @@ namespace
     DWORD WINAPI InitializeHook(void *)
     {
         duluka::d3d11::Initialize(&Log);
+        // Primary compositor: raw DXGI Present vtable hook. Zero dependencies:
+        // works with no ReShade, proxy ReShade, or add-on-support ReShade.
+        if (InstallDxgiPresentHook())
+            Log("[compositor] mode=raw-present (primary; ReShade-independent)");
+        else
+            Log("[compositor] mode=none (raw hook failed to install)");
+        // Opportunistic enhancement: add-on mode draws AFTER ReShade effects.
         if (RegisterReShadeAddon())
         {
-            Log("ReShade post-effect compositor active; skipping the raw DXGI Present hook.");
+            // raw hook stays installed; OnPresent skips its draw while the
+            // add-on event handles composition (single draw, on top).
         }
         else
         {
-            InstallDxgiPresentHook();
+            StartReShadeLateRegisterWatch();
         }
         InitializeD3D9PresentHook(g_module);
         return 0;
