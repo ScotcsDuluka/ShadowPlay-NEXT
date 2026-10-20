@@ -1,0 +1,26 @@
+{
+  "result": {
+    "type": "object",
+    "value": {
+      "hash": "#/base",
+      "runtime": "[18652,\"18652:7840640:4\",2]",
+      "prepared": null,
+      "enabled": false,
+      "supported": true,
+      "uiRunning": false,
+      "offSelected": false,
+      "focus": null,
+      "catalogs": [
+        3,
+        3,
+        3,
+        3
+      ],
+      "choice": -1,
+      "data": {
+        "lastSlot": -1,
+        "modsIsEnabled": false
+      }
+    }
+  }
+}

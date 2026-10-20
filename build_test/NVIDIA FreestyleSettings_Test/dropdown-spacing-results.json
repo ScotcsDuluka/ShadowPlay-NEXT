@@ -1,0 +1,32 @@
+{
+  "idle": {
+    "padding": "0px 10px",
+    "leftInset": 13,
+    "rightInset": 16.999876022338867,
+    "textCenterDelta": 0.0000247955322265625,
+    "iconCenterDelta": 9.5367431640625e-7,
+    "width": 300,
+    "height": 50.000003814697266,
+    "border": "rgba(0, 0, 0, 0)",
+    "focused": false,
+    "overflow": false
+  },
+  "focus": {
+    "padding": "0px 10px",
+    "leftInset": 13,
+    "rightInset": 16.999876022338867,
+    "textCenterDelta": 0.0000247955322265625,
+    "iconCenterDelta": 9.5367431640625e-7,
+    "width": 300,
+    "height": 50.000003814697266,
+    "border": "rgb(118, 185, 0)",
+    "focused": true,
+    "overflow": false
+  },
+  "options": [
+    "ReShade Freestyle",
+    "Duluka Freestyle",
+    "NVIDIA Freestyle"
+  ],
+  "settingsUnchanged": true
+}

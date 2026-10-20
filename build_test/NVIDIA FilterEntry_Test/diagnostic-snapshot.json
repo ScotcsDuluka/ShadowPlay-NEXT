@@ -1,0 +1,70 @@
+﻿{
+  "timestamp": "2026-10-20T09:22:13.484Z",
+  "gameFilter": {
+    "status": 503,
+    "body": {
+      "connected": false,
+      "code": "ANSEL_UNAVAILABLE",
+      "message": "No responding D3D11 ReShade runtime is connected"
+    }
+  },
+  "settings": {
+    "status": 200,
+    "body": {
+      "bridgeEnabled": true,
+      "mode": "reshade",
+      "allowConnection": true,
+      "connectionManager": true
+    }
+  },
+  "gameWatcher": {
+    "status": 200,
+    "body": {
+      "enabled": true,
+      "running": true,
+      "catalogReady": true,
+      "catalogSource": "local-cache",
+      "catalogReachable": true,
+      "catalogEmpty": false,
+      "catalogVersion": "1.2.5",
+      "catalogGameCount": 5,
+      "knownExecutableNames": 6,
+      "cachedExecutableResolutions": 1,
+      "candidateProcessCount": 0,
+      "matchedGameCount": 0,
+      "matchedGames": [],
+      "lastCatalogRefreshUtc": "2026-10-20T09:21:55.3130448Z",
+      "lastScanUtc": "2026-10-20T09:22:10.4840749Z",
+      "lastRefreshStatusCode": 200,
+      "catalogError": "",
+      "lastError": ""
+    }
+  },
+  "anselPipes": [],
+  "pipeError": null,
+  "overlay": {
+    "url": "http://localhost:59011/index.html#/base",
+    "state": {
+      "hash": "#/base",
+      "readyState": "complete",
+      "route": "base",
+      "connected": false,
+      "runtime": null,
+      "prepared": null,
+      "initialization": true,
+      "supported": true,
+      "enabled": false,
+      "uiRunning": false,
+      "executable": "",
+      "savedChoice": null,
+      "lastSlot": -1,
+      "activeSlot": null,
+      "slotCatalogSizes": [
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  }
+}

@@ -1,0 +1,2 @@
+/* Route integration only. Visual styles come from NVIDIA OSC. */
+.nv-filter-settings-host > :not(#nv-filter-settings) { display: none !important; }

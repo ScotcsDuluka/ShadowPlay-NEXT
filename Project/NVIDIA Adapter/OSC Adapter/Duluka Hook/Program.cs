@@ -17,6 +17,7 @@ internal static class Program
     private const uint WaitTimeout = 0x00000102;
     private const uint Infinite = 0xFFFFFFFF;
     private const ushort ImageFileMachineUnknown = 0;
+    private const ushort ImageFileMachineI386 = 0x014c;
     private const ushort ImageFileMachineAmd64 = 0x8664;
 
     private static int Main(string[] args)
@@ -29,15 +30,33 @@ internal static class Program
                 using var game = Process.GetProcessById(options.GamePid);
                 ValidateGameIdentity(game, options.GameExecutable);
 
-                if (!Environment.Is64BitProcess)
-                    throw new InvalidOperationException("The OSC Adapter host must run as x64.");
+                var targetIs64Bit = IsSupportedX64Process(game.Handle);
+                if (targetIs64Bit != Environment.Is64BitProcess)
+                {
+                    if (!Environment.Is64BitProcess)
+                        throw new InvalidOperationException("The x86 adapter cannot attach to an x64 game.");
+                    if (options.AnselOnly)
+                        throw new InvalidOperationException("Ansel Game Filter currently supports x64 games only.");
+                    var hostPath = Path.Combine(AppContext.BaseDirectory, "x86", "NVIDIA OSC Adapter.exe");
+                    if (!File.Exists(hostPath))
+                        throw new FileNotFoundException("The x86 OSC Adapter host is missing.", hostPath);
+                    var start = new ProcessStartInfo(hostPath) { UseShellExecute = false, CreateNoWindow = true };
+                    foreach (var argument in args) start.ArgumentList.Add(argument);
+                    using var child = Process.Start(start)
+                        ?? throw new InvalidOperationException("Could not start the x86 OSC Adapter host.");
+                    Log("Routing game PID " + options.GamePid + " to the x86 adapter host.");
+                    child.WaitForExit();
+                    return child.ExitCode;
+                }
 
-                var adapterPath = Path.Combine(AppContext.BaseDirectory, "NVIDIA OSC Adapter Hook.dll");
+                var adapterPath = Path.Combine(AppContext.BaseDirectory,
+                    options.AnselOnly ? "NVIDIA Ansel Adapter.dll" : "NVIDIA OSC Adapter Hook.dll");
                 if (!File.Exists(adapterPath))
-                    throw new FileNotFoundException("The x64 OSC Adapter DLL is missing.", adapterPath);
+                    throw new FileNotFoundException("The matching OSC Adapter DLL is missing.", adapterPath);
 
                 InjectDxgiAdapter(options.GamePid, adapterPath);
-                Log("DXGI adapter loaded for " + options.GameName + " (game PID " + options.GamePid + ").");
+                Log((options.AnselOnly ? "Ansel filter adapter" : "DXGI adapter") +
+                    " loaded for " + options.GameName + " (game PID " + options.GamePid + ").");
 
                 try
                 {
@@ -67,7 +86,7 @@ internal static class Program
         }
     }
 
-    private static (int GamePid, string GameName, string GameExecutable, bool ElevationRetry) ParseArguments(string[] args)
+    private static (int GamePid, string GameName, string GameExecutable, bool ElevationRetry, bool AnselOnly) ParseArguments(string[] args)
     {
         var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         for (var i = 0; i + 1 < args.Length; i += 2)
@@ -89,7 +108,9 @@ internal static class Program
 
         var elevationRetry = values.TryGetValue("--elevation-retry", out var retryText) &&
             bool.TryParse(retryText, out var retryRequested) && retryRequested;
-        return (pid, name, Path.GetFullPath(executable), elevationRetry);
+        var anselOnly = values.TryGetValue("--ansel-only", out var anselText) &&
+            bool.TryParse(anselText, out var anselRequested) && anselRequested;
+        return (pid, name, Path.GetFullPath(executable), elevationRetry, anselOnly);
     }
 
     private static bool IsAdministrator()
@@ -157,8 +178,6 @@ internal static class Program
         if (!string.Equals(actualExecutable, expectedExecutable, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("The target PID no longer matches the expected game executable.");
 
-        if (!IsSupportedX64Process(game.Handle))
-            throw new InvalidOperationException("Only x64 game processes are supported by the first DXGI adapter.");
     }
 
     private static bool IsSupportedX64Process(IntPtr process)
@@ -166,8 +185,10 @@ internal static class Program
         if (!IsWow64Process2(process, out var processMachine, out var nativeMachine))
             throw new Win32Exception(Marshal.GetLastWin32Error(), "Could not determine target process architecture.");
 
-        return processMachine == ImageFileMachineUnknown &&
-            nativeMachine == ImageFileMachineAmd64;
+        if (nativeMachine != ImageFileMachineAmd64 ||
+            (processMachine != ImageFileMachineUnknown && processMachine != ImageFileMachineI386))
+            throw new InvalidOperationException("Only Windows x86 and x64 game processes are supported.");
+        return processMachine == ImageFileMachineUnknown;
     }
 
     private static void InjectDxgiAdapter(int processId, string dllPath)

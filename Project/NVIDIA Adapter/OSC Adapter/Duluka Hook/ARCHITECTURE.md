@@ -51,3 +51,28 @@ A folder or README is a planned slot, not a working implementation.
 ## Safe migration rule
 
 D3D9 and D3D11 Hook/Renderer responsibilities have been extracted into independent translation units. Keep smoke tests green while adding one API at a time. Do not add empty .cpp stubs to the DLL build; unimplemented API folders must not masquerade as support.
+## DX9 x86 / x64
+
+Release builds now include Win32 and x64 Hook DLLs. The x64 attachment host
+checks the game machine type and delegates x86 targets to `x86/NVIDIA OSC Adapter.exe`.
+That child loads its sibling x86 Hook DLL. The existing x64 path remains in place.
+Both hosts require the matching .NET 10 Windows Desktop Runtime.
+
+The CPU frame bridge has fixed-width fields and compile-time wire-offset checks
+in both native builds. D3D9 import walking uses the target-native PE header/thunk
+types. x86 test exports have explicit undecorated aliases.
+
+`Scripts/verify-dx9.ps1` builds both Hook DLLs and hosts, runs D3D9/9Ex pixel,
+alpha, Present and Reset tests on both architectures, checks x64-host-to-x86-game
+attachment, then runs the x64 D3D11 regression. `-Stage` backs up and updates the
+canonical adapter folder and configured active folder, preserving existing x64
+host executables (including CrossIntegrity manifests).
+
+Limits: this adds x86 overlay composition, not x86 Ansel Game Filter. Existing
+late-device attachment/dynamic factory lookup limitations still apply. Passing
+native tests does not certify compatibility with every real DX9 game.
+
+ReShade DX9 resource lifetime: the `destroy_effect_runtime` event releases the
+matching device's default-pool overlay texture and state block before ReShade
+calls Reset/ResetEx. Raw Present/Reset interception remains separate. This is
+required even when ReShade owns the proxy device and no raw device hook exists.

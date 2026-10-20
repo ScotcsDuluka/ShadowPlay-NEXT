@@ -1,76 +1,36 @@
-#nv-gpu-settings {
-  margin-top: 24px;
-  padding-top: 18px;
-  border-top: 1px solid rgba(255, 255, 255, .12);
-  color: #fff;
-  font-family: 'Segoe UI', sans-serif;
-}
+/* Route integration only. Visual styles come from NVIDIA OSC. */
+.nv-filter-settings-host > :not(#nv-filter-settings) { display: none !important; }
 
-#nv-gpu-settings .nv-gpu-heading {
-  margin-bottom: 14px;
-  font-size: 16px;
-  font-weight: 600;
-}
-
-#nv-gpu-settings .nv-gpu-toggle {
+/* Layout only: retain NVIDIA typography, colors, controls and focus states. */
+#nv-filter-settings .nv-freestyle-content { padding: 24px 0 12px; }
+#nv-filter-settings .nv-freestyle-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  max-width: 520px;
-  min-height: 34px;
-  color: #fff;
-  font-size: 14px;
+  gap: 40px;
+  min-height: 88px;
+  box-sizing: border-box;
+  padding: 16px 0;
 }
-
-#nv-gpu-settings .nv-gpu-toggle input {
-  width: 34px;
-  height: 18px;
-  accent-color: #76b900;
+#nv-filter-settings .nv-freestyle-content > .nv-freestyle-row { padding-top: 0; }
+#nv-filter-settings .nv-freestyle-label { flex: 1 1 auto; min-width: 0; }
+#nv-filter-settings .settings-switch-label { display: block; min-width: 0; max-width: none; }
+#nv-filter-settings .settings-describe { max-width: 760px; margin: 8px 0 0; }
+#nv-filter-settings md-switch.settings-switch { flex: 0 0 auto; margin: 0; }
+#nv-filter-settings .nv-freestyle-select { flex: 0 0 300px; width: 300px; min-width: 0; min-height: 50px; }
+#nv-filter-settings .nv-freestyle-select > md-select-value { box-sizing: border-box; min-width: 0; padding: 0 10px; }
+#nv-filter-settings .osc-button { flex: 0 0 auto; margin: 0; }
+#nv-filter-settings .nv-freestyle-feedback { padding-top: 20px; }
+#nv-filter-settings .nv-freestyle-feedback .osc-button { margin-top: 16px; }
+@media (max-width: 1000px) {
+  #nv-filter-settings .nv-freestyle-row { gap: 20px; }
+  #nv-filter-settings .nv-freestyle-select { flex-basis: 230px; width: 230px; }
 }
-
-#nv-gpu-settings .nv-gpu-description,
-#nv-gpu-settings .nv-gpu-empty {
-  margin: 8px 0 16px;
-  color: rgba(255, 255, 255, .72);
-  font-size: 13px;
-  line-height: 1.45;
-}
-
-#nv-gpu-settings .nv-gpu-section-title {
-  margin: 14px 0 8px;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-#nv-gpu-settings .nv-gpu-game-row,
-#nv-gpu-settings .nv-gpu-adapter-row {
-  display: grid;
-  grid-template-columns: minmax(140px, 1fr) auto;
-  gap: 4px 16px;
-  max-width: 760px;
-  padding: 9px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, .08);
-  font-size: 13px;
-}
-
-#nv-gpu-settings .nv-gpu-state {
-  color: #b8b8b8;
-  text-align: right;
-}
-
-#nv-gpu-settings .nv-gpu-state-verified,
-#nv-gpu-settings .nv-gpu-state-multipleadapters {
-  color: #76b900;
-}
-
-#nv-gpu-settings .nv-gpu-state-unknown {
-  color: #ffca68;
-}
-
-#nv-gpu-settings .nv-gpu-detail,
-#nv-gpu-settings .nv-gpu-preference,
-#nv-gpu-settings .nv-gpu-adapter-row span {
-  grid-column: 1 / -1;
-  color: rgba(255, 255, 255, .76);
-  overflow-wrap: anywhere;
+@media (max-width: 700px) {
+  #nv-filter-settings .nv-freestyle-row { flex-wrap: wrap; }
+  #nv-filter-settings .nv-freestyle-label,
+  #nv-filter-settings .nv-freestyle-row > .settings-switch-label { flex: 1 1 100%; }
+  #nv-filter-settings .nv-freestyle-select { flex: 1 1 100%; width: 100%; margin-top: 12px; }
+  #nv-filter-settings .nv-freestyle-row > .osc-button,
+  #nv-filter-settings .nv-freestyle-row > md-switch.settings-switch { margin-top: 12px; margin-left: 0; }
 }

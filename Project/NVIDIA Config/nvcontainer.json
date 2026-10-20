@@ -1,7 +1,7 @@
 {
   "$comment": "ตัวแม่ NvContainer.exe — ศูนย์กลาง config ของ Duluka System ทั้งหมด",
   "mode": "ours",
-  "$mode_note": "ours = NvContainer ดูแล NvGraphics.exe, NodeAPI ใน Overlay On-Screen Control\\NVIDIA NodeAPI :59011, NVIDIA OSC.exe และ nvsphelper.exe | NvCapture.exe ยังไม่ spawn | genuine = NVIDIA Share.exe แท้",
+  "$mode_note": "ours = NvContainer ดูแล NvGraphics.exe, NvCapture.exe, NodeAPI :59011, NVIDIA OSC.exe และ nvsphelper.exe | genuine = NVIDIA Share.exe แท้",
   "controlApiPort": 59012,
   "applicationOntology": {
     "baseUrl": "https://nv-ontology.pages.dev/api/",
@@ -22,7 +22,12 @@
   },
   "testMode": {
     "enabled": true,
-    "$note": "NvContainer simulates supported capture and game-filter actions for UI testing; no capture/filter operation is started."
+    "$note": "Menu and non-capture actions remain simulated while the separate capture runtime is enabled."
+  },
+  "captureRuntime": {
+    "enabled": true,
+    "apiPort": 59077,
+    "$note": "NvContainer starts NvCapture.exe headless. Manual recording uses the live NodeAPI state route; no recording starts until requested."
   },
   "buildRoot": ".",
   "children": {
@@ -32,6 +37,8 @@
     "oscWd": "Overlay On-Screen Control\\NVIDIA OSC",
     "graphicsExe": "NVIDIA Graphics\\NvGraphics.exe",
     "graphicsWd": "NVIDIA Graphics",
+    "captureExe": "NVIDIA Capture\\NvCapture.exe",
+    "captureWd": "NVIDIA Capture",
     "$oscExe_note": "OSC host ที่ใช้งานและยืนยันแล้ว",
     "genuineShareExe": "%ProgramFiles%\\NVIDIA Corporation\\NVIDIA GeForce Experience\\NVIDIA Share.exe",
     "genuineShareWd": "%ProgramFiles%\\NVIDIA Corporation\\NVIDIA GeForce Experience",

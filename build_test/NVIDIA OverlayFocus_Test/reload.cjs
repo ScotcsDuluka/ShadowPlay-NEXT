@@ -1,0 +1,1 @@
+(async()=>{const p=await(await fetch('http://127.0.0.1:59099/json/list')).json();const w=new WebSocket(p[0].webSocketDebuggerUrl);await new Promise(r=>w.onopen=r);w.onmessage=e=>{const m=JSON.parse(e.data);if(m.id){console.log(JSON.stringify(m));w.close();}};w.send(JSON.stringify({id:1,method:'Page.reload',params:{ignoreCache:true}}));})().catch(console.error);

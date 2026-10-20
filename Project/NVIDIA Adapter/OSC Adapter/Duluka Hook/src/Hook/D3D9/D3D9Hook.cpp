@@ -24,6 +24,11 @@
 // and the raw D3D9 hook must stop drawing (single draw site, after effects).
 bool ReShadeAddonDrawActive();
 
+#if defined(_M_IX86)
+#pragma comment(linker, "/EXPORT:NvOscAdapterRenderD3D9ForTest=_NvOscAdapterRenderD3D9ForTest@4")
+#pragma comment(linker, "/EXPORT:NvOscAdapterGetD3D9Status=_NvOscAdapterGetD3D9Status@12")
+#endif
+
 namespace
 {
     using PresentFunction = HRESULT(STDMETHODCALLTYPE *)(
@@ -454,10 +459,10 @@ namespace
         auto *dosHeader = reinterpret_cast<IMAGE_DOS_HEADER *>(base);
         if (dosHeader->e_magic != IMAGE_DOS_SIGNATURE)
             return 0;
-        auto *ntHeaders = reinterpret_cast<IMAGE_NT_HEADERS64 *>(
+        auto *ntHeaders = reinterpret_cast<IMAGE_NT_HEADERS *>(
             base + dosHeader->e_lfanew);
         if (ntHeaders->Signature != IMAGE_NT_SIGNATURE ||
-            ntHeaders->OptionalHeader.Magic != IMAGE_NT_OPTIONAL_HDR64_MAGIC)
+            ntHeaders->OptionalHeader.Magic != IMAGE_NT_OPTIONAL_HDR_MAGIC)
             return 0;
         const auto &directory = ntHeaders->OptionalHeader.DataDirectory[
             IMAGE_DIRECTORY_ENTRY_IMPORT];
@@ -483,13 +488,13 @@ namespace
             if (!descriptor[index].OriginalFirstThunk)
                 continue;
             const DWORD originalThunkRva = descriptor[index].OriginalFirstThunk;
-            auto *names = reinterpret_cast<IMAGE_THUNK_DATA64 *>(
+            auto *names = reinterpret_cast<IMAGE_THUNK_DATA *>(
                 base + originalThunkRva);
-            auto *addresses = reinterpret_cast<IMAGE_THUNK_DATA64 *>(
+            auto *addresses = reinterpret_cast<IMAGE_THUNK_DATA *>(
                 base + descriptor[index].FirstThunk);
             for (; names->u1.AddressOfData; ++names, ++addresses)
             {
-                if (IMAGE_SNAP_BY_ORDINAL64(names->u1.Ordinal))
+                if (IMAGE_SNAP_BY_ORDINAL(names->u1.Ordinal))
                     continue;
                 auto *importName = reinterpret_cast<IMAGE_IMPORT_BY_NAME *>(
                     base + names->u1.AddressOfData);

@@ -27,6 +27,8 @@ var fs = require('fs');
 var path = require('path');
 var containerTestMode = false;
 var containerControlApiPort = 59012;
+var captureRuntimeEnabled = false;
+var captureRuntimeApiPort = 59077;
 var containerConfigFound = false;
 var containerConfigError = null;
 try {
@@ -40,6 +42,11 @@ try {
             if (Number.isInteger(configuredControlPort) && configuredControlPort > 0 && configuredControlPort <= 65535) {
                 containerControlApiPort = configuredControlPort;
             }
+            captureRuntimeEnabled = !!(containerConfig.captureRuntime && containerConfig.captureRuntime.enabled);
+            var configuredCapturePort = Number(containerConfig.captureRuntime && containerConfig.captureRuntime.apiPort);
+            if (Number.isInteger(configuredCapturePort) && configuredCapturePort > 0 && configuredCapturePort <= 65535) {
+                captureRuntimeApiPort = configuredCapturePort;
+            }
             containerConfigFound = true;
             break;
         }
@@ -52,6 +59,8 @@ try {
 }
 process.env.NV_CONTAINER_TEST_MODE = containerTestMode ? '1' : '0';
 process.env.NV_CONTAINER_CONTROL_API_PORT = String(containerControlApiPort);
+process.env.NV_CAPTURE_RUNTIME_ENABLED = captureRuntimeEnabled ? '1' : '0';
+process.env.NV_CAPTURE_RUNTIME_API_PORT = String(captureRuntimeApiPort);
 var logger = require('./Logger.js')(nvUtil, GetNvNodeAppdataDirectoryPath() + '\\nvnode.log');
 if (containerConfigError) {
     logger.error('Unable to read NvContainer configuration; using non-test defaults: ' + containerConfigError.message);
@@ -217,6 +226,7 @@ app.get('/mods/list', function (req, res) {
         // Serve only the source-owned mod manifest. The Build tree may retain
         // retired CSS/JS files; auto-loading every extension would reactivate them.
         var allowedMods = {
+            'ansel-game-filter.js': true,
             'base.css': true,
             'folder-browser-navigation.js': true,
             'gallery-media-source.js': true,

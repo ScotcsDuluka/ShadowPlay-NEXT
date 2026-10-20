@@ -14,6 +14,8 @@
   var applyUrl = '/Duluka/v1/gpu/preference/apply';
   var removePreferenceUrl = '/Duluka/v1/gpu/preference/remove';
   var tileMarker = '__nvGpuProfilesTile';
+  var mainMenuTileMarker = '__nvGpuProfilesMainMenuTile';
+  var mainMenuTileStyleId = 'nv-gpu-profiles-mainmenu-tile-style';
   var observer;
   var hookedMenus = [];
   var activeRoute = null;
@@ -24,18 +26,72 @@
   var performanceSupportAvailable = null;
   var performanceSupportListenerRegistered = false;
 
+  function openGameProfilesFromMainMenu() {
+    if (!window.angular) return;
+    var injector = window.angular.element(document.documentElement).injector();
+    if (!injector) return;
+    return injector.get('$state').go('main.gpu-profiles');
+  }
+
+  function ensureMainMenuTileStyle() {
+    if (document.getElementById(mainMenuTileStyleId)) return;
+    var style = document.createElement('style');
+    style.id = mainMenuTileStyleId;
+    style.textContent = '.main-menu-container md-menu.preferences-tile.nv-gpu-profiles-left-tile {' +
+      'left: -360px !important; right: auto !important; top: 160px !important; ' +
+      'width: 80px !important; height: 80px !important; }';
+    (document.head || document.documentElement).appendChild(style);
+  }
+
   function updateMainMenuPerformance() {
     var root = document.querySelector('.main-menu-container');
     if (!root || !window.angular) return;
+    ensureMainMenuTileStyle();
     var scope = window.angular.element(root).scope();
     while (scope && !scope.mainMenu) scope = scope.$parent;
     if (!scope || !scope.mainMenu || !scope.mainMenu.tiles) return;
 
     var tiles = scope.mainMenu.tiles;
-    var performance = tiles.Performance;
-    if (!performance) return;
-
     var changed = false;
+    var gameProfiles = tiles.GameProfiles;
+    var gameProfilesExtraClass = 'three-right nv-gpu-profiles-left-tile ' +
+      'nv-gpu-profiles-mainmenu-tile';
+    if (!gameProfiles || gameProfiles[mainMenuTileMarker] !== true) {
+      gameProfiles = {
+        // Match the small right-side tile, mirrored into the free far-left slot.
+        name: 'preferences-tile',
+        extraclass: gameProfilesExtraClass,
+        title: 'Game Profiles',
+        icon: 'icon-edit_tune',
+        initialFocus: 'false',
+        visible: true,
+        enabled: true,
+        click: openGameProfilesFromMainMenu
+      };
+      gameProfiles[mainMenuTileMarker] = true;
+      tiles.GameProfiles = gameProfiles;
+      changed = true;
+    } else {
+      if (gameProfiles.extraclass !== gameProfilesExtraClass) {
+        gameProfiles.extraclass = gameProfilesExtraClass;
+        changed = true;
+      }
+      if (gameProfiles.visible !== true) {
+        gameProfiles.visible = true;
+        changed = true;
+      }
+      if (gameProfiles.enabled !== true) {
+        gameProfiles.enabled = true;
+        changed = true;
+      }
+    }
+
+    var performance = tiles.Performance;
+    if (!performance) {
+      if (changed) scope.$applyAsync();
+      return;
+    }
+
     if (!performance.visible) {
       performance.visible = true;
       changed = true;
@@ -53,6 +109,14 @@
       }
     });
     if (changed) scope.$applyAsync();
+
+    // The native preferences-style tile renders icon-only. Give it a tooltip
+    // and an accessible name without changing the OSC's menu template.
+    var button = root.querySelector('.nv-gpu-profiles-mainmenu-tile .menu-button');
+    if (button) {
+      button.title = 'Game Profiles';
+      button.setAttribute('aria-label', 'Game Profiles');
+    }
   }
 
   function registerPerformanceSupportListener() {

@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <!-- NvContainer owns NvGraphics.exe, NVIDIA OSC.exe, NVIDIA Web Helper.exe,
-         and nvsphelper.exe. NvCapture.exe is not started yet. -->
+    <!-- NvContainer owns NvGraphics.exe, NvCapture.exe, NVIDIA OSC.exe,
+         NVIDIA Web Helper.exe, and nvsphelper.exe. -->
     <OutputType>WinExe</OutputType>
     <AssemblyName>NvContainer</AssemblyName>
     <RootNamespace>NvContainer</RootNamespace>
@@ -14,6 +14,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWindowsForms>true</UseWindowsForms>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The helper is a separate nested project; its generated obj sources
+         must not be globbed into NvContainer during a local build. -->
+    <Compile Remove="NVIDIA ShadowPlay Helper/**/*.cs" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\NVIDIA Graphics\NvGraphics.Contracts\NvGraphics.Contracts.csproj" />

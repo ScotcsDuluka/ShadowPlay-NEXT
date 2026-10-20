@@ -1,0 +1,35 @@
+✔ receives a fragmented catalog larger than the old 1 MiB limit (73.7329ms)
+✔ keeps a finite response bound (65.835ms)
+✔ discovery preserves the actual catalog failure (1.3293ms)
+PASS: Freestyle preferences UI loading, validated persistence, timeout/retry, rollback, repeated saves, disposed requests, honest availability and NVIDIA template semantics
+✔ Project\Overlay On-Screen Control\NVIDIA NodeAPI\tests\freestyleSettingsUi.test.js (146.174ms)
+PASS: OSC HTTP + real native named pipe + explicitly fake effects: catalog, slider/readback, events, toggles, presets, reload, expiry, errors and disconnect
+✔ Project\Overlay On-Screen Control\NVIDIA NodeAPI\tests\gameFilter.test.js (1657.5701ms)
+✔ default settings are readable without native discovery or filesystem writes (61.577ms)
+✔ settings validate all fields, types, unknown fields, JSON shape and HTTP method (27.7235ms)
+✔ saved preferences survive remount and never change the current ReShade effects (54.1615ms)
+✔ when connection permission is off, runtime APIs and polling make zero native calls (32.1078ms)
+✔ when connection manager is off, runtime APIs and polling make zero native calls (22.2587ms)
+✔ when Duluka mode is selected, runtime APIs and polling make zero native calls (25.2033ms)
+[game-filter] settings load failed: Expected property name or '}' in JSON at position 1 (line 1 column 2)
+✔ when NVIDIA mode is selected, runtime APIs and polling make zero native calls (29.8588ms)
+✔ unreadable JSON and invalid saved preferences fall back to defaults (38.0086ms)
+✔ a backend restarted with a disabled saved configuration never contacts the runtime (33.2118ms)
+✔ save failure reports an error and leaves active preferences and runtime untouched (5.768ms)
+✔ disabling while a snapshot is in flight cannot reconnect the disabled bridge (9.6439ms)
+✔ disabling during mutation discovery cancels the pending native write (8.595ms)
+✔ rapid disconnect and reconnect cannot reuse an old in-flight snapshot or clear the new session (14.4773ms)
+✔ disabling clears an offline pending shader preference before a later reconnect (9.1944ms)
+✔ a command already sent before disconnect cannot publish a late connected state (10.536ms)
+✔ disconnect during pending-preference polling stops before a native read or write (7.916ms)
+✔ a native command queued behind another operation rechecks permission immediately before sending (0.9327ms)
+PASS: live UI entry, runtime stack import, existing/other-game preset preservation, initial Off guard and hot-load idempotency
+✔ Project\Overlay On-Screen Control\NVIDIA NodeAPI\tests\gameFilterUi.test.js (201.7584ms)
+ℹ tests 23
+ℹ suites 0
+ℹ pass 23
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1708.8647

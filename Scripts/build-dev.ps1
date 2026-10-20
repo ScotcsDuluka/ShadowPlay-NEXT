@@ -1,4 +1,4 @@
-# Build only the active Project tree; the retired Close Project tree is never
+﻿# Build only the active Project tree; the retired Close Project tree is never
 # a source or a fallback.
 param(
     [string]$Dest = '',
@@ -127,9 +127,13 @@ if ($Clean -and (Test-Path -LiteralPath $BuildRoot)) {
 $activeProjects = @(
     @{ Path = 'Overlay On-Screen Control\NVIDIA OSC\NVIDIA OSC.vcxproj'; Platform = 'x64' },
     @{ Path = 'NVIDIA Adapter\OSC Adapter\Duluka Hook\NVIDIA OSC Adapter.vcxproj'; Platform = 'x64' },
+    @{ Path = 'NVIDIA Adapter\OSC Adapter\Duluka Hook\NVIDIA OSC Adapter.vcxproj'; Platform = 'Win32' },
+    @{ Path = 'NVIDIA Adapter\Ansel Adapter\NVIDIA Ansel Adapter.vcxproj'; Platform = 'x64' },
     @{ Path = 'NVIDIA Adapter\OSC Adapter\Duluka Hook\NVIDIA OSC Adapter Host.csproj'; Platform = 'x64' },
+    @{ Path = 'NVIDIA Adapter\OSC Adapter\Duluka Hook\NVIDIA OSC Adapter Host.csproj'; Platform = 'x86' },
     @{ Path = 'Overlay On-Screen Control\NVIDIA NodeAPI\NVIDIA Web Helper\NVIDIA Web Helper.vbproj'; Platform = 'x64' },
     @{ Path = 'NVIDIA Container\NvContainer.csproj'; Platform = 'AnyCPU' },
+    @{ Path = 'NVIDIA Capture\NVIDIA Capture.vbproj'; Platform = 'AnyCPU' },
     @{ Path = 'NVIDIA Graphics\NvGraphics.App\NvGraphics.csproj'; Platform = 'AnyCPU' },
     @{ Path = 'NVIDIA Container\NVIDIA ShadowPlay Helper\nvsphelper.csproj'; Platform = 'AnyCPU' },
     @{ Path = 'Launcher.Cef\Launcher.vcxproj'; Platform = 'x64' },
@@ -211,6 +215,17 @@ if (Test-Path -LiteralPath $legacyOverlayConfig) {
 $containerOutput = Join-Path $BuildRoot 'NVIDIA Container'
 Copy-RuntimeFiles (Join-Path $ProjectRoot ("NVIDIA Container\bin\Release\{0}" -f $TargetFramework)) $containerOutput
 Copy-RuntimeFiles (Join-Path $ProjectRoot ("NVIDIA Container\NVIDIA ShadowPlay Helper\bin\Release\{0}" -f $TargetFramework)) $containerOutput
+$captureOutput = Join-Path $BuildRoot 'NVIDIA Capture'
+Copy-RuntimeFiles (Join-Path $ProjectRoot ("NVIDIA Capture\bin\Release\{0}" -f $TargetFramework)) $captureOutput
+$ffmpegSource = Join-Path $ProjectRoot 'FFmpeg'
+$ffmpegOutput = Join-Path $captureOutput 'FFmpeg'
+Ensure-Dir $ffmpegOutput
+foreach ($ffmpegName in @('ffmpeg.exe', 'ffprobe.exe')) {
+    Copy-FileSafe (Join-Path $ffmpegSource $ffmpegName) (Join-Path $ffmpegOutput $ffmpegName)
+}
+Get-ChildItem -LiteralPath $ffmpegSource -File -Filter '*.dll' | ForEach-Object {
+    Copy-FileSafe $_.FullName (Join-Path $ffmpegOutput $_.Name)
+}
 $graphicsBuildOutput = Join-Path $Repo 'Build\NVIDIA ShadowPlay\NVIDIA Graphics'
 $graphicsOutput = Join-Path $BuildRoot 'NVIDIA Graphics'
 if ([IO.Path]::GetFullPath($graphicsBuildOutput) -ne [IO.Path]::GetFullPath($graphicsOutput)) {
@@ -221,15 +236,21 @@ if (Test-Path -LiteralPath $containerGraphicsExe) {
     Remove-Item -LiteralPath $containerGraphicsExe -Force
 }
 
-# The OSC Adapter host injects the x64 DXGI Present probe into ontology-matched
-# games. Keep the host and native module together in the adapter runtime folder.
+# The x64 host routes x86 games to the matching host/DLL in the x86 subfolder.
+# Keep each host and native module together.
 $adapterOutput = Join-Path $BuildRoot 'NVIDIA Adapter'
 $adapterSource = Join-Path $ProjectRoot 'NVIDIA Adapter\OSC Adapter\Duluka Hook'
 $adapterHostOutput = Join-Path $adapterSource (
     "bin\x64\Release\{0}\win-x64" -f $TargetFramework)
 $adapterNativeDll = Join-Path $adapterSource 'bin\x64\Release\NVIDIA OSC Adapter Hook.dll'
 Copy-RuntimeFiles $adapterHostOutput $adapterOutput
+$adapterX86Output = Join-Path $adapterOutput 'x86'
+$adapterX86HostOutput = Join-Path $adapterSource (
+    "bin\x86\Release\{0}\win-x86" -f $TargetFramework)
+Copy-RuntimeFiles $adapterX86HostOutput $adapterX86Output
+Copy-FileSafe (Join-Path $adapterSource 'bin\Win32\Release\NVIDIA OSC Adapter Hook.dll') (Join-Path $adapterX86Output 'NVIDIA OSC Adapter Hook.dll')
 Copy-FileSafe $adapterNativeDll (Join-Path $adapterOutput (Split-Path -Leaf $adapterNativeDll))
+Copy-FileSafe (Join-Path $ProjectRoot 'NVIDIA Adapter\Ansel Adapter\bin\x64\Release\NVIDIA Ansel Adapter.dll') (Join-Path $adapterOutput 'NVIDIA Ansel Adapter.dll')
 
 # Launcher host/UI slot; CEF runtime is shared from the OSC slot below.
 $launcherOutput = Join-Path $ProjectRoot 'Launcher.Cef\bin\x64\Release'

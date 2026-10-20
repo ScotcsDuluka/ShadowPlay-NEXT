@@ -516,10 +516,12 @@ namespace duluka::d3d9
             device->SetRenderTarget(0, previousTarget);
         previousTarget->Release();
     }
-    void OnReset()
+    void OnReset(IDirect3DDevice9 *device)
     {
         std::lock_guard<std::mutex> lock(g_renderMutex);
+        if (device && device != g_resourceDevice) return;
         ReleaseDeviceResources();
+        g_resourceDevice = nullptr;
     }
     void RenderForTest(IDirect3DDevice9 *device)
     {

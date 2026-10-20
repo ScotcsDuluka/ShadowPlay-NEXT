@@ -50,6 +50,13 @@ static class NvContainer
     {
         Timeout = TimeSpan.FromMilliseconds(3000)
     };
+    static readonly HttpClient NvCaptureHealthHttp = new HttpClient
+    {
+        Timeout = TimeSpan.FromMilliseconds(2000)
+    };
+    static bool NvCaptureMissingPathLogged;
+    static bool NvCaptureReadyStateKnown;
+    static bool NvCaptureLastReady;
 
     static string FindStartupRoot()
     {
@@ -116,6 +123,67 @@ static class NvContainer
     {
         try { return C.GetProperty("testMode").GetProperty("enabled").GetBoolean(); }
         catch { return false; }
+    }
+
+    static bool CaptureRuntimeEnabled()
+    {
+        return ConfigBool("captureRuntime", "enabled", false);
+    }
+
+    static int CaptureRuntimeApiPort()
+    {
+        return ConfigInt("captureRuntime", "apiPort", 59077, 1, 65535);
+    }
+
+    static string NvCaptureExe()
+    {
+        try { return ResolvePath(C.GetProperty("children").GetProperty("captureExe").GetString(), BuildRoot); }
+        catch { return Path.Combine(BuildRoot, "NVIDIA Capture", "NvCapture.exe"); }
+    }
+
+    static string NvCaptureWorkingDirectory()
+    {
+        try { return ResolvePath(C.GetProperty("children").GetProperty("captureWd").GetString(), BuildRoot); }
+        catch { return Path.GetDirectoryName(NvCaptureExe()); }
+    }
+
+    static bool NvCaptureReady()
+    {
+        try
+        {
+            using var response = NvCaptureHealthHttp.GetAsync(
+                "http://127.0.0.1:" + CaptureRuntimeApiPort() + "/health").GetAwaiter().GetResult();
+            if (!response.IsSuccessStatusCode) return false;
+            using var document = JsonDocument.Parse(
+                response.Content.ReadAsStringAsync().GetAwaiter().GetResult());
+            return document.RootElement.TryGetProperty("ready", out var ready) &&
+                   ready.ValueKind == JsonValueKind.True;
+        }
+        catch { return false; }
+    }
+
+    static void EnsureNvCapture()
+    {
+        if (!CaptureRuntimeEnabled()) return;
+        var exe = NvCaptureExe();
+        if (!File.Exists(exe))
+        {
+            if (!NvCaptureMissingPathLogged)
+            {
+                Log("[capture] real capture is enabled, but NvCapture.exe is missing: " + exe);
+                NvCaptureMissingPathLogged = true;
+            }
+            return;
+        }
+        NvCaptureMissingPathLogged = false;
+        EnsureRunning(exe, "NvCapture", NvCaptureWorkingDirectory(), "--rest");
+        var ready = NvCaptureReady();
+        if (!NvCaptureReadyStateKnown || NvCaptureLastReady != ready)
+        {
+            NvCaptureReadyStateKnown = true;
+            NvCaptureLastReady = ready;
+            Log(ready ? "[capture] NvCapture is ready" : "[capture] NvCapture is starting or unavailable");
+        }
     }
 
     static int ControlApiPort()
@@ -764,6 +832,8 @@ static class NvContainer
                 elapsed = 0;
 
                 EnsureNvGraphics();
+                var nodeApiReady = enabled && NodeApiHealthy(nodeApiPort);
+                if (nodeApiReady) EnsureNvCapture();
                 if (!enabled) continue;
 
                 EnsureRunning(hk, "nvsphelper", Path.GetDirectoryName(hk));
@@ -786,7 +856,7 @@ static class NvContainer
                         // Give the child a startup grace period; don't count cold-start probes.
                         unhealthyNodeApiChecks = 0;
                     }
-                    else if (NodeApiHealthy(nodeApiPort))
+                    else if (nodeApiReady)
                     {
                         unhealthyNodeApiChecks = 0;
                     }

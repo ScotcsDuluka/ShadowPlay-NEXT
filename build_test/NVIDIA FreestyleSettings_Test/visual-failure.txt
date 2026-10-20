@@ -1,0 +1,3 @@
+AssertionError [ERR_ASSERTION]: {"width":640,"overflow":false,"overlap":true}
+    at C:\My Project\NVIDIA-Shadowplay\build_test\NVIDIA FreestyleSettings_Test\visual-qa.cjs:115:7
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)

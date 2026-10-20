@@ -72,7 +72,7 @@ body > nv-osc-notifier.notifier-slider {
     top: 0;                                   /* JS set ตาม slot rank */
     pointer-events: auto;
     cursor: pointer;
-    opacity: 0.90;
+    opacity: 1;
     transition: right var(--nv-slide-ms) var(--nv-ease),
                 top var(--nv-glide-ms) var(--nv-ease);
     border-radius: 0;
@@ -215,13 +215,24 @@ body > nv-osc-notifier.notifier-slider {
     -webkit-box-orient: vertical;
 }
 
-.nv-toast__subtext {                             /* แท้: .notifier-subtext */
-    margin-top: -25px;                           /* แท้: -25px (ทับบรรทัดบน) */
+.nv-toast__subtext,
+.nv-toast.is-gpu .nv-toast__subtext,
+.nv-toast.is-large .nv-toast__subtext,
+.nv-toast.is-tall .nv-toast__subtext {
+    /* Content uses a flex column; a negative margin overlaps the title. */
+    margin-top: 2px;
+    line-height: 1.35;
     padding-right: 15px;
     color: #fff;
     font-size: 14px;                             /* แท้ */
     font-weight: 400;
     font-family: 'Segoe UI', sans-serif;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+    max-width: 100%;
+    opacity: 0.85;
 }
 
 /* ============================================================================
@@ -243,13 +254,6 @@ body > nv-osc-notifier.notifier-slider {
     height: 150px !important;
     top: 0 !important;
 }
-.nv-toast.is-large .nv-toast__subtext,
-.nv-toast.is-tall .nv-toast__subtext {
-    margin-top: 2px;
-    line-height: 1.2;
-    white-space: normal;
-    overflow-wrap: anywhere;
-}
 
 /* ============================================================================
    FLIP (แท้: .notifier-flip) — Updater UI ของแท้ ตอนข้อความซ้ำ
@@ -268,7 +272,18 @@ body > nv-osc-notifier.notifier-slider {
     transform-style: preserve-3d;
     transform: rotateX(-180deg);
 }
-.nv-toast__green, .nv-toast__black, .nv-toast__content {
+/* Keep resting text in the 2D raster path. Also overrides older hot-loaded
+   notifier styles; only the flip animation needs separate 3D layers. */
+.nv-toast:not(.is-flip) > .nv-toast__green,
+.nv-toast:not(.is-flip) > .nv-toast__black,
+.nv-toast:not(.is-flip) > .nv-toast__black > .nv-toast__content {
+    perspective: none;
+    backface-visibility: visible;
+    transform-style: flat;
+}
+.nv-toast.is-flip > .nv-toast__green,
+.nv-toast.is-flip > .nv-toast__black,
+.nv-toast.is-flip > .nv-toast__black > .nv-toast__content {
     perspective: 800px;                          /* แท้: .notifier-slider{perspective:800px} */
     backface-visibility: hidden;
 }
@@ -302,13 +317,4 @@ body > nv-osc-notifier.notifier-slider {
     width: var(--gpu-w) !important;
     height: var(--nv-height) !important;
     top: 0 !important;
-}
-.nv-toast.is-gpu .nv-toast__subtext {
-    margin-top: 2px;
-    white-space: normal;
-    overflow: visible;
-    text-overflow: clip;
-    overflow-wrap: anywhere;
-    max-width: 100%;
-    opacity: 0.85;
 }

@@ -1,5 +1,6 @@
 ﻿#include "D3D11Renderer.h"
 #include <d3d11_1.h>
+#include "D3D11SharedTextureRelay.h"
 #include <d3dcompiler.h>
 #include <strsafe.h>
 #include <atomic>
@@ -8,6 +9,8 @@
 #include <cstring>
 #include <iterator>
 #include <mutex>
+#include <memory>
+#include <new>
 #include <string>
 #include "../../../include/osc_frame_bridge.h"
 
@@ -38,6 +41,8 @@ namespace
     ID3D11BlendState *g_overlayBlendState = nullptr;
     ID3D11SamplerState *g_overlaySampler = nullptr;
     ID3D11Texture2D *g_overlayTexture = nullptr;
+    // Explicit lifetime: never run a GPU-owning static destructor at process exit.
+    duluka::d3d11::SharedTextureRelay *g_textureRelay = nullptr;
     ID3D11ShaderResourceView *g_overlayView = nullptr;
     IDXGIKeyedMutex *g_overlayKeyedMutex = nullptr;
     ID3D11Texture2D *g_overlayCachedTexture = nullptr;
@@ -215,6 +220,8 @@ namespace
         if (g_overlayView) { g_overlayView->Release(); g_overlayView = nullptr; }
         if (g_overlayKeyedMutex) { g_overlayKeyedMutex->Release(); g_overlayKeyedMutex = nullptr; }
         if (g_overlayTexture) { g_overlayTexture->Release(); g_overlayTexture = nullptr; }
+        delete g_textureRelay;
+        g_textureRelay = nullptr;
         if (g_overlaySourceProcess) { CloseHandle(g_overlaySourceProcess); g_overlaySourceProcess = nullptr; }
         g_overlaySourcePid = 0;
         g_overlaySourceResourceId = 0;
@@ -259,11 +266,12 @@ namespace
                     char diagnostic[256]{};
                     sprintf_s(diagnostic, sizeof(diagnostic),
                         "Game D3D11 device: featureLevel=0x%X vendor=0x%04X "
-                        "device=0x%04X adapterLuid=%08lX:%08lX",
+                        "device=0x%04X adapterLuid=%08lX:%08lX creationFlags=0x%X",
                         static_cast<unsigned>(device->GetFeatureLevel()),
                         adapterDesc.VendorId, adapterDesc.DeviceId,
                         static_cast<unsigned long>(adapterDesc.AdapterLuid.HighPart),
-                        static_cast<unsigned long>(adapterDesc.AdapterLuid.LowPart));
+                        static_cast<unsigned long>(adapterDesc.AdapterLuid.LowPart),
+                        device->GetCreationFlags());
                     Log(diagnostic);
                 }
                 adapter->Release();
@@ -445,6 +453,7 @@ namespace
         }
         ID3D11Device1 *device1 = nullptr;
         ID3D11Resource *resource = nullptr;
+        std::unique_ptr<duluka::d3d11::SharedTextureRelay> relay;
         HRESULT result = device->QueryInterface(__uuidof(ID3D11Device1),
             reinterpret_cast<void **>(&device1));
         if (SUCCEEDED(result))
@@ -453,6 +462,41 @@ namespace
                 reinterpret_cast<void **>(&resource));
         if (device1)
             device1->Release();
+        wchar_t testBridge[128]{}, expectedBridge[128]{}, forceRelay[2]{};
+        swprintf_s(expectedBridge, std::size(expectedBridge),
+            L"Local\\NVIDIAOSC.Frame.Test.%lu", GetCurrentProcessId());
+        if (GetEnvironmentVariableW(osc_frame_bridge::MappingNameEnvironmentVariable,
+                testBridge, static_cast<DWORD>(std::size(testBridge))) &&
+            wcscmp(testBridge, expectedBridge) == 0 &&
+            GetEnvironmentVariableW(L"NVIDIA_OSC_TEST_FORCE_TEXTURE_RELAY",
+                forceRelay, static_cast<DWORD>(std::size(forceRelay))) == 1 &&
+            forceRelay[0] == L'1')
+        {
+            if (resource) { resource->Release(); resource = nullptr; }
+            result = E_INVALIDARG;
+        }
+        if (result == E_INVALIDARG || result == E_NOINTERFACE)
+        {
+            relay.reset(new (std::nothrow) duluka::d3d11::SharedTextureRelay());
+            ID3D11Texture2D *relayTexture = nullptr;
+            const HRESULT relayResult = relay
+                ? relay->Open(device, sharedResourceName, &relayTexture) : E_OUTOFMEMORY;
+            if (SUCCEEDED(relayResult) && relayTexture)
+            {
+                resource = relayTexture;
+                result = S_OK;
+            }
+            else
+            {
+                if (relayTexture) relayTexture->Release();
+                relay.reset();
+                char diagnostic[192]{};
+                sprintf_s(diagnostic, sizeof(diagnostic),
+                    "Shared texture relay failed: namedHr=0x%08lX relayHr=0x%08lX",
+                    static_cast<unsigned long>(result), static_cast<unsigned long>(relayResult));
+                Log(diagnostic);
+            }
+        }
         if (SUCCEEDED(result) && !resource)
             result = E_UNEXPECTED;
         if (FAILED(result) || !resource)
@@ -467,11 +511,12 @@ namespace
                 char diagnostic[512]{};
                 sprintf_s(diagnostic, sizeof(diagnostic),
                     "Named shared texture open failed: sourcePid=%lu resourceId=%llu "
-                    "openByNameHr=0x%08lX optionalSyncOpenError=%lu",
+                    "openByNameHr=0x%08lX optionalSyncOpenError=%lu deviceRemovedHr=0x%08lX",
                     sourcePid,
                     static_cast<unsigned long long>(sourceResourceId),
                     static_cast<unsigned long>(result),
-                    static_cast<unsigned long>(syncOpenError));
+                    static_cast<unsigned long>(syncOpenError),
+                    static_cast<unsigned long>(device->GetDeviceRemovedReason()));
                 Log(diagnostic);
             }
             g_lastOverlayError.store(static_cast<long>(result), std::memory_order_relaxed);
@@ -563,6 +608,7 @@ namespace
             reinterpret_cast<void **>(&keyedMutex));
         ReleaseOverlayTexture();
         g_overlayTexture = texture;
+        g_textureRelay = relay.release();
         g_overlayView = view;
         g_overlayKeyedMutex = keyedMutex;
         g_overlayCachedTexture = cachedTexture;
@@ -573,6 +619,7 @@ namespace
         g_overlayTextureReady.store(true, std::memory_order_release);
         g_lastOverlayError.store(0, std::memory_order_relaxed);
         Log("Opened the CEF shared texture for in-game composition.");
+        if (g_textureRelay) Log("Texture transport: same-adapter GPU legacy-handle relay.");
         return true;
     }
 
@@ -642,7 +689,13 @@ namespace
         if (!g_overlayCacheValid || frameNumber != g_cachedFrameNumber)
         {
             bool acquired = true;
-            if (g_overlayKeyedMutex)
+            if (g_textureRelay)
+            {
+                result = g_textureRelay->Refresh();
+                acquired = result == S_OK;
+                if (!acquired) SetDiagnosticStage("shared-texture-relay-not-ready", result);
+            }
+            if (acquired && g_overlayKeyedMutex)
             {
                 result = g_overlayKeyedMutex->AcquireSync(0, 2);
                 acquired = result == WAIT_OBJECT_0;

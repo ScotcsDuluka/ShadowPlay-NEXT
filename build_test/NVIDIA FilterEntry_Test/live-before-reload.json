@@ -1,0 +1,231 @@
+{
+  "before": {
+    "pid": 18652,
+    "session": "18652:7840640:4",
+    "generation": 2,
+    "filters": [
+      "RadiantGI",
+      "BaBa: PHDR",
+      "FXAA"
+    ]
+  },
+  "cold": {
+    "route": "#/base/mods",
+    "runtime": "[18652,\"18652:7840640:4\",2]",
+    "prepared": "[18652,\"18652:7840640:4\",2]",
+    "active": null,
+    "slotFocus": "off",
+    "offActive": true,
+    "catalogs": [
+      [
+        "RadiantGI",
+        "BaBa: PHDR",
+        "FXAA"
+      ],
+      [
+        "RadiantGI",
+        "BaBa: PHDR",
+        "FXAA"
+      ],
+      [
+        "RadiantGI",
+        "BaBa: PHDR",
+        "FXAA"
+      ],
+      [
+        "RadiantGI",
+        "BaBa: PHDR",
+        "FXAA"
+      ]
+    ],
+    "nativeData": {
+      "lastSlot": 1,
+      "modsIsEnabled": true
+    },
+    "storedPresets": 4
+  },
+  "selected": {
+    "route": "#/base/mods",
+    "runtime": "[18652,\"18652:7840640:4\",2]",
+    "prepared": "[18652,\"18652:7840640:4\",2]",
+    "active": 2,
+    "slotFocus": 2,
+    "offActive": false,
+    "catalogs": [
+      [
+        "RadiantGI",
+        "BaBa: PHDR",
+        "FXAA"
+      ],
+      [
+        "RadiantGI",
+        "BaBa: PHDR",
+        "FXAA"
+      ],
+      [
+        "RadiantGI",
+        "BaBa: PHDR",
+        "FXAA"
+      ],
+      [
+        "RadiantGI",
+        "BaBa: PHDR",
+        "FXAA"
+      ]
+    ],
+    "choices": 1,
+    "nativeData": {
+      "lastSlot": 1,
+      "modsIsEnabled": true
+    },
+    "storedPresets": 4
+  },
+  "available": [
+    "RadiantGI",
+    "BaBa: PHDR",
+    "FXAA"
+  ],
+  "off": {
+    "route": "#/base/mods",
+    "runtime": "[18652,\"18652:7840640:4\",2]",
+    "prepared": null,
+    "active": null,
+    "slotFocus": "off",
+    "offActive": true,
+    "catalogs": [
+      [
+        "RadiantGI",
+        "BaBa: PHDR",
+        "FXAA"
+      ],
+      [
+        "RadiantGI",
+        "BaBa: PHDR",
+        "FXAA"
+      ],
+      [
+        "RadiantGI",
+        "BaBa: PHDR",
+        "FXAA"
+      ],
+      [
+        "RadiantGI",
+        "BaBa: PHDR",
+        "FXAA"
+      ]
+    ],
+    "choices": -1,
+    "nativeData": {
+      "lastSlot": 1,
+      "modsIsEnabled": false
+    },
+    "storedPresets": 4
+  },
+  "reopened": {
+    "route": "#/base/mods",
+    "runtime": "[18652,\"18652:7840640:4\",2]",
+    "prepared": "[18652,\"18652:7840640:4\",2]",
+    "active": null,
+    "slotFocus": "off",
+    "offActive": true,
+    "catalogs": [
+      [
+        "RadiantGI",
+        "BaBa: PHDR",
+        "FXAA"
+      ],
+      [
+        "RadiantGI",
+        "BaBa: PHDR",
+        "FXAA"
+      ],
+      [
+        "RadiantGI",
+        "BaBa: PHDR",
+        "FXAA"
+      ],
+      [
+        "RadiantGI",
+        "BaBa: PHDR",
+        "FXAA"
+      ]
+    ],
+    "choices": -1,
+    "nativeData": {
+      "lastSlot": 1,
+      "modsIsEnabled": false
+    },
+    "storedPresets": 4
+  },
+  "errors": [],
+  "requests": [
+    {
+      "url": "http://localhost:59011/NvCamera/v.1.0/EnableMods",
+      "method": "POST"
+    },
+    {
+      "url": "http://localhost:59011/NvCamera/v.1.0/ReshadeSupported",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:59011/NvCamera/v.1.0/GetAvailable",
+      "method": "POST"
+    },
+    {
+      "url": "http://localhost:59011/NvCamera/v.1.0/Capture/Control",
+      "method": "POST"
+    },
+    {
+      "url": "http://localhost:59011/NvCamera/v.1.0/GetProcessInfo",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:59011/NvCamera/v.1.0/Language",
+      "method": "POST"
+    },
+    {
+      "url": "http://localhost:59011/NvCamera/v.1.0/GetFilters",
+      "method": "POST"
+    },
+    {
+      "url": "http://localhost:59011/NvCamera/v.1.0/Filter/ResetStack",
+      "method": "POST"
+    },
+    {
+      "url": "http://localhost:59011/NvCamera/v.1.0/Filter/ResetStack",
+      "method": "POST"
+    },
+    {
+      "url": "http://localhost:59011/NvCamera/v.1.0/Filter/ResetStack",
+      "method": "POST"
+    },
+    {
+      "url": "http://localhost:59011/NvCamera/v.1.0/Filter/ResetStack",
+      "method": "POST"
+    },
+    {
+      "url": "http://localhost:59011/NvCamera/v.1.0/Filter/ResetStack",
+      "method": "POST"
+    },
+    {
+      "url": "http://localhost:59011/NvCamera/v.1.0/ReshadeSupported",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:59011/NvCamera/v.1.0/GetAvailable",
+      "method": "POST"
+    },
+    {
+      "url": "http://localhost:59011/NvCamera/v.1.0/Capture/Control",
+      "method": "POST"
+    },
+    {
+      "url": "http://localhost:59011/NvCamera/v.1.0/GetProcessInfo",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:59011/NvCamera/v.1.0/Filter/ResetStack",
+      "method": "POST"
+    }
+  ]
+}

@@ -26,6 +26,9 @@ static class NvShadowPlayHelper
     static extern bool UnregisterHotKey(IntPtr h, int id);
     [DllImport("user32.dll")]
     static extern short GetAsyncKeyState(int vKey);
+    [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr window, out uint pid);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr window, StringBuilder text, int count);
     [DllImport("user32.dll")]
     static extern int PeekMessageW(out MSG m, IntPtr h, uint a, uint b, uint remove);
     [DllImport("winmm.dll")]
@@ -69,6 +72,7 @@ static class NvShadowPlayHelper
         ["modsui"]               = new[] { 18, 114 },   // Alt+F3
         ["modstoggle"]           = new[] { 16, 18, 114 },
         ["nvcameraui"]           = new[] { 18, 113 },
+        ["overlayfocus"]         = new[] { 18, 16, 84 }, // Alt+Shift+T
     };
 
     // ชื่อใน settings (lowercase) → ชื่อทางการที่หน้า/node ใช้ (we.HotkeyShortcuts)
@@ -314,6 +318,17 @@ static class NvShadowPlayHelper
                 var hotkeyName = name;
                 ThreadPool.QueueUserWorkItem(delegate
                 {
+                    if (n == "overlayfocus")
+                    {
+                        var window = GetForegroundWindow();
+                        GetWindowThreadProcessId(window, out var pid);
+                        var title = new StringBuilder(512);
+                        GetWindowText(window, title, title.Capacity);
+                        string executable = "";
+                        try { using var process = System.Diagnostics.Process.GetProcessById((int)pid); executable = process.ProcessName; } catch { }
+                        Post("http://127.0.0.1:59011/Duluka/v.1.0/GameFilter/Focus", JsonSerializer.Serialize(new { pid, executable, title = title.ToString() }));
+                        return;
+                    }
                     Log("[hotkey] " + hotkeyName + " (" + n + ") -> fire");
                     if (_fireUrl.Length > 0) Post(_fireUrl.Replace("{name}", n));
                 });
@@ -383,15 +398,15 @@ static class NvShadowPlayHelper
         }
     }
 
-    static void Post(string url)
+    static void Post(string url, string body = "{}")
     {
         try
         {
             var req = (HttpWebRequest)WebRequest.Create(url);
             req.Method = "POST"; req.ContentType = "application/json"; req.Proxy = null;
-            req.ContentLength = 2;
+            var bs = Encoding.UTF8.GetBytes(body);
+            req.ContentLength = bs.Length;
             req.Timeout = 3000;
-            var bs = Encoding.UTF8.GetBytes("{}");
             using (var s = req.GetRequestStream()) s.Write(bs, 0, bs.Length);
             using var r = (HttpWebResponse)req.GetResponse();
             Log("[hotkey] " + url + " -> " + (int)r.StatusCode);

@@ -330,17 +330,21 @@ int wmain(int argc, wchar_t **argv)
     if (argc == 5 && wcscmp(argv[1], L"--publish") == 0)
         return RunTexturePublisher(argv[2], argv[3], argv[4]);
 
+    const bool gameDeviceMode = argc == 3 && wcscmp(argv[2], L"--game-device") == 0;
+    const bool relayMode = argc == 3 && wcscmp(argv[2], L"--legacy-relay") == 0;
+    if (relayMode) SetEnvironmentVariableW(L"NVIDIA_OSC_TEST_FORCE_TEXTURE_RELAY", L"1");
+    const bool noBgraMode = gameDeviceMode || (argc == 3 && wcscmp(argv[2], L"--no-bgra") == 0);
     const bool liveBridgeMode = argc == 3 &&
         wcscmp(argv[2], L"--live-bridge") == 0;
     const bool recursiveChainMode = argc == 3 &&
         wcscmp(argv[2], L"--recursive-chain") == 0;
     const bool resizeBaselineMode = argc == 3 &&
         wcscmp(argv[2], L"--resize-baseline") == 0;
-    if (argc != 2 && !liveBridgeMode && !recursiveChainMode &&
+    if (argc != 2 && !relayMode && !noBgraMode && !liveBridgeMode && !recursiveChainMode &&
         !resizeBaselineMode)
     {
         std::cerr << "Usage: NVIDIA OSC Adapter Smoke Test.exe <adapter-dll> "
-            << "[--live-bridge|--recursive-chain|--resize-baseline]\n";
+            << "[--live-bridge|--recursive-chain|--resize-baseline|--no-bgra]\n";
         return 2;
     }
 
@@ -428,14 +432,15 @@ int wmain(int argc, wchar_t **argv)
     ID3D11DeviceContext *context = nullptr;
     IDXGISwapChain *swapChain = nullptr;
     D3D_FEATURE_LEVEL featureLevel{};
+    const D3D_FEATURE_LEVEL gameFeatureLevel = D3D_FEATURE_LEVEL_11_1;
     HRESULT result = D3D11CreateDeviceAndSwapChain(
-        nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, D3D11_CREATE_DEVICE_BGRA_SUPPORT,
-        nullptr, 0, D3D11_SDK_VERSION, &swapChainDesc,
+        nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, noBgraMode ? 0 : D3D11_CREATE_DEVICE_BGRA_SUPPORT,
+        gameDeviceMode ? &gameFeatureLevel : nullptr, gameDeviceMode ? 1 : 0, D3D11_SDK_VERSION, &swapChainDesc,
         &swapChain, &device, &featureLevel, &context);
     if (FAILED(result))
     {
         result = D3D11CreateDeviceAndSwapChain(
-            nullptr, D3D_DRIVER_TYPE_WARP, nullptr, D3D11_CREATE_DEVICE_BGRA_SUPPORT,
+            nullptr, D3D_DRIVER_TYPE_WARP, nullptr, noBgraMode ? 0 : D3D11_CREATE_DEVICE_BGRA_SUPPORT,
             nullptr, 0, D3D11_SDK_VERSION, &swapChainDesc,
             &swapChain, &device, &featureLevel, &context);
     }

@@ -221,7 +221,9 @@
             }
 
             function showOpenShareGameCard(game, instanceKey, iconPath, shortcut, updaterUi, onClosed) {
-                var exeName = executableName(game.executablePath);
+                var exeName = typeof game.displayName === 'string' && game.displayName.trim()
+                    ? game.displayName.trim()
+                    : executableName(game.executablePath).replace(/\.exe$/i, '');
                 var subtext = $filter('translate')('l10n.notificationOpenShare', {
                     arg1: shortcut || 'Alt+Z'
                 });
@@ -326,6 +328,17 @@
                 });
                 saveObservedGameInstances(observedGameInstances);
             }
+
+            // Manual replay uses the same card, icon resolution and shortcut
+            // as game entry, without changing automatic-entry deduplication.
+            window.__dulukaReplayGameEntry = function (game) {
+                return Promise.all([
+                    getExecutableIcon(game.executablePath).then(getOpenShareIcon).catch(function () { return NVIDIA_ICON_FALLBACK; }),
+                    window.Notifier.getOpenShareShortcut().catch(function () { return 'Alt+Z'; })
+                ]).then(function (presentation) {
+                    return showOpenShareGameCard(game, 'manual-focus', presentation[0], presentation[1], false);
+                });
+            };
 
             function showNotification(event) {
                 if (!event || typeof event.selection !== 'string') {

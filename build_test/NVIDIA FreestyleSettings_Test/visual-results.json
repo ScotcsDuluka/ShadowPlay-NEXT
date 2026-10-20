@@ -1,0 +1,61 @@
+{
+  "results": [
+    {
+      "case": "loading locks controls; installer visibly disabled",
+      "pass": true
+    },
+    {
+      "case": "visible load error and successful retry",
+      "pass": true
+    },
+    {
+      "case": "labels and controls aligned without overlap",
+      "pass": true
+    },
+    {
+      "case": "native dropdown includes exactly three modes; Escape dismisses",
+      "pass": true
+    },
+    {
+      "case": "unavailable modes show honest status and hide ReShade controls",
+      "pass": true
+    },
+    {
+      "case": "save locks controls; rollback; retry sends intended value",
+      "pass": true
+    },
+    {
+      "case": "Photo mode tab opens and remains unavailable",
+      "pass": true
+    },
+    {
+      "case": "keyboard focus and Space toggles native switch exactly once",
+      "pass": true
+    },
+    {
+      "case": "responsive viewport 960px without overflow/overlap",
+      "pass": true
+    },
+    {
+      "case": "responsive viewport 640px without overflow/overlap",
+      "pass": true
+    },
+    {
+      "case": "real backend settings unchanged by visual tests",
+      "pass": true
+    }
+  ],
+  "passed": 11,
+  "initial": {
+    "bridgeEnabled": true,
+    "mode": "reshade",
+    "allowConnection": true,
+    "connectionManager": true
+  },
+  "after": {
+    "bridgeEnabled": true,
+    "mode": "reshade",
+    "allowConnection": true,
+    "connectionManager": true
+  }
+}

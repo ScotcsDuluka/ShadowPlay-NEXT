@@ -9,8 +9,12 @@
   }]).run(['$rootScope', '$http', '$state', function ($rootScope, $http, $state) {
     var checkingReadiness = false;
     var allowReadyTransition = false;
+    function fullInterfaceEnabled() {
+      return window.__dulukaOscInterface && window.__dulukaOscInterface.navigationEnabled;
+    }
     $rootScope.$on('$stateChangeStart', function (event, toState, toParams) {
       if (toState.name !== 'main.gpu-profiles') return;
+      if (fullInterfaceEnabled()) return;
       if (allowReadyTransition) {
         allowReadyTransition = false;
         return;
@@ -47,13 +51,13 @@
               window.dispatchEvent(new CustomEvent('nvgraphics-readiness-change', {
                 detail: { ready: false }
               }));
-              $state.go('main.preferences');
+              if (!fullInterfaceEnabled()) $state.go('main.preferences');
             }
           }, function () {
             window.dispatchEvent(new CustomEvent('nvgraphics-readiness-change', {
               detail: { ready: false }
             }));
-            $state.go('main.preferences');
+            if (!fullInterfaceEnabled()) $state.go('main.preferences');
           });
         }, 2000);
       } else if (readinessTimer) {

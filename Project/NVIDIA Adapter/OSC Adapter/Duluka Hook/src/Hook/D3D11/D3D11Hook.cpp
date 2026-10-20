@@ -300,6 +300,19 @@ namespace
             GetCurrentProcessId());
     }
 
+    void OnReShadeRuntimeDestroyed(reshade::api::effect_runtime *runtime)
+    {
+        if (!runtime) return;
+        auto *device = runtime->get_device();
+        if (device && device->get_api() == reshade::api::device_api::d3d9)
+        {
+            // ReShade releases its runtime before Reset/ResetEx. Default-pool
+            // textures and state blocks must be released before that call.
+            duluka::d3d9::OnReset(reinterpret_cast<IDirect3DDevice9 *>(
+                static_cast<std::uintptr_t>(device->get_native())));
+        }
+    }
+
     void OnReShadePresent(reshade::api::effect_runtime *runtime)
     {
         if (!runtime)
@@ -364,6 +377,36 @@ namespace
 
         reshade::register_event<reshade::addon_event::reshade_present>(
             &OnReShadePresent);
+        reshade::register_event<reshade::addon_event::destroy_effect_runtime>(
+            &OnReShadeRuntimeDestroyed);
+        // The filter bridge owns a separate ReShade SDK/registration and has
+        // process lifetime. The compositor never owns effect handles or values.
+        wchar_t hookPath[32768]{};
+        if (GetModuleFileNameW(g_module, hookPath, static_cast<DWORD>(std::size(hookPath))))
+        {
+            std::wstring adapterPath(hookPath);
+            const auto separator = adapterPath.find_last_of(L"\\/");
+            if (separator != std::wstring::npos)
+            {
+                adapterPath.resize(separator + 1);
+                adapterPath += L"NVIDIA Ansel Adapter.dll";
+                const HMODULE adapter = LoadLibraryExW(adapterPath.c_str(), nullptr,
+                    LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
+                if (adapter)
+                {
+                    const auto start = reinterpret_cast<BOOL(WINAPI *)(HMODULE)>(
+                        GetProcAddress(adapter, "StartNVIDIAAnselAdapter"));
+                    if (start && start(adapter))
+                        Log("[ansel] Live Game Filter adapter registered.");
+                    else
+                    {
+                        Log("[ansel] ReShade rejected filter adapter SDK; Game Filter unavailable.");
+                        FreeLibrary(adapter);
+                    }
+                }
+                else Log("[ansel] Filter adapter is missing or could not be loaded.");
+            }
+        }
         Log("[compositor] enhancement=reshade-addon active; OSC renders after "
             "ReShade effects (raw hook is pass-through).");
         return true;
@@ -376,6 +419,8 @@ namespace
 
         reshade::unregister_event<reshade::addon_event::reshade_present>(
             &OnReShadePresent);
+        reshade::unregister_event<reshade::addon_event::destroy_effect_runtime>(
+            &OnReShadeRuntimeDestroyed);
         reshade::unregister_addon(g_module);
     }
 

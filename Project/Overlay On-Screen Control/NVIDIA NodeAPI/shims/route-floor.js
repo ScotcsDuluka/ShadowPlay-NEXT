@@ -248,6 +248,9 @@ function savedHotkey(name) {
 
 function isContainerTestRoute(req) {
   if (req.method !== 'GET' && req.method !== 'POST') return false;
+  if (process.env.NV_CAPTURE_RUNTIME_ENABLED === '1' &&
+      (/^\/ShadowPlay\/v\.1\.0\/(Record\/(Enable|Running)|Capture\/State)$/.test(req.path) ||
+       /^\/Duluka\/v\.1\.0\/(State|Actual)$/.test(req.path))) return false;
   return /^\/ShadowPlay\/v\.1\.0\/(Record\/(Enable|Running|Save)|InstantReplay\/(Enable|Running|Save)|Broadcast\/(Enable|Running|Pause)|Screenshot\/(Support|Capture)|Capture\/State|OSC\/MainView)$/.test(req.path) ||
     /^\/NvCamera\/v\.1\.\d+(\/|$)/.test(req.path) ||
     /^\/Duluka\/v\.1\.0\/(State|Actual)$/.test(req.path);
@@ -362,6 +365,17 @@ function mainViewData() {
 }
 
 module.exports = function routeFloor(app, io) {
+  require('./performance-route.js')(app);
+  // Local interface policy is independent of NVIDIA account/driver allowlists.
+  // It unlocks navigation, without claiming unavailable engines completed work.
+  app.get('/Duluka/v.1.0/OSC/Interface', function (req, res) {
+    res.json({ fullInterface: true, navigationEnabled: true, preferencesEnabled: true, gameEditorsRequireSupportedGame:true,
+      menus: ['Screenshot', 'Ansel', 'Mods', 'InstantReplay', 'ManualRecord',
+        'Stream', 'Broadcast', 'Performance', 'Gallery', 'Mic', 'Camera', 'Preferences', 'QuietMode2'],
+      editorRoutes: { Ansel: 'nvcamera', Mods: 'mods' } });
+  });
+  // Live filter ownership precedes every simulated NvCamera/container route.
+  require('./game-filter-route.js')(app, io);
   // ตัวอัด = NvCapture.exe (bus: NvContainer.exe spawn + watchdog)
   // หน้า/REST คุม recordEnabled → engine poll /Duluka plane เอง → Actual กลับมาที่นี่
 
@@ -519,6 +533,33 @@ module.exports = function routeFloor(app, io) {
             res.status(500).json({ type: 'Error', code: -1, codeText: 'CAPTURE_SETTINGS_SAVE_FAILED',
               message: 'Unable to persist capture engine settings' });
           }
+        });
+        return;
+      }
+      if (p === '/DulukaCapture/v.1.0/status') {
+        if (process.env.NV_CAPTURE_RUNTIME_ENABLED !== '1') {
+          return G({ enabled: false, ready: false, recording: false });
+        }
+        const port = Number(process.env.NV_CAPTURE_RUNTIME_API_PORT) || 59077;
+        const request = http.get({ hostname: '127.0.0.1', port: port, path: '/health', timeout: 2000 }, function (response) {
+          let raw = '';
+          response.setEncoding('utf8');
+          response.on('data', function (chunk) { raw += chunk; });
+          response.on('end', function () {
+            let status;
+            try { status = JSON.parse(raw); }
+            catch (e) {
+              return res.status(502).json({ enabled: true, ready: false, recording: false,
+                codeText: 'CAPTURE_RUNTIME_INVALID_RESPONSE' });
+            }
+            status.enabled = true;
+            res.status(response.statusCode === 200 ? 200 : 503).json(status);
+          });
+        });
+        request.on('timeout', function () { request.destroy(new Error('NvCapture health timed out')); });
+        request.on('error', function () {
+          if (!res.headersSent) res.status(503).json({ enabled: true, ready: false, recording: false,
+            codeText: 'CAPTURE_RUNTIME_UNAVAILABLE' });
         });
         return;
       }

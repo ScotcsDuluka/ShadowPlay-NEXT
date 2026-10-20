@@ -1,0 +1,23 @@
+const fs = require('fs');
+(async () => {
+ const pages = await (await fetch('http://127.0.0.1:59099/json/list')).json();
+ const page = pages.find(p => p.url.startsWith('http://localhost:59011/'));
+ if (!page) throw Error('OSC page unavailable');
+ const ws = new WebSocket(page.webSocketDebuggerUrl);
+ await new Promise((r,j) => { ws.onopen=r; ws.onerror=j; });
+ let id=0; const pending=new Map();
+ ws.onmessage=e=>{const m=JSON.parse(e.data); if(pending.has(m.id)){pending.get(m.id)(m);pending.delete(m.id);}};
+ const call=(method,params)=>new Promise(r=>{const n=++id;pending.set(n,r);ws.send(JSON.stringify({id:n,method,params}));});
+ const evaluate=async expression=>{const r=await call('Runtime.evaluate',{expression,returnByValue:true});if(r.result.exceptionDetails)throw Error(JSON.stringify(r.result.exceptionDetails));return r.result.result.value;};
+ const probe=`JSON.stringify({dpr:devicePixelRatio,width:innerWidth,toast:Array.from(document.querySelectorAll('.nv-toast')).map(e=>({opacity:getComputedStyle(e).opacity,blackPerspective:getComputedStyle(e.querySelector('.nv-toast__black')).perspective,textPerspective:getComputedStyle(e.querySelector('.nv-toast__content')).perspective,flip:e.classList.contains('is-flip')}))})`;
+ console.log('before',await evaluate(probe));
+ const css=fs.readFileSync('Project/Overlay On-Screen Control/NVIDIA NodeAPI/osc/mods/notifier/notifier-system/notifier.css','utf8');
+ console.log('apply',await evaluate(`(()=>{let s=document.getElementById('nv-notifier-sharpness');if(!s){s=document.createElement('style');s.id='nv-notifier-sharpness';document.head.appendChild(s)}s.textContent=${JSON.stringify(css)};return 'ok'})()`));
+ console.log('after',await evaluate(probe));
+ console.log('preview',await evaluate(`(()=>{if(typeof Notifier==='undefined')return 'no notifier';Notifier.show('Notification clarity test',{group:'sharpness-test',icon:'\\uE933'});return 'shown'})()`));
+ await new Promise(r=>setTimeout(r,1700));
+ console.log('visible',await evaluate(probe));
+ const shot=await call('Page.captureScreenshot',{format:'png'});
+ if(shot.result)fs.writeFileSync('build_test/NVIDIA NotificationSharpness_Test/after.png',Buffer.from(shot.result.data,'base64'));
+ ws.close();
+})().catch(e=>{console.error(e);process.exitCode=1;});

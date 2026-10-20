@@ -4,12 +4,14 @@
   var endpoint = '/DulukaCapture/v.1.0/settings';
   var panelId = 'nv-video-capture-options';
   var panelStackId = 'nv-video-capture-panels';
-  var panelVersion = '64';
+  var panelVersion = '66';
   var state = null;
   var statusNode = null;
   var captureFields = [];
   var captureFieldsRow = null;
   var previewNode = null;
+  var runtimeStatusNode = null;
+  var runtimeStatusTimer = null;
   var encoderNames = {};
   var panelScope = null;
   var injector = null;
@@ -108,6 +110,12 @@
       return { value: choice[0], label: choice[1] };
     });
     panelScope.capturePresetChoices = [];
+    panelScope.captureSelectedLabel = function (value, choices) {
+      var selected = (choices || []).filter(function (choice) {
+        return String(choice.value) === String(value);
+      })[0];
+      return selected ? selected.label : '';
+    };
     panelScope.onCaptureEngineChange = function () {
       if (panelScope.captureUi.engineMode !== 'FFmpeg' &&
           panelScope.captureUi.engineMode !== 'Duluka') return;
@@ -169,11 +177,12 @@
     select.setAttribute('ng-change', changeHandler);
     select.setAttribute('ng-disabled', '!captureSettingsReady');
     select.setAttribute('aria-label', label);
+    select.setAttribute('md-selected-text', 'captureSelectedLabel(' + model + ', ' + choices + ')');
     select.className = 'osc-select resolution-fps-select nv-video-engine-select';
     select.id = id;
     select.setAttribute('hover-focus', '');
     var repeat = document.createElement('md-option');
-    repeat.setAttribute('ng-repeat', 'choice in ' + choices);
+    repeat.setAttribute('ng-repeat', 'choice in ' + choices + ' track by choice.value');
     repeat.setAttribute('ng-value', 'choice.value');
     repeat.setAttribute('ng-disabled', 'choice.disabled');
     repeat.setAttribute('hover-focus', '');
@@ -403,6 +412,28 @@
     schedulePanelDigest();
   }
 
+  function refreshCaptureRuntimeStatus() {
+    if (!runtimeStatusNode || !videoPage()) return;
+    fetchWithTimeout('/DulukaCapture/v.1.0/status', {}, 2500).then(function (response) {
+      return response.json().then(function (body) {
+        return { statusCode: response.status, body: body };
+      });
+    }).then(function (result) {
+      var body = result.body || {};
+      runtimeStatusNode.classList.remove('nv-video-engine-error');
+      if (!body.enabled) runtimeStatusNode.textContent = 'Capture runtime: disabled';
+      else if (body.ready) runtimeStatusNode.textContent = 'Capture runtime: ready · ' +
+        (body.recording ? 'Recording' : 'Idle');
+      else {
+        runtimeStatusNode.textContent = 'Capture runtime: starting or unavailable';
+        runtimeStatusNode.classList.add('nv-video-engine-error');
+      }
+    }).catch(function () {
+      runtimeStatusNode.textContent = 'Capture runtime: unavailable';
+      runtimeStatusNode.classList.add('nv-video-engine-error');
+    });
+  }
+
   function buildPanel(host) {
     var panel = document.createElement('section');
     panel.id = panelId;
@@ -503,7 +534,11 @@
     cursorSwitch.textContent = 'Capture cursor';
     statusNode = document.createElement('span');
     statusNode.className = 'nv-video-engine-status';
+    runtimeStatusNode = document.createElement('span');
+    runtimeStatusNode.className = 'nv-video-engine-runtime-status';
+    runtimeStatusNode.textContent = 'Capture runtime: checking…';
     footer.appendChild(cursorSwitch);
+    footer.appendChild(runtimeStatusNode);
     footer.appendChild(statusNode);
     var content = document.createElement('div');
     content.className = 'nv-video-capture-options-content';
@@ -536,6 +571,9 @@
     if (!buildCaptureControls(resolutionRow)) return;
     buildPanel(host);
     document.getElementById(panelId).setAttribute('data-nv-ui-version', panelVersion);
+    if (runtimeStatusTimer) window.clearInterval(runtimeStatusTimer);
+    refreshCaptureRuntimeStatus();
+    runtimeStatusTimer = window.setInterval(refreshCaptureRuntimeStatus, 5000);
     statusNode.textContent = 'Loading…';
     fetchWithTimeout(endpoint).then(function (response) {
       if (!response.ok) {

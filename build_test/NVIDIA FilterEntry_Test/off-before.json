@@ -1,0 +1,32 @@
+{
+  "result": {
+    "route": "#/base/mods",
+    "clicked": true,
+    "modsIsEnabled": true,
+    "lastSlot": 2,
+    "lastActiveSlot": -1,
+    "prepared": null,
+    "controller": {},
+    "slotClasses": [
+      "mods-slot ng-scope ng-isolate-scope",
+      "mods-slot ng-scope ng-isolate-scope",
+      "mods-slot ng-scope ng-isolate-scope",
+      "mods-slot ng-isolate-scope active"
+    ],
+    "storage": {
+      "lastSlot": 1,
+      "modsIsEnabled": true
+    }
+  },
+  "runtime": {
+    "stack": [],
+    "enabled": true
+  },
+  "requests": [
+    {
+      "url": "http://localhost:59011/NvCamera/v.1.0/Filter/ResetStack",
+      "method": "POST"
+    }
+  ],
+  "events": []
+}

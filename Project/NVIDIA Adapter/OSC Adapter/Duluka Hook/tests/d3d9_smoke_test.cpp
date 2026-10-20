@@ -17,9 +17,11 @@ using RenderD3D9ForTest = BOOL(WINAPI *)(IDirect3DDevice9 *);
 
 namespace
 {
+    bool g_reshadeTest = false;
+    std::uint64_t g_expectedDraws = 0;
     constexpr wchar_t WindowClassName[] = L"DulukaNvOscAdapterD3D9SmokeTest";
-    constexpr std::uint32_t FrameWidth = 64;
-    constexpr std::uint32_t FrameHeight = 64;
+    constexpr std::uint32_t FrameWidth = 640;
+    constexpr std::uint32_t FrameHeight = 480;
     constexpr std::uint32_t FramePitch = FrameWidth * 4;
 
     LRESULT CALLBACK WindowProc(HWND window, UINT message,
@@ -92,11 +94,11 @@ namespace
             CheckPixel(device, FrameWidth / 2, FrameHeight - 3,
                    "bottom orientation", 255, 0, 0, 8) &&
             CheckPixel(device, FrameWidth / 2, FrameHeight / 2,
-                   "alpha blend", 138, 15, 20, 10);
+                   "alpha blend", g_reshadeTest ? 128 : 138, g_reshadeTest ? 0 : 15, g_reshadeTest ? 127 : 20, 10) &&
+            (!g_reshadeTest || CheckPixel(device, FrameWidth - 4, FrameHeight / 2, "shader background", 0, 0, 255, 8));
     }
 
-    bool ClearAndDraw(IDirect3DDevice9 *device,
-        RenderD3D9ForTest renderForTest)
+    bool ClearFrame(IDirect3DDevice9 *device)
     {
         const HRESULT clearResult = device->Clear(
             0, nullptr, D3DCLEAR_TARGET,
@@ -107,50 +109,49 @@ namespace
                       << static_cast<unsigned long>(clearResult) << "\n";
             return false;
         }
-        if (!renderForTest(device))
-        {
-            std::cerr << "D3D9 compositor test draw failed.\n";
-            return false;
-        }
         return true;
     }
 
-    bool RenderAndVerify(IDirect3DDevice9Ex *device,
-        RenderD3D9ForTest renderForTest)
+    bool RenderAndVerify(IDirect3DDevice9Ex *device)
     {
-        if (!ClearAndDraw(device, renderForTest))
-            return false;
-        const HRESULT presentResult = device->PresentEx(
-            nullptr, nullptr, nullptr, nullptr, 0);
-        if (FAILED(presentResult))
+        const int frames = g_reshadeTest ? 420 : 1;
+        for (int frame = 0; frame < frames; ++frame)
         {
-            std::cerr << "D3D9 PresentEx failed: 0x" << std::hex
-                      << static_cast<unsigned long>(presentResult) << "\n";
-            return false;
+            MSG message{};
+            while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE))
+            { TranslateMessage(&message); DispatchMessageW(&message); }
+            if (!ClearFrame(device)) return false;
+            if (FAILED(device->PresentEx(
+            nullptr, nullptr, nullptr, nullptr, 0))) return false;
+            ++g_expectedDraws;
+            if (g_reshadeTest) Sleep(16);
         }
         return VerifyOutput(device);
     }
 
-    bool RenderAndVerify(IDirect3DDevice9 *device,
-        RenderD3D9ForTest renderForTest)
+    bool RenderAndVerify(IDirect3DDevice9 *device)
     {
-        if (!ClearAndDraw(device, renderForTest))
-            return false;
-        const HRESULT presentResult = device->Present(
-            nullptr, nullptr, nullptr, nullptr);
-        if (FAILED(presentResult))
+        const int frames = g_reshadeTest ? 420 : 1;
+        for (int frame = 0; frame < frames; ++frame)
         {
-            std::cerr << "D3D9 Present failed: 0x" << std::hex
-                      << static_cast<unsigned long>(presentResult) << "\n";
-            return false;
+            MSG message{};
+            while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE))
+            { TranslateMessage(&message); DispatchMessageW(&message); }
+            if (!ClearFrame(device)) return false;
+            if (FAILED(device->Present(
+            nullptr, nullptr, nullptr, nullptr))) return false;
+            ++g_expectedDraws;
+            if (g_reshadeTest) Sleep(16);
         }
         return VerifyOutput(device);
     }
 
     bool VerifyConsumerAdapterInfo()
     {
-        HANDLE mapping = OpenFileMappingW(FILE_MAP_READ, FALSE,
-            osc_frame_bridge::ConsumerAdapterMappingName);
+        wchar_t name[128]{};
+        if (!GetEnvironmentVariableW(osc_frame_bridge::ConsumerAdapterMappingNameEnvironmentVariable,
+                name, static_cast<DWORD>(std::size(name)))) return false;
+        HANDLE mapping = OpenFileMappingW(FILE_MAP_READ, FALSE, name);
         if (!mapping)
             return false;
         auto *info = static_cast<const osc_frame_bridge::ConsumerAdapterInfo *>(
@@ -168,6 +169,8 @@ namespace
             info->adapterLuid != 0 &&
             osc_frame_bridge::LoadConsumerRenderApi(*info) == static_cast<LONG>(
                 osc_frame_bridge::ConsumerRenderApiD3D9);
+        if (!valid) std::cerr << "Consumer identity invalid: pid=" << info->ownerProcessId
+            << " api=" << info->renderApi << " luid=" << info->adapterLuid << "\n";
         UnmapViewOfFile(info);
         CloseHandle(mapping);
         return valid;
@@ -176,7 +179,8 @@ namespace
 
 int wmain(int argc, wchar_t **argv)
 {
-    if (argc != 2)
+    if (argc != 2 && !(argc == 3 && std::wcscmp(argv[2], L"--external-attach") == 0) &&
+        !(argc == 4 && std::wcscmp(argv[2], L"--reshade") == 0))
     {
         std::cerr << "Usage: NVIDIA OSC Adapter D3D9 Smoke Test.exe <adapter-dll>\n";
         return 2;
@@ -193,8 +197,14 @@ int wmain(int argc, wchar_t **argv)
         return 3;
     }
 
+    wchar_t identityName[128]{};
+    if (FAILED(StringCchPrintfW(identityName, std::size(identityName),
+            L"Local\\NVIDIAOSC.Identity.D3D9.Smoke.%lu", GetCurrentProcessId())) ||
+        !SetEnvironmentVariableW(osc_frame_bridge::ConsumerAdapterMappingNameEnvironmentVariable,
+            identityName)) return 3;
+
     const DWORD mappingHigh = static_cast<DWORD>(
-        osc_frame_bridge::D3D9FrameMappingBytes >> 32);
+        static_cast<std::uint64_t>(osc_frame_bridge::D3D9FrameMappingBytes) >> 32);
     const DWORD mappingLow = static_cast<DWORD>(
         osc_frame_bridge::D3D9FrameMappingBytes & 0xFFFFFFFF);
     HANDLE mapping = CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr,
@@ -224,7 +234,7 @@ int wmain(int argc, wchar_t **argv)
             pixels[offset + 1] = 255;
             pixels[offset + 3] = 255;
         }
-    for (std::uint32_t y = 56; y < FrameHeight; ++y)
+    for (std::uint32_t y = FrameHeight - 8; y < FrameHeight; ++y)
         for (std::uint32_t x = 0; x < FrameWidth; ++x)
         {
             const std::size_t offset =
@@ -232,8 +242,8 @@ int wmain(int argc, wchar_t **argv)
             pixels[offset + 2] = 255;
             pixels[offset + 3] = 255;
         }
-    for (std::uint32_t y = 24; y < 40; ++y)
-        for (std::uint32_t x = 24; x < 40; ++x)
+    for (std::uint32_t y = FrameHeight / 2 - 8; y < FrameHeight / 2 + 8; ++y)
+        for (std::uint32_t x = FrameWidth / 2 - 8; x < FrameWidth / 2 + 8; ++x)
         {
             const std::size_t offset =
                 static_cast<std::size_t>(y) * FramePitch + x * 4;
@@ -279,7 +289,25 @@ int wmain(int argc, wchar_t **argv)
     }
     ShowWindow(window, SW_SHOW);
     UpdateWindow(window);
-    HMODULE hook = LoadLibraryW(argv[1]);
+    HMODULE reshadeModule = nullptr;
+    g_reshadeTest = argc == 4;
+    if (g_reshadeTest)
+    {
+        reshadeModule = LoadLibraryW(argv[3]);
+        if (!reshadeModule) { std::cerr << "Could not load ReShade: " << GetLastError() << "\n"; return 15; }
+    }
+    HMODULE hook = nullptr;
+    if (argc == 3)
+    {
+        // The external x64 host must route to its x86 child and load this DLL.
+        for (int attempt = 0; attempt < 1500 && !hook; ++attempt)
+        {
+            hook = GetModuleHandleW(argv[1]);
+            if (!hook) Sleep(10);
+        }
+        if (hook) LoadLibraryW(argv[1]); // Own one reference for test cleanup.
+    }
+    else hook = LoadLibraryW(argv[1]);
     if (!hook)
     {
         std::cerr << "LoadLibraryW failed: " << GetLastError() << "\n";
@@ -324,6 +352,20 @@ int wmain(int argc, wchar_t **argv)
         return 10;
     }
 
+    // External attachment starts another process; reacquire our test window
+    // before asserting a foreground-only compositor draw.
+    SetForegroundWindow(window);
+    for (int attempt = 0; attempt < 100 && GetForegroundWindow() != window; ++attempt)
+    {
+        SetForegroundWindow(window);
+        Sleep(10);
+    }
+    if (GetForegroundWindow() != window)
+    {
+        std::cerr << "DX9 test window could not become foreground.\n";
+        return 14;
+    }
+
     D3DPRESENT_PARAMETERS parameters{};
     parameters.BackBufferWidth = FrameWidth;
     parameters.BackBufferHeight = FrameHeight;
@@ -335,7 +377,14 @@ int wmain(int argc, wchar_t **argv)
     parameters.PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE;
 
     bool passed = true;
-    IDirect3D9 *baseDirect3d = Direct3DCreate9(D3D_SDK_VERSION);
+    auto create9 = g_reshadeTest
+        ? reinterpret_cast<IDirect3D9 *(WINAPI *)(UINT)>(GetProcAddress(reshadeModule, "Direct3DCreate9"))
+        : &Direct3DCreate9;
+    auto create9Ex = g_reshadeTest
+        ? reinterpret_cast<HRESULT(WINAPI *)(UINT, IDirect3D9Ex **)>(GetProcAddress(reshadeModule, "Direct3DCreate9Ex"))
+        : &Direct3DCreate9Ex;
+    if (!create9 || !create9Ex) return 16;
+    IDirect3D9 *baseDirect3d = create9(D3D_SDK_VERSION);
     IDirect3DDevice9 *baseDevice = nullptr;
     HRESULT result = baseDirect3d
         ? baseDirect3d->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL,
@@ -355,13 +404,13 @@ int wmain(int argc, wchar_t **argv)
         CloseHandle(mapping);
         return 11;
     }
-    passed = RenderAndVerify(baseDevice, renderForTest) &&
+    passed = RenderAndVerify(baseDevice) &&
         VerifyConsumerAdapterInfo();
     if (passed)
     {
         result = baseDevice->Reset(&parameters);
         passed = SUCCEEDED(result) &&
-            RenderAndVerify(baseDevice, renderForTest);
+            RenderAndVerify(baseDevice);
     }
     result = baseDevice->Reset(&parameters);
     baseDevice->Release();
@@ -369,7 +418,7 @@ int wmain(int argc, wchar_t **argv)
 
     IDirect3D9Ex *direct3d = nullptr;
     IDirect3DDevice9Ex *device = nullptr;
-    result = Direct3DCreate9Ex(D3D_SDK_VERSION, &direct3d);
+    result = create9Ex(D3D_SDK_VERSION, &direct3d);
     if (SUCCEEDED(result))
         result = direct3d->CreateDeviceEx(D3DADAPTER_DEFAULT,
             D3DDEVTYPE_HAL, window, D3DCREATE_SOFTWARE_VERTEXPROCESSING,
@@ -388,19 +437,19 @@ int wmain(int argc, wchar_t **argv)
         return 12;
     }
     if (passed)
-        passed = RenderAndVerify(device, renderForTest);
+        passed = RenderAndVerify(device);
     if (passed)
     {
         result = device->ResetEx(&parameters, nullptr);
-        passed = SUCCEEDED(result) && RenderAndVerify(device, renderForTest);
+        passed = SUCCEEDED(result) && RenderAndVerify(device);
     }
     getStatus(&presentCount, &drawCount, &hookInstalled);
-    passed = passed && drawCount >= 2;
+    passed = passed && drawCount == g_expectedDraws && (g_reshadeTest || presentCount == 4);
     if (!passed)
         std::cerr << "D3D9 smoke test failed; present=" << presentCount
                   << " draws=" << drawCount << "\n";
     else
-        std::cout << "D3D9 smoke test passed; present=" << presentCount
+        std::cout << (g_reshadeTest ? "D3D9 ReShade shader-isolation test passed; present=" : "D3D9 smoke test passed; present=") << presentCount
                   << " draws=" << drawCount << "\n";
 
     device->Release();

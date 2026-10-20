@@ -147,6 +147,14 @@ namespace osc_frame_bridge
         std::uint8_t pixels[1];
     };
 
+    // Fixed wire layout shared by the x64 publisher and x86/x64 consumers.
+    static_assert(offsetof(ConsumerAdapterInfo, adapterLuid) == 16);
+    static_assert(offsetof(ConsumerAdapterInfo, renderApi) == 24);
+    static_assert(sizeof(ConsumerAdapterInfo) == 32);
+    static_assert(offsetof(Frame, sharedResourceId) == 32);
+    static_assert(offsetof(D3D9Frame, frameNumber) == 32);
+    static_assert(offsetof(D3D9Frame, pixels) == 40);
+
     inline constexpr std::size_t D3D9FrameMappingBytes =
         offsetof(D3D9Frame, pixels) + MaxFrameBytes;
     inline constexpr std::size_t MappingBytes =

@@ -36,6 +36,17 @@ This product includes software developed by:
    Used via: FFmpeg nvenc integration
    Requires: NVIDIA GPU with NVENC support
 
+7. Patrick Mours and ReShade contributors - ReShade add-on SDK v5.9.2 (API v8)
+   Website: https://github.com/crosire/reshade/tree/v5.9.2
+   Used by: NVIDIA Ansel Adapter (Game Filter integration)
+   Source and license: Project/NVIDIA Adapter/Ansel Adapter/include/reshade-api-v8/
+   The bundled headers retain their original copyright and license notices.
+
+8. Niels Lohmann - JSON for Modern C++ v3.11.3
+   Website: https://github.com/nlohmann/json/tree/v3.11.3
+   License: MIT
+   Source and full license: Project/NVIDIA Adapter/Ansel Adapter/include/nlohmann/
+
 =====================================
 Project Information
 =====================================

@@ -1,0 +1,28 @@
+{
+  "result": {
+    "loaded": true,
+    "busy": false,
+    "config": {
+      "mode": "reshade",
+      "allowConnection": true,
+      "connectionManager": true
+    },
+    "initial": {
+      "mode": "reshade",
+      "allowConnection": true,
+      "connectionManager": true
+    },
+    "status": "Game filter can connect to ReShade in supported games.",
+    "watchersBefore": 136,
+    "watchersAfter": 136,
+    "panels": 1,
+    "selectNative": true,
+    "nestedDarkContent": 0,
+    "installer": true,
+    "testStagePresent": false
+  },
+  "photo": {
+    "selected": "Photo mode",
+    "unavailable": true
+  }
+}

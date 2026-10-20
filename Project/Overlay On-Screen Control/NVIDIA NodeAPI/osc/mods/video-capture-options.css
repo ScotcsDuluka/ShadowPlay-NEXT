@@ -215,6 +215,11 @@
   overflow-wrap: anywhere;
 }
 
+#nv-video-capture-options .nv-video-engine-runtime-status {
+  color: #919191;
+  font: 10px "Segoe UI", sans-serif;
+}
+
 #nv-video-capture-options .nv-video-engine-error {
   color: #c93;
 }
@@ -256,6 +261,10 @@
 
   #nv-video-capture-options .nv-video-engine-status {
     margin-left: 0;
+    text-align: left;
+  }
+
+  #nv-video-capture-options .nv-video-engine-runtime-status {
     text-align: left;
   }
 }
