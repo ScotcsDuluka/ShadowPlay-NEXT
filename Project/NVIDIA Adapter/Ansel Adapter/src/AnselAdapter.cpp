@@ -1,6 +1,7 @@
 #include <windows.h>
 #include <reshade.hpp>
 #include "FilterSession.h"
+#include "ReShadeUiMetadata.h"
 #include <array>
 #include <filesystem>
 #include <map>
@@ -89,16 +90,53 @@ struct ReShadeRuntime final : Runtime {
                 char uiType[64]{};
                 owner->get_annotation_string_from_uniform_variable(uniform, "ui_type", uiType);
                 if (std::string(uiType) == "text") return;
-                const bool slider = bounded && (std::string(uiType) == "slider" || std::string(uiType) == "drag");
+                const std::string kind = uiType;
+                const bool slider = bounded && (kind == "slider" || kind == "drag");
                 float step[4]{0.01f,0.01f,0.01f,0.01f};
                 owner->get_annotation_float_from_uniform_variable(uniform, "ui_step", step, count);
                 Json steps = Json::array();
                 for (size_t i=0; i<count; ++i) steps.push_back(type == "float" ? (step[i] > 0 ? step[i] : 0.01f) : 1.0f);
-                controls.push_back({{"id",controlId}, {"displayName",title[0] ? title : uniformName},
+                Json control = {{"id",controlId}, {"displayName",title[0] ? title : uniformName},
                     {"type",type == "bool" ? "boolean" : slider ? "slider" : "edit"},
                     {"dataType",type}, {"currentValue",values}, {"defaultValue",defaults.at(defaultKey)},
                     {"minValue",minimum}, {"maxValue",maximum}, {"stepSize",steps},
-                    {"uiMinValueV1",minimum}, {"uiMaxValueV1",maximum}});
+                    {"uiMinValueV1",minimum}, {"uiMaxValueV1",maximum}, {"uiType",kind}};
+                char tooltip[2048]{}, category[256]{};
+                owner->get_annotation_string_from_uniform_variable(uniform, "ui_tooltip", tooltip);
+                owner->get_annotation_string_from_uniform_variable(uniform, "ui_category", category);
+                if (tooltip[0]) control["tooltip"] = tooltip;
+                if (category[0]) control["category"] = category;
+                if ((kind == "combo" || kind == "radio") && count == 1 &&
+                    (type == "int" || type == "uint")) {
+                    // ui_items is a NUL-delimited annotation. Read its full
+                    // byte length rather than stopping at the first label.
+                    size_t bytes = 0;
+                    if (owner->get_annotation_string_from_uniform_variable(uniform, "ui_items", nullptr, &bytes) &&
+                        bytes > 1 && bytes <= 8192) {
+                        std::string raw(bytes, '\0');
+                        size_t actual = bytes;
+                        if (owner->get_annotation_string_from_uniform_variable(uniform, "ui_items", raw.data(), &actual) &&
+                            actual > 0 && actual <= bytes) {
+                            raw.resize(actual);
+                            reshade_ui::Choices choices;
+                            choices.labels = reshade_ui::split_items(raw);
+                            for (size_t i=0; i<choices.labels.size(); ++i)
+                                choices.values.push_back(static_cast<int64_t>(i));
+                            const int64_t selected = values[0].get<int64_t>();
+                            const int64_t original = defaults.at(defaultKey)[0].get<int64_t>();
+                            // Unknown enumeration values must remain editable
+                            // numerically, never silently become the first item.
+                            if (choices.valid() && choices.index_of(selected) >= 0 &&
+                                choices.index_of(original) >= 0) {
+                                control["type"] = "pulldown";
+                                control["controlDisplayName"] = choices.labels;
+                                control["currentId"] = selected;
+                                control["defaultId"] = original;
+                            }
+                        }
+                    }
+                }
+                controls.push_back(std::move(control));
             });
             filters.push_back({{"id",id}, {"name",label[0] ? label : name}, {"effect",effect},
                 {"enabled",r->get_technique_state(technique)}, {"controls",controls}});

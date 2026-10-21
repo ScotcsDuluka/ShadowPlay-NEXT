@@ -71,7 +71,7 @@ numeric and boolean uniforms (up to four components); global OSC-stack enable;
 reset to values observed when the runtime/effects were attached or reloaded.
 Engine-driven (`source`) and hidden uniforms, matrices and uniform arrays are
 excluded. Unbounded numeric uniforms use edits instead of fabricated sliders.
-Shader combo/radio annotations currently appear as numeric edits.
+ReShade `ui_type=combo` and `ui_type=radio` annotations with a valid NUL-separated `ui_items` list and a zero-based integer uniform now appear as NVIDIA OSC list controls, with actual option labels. Unrecognized or out-of-range values retain a numeric editor rather than silently selecting another shader mode. The adapter also passes `ui_tooltip`, `ui_category` and `ui_type` metadata to the OSC catalog (display of those metadata fields is still limited by the NVIDIA control templates). This is ReShade control compatibility, not a complete replacement for ReShade's overlay: color pickers, shaders' static text, full matrix/array controls, and ReShade settings/add-on/statistics tabs are not imported.
 
 Preset batches validate the complete input before the first write. Hardware or
 other add-on rejection during application is reported; this is not a GPU

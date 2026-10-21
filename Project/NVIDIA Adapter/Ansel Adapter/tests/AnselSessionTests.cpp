@@ -62,6 +62,18 @@ int main(int argc, char **argv) {
             }
             return 0;
         }
+        // ReShade ui_items is NUL-delimited, including the final terminator.
+        const char rawItems[] = "Off\0Low\0High\0";
+        const auto parsed = reshade_ui::split_items(std::string(rawItems, sizeof(rawItems) - 1));
+        require(parsed.size() == 3 && parsed[0] == "Off" && parsed[1] == "Low" &&
+            parsed[2] == "High", "ReShade combo/radio labels were parsed incorrectly");
+        reshade_ui::Choices choices;
+        choices.labels = parsed;
+        choices.values = {0, 1, 2};
+        require(choices.valid() && choices.index_of(2) == 2 && choices.index_of(5) == -1,
+            "ReShade combo/radio accepted a missing enum value");
+        require(!reshade_ui::Choices{{"Only"},{0}}.valid(),
+            "single-item ReShade dropdown must not replace a numeric input");
         require(session.dispatch(request("select",{{"type","test/filter-a"},{"stackIdx",0}}))["ok"], "select failed");
         require(session.dispatch(request("select",{{"type","test/filter-b"},{"stackIdx",1}}))["ok"], "second filter select failed");
         require(session.snapshot()["stack"].size() == 2, "second filter replaced the first in the preset");
