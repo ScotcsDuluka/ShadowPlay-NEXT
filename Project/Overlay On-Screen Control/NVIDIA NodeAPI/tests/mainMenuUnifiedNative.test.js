@@ -141,3 +141,25 @@ test('V4 preflight positions menu before Motion, but normal sync is frozen durin
   phase='idle';u.nativeGeometry(root);
   assert.equal(values.transform,baseline,'idle must keep the same anchored positions as preflight');
 });
+
+test('context menu edits the containing native Preview Block without showing Block frames',()=>{
+ assert(js.includes("document.addEventListener('contextmenu',openBlockContext,true)"));
+ assert(js.includes("document.documentElement.classList.contains('nv-live-layout-editing')"));
+ assert(js.includes("event.target.closest('md-menu[data-nv-unified-key]')"));
+ assert(js.includes("nativeMenu.hasAttribute('data-customize-preview')"));
+ assert(js.includes("var key=nativeTile.getAttribute('data-nv-unified-key'),current=get(),where=M.locate(current,key)"));
+ assert(js.includes("M.changeType(s,panel,index,type)"));
+ assert(js.includes("data-v4-context-type"));
+ assert(js.includes("closeBlockContext()"));
+ assert(js.includes("document.removeEventListener('contextmenu',openBlockContext,true)"));
+ assert(js.includes("Right-click a tile in the preview"));
+ const css=fs.readFileSync(path.join(__dirname,'../osc/mods/main-menu-unified-native.css'),'utf8');
+ assert(css.includes('.nv-unified-context'));
+ assert(css.includes('.nv-unified-context button[aria-checked="true"]'));
+ const f=fake();f.api.setEnabled(true);
+ const before=f.api.get(),where=M.locate(before,'Settings');
+ f.api.changeType(where.panel,where.index,'slot');
+ const after=f.api.get();
+ assert.equal(after.panels[where.panel][where.index].type,'slot');
+ assert.equal(M.locate(after,'Settings').panel,where.panel);
+});

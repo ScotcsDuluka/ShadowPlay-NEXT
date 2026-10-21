@@ -171,7 +171,7 @@
       }
     },true);
     var wrap=document.createElement('section');wrap.className='nv-unified-editor';wrap.setAttribute('aria-label','Flexible Main-menu Customize');
-    wrap.innerHTML='<div class="nv-unified-guide"><span>Drag a Control onto a Block to group it, or onto empty space for a new Block.</span><button type="button" data-v4-undo aria-label="Undo last layout change">↶ Undo</button></div><div class="nv-unified-panel-row">'+M.PANELS.map(function(p){
+    wrap.innerHTML='<div class="nv-unified-guide"><span>Drag to arrange · Right-click a tile in the preview to change its Block Type.</span><button type="button" data-v4-undo aria-label="Undo last layout change">↶ Undo</button></div><div class="nv-unified-panel-row">'+M.PANELS.map(function(p){
       return '<section class="nv-unified-panel" data-panel="'+p+'"><h3>'+p.toUpperCase()+' <span class="nv-unified-count"></span></h3><div class="nv-unified-block-list"></div><button data-v4-add="'+p+'">+ New Block</button></section>';
     }).join('')+'</div><div class="nv-unified-controls"><header><h3>Controls</h3><span class="nv-unified-selection"></span></header>'+
       '<input type="search" class="nv-unified-search" placeholder="Search Controls..." aria-label="Search Controls"><div class="nv-unified-palette"></div>'+
@@ -202,6 +202,63 @@
       if(target){var b=target.getAttribute('data-v4-block').split(':');change(function(s){return M.join(s,key,b[0],Number(b[1]));},'Grouped Controls');}
       else change(function(s){return M.toBlock(s,key,p,s.panels[p].length,'side');},'Moved Control');
     });
+    // The native Preview is intentionally borderless. Right-click a REAL
+    // NVIDIA md-menu tile while editing to configure the containing Block.
+    // Outside Customize we leave the original NVIDIA context menu alone.
+    var blockContextPopup=null;
+    function closeBlockContext(){
+      if(blockContextPopup&&blockContextPopup.parentNode)blockContextPopup.parentNode.removeChild(blockContextPopup);
+      blockContextPopup=null;
+    }
+    function openBlockContext(event){
+      if(!enabled()||!editor||!editor.isConnected||
+        !document.documentElement.classList.contains('nv-live-layout-editing'))return;
+      if(!event.target.closest)return;
+      var nativeTile=event.target.closest('md-menu[data-nv-unified-key]');
+      if(!nativeTile)return;
+      var nativeMenu=nativeTile.closest('nv-main-menu');
+      if(!nativeMenu||nativeMenu.hasAttribute('data-customize-preview'))return;
+      var key=nativeTile.getAttribute('data-nv-unified-key'),current=get(),where=M.locate(current,key);
+      if(!where)return;
+      event.preventDefault();event.stopImmediatePropagation();
+      closeBlockContext();
+      var block=current.panels[where.panel][where.index];
+      var names={big:'Block Big',side:'Block Side',slot:'Block Side Slot'};
+      var popup=document.createElement('div');popup.className='nv-unified-context';
+      popup.setAttribute('role','menu');popup.setAttribute('aria-label','Block type options');
+      popup.innerHTML='<div class="nv-unified-context-title">'+escapeText(members[key].label)+
+        '<small>'+escapeText(where.panel.toUpperCase())+' · '+block.controls.length+'/9 Controls</small></div>'+
+        M.TYPES.map(function(type){
+          return '<button type="button" role="menuitemradio" aria-checked="'+(block.type===type)+
+            '" data-v4-context-type="'+type+'"><span>'+names[type]+'</span>'+
+            (block.type===type?'<strong>✓</strong>':'')+'</button>';
+        }).join('');
+      document.body.appendChild(popup);blockContextPopup=popup;
+      var w=popup.offsetWidth||220,h=popup.offsetHeight||160;
+      popup.style.left=Math.max(8,Math.min(event.clientX,(window.innerWidth||1920)-w-8))+'px';
+      popup.style.top=Math.max(8,Math.min(event.clientY,(window.innerHeight||1080)-h-8))+'px';
+      popup.__v4Panel=where.panel;popup.__v4Index=where.index;
+    }
+    function clickBlockContext(event){
+      if(!blockContextPopup)return;
+      var target=event.target.closest&&event.target.closest('[data-v4-context-type]');
+      if(target&&blockContextPopup.contains(target)){
+        event.preventDefault();event.stopImmediatePropagation();
+        var type=target.getAttribute('data-v4-context-type');
+        var panel=blockContextPopup.__v4Panel,index=blockContextPopup.__v4Index;
+        closeBlockContext();
+        if(M.TYPES.indexOf(type)>=0)
+          change(function(s){return M.changeType(s,panel,index,type);},'Block Type: '+type);
+        return;
+      }
+      if(!blockContextPopup.contains(event.target))closeBlockContext();
+    }
+    function escapeBlockContext(event){
+      if(blockContextPopup&&event.key==='Escape'){closeBlockContext();event.preventDefault();}
+    }
+    document.addEventListener('contextmenu',openBlockContext,true);
+    document.addEventListener('click',clickBlockContext,true);
+    document.addEventListener('keydown',escapeBlockContext,true);
     // Older NVIDIA CEF does not reliably fire HTML5 drag/drop. Use native
     // mouse events, a non-interactive ghost and actual elementFromPoint hits.
     // Works for both catalog tiles and whole Block handles.
@@ -277,7 +334,10 @@
     wrap.addEventListener('click',suppressAfterDrag,true);
     var destroyTimer=window.setInterval(function(){
       if(wrap.isConnected)return;
-      window.clearInterval(destroyTimer);cancelDrag();
+      window.clearInterval(destroyTimer);cancelDrag();closeBlockContext();
+      document.removeEventListener('contextmenu',openBlockContext,true);
+      document.removeEventListener('click',clickBlockContext,true);
+      document.removeEventListener('keydown',escapeBlockContext,true);
       document.removeEventListener('mousemove',dragMove,true);
       document.removeEventListener('mouseup',dragUp,true);
       document.removeEventListener('keydown',cancelOnKey,true);

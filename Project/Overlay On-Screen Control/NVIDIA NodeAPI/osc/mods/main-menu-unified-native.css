@@ -91,3 +91,13 @@ html.nv-live-layout-editing:not(.nv-motion-active):not(.nv-motion-preparing) .ma
 .nv-unified-block-head{min-height:31px}
 .nv-unified-palette button{cursor:grab}
 @media(prefers-reduced-motion:reduce){.nv-unified-panel{transition:none}}
+
+/* Borderless native preview; right-click offers lightweight Block Type options.
+   Never show or intercept a V4 context menu outside Customize. */
+.nv-unified-context{position:fixed;z-index:2147483610;min-width:220px;max-width:265px;padding:5px;background:#242b2c;border:1px solid #58665b;border-top:3px solid #76b900;box-shadow:0 10px 32px rgba(0,0,0,.65);color:#fff;font-family:Arial,"Segoe UI",sans-serif}
+.nv-unified-context-title{padding:8px 9px 10px;font-size:13px;font-weight:bold;border-bottom:1px solid #4b5650}
+.nv-unified-context-title small{display:block;margin-top:4px;color:#afc0b3;font-size:10px;font-weight:normal}
+.nv-unified-context button{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;padding:10px 11px;min-height:37px;background:transparent;color:#e5eee3;border:0;text-align:left;font-size:12px;cursor:pointer}
+.nv-unified-context button:hover,.nv-unified-context button:focus{background:#405235;outline:none}
+.nv-unified-context button[aria-checked="true"]{color:#b0e567}
+.nv-unified-context button strong{font-size:14px}
