@@ -1,12 +1,4 @@
-(function (angular) {
-  'use strict';
-
-  angular.module('main').config(['$stateProvider', function ($stateProvider) {
-    $stateProvider.state('main.gpu-profiles', {
-      url: '/preferences/game-profiles',
-      template: '<div class="nv-gpu-profiles-route-slot"></div>'
-    });
-  }]).run(['$rootScope', '$http', '$state', function ($rootScope, $http, $state) {
+(function(angular){'use strict';angular.module('main').config(['$stateProvider',function($stateProvider){$stateProvider.state('main.gpu-profiles',{url:'/preferences/game-profiles',template:'<div class="nv-gpu-profiles-route-slot"></div>'});}]).run(['$rootScope', '$http', '$state', function ($rootScope, $http, $state) {
     var checkingReadiness = false;
     var allowReadyTransition = false;
     function fullInterfaceEnabled() {

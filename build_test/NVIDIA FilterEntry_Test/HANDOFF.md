@@ -71,3 +71,6 @@
 - Saved quick status and safe next steps in CURRENT-STATUS.md.
 - No game or service restart, no Native OSC change, no production code modifications, no Git commit. Working files are saved on disk; relevant project files are untracked.
 - NEXT: only when real game/adapter is connected, re-run diagnostics then test menu entry, Alt+F3, Off close/reopen and direct #/base/mods cold reload. External ReShade/Off sync remains unverified.
+
+## Compact Overlay Sidebar — 2026-10-20
+- User selected visible 4x60px sidebar over 4x80px scrolling. Source/live `osc/mods/gpu-profiles.js` modified and matched by SHA256; only CEF reloaded. Live CDP smoke: 4 native button rows fit in 240px; scrolling disabled; existing Game Profiles click opens `main.gpu-profiles`; center/right tiles remain fixed; no JS exceptions. Node tests 26/26 pass. Backups, screenshot, logs and full details: `build_test/NVIDIA LeftSidebar_Test/HANDOFF.md`. No game or backend restarts and no native OSC changes.

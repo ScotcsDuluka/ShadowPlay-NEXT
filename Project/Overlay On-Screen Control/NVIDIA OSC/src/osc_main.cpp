@@ -1,4 +1,4 @@
-﻿// osc_main.cpp — NVIDIA OSC (ของเรา): host C++ เหมือน NVIDIA Share.exe
+// osc_main.cpp — NVIDIA OSC (ของเรา): host C++ เหมือน NVIDIA Share.exe
 //
 // เฟส B+C: OSR (offscreen) + layered compositor per-pixel alpha + input forwarding
 // + page server :3000 + toggle :59003 + อ่าน NVIDIA Config\nvidia-osc.json — ใช้แทน CefSharp
@@ -20,6 +20,7 @@
 #include "include/cef_app.h"
 #include "include/cef_client.h"
 #include "include/cef_browser.h"
+#include "include/cef_parser.h"
 #include "include/cef_keyboard_handler.h"
 #include "include/wrapper/cef_helpers.h"
 #include "include/wrapper/cef_message_router.h"
@@ -506,6 +507,43 @@ static bool OscFramePublisherOverlayVisible() {
     return g_ui_open_snapshot.load(std::memory_order_acquire) ||
         g_notifier_overlay_visible.load(std::memory_order_acquire);
 }
+
+static constexpr UINT WM_OSC_DESKTOP_MONITOR = WM_APP + 0x43;
+static std::mutex g_desktop_monitor_mutex;
+static std::wstring g_desktop_monitor_device;
+static RECT g_desktop_monitor_rect{};
+struct OscMonitorEntry { std::wstring device, name; RECT rect{}; bool primary=false; };
+static BOOL CALLBACK OscEnumMonitor(HMONITOR monitor,HDC,LPRECT,LPARAM parameter) {
+    MONITORINFOEXW info{}; info.cbSize=sizeof(info);
+    if(!GetMonitorInfoW(monitor,&info)) return TRUE;
+    DISPLAY_DEVICEW display{};display.cb=sizeof(display);
+    EnumDisplayDevicesW(info.szDevice,0,&display,0);
+    auto* entries=reinterpret_cast<std::vector<OscMonitorEntry>*>(parameter);
+    entries->push_back({info.szDevice,display.DeviceString,info.rcMonitor,(info.dwFlags&MONITORINFOF_PRIMARY)!=0});
+    return TRUE;
+}
+static std::vector<OscMonitorEntry> OscDesktopMonitors() {
+    std::vector<OscMonitorEntry> entries;
+    EnumDisplayMonitors(nullptr,nullptr,OscEnumMonitor,reinterpret_cast<LPARAM>(&entries));
+    return entries;
+}
+static void OscRefreshDesktopMonitor() {
+    auto entries=OscDesktopMonitors();
+    std::lock_guard<std::mutex> lock(g_desktop_monitor_mutex);
+    const OscMonitorEntry* chosen=nullptr;
+    for(const auto& entry:entries) {
+        if(entry.primary&&!chosen)chosen=&entry;
+        if(!g_desktop_monitor_device.empty()&&entry.device==g_desktop_monitor_device){chosen=&entry;break;}
+    }
+    g_desktop_monitor_rect=chosen?chosen->rect:RECT{0,0,GetSystemMetrics(SM_CXSCREEN),GetSystemMetrics(SM_CYSCREEN)};
+}
+static RECT OscRenderScreenRect() {
+    if(g_game_focused.load(std::memory_order_acquire))return RECT{0,0,GetSystemMetrics(SM_CXSCREEN),GetSystemMetrics(SM_CYSCREEN)};
+    std::lock_guard<std::mutex> lock(g_desktop_monitor_mutex);
+    if(g_desktop_monitor_rect.right>g_desktop_monitor_rect.left)return g_desktop_monitor_rect;
+    return RECT{0,0,GetSystemMetrics(SM_CXSCREEN),GetSystemMetrics(SM_CYSCREEN)};
+}
+
 static constexpr UINT WM_OSC_FOCUS_MODE = WM_APP + 0x41;
 static constexpr UINT WM_OSC_GPU_FRAME_READY = WM_APP + 0x42;
 // Desktop shared-texture rendering stays on the CEF callback; only Present is queued.
@@ -687,6 +725,16 @@ static OscPresentResult PresentToSwap(int w, int h, bool deferDesktopPresent = f
     if (FAILED(g_gpu_swap->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)&back)) || !back)
         return OscPresentResult::Failed;
 
+    if(!g_game_focused.load(std::memory_order_acquire)&&g_dcomp_visual&&w>0&&h>0) {
+        const RECT screen=OscRenderScreenRect();
+        const float scale=static_cast<float>(screen.right-screen.left)/w;
+        const float offsetY=(static_cast<float>(screen.bottom-screen.top)-h*scale)*0.5f;
+        static float previousScale=-1,previousOffset=-1;
+        if(scale!=previousScale||offsetY!=previousOffset) {
+            const D2D_MATRIX_3X2_F transform{scale,0,0,scale,0,offsetY};
+            if(SUCCEEDED(g_dcomp_visual->SetTransform(transform))){previousScale=scale;previousOffset=offsetY;}
+        }
+    }
     const auto copyStartUs = OscPerfNowUs();
     g_gpu_ctx->CopyResource(back, g_own_rt);
     const auto copyCallUs = OscPerfNowUs() - copyStartUs;
@@ -1590,8 +1638,9 @@ static void ClearNotifierRects() {
 static std::atomic<double> g_ui_adjust{ 1.0 };   // ปรับสดด้วย Ctrl+ลูกเมาส์
 
 static void UpdateDisplayGeometry(int rasterWidth, int rasterHeight) {
-    const int screenWidth = GetSystemMetrics(SM_CXSCREEN);
-    const int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+    const RECT screen=OscRenderScreenRect();
+    const int screenWidth = screen.right-screen.left;
+    const int screenHeight = screen.bottom-screen.top;
     if (rasterWidth <= 0 || rasterHeight <= 0 || screenWidth <= 0 ||
         screenHeight <= 0)
         return;
@@ -1638,6 +1687,7 @@ static void ApplyGenuineZoomOnUi(bool force_log) {
     const double level = log(fit) / log(1.2);
     g_css_scale = fit;               // แมพ rect หน้าเว็บ (css px) → พิกเซลจอ
     auto host = g_browser->GetHost();
+    if(force_log)host->Invalidate(PET_VIEW);
     if (std::abs(host->GetZoomLevel() - level) > 0.000001)
         host->SetZoomLevel(level);
     if (!g_cfg.windowed && (previousDsf != g_render_dsf ||
@@ -1770,15 +1820,38 @@ static void CompositeFrame(const void* bgra, int w, int h, const std::vector<Cef
     const int displayHeight = g_disp_h.load(std::memory_order_acquire);
     const int destinationX = g_dst_x.load(std::memory_order_relaxed);
     const int destinationY = g_dst_y.load(std::memory_order_relaxed);
-    POINT dstpt{ destinationX, destinationY };
+    const RECT desktopOrigin=OscRenderScreenRect();
+    POINT dstpt{ desktopOrigin.left+destinationX, desktopOrigin.top+destinationY };
     // Leave a one-pixel gap at the right edge. UpdateLayeredWindow otherwise resets
     // the HWND to exact monitor width, which makes Windows classify it as full-screen
     // and suppress notifications even while the OSC is closed.
     SIZE winsz{ (std::max)(1, displayWidth - 1), displayHeight };
     POINT zerop{ 0, 0 };
     BLENDFUNCTION bf{ AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
+    // Scale the premultiplied DIB as well when GPU compositing is unavailable.
+    static HDC scaledDc=nullptr;
+    static HBITMAP scaledBitmap=nullptr,scaledOld=nullptr;
+    static int scaledWidth=0,scaledHeight=0;
+    HDC presentDc=g_hdc_mem;
+    if(displayWidth!=w||displayHeight!=h) {
+        if(scaledWidth!=displayWidth||scaledHeight!=displayHeight) {
+            if(scaledDc){SelectObject(scaledDc,scaledOld);DeleteObject(scaledBitmap);DeleteDC(scaledDc);}
+            scaledDc=CreateCompatibleDC(nullptr);scaledBitmap=nullptr;scaledOld=nullptr;
+            BITMAPINFO bi{};bi.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);
+            bi.bmiHeader.biWidth=displayWidth;bi.bmiHeader.biHeight=-displayHeight;
+            bi.bmiHeader.biPlanes=1;bi.bmiHeader.biBitCount=32;bi.bmiHeader.biCompression=BI_RGB;
+            void* bits=nullptr;
+            if(scaledDc)scaledBitmap=CreateDIBSection(scaledDc,&bi,DIB_RGB_COLORS,&bits,nullptr,0);
+            if(!scaledBitmap){if(scaledDc)DeleteDC(scaledDc);scaledDc=nullptr;scaledWidth=scaledHeight=0;return;}
+            scaledOld=(HBITMAP)SelectObject(scaledDc,scaledBitmap);
+            scaledWidth=displayWidth;scaledHeight=displayHeight;
+        }
+        SetStretchBltMode(scaledDc,COLORONCOLOR);
+        if(!StretchBlt(scaledDc,0,0,displayWidth,displayHeight,g_hdc_mem,0,0,w,h,SRCCOPY))return;
+        presentDc=scaledDc;
+    }
     HDC scr2 = GetDC(nullptr);
-    BOOL ulw = UpdateLayeredWindow(g_hwnd, scr2, &dstpt, &winsz, g_hdc_mem, &zerop, 0, &bf, ULW_ALPHA);
+    BOOL ulw = UpdateLayeredWindow(g_hwnd, scr2, &dstpt, &winsz, presentDc, &zerop, 0, &bf, ULW_ALPHA);
     ReleaseDC(nullptr, scr2);
     static bool last_ok = false;
     bool ok = ulw != 0;
@@ -1965,6 +2038,20 @@ static std::string ExtractDataValue(const std::string& req) {
     return "{}";
 }
 
+
+static void OscLoadDesktopMonitor() {
+    StoreLoad();
+    auto entry=g_store.find("DesktopMonitor");
+    if(entry!=g_store.end()) {
+        auto value=CefParseJSON(entry->second,JSON_PARSER_RFC);
+        if(value&&value->GetType()==VTYPE_DICTIONARY) {
+            std::lock_guard<std::mutex> lock(g_desktop_monitor_mutex);
+            g_desktop_monitor_device=value->GetDictionary()->GetString("device").ToWString();
+        }
+    }
+    OscRefreshDesktopMonitor();
+}
+
 static void HandleOscQuery(const std::string& req, bool persistent,
     const std::function<void(const std::string&)>& reply) {
     std::string cmd;
@@ -1977,6 +2064,35 @@ static void HandleOscQuery(const std::string& req, bool persistent,
     static int qcount = 0;
     if (qcount++ < 25 || cmd != "QUERY_OSC_SET_PAINTING")
         Log(std::string("[cefQuery] ") + cmd + (persistent ? " (persistent)" : ""));
+
+
+    if(cmd=="QUERY_OSC_DESKTOP_MONITORS") {
+        auto response=CefDictionaryValue::Create();auto list=CefListValue::Create();
+        std::wstring selected;{std::lock_guard<std::mutex> lock(g_desktop_monitor_mutex);selected=g_desktop_monitor_device;}
+        auto monitors=OscDesktopMonitors();int index=0;
+        for(const auto& monitor:monitors){auto item=CefDictionaryValue::Create();
+            item->SetString("device",monitor.device);item->SetString("name",monitor.name);
+            item->SetBool("primary",monitor.primary);item->SetInt("width",monitor.rect.right-monitor.rect.left);
+            item->SetInt("height",monitor.rect.bottom-monitor.rect.top);item->SetInt("left",monitor.rect.left);item->SetInt("top",monitor.rect.top);
+            list->SetDictionary(index++,item);
+        }
+        response->SetString("selected",selected);response->SetList("displays",list);
+        auto value=CefValue::Create();value->SetDictionary(response);reply(CefWriteJSON(value,JSON_WRITER_DEFAULT));return;
+    }
+    if(cmd=="QUERY_OSC_SET_DESKTOP_MONITOR") {
+        auto request=CefParseJSON(req,JSON_PARSER_RFC);
+        if(!request||request->GetType()!=VTYPE_DICTIONARY){reply("{\"saved\":false}");return;}
+        auto device=request->GetDictionary()->GetString("device").ToWString();
+        auto monitors=OscDesktopMonitors();bool found=device.empty();
+        for(const auto& monitor:monitors)if(monitor.device==device)found=true;
+        if(!found){reply("{\"saved\":false,\"error\":\"Display disconnected\"}");return;}
+        auto data=CefDictionaryValue::Create();data->SetString("device",device);auto value=CefValue::Create();value->SetDictionary(data);
+        StoreLoad();g_store["DesktopMonitor"]=CefWriteJSON(value,JSON_WRITER_DEFAULT);StoreSaveAsync();
+        {std::lock_guard<std::mutex> lock(g_desktop_monitor_mutex);g_desktop_monitor_device=device;}
+        OscRefreshDesktopMonitor();
+        if(g_hwnd)PostMessageW(g_hwnd,WM_OSC_DESKTOP_MONITOR,0,0);
+        reply("{\"saved\":true}");return;
+    }
 
     if (cmd == "QUERY_OSC_REGISTER_CLOSE_EVENT") {
         g_close_registered = true;
@@ -2679,6 +2795,7 @@ public:
 };
 
 static void CreateBrowserNow() {
+    // Keep the CEF shared-texture raster stable when the desktop monitor changes.
     int w = GetSystemMetrics(SM_CXSCREEN), h = GetSystemMetrics(SM_CYSCREEN);
     CefWindowInfo wi;
     char ow[4] = { 0 };
@@ -2790,6 +2907,7 @@ static CefMouseEvent MkMousePt(POINT s) {
         const int displayWidth = g_disp_w.load(std::memory_order_acquire);
         const int displayHeight = g_disp_h.load(std::memory_order_acquire);
         if (displayWidth > 0 && displayHeight > 0) {
+            const RECT desktop=OscRenderScreenRect();s.x-=desktop.left;s.y-=desktop.top;
             const int destinationX = g_dst_x.load(std::memory_order_relaxed);
             const int destinationY = g_dst_y.load(std::memory_order_relaxed);
             int x = (int)((LONGLONG)(s.x - destinationX) * g_view_w / displayWidth);
@@ -2957,6 +3075,7 @@ static bool ScreenInUiRects(POINT s) {
     if (displayWidth <= 0 || displayHeight <= 0) return false;
     const int destinationX = g_dst_x.load(std::memory_order_relaxed);
     const int destinationY = g_dst_y.load(std::memory_order_relaxed);
+    const RECT desktop=OscRenderScreenRect();s.x-=desktop.left;s.y-=desktop.top;
     RECT overlay_rect{
         destinationX - 1,
         destinationY - 1,
@@ -3203,7 +3322,7 @@ static void BindDcompTarget() {
     if (FAILED(vis->SetContent(g_gpu_swap))) { vis->Release(); target->Release(); Log("[gpu] BindDcompTarget: SetContent FAILED"); return; }
     if (FAILED(target->SetRoot(vis))) { vis->Release(); target->Release(); Log("[gpu] BindDcompTarget: SetRoot FAILED"); return; }
     if (FAILED(g_dcomp_dev->Commit())) { vis->Release(); target->Release(); Log("[gpu] BindDcompTarget: Commit FAILED"); return; }
-    vis->Release();
+    g_dcomp_visual = vis;
     g_dcomp_target = target;          // เจ้าของตลอดอายุ — teardown จริงค่อยปล่อย
     g_dcomp_bound = true;
     Log("[gpu] dcomp target BOUND after show");
@@ -3258,8 +3377,9 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         if (hookMode) {
             ShowWindow(h, SW_HIDE);
             if (g_browser) g_browser->GetHost()->SetFocus(false);
-        } else if (g_ui_open) {
-            ShowWindow(h, SW_SHOWNOACTIVATE);
+        } else {
+            PostMessageW(h,WM_OSC_DESKTOP_MONITOR,0,0);
+            if(g_ui_open) ShowWindow(h, SW_SHOWNOACTIVATE);
         }
         Log(std::string("[focus-mode] ") +
             (hookMode ? "hook active; desktop OSC hidden" :
@@ -3309,6 +3429,16 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         case WM_CHAR:
             ForwardKey(msg, w, l); return 0;
         }
+    }
+    if(msg==WM_OSC_DESKTOP_MONITOR||msg==WM_DISPLAYCHANGE) {
+        if(!g_game_focused.load(std::memory_order_acquire)) {
+            OscRefreshDesktopMonitor();const RECT screen=OscRenderScreenRect();
+            SetWindowPos(h,HWND_TOPMOST,screen.left,screen.top,NotificationSafeOverlayWidth(screen.right-screen.left),screen.bottom-screen.top,SWP_NOACTIVATE);
+            if(g_ui_open)SetFullOverlayRegion();
+            ApplyGenuineZoom(true);
+
+        }
+        return 0;
     }
     switch (msg) {
     case WM_OSC_ROUTE: {
@@ -3408,11 +3538,10 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM w, LPARAM l) {
             }
             if (!IsOverlayInputClickThrough() && !SetFullOverlayRegion())
                 Log("[window] OSC opened but full hit-test region could not be restored");
-            // OSC ขึ้นจอหลักเสมอ (primary) + ขยายเต็ม
-            POINT zero{ 0, 0 };
-            HMONITOR mon = MonitorFromPoint(zero, MONITOR_DEFAULTTOPRIMARY);
-            MONITORINFO mi{ sizeof(mi) };
-            if (mon && GetMonitorInfoW(mon, &mi)) {
+            OscRefreshDesktopMonitor();
+            const RECT selectedScreen=OscRenderScreenRect();
+            MONITORINFO mi{ sizeof(mi) };mi.rcMonitor=selectedScreen;
+            {
                 SetWindowPos(g_hwnd, HWND_TOPMOST,
                     mi.rcMonitor.left, mi.rcMonitor.top,
                     NotificationSafeOverlayWidth(mi.rcMonitor.right - mi.rcMonitor.left),
@@ -4055,7 +4184,9 @@ public:
     void OnContextInitialized() override {
         CEF_REQUIRE_UI_THREAD();
         OscClient::CreateRouter();
+        OscLoadDesktopMonitor();
 
+        const RECT renderScreen=OscRenderScreenRect();
         int w = GetSystemMetrics(SM_CXSCREEN), h = GetSystemMetrics(SM_CYSCREEN);
         int overlay_w = NotificationSafeOverlayWidth(w);
         if (g_cfg.design_w > 0 && g_cfg.design_h > 0) {
@@ -4083,7 +4214,7 @@ public:
         g_hwnd = CreateWindowExW(
             WS_EX_TOOLWINDOW | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE | WS_EX_TOPMOST,
             L"DulukaOscNative", L"NVIDIA OSC", WS_POPUP,
-            0, 0, overlay_w, h, nullptr, nullptr, wc.hInstance, nullptr);
+            renderScreen.left, renderScreen.top, overlay_w, h, nullptr, nullptr, wc.hInstance, nullptr);
         g_game_focused.store(IsHookGameForegroundStable(), std::memory_order_release);
         // ★ บทเรียน 03:57 — DComp กับ LAYERED ขัดกัน (DWM ใช้เลเยอร์ GDI ทับ visual)
         //   และ LAYERED ก็ทำให้ DComp มองไม่เห็น → โมเดลใหม่ไม่พึ่งการซ่อนหน้าต่างแล้ว
@@ -4113,6 +4244,8 @@ public:
                     GetWindowLongW(g_hwnd, GWL_EXSTYLE) | WS_EX_LAYERED);
                 Log("[gpu] hybrid init failed → layered CPU fallback");
             } else {
+                // A resized DComp host must not expose an opaque GDI backing surface.
+                SetWindowLongPtrW(g_hwnd,GWL_EXSTYLE,GetWindowLongPtrW(g_hwnd,GWL_EXSTYLE)|WS_EX_NOREDIRECTIONBITMAP);
                 ShowWindow(g_hwnd, SW_HIDE);
                 Log("[gpu] hybrid ready: DComp surface with route-driven layered pass-through");
             }
@@ -4120,8 +4253,9 @@ public:
         if (!g_clickthrough_hwnd) {
             ShowWindow(g_hwnd, SW_SHOWNOACTIVATE);
             SetWindowPos(g_hwnd, HWND_TOPMOST,
-                0, 0, overlay_w, h, SWP_NOACTIVATE);
+                renderScreen.left, renderScreen.top, overlay_w, h, SWP_NOACTIVATE);
         }
+        PostMessageW(g_hwnd,WM_OSC_DESKTOP_MONITOR,0,0);
         ApplyOpenShareInputMode(); // OpenShare starts closed; input mode follows its state.
         Log("[window] boot: click-through until OpenShare opens");
         SetTimer(g_hwnd, 1, 30000, nullptr);   // เฝ้าระวัง: หน้าค้าง about:blank → กู้คืนเอง

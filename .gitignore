@@ -131,6 +131,7 @@ Server/.server-secret
 Project/NvNode/node_modules/
 Project/OscProvision/Payload/
 build/
+build_test/
 # OWNER 2026-10-03: licensed NVIDIA payload = LOCAL ONLY — ห้าม push จนกว่า OWNER จะตัดสินใจเรื่อง payload บน GitHub
 # (commit acb342263e เก็บสำเนาไว้ local เพื่อกันดิสก์พัง — กฎข้างล่างกัน "add เพิ่ม" ในอนาคต)
 Project/Overlay OSC/Docs ShadowPlay - Real/OscProvision/Payload/

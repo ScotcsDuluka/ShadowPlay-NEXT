@@ -177,7 +177,10 @@ function fallbackFolderListing(options, callback) {
             if (entry.isDirectory()) {
                 directories.push(entry.name);
             } else if (entry.isFile()) {
-                files.push({ name: entry.name });
+                var ext=path.extname(entry.name).toLowerCase();
+                var file={name:entry.name};
+                if(VIDEO_EXTENSIONS[ext]||IMAGE_EXTENSIONS[ext]){file.type=VIDEO_EXTENSIONS[ext]?'video':'image';file.subtype='Normal';file.source='ShadowPlay';}
+                files.push(file);
             }
         });
         directories.sort(function (a, b) { return a.localeCompare(b); });
@@ -262,6 +265,8 @@ function findFfmpegPath() {
     if (process.env.NV_FFMPEG_PATH)
         candidates.push(process.env.NV_FFMPEG_PATH);
     candidates.push(path.join(__dirname, 'ffmpeg.exe'));
+    candidates.push(path.resolve(__dirname, '..', '..', 'NVIDIA Capture', 'FFmpeg', 'ffmpeg.exe'));
+    candidates.push(path.resolve(__dirname, '..', '..', 'FFmpeg', 'ffmpeg.exe'));
     candidates.push(path.resolve(__dirname, '..', '..', '..', 'Project',
         'ShadowPlay', 'FFmpeg Capture', 'FFmpeg', 'ffmpeg.exe'));
     candidates.push(path.resolve(__dirname, '..', '..', '..', '..', 'Project',
@@ -279,7 +284,7 @@ function findFfmpegPath() {
     return null;
 }
 
-function prepareRecordingPlayback(media, callback) {
+function prepareRecordingPlayback(media, callback, segmentStart, segmentTrack) {
     var ffmpegPath = findFfmpegPath();
     if (!ffmpegPath) {
         callback(new Error('FFmpeg executable is not available'));
@@ -290,7 +295,8 @@ function prepareRecordingPlayback(media, callback) {
     var cacheKey = crypto.createHash('sha256').update([
         media.filename,
         media.stats.size,
-        media.stats.mtimeMs
+        media.stats.mtimeMs,
+        segmentStart === undefined ? 'full' : 'segment-v7-' + segmentStart + '-' + (segmentTrack || 'both')
     ].join('|')).digest('hex');
     var cacheFile = path.join(cacheDir, cacheKey + '.webm');
 
@@ -369,6 +375,23 @@ function prepareRecordingPlayback(media, callback) {
                         temporaryFile
                     ];
 
+                    if (segmentStart !== undefined) {
+                        args.splice(4, 0, '-ss', String(segmentStart));
+                        args[args.indexOf('-c:a') + 1] = 'libvorbis';
+                        args.splice(args.length - 3, 0, '-af', 'asetpts=PTS+0.01/TB', '-g', '240', '-cluster_time_limit', '10000', '-output_ts_offset', String(segmentStart + 0.05), '-ac', '2', '-ar', '48000', '-t', '8', '-vf', 'scale=1280:720:force_original_aspect_ratio=decrease', '-r', '30', '-threads', '2');
+                    }
+
+                    if (segmentStart !== undefined && segmentTrack === 'video') {
+                        var audioMap=args.indexOf('0:a:0?');
+                        if(audioMap>=0)args.splice(audioMap-1,2);
+                        args.splice(args.length-3,0,'-an');
+                    }
+                    if (segmentStart !== undefined && segmentTrack === 'audio') {
+                        args=['-nostdin','-v','error','-y','-ss',String(segmentStart),'-i',media.filename,
+                            '-map','0:a:0','-vn','-t','8','-c:a','libvorbis','-ac','2','-ar','48000','-af','asetpts=PTS+0.01/TB',
+                            '-b:a','128k','-output_ts_offset',String(segmentStart+0.05),'-cluster_time_limit','10000','-f','webm',temporaryFile];
+                    }
+
                     function startTranscode() {
                         execFile(ffmpegPath, args, {
                             windowsHide: true,
@@ -441,10 +464,10 @@ function thumbnailDataUri(filename, stats, requestedWidth, callback) {
     function returnCached() {
         fs.readFile(cacheFile, function (err, image) {
             if (err) {
-                callback(err);
+                finish(err);
                 return;
             }
-            callback(null, mimeType + image.toString('base64'));
+            finish(null, mimeType + image.toString('base64'));
         });
     }
 
@@ -789,7 +812,28 @@ function RegisterExpressEndpoints(app, logger) {
         }
     });
 
+    app.get('/Gallery/v.1.0/PlaybackInfo', function(req,res) {
+        resolveRecordingMedia(req.query && req.query.file, function(err,media) {
+            if(err){res.status(err.statusCode||500).json({error:err.message});return;}
+            var ffmpeg=findFfmpegPath();
+            if(!ffmpeg){res.status(503).json({error:'Playback tools are unavailable'});return;}
+            execFile(path.join(path.dirname(ffmpeg),'ffprobe.exe'),['-v','error','-show_entries','format=duration:stream=codec_type','-of','json',media.filename],
+                {windowsHide:true,timeout:15000,maxBuffer:1024*1024},function(error,stdout) {
+                    try {
+                        if(error)throw error;
+                        var data=JSON.parse(stdout),duration=Number(data.format&&data.format.duration);
+                        if(!(duration>0))throw new Error('Video duration is unavailable');
+                        res.json({duration:duration,segmentDuration:8,audio:(data.streams||[]).some(function(s){return s.codec_type==='audio';})});
+                    }catch(e){res.status(500).json({error:'Unable to inspect video'});}
+                });
+        });
+    });
+
     app.get('/Gallery/v.1.0/Media', function (req, res) {
+        var segmentStart=req.query && req.query.segment!==undefined ? Number(req.query.segment) : undefined;
+        var segmentTrack=req.query&&req.query.track;
+        if(segmentTrack&&segmentTrack!=='video'&&segmentTrack!=='audio'){res.status(400).end('Invalid track');return;}
+        if(segmentStart!==undefined && (!isFinite(segmentStart)||segmentStart<0)){res.status(400).end('Invalid segment');return;}
         resolveRecordingMedia(req.query && req.query.file, function (err, media) {
             if (err) {
                 res.writeHead(err.statusCode || 500, { 'Content-Type': 'text/plain' });
@@ -861,7 +905,7 @@ function RegisterExpressEndpoints(app, logger) {
                     res.end();
                 });
                 stream.pipe(res);
-            });
+            }, segmentStart, segmentTrack);
         });
     });
 

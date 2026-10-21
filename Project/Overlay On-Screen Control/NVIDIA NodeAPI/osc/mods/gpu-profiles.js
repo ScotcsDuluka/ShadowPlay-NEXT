@@ -16,6 +16,7 @@
   var tileMarker = '__nvGpuProfilesTile';
   var mainMenuTileMarker = '__nvGpuProfilesMainMenuTile';
   var mainMenuTileStyleId = 'nv-gpu-profiles-mainmenu-tile-style';
+  var gameProfilesReturnState = 'main.preferences';
   var observer;
   var hookedMenus = [];
   var activeRoute = null;
@@ -25,65 +26,72 @@
   var pickerInProgress = false;
   var performanceSupportAvailable = null;
   var performanceSupportListenerRegistered = false;
+  var liveLayoutUnsubscribe = null;
 
   function openGameProfilesFromMainMenu() {
     if (!window.angular) return;
     var injector = window.angular.element(document.documentElement).injector();
     if (!injector) return;
+    gameProfilesReturnState = 'main.main-menu';
     return injector.get('$state').go('main.gpu-profiles');
   }
 
   function ensureMainMenuTileStyle() {
-    if (document.getElementById(mainMenuTileStyleId)) return;
-    var style = document.createElement('style');
-    style.id = mainMenuTileStyleId;
-    style.textContent = '.main-menu-container md-menu.preferences-tile.nv-gpu-profiles-left-tile {' +
+    var style = document.getElementById(mainMenuTileStyleId);
+    if (!style) {
+      style = document.createElement('style');
+      style.id = mainMenuTileStyleId;
+    }
+    var css = '.main-menu-container{min-width:960px!important;}' +
+      '.main-menu-container md-menu-bar{min-width:960px!important;}' +
+      '.main-menu-container md-menu.preferences-tile.nv-gpu-profiles-left-tile {' +
       'left: -360px !important; right: auto !important; top: 160px !important; ' +
-      'width: 80px !important; height: 80px !important; }';
-    (document.head || document.documentElement).appendChild(style);
+      'width: 80px !important; height: 80px !important; }' +
+      '.main-menu-container md-menu.performance-tile{left:calc(100% + 40px)!important;right:auto!important;width:80px!important;}' +
+      '.main-menu-container .performance-tile .gallery-tile-align{padding:0!important;justify-content:center;}' +
+      '.main-menu-container .performance-tile img{width:40px!important;height:40px!important;}' +
+      '.main-menu-container .performance-tile .right-tile-offset{display:none!important;}' +
+      '.main-menu-container md-menu.mic-tile{top:0!important;right:-200px!important;width:80px!important;height:80px!important;}' +
+      '.main-menu-container md-menu.camera-tile{top:0!important;right:-280px!important;width:80px!important;height:80px!important;}' +
+      '.main-menu-container .mic-tile md-icon,.main-menu-container .camera-tile md-icon{width:40px!important;height:40px!important;font-size:40px!important;}' +
+      '.main-menu-container md-menu.preferences-tile,.main-menu-container md-menu.nv-settings-menu-tile{position:absolute!important;left:auto!important;top:160px!important;right:-280px!important;width:240px!important;height:80px!important;}' +
+      '.main-menu-container .nv-settings-menu-tile nv-osc-tile>div{position:relative;height:74px;}' +
+      '.main-menu-container .nv-settings-menu-tile .osc-tile-header{position:absolute;left:68px;top:0;height:74px!important;display:flex;align-items:center;}' +
+      '.main-menu-container .nv-settings-menu-tile .osc-tile-header h2{font-size:18px;margin:0;}' +
+      '.main-menu-container .nv-settings-menu-tile .osc-tile-icon{position:absolute;left:20px;top:21px;width:32px;height:32px;}' +
+      '.main-menu-container .nv-settings-menu-tile .osc-tile-icon md-icon{width:32px;height:32px;font-size:32px;}' +
+      '.main-menu-container .nv-settings-menu-tile .osc-tile-footer{display:none!important;}' +
+      '';
+    if (style.textContent !== css) style.textContent = css;
+    if (!style.parentNode) (document.head || document.documentElement).appendChild(style);
+  }
+
+  // Reposition the original NVIDIA md-menu elements without replacing any
+  // Angular controllers, click actions, or focus/keyboard behavior.
+  function syncNativeMainMenuSlots(root) {
+    var api=window.__dulukaMenuLayout;if(!api||!root)return;
+    var map={};api.items.forEach(function(item){map[item.key]=item.name;});
+    function setStyle(element,key,value){if(element.style.getPropertyValue(key)!==value||element.style.getPropertyPriority(key)!=='important')element.style.setProperty(key,value,'important');}
+    api.cells(api.get()).forEach(function(cell){var element=root.querySelector('md-menu.'+map[cell.key]);if(!element)return;
+      if(!element.classList.contains('nv-flex-tile'))element.classList.add('nv-flex-tile');setStyle(element,'position','absolute');setStyle(element,'left',cell.x+'px');setStyle(element,'top',cell.y+'px');setStyle(element,'width',cell.width+'px');setStyle(element,'height',cell.height+'px');setStyle(element,'right','auto');
+    });
   }
 
   function updateMainMenuPerformance() {
-    var root = document.querySelector('.main-menu-container');
-    if (!root || !window.angular) return;
+    // Customize can be opened directly, without ever visiting Main-menu.
     ensureMainMenuTileStyle();
+    var root = document.querySelector('nv-main-menu:not([data-customize-preview]) .main-menu-container');
+    if (!root || !window.angular) return;
     var scope = window.angular.element(root).scope();
     while (scope && !scope.mainMenu) scope = scope.$parent;
     if (!scope || !scope.mainMenu || !scope.mainMenu.tiles) return;
 
     var tiles = scope.mainMenu.tiles;
     var changed = false;
-    var gameProfiles = tiles.GameProfiles;
-    var gameProfilesExtraClass = 'three-right nv-gpu-profiles-left-tile ' +
-      'nv-gpu-profiles-mainmenu-tile';
-    if (!gameProfiles || gameProfiles[mainMenuTileMarker] !== true) {
-      gameProfiles = {
-        // Match the small right-side tile, mirrored into the free far-left slot.
-        name: 'preferences-tile',
-        extraclass: gameProfilesExtraClass,
-        title: 'Game Profiles',
-        icon: 'icon-edit_tune',
-        initialFocus: 'false',
-        visible: true,
-        enabled: true,
-        click: openGameProfilesFromMainMenu
-      };
-      gameProfiles[mainMenuTileMarker] = true;
-      tiles.GameProfiles = gameProfiles;
+    if(!liveLayoutUnsubscribe&&window.__dulukaMenuLayout)liveLayoutUnsubscribe=window.__dulukaMenuLayout.subscribe(function(){updateMainMenuPerformance();});
+    if (tiles.GameProfiles) {
+      delete tiles.GameProfiles;
       changed = true;
-    } else {
-      if (gameProfiles.extraclass !== gameProfilesExtraClass) {
-        gameProfiles.extraclass = gameProfilesExtraClass;
-        changed = true;
-      }
-      if (gameProfiles.visible !== true) {
-        gameProfiles.visible = true;
-        changed = true;
-      }
-      if (gameProfiles.enabled !== true) {
-        gameProfiles.enabled = true;
-        changed = true;
-      }
     }
 
     var performance = tiles.Performance;
@@ -92,7 +100,7 @@
       return;
     }
 
-    if (!performance.visible) {
+    if (!performance.visible && (!window.__dulukaMainMenuVisibility || window.__dulukaMainMenuVisibility.Performance !== false)) {
       performance.visible = true;
       changed = true;
     }
@@ -101,15 +109,72 @@
       performance.enabled = performanceSupportAvailable;
       changed = true;
     }
-    ['Performance', 'Gallery', 'Mic', 'Camera', 'Preferences'].forEach(function (name) {
+    ['Performance', 'Gallery', 'Mic', 'Camera'].forEach(function (name) {
       var tile = tiles[name];
       if (tile && tile.extraclass !== 'three-right') {
         tile.extraclass = 'three-right';
         changed = true;
       }
     });
+    var quietMode = tiles.QuietMode2;
+    if (quietMode) {
+      if (typeof quietMode.__dulukaAvailable !== 'boolean') {
+        quietMode.__dulukaAvailable = quietMode.visible === true;
+      }
+      if (quietMode.visible !== false) {
+        quietMode.visible = false;
+        changed = true;
+      }
+    }
+    var settings = tiles.Preferences;
+    if (settings && !settings.__dulukaSettingsSubmenu) {
+      var injector = window.angular.element(document.documentElement).injector();
+      settings.name = 'nv-settings-menu';
+      settings.extraclass = 'nv-settings-menu-tile';
+      settings.title = 'Settings';
+      settings.currentState = 'Menu';
+      settings.state = { Menu: {icon:'icon-settings',status:'',items:[
+        {id:'settings',name:'Settings',icon:'icon-settings',visible:true,enabled:true,
+          click:function () { return injector.get('$state').go('main.preferences'); }},
+        {id:'customize-main-menu',name:'Customize Main-menu',icon:'icon-share',visible:true,enabled:true,
+          click:function () { if(window.__dulukaStartMainMenuEditor)return window.__dulukaStartMainMenuEditor(); }},
+        {id:'game-profiles',name:'Game Profiles',icon:'icon-edit_tune',visible:true,enabled:true,
+          click:openGameProfilesFromMainMenu},
+        {id:'quiet-mode',name:'Whisper Mode',icon:'icon-volume_off',visible:false,enabled:false,
+          click:function () {
+            var current = scope.mainMenu.tiles.QuietMode2;
+            if (current && typeof current.click === 'function') return current.click();
+          }}
+      ]}};
+      delete settings.click;
+      settings.__dulukaSettingsSubmenu = true;
+      changed = true;
+    }
+    if (settings && settings.__dulukaSettingsSubmenu) {
+      var quietItem = settings.state.Menu.items.filter(function (item) { return item.id === 'quiet-mode'; })[0];
+      var customizeItem = settings.state.Menu.items.filter(function (item) { return item.id === 'customize-main-menu'; })[0];
+      if (customizeItem && customizeItem.icon !== 'icon-share') {
+        customizeItem.icon = 'icon-share';
+        changed = true;
+      }
+      if (quietItem) {
+        var available = !!(quietMode && quietMode.__dulukaAvailable);
+        if (quietItem.visible !== available) { quietItem.visible = available; changed = true; }
+        if (quietItem.enabled !== available) { quietItem.enabled = available; changed = true; }
+      }
+    }
+    // Gallery and Settings share the same native md-menu-bar positioning context.
+    // The scoped CSS anchors Settings with right:-280px, top:160px, underneath
+    // Gallery. Measuring during the first Angular digest created stale inline
+    // positions and sometimes covered Instant Replay; never pin pixel offsets.
+    var visibility = window.__dulukaMainMenuVisibility || {};
+    ['Performance','Mic','Camera','Gallery','Preferences'].forEach(function(name){if(tiles[name]&&tiles[name].visible!==true){tiles[name].visible=true;changed=true;}});
+    Object.keys(visibility).forEach(function (name) {
+      if (['Performance','Mic','Camera','Gallery','Preferences'].indexOf(name)>=0 || typeof visibility[name] !== 'boolean' || !tiles[name]) return;
+      if (tiles[name].visible !== visibility[name]) { tiles[name].visible = visibility[name]; changed = true; }
+    });
     if (changed) scope.$applyAsync();
-
+    syncNativeMainMenuSlots(root);
     // The native preferences-style tile renders icon-only. Give it a tooltip
     // and an accessible name without changing the OSC's menu template.
     var button = root.querySelector('.nv-gpu-profiles-mainmenu-tile .menu-button');
@@ -227,6 +292,7 @@
 
   function showEntry() {
     if (!onPreferencesHome()) return;
+    gameProfilesReturnState = 'main.preferences';
     var container = document.querySelector('.preferences-item-container');
     if (!container || !window.angular) return;
 
@@ -580,7 +646,7 @@
             : 'System default';
         var row = makeNativeItem(
           profile.name || profilePath,
-          profilePath + ' · ' + preferenceText,
+          profilePath + ' Â· ' + preferenceText,
           Boolean(selectedProfile && String(selectedProfile.exePath || '').toLowerCase() ===
             profilePath.toLowerCase()),
           profile.iconDataUri
@@ -697,7 +763,7 @@
       refreshButton.setAttribute('aria-busy', 'true');
       selectedGame = null;
       runningList.textContent = '';
-      setStatus('Loading GPU manager…');
+      setStatus('Loading GPU managerâ€¦');
       return Promise.all([
         requestJson(managerUrl),
         requestJson(runningGamesUrl)
@@ -742,8 +808,8 @@
     addButton.addEventListener('click', function () {
       if (!selectedGame) return;
       addButton.disabled = true;
-      addButton.title = 'Adding game…';
-      setStatus('Adding game…');
+      addButton.title = 'Adding gameâ€¦';
+      setStatus('Adding gameâ€¦');
       postJson(addGameUrl, { exePath: selectedGame.exePath }).then(function () {
         selectedGame = null;
         return load();
@@ -768,8 +834,8 @@
       var isWindowsGraphicsOnly = selectedProfile && selectedProfile.windowsGraphicsOnly &&
         String(selectedProfile.exePath || '').toLowerCase() === exePath.toLowerCase();
       setStatus(isWindowsGraphicsOnly
-        ? 'Saving game name and updating the Windows GPU preference…'
-        : 'Saving profile and updating the Windows GPU preference…');
+        ? 'Saving game name and updating the Windows GPU preferenceâ€¦'
+        : 'Saving profile and updating the Windows GPU preferenceâ€¦');
       var saveRequest = postJson(saveUrl, {
         exePath: exePath,
         name: name,
@@ -816,8 +882,8 @@
       if (!selectedProfile) return;
       var windowsGraphicsOnly = selectedProfile.windowsGraphicsOnly;
       setStatus(windowsGraphicsOnly
-        ? 'Removing Windows Graphics entry…'
-        : 'Removing game profile and Windows GPU preference…');
+        ? 'Removing Windows Graphics entryâ€¦'
+        : 'Removing game profile and Windows GPU preferenceâ€¦');
       var removeRequest = windowsGraphicsOnly
         ? postJson(removePreferenceUrl, { exePath: selectedProfile.exePath })
         : postJson(removeUrl, { exePath: selectedProfile.exePath });
@@ -866,7 +932,7 @@
       };
       pickerReturnStatus = '';
       var pickerModeActive = false;
-      setStatus('Closing overlay before opening executable picker…');
+      setStatus('Closing overlay before opening executable pickerâ€¦');
       closeOverlay().then(function () {
         return waitForOverlayClosed();
       }).then(function () {
@@ -908,7 +974,7 @@
       backButton.disabled = true;
       closePage().catch(function (error) {
         backButton.disabled = false;
-        setStatus('Could not return to Preferences: ' + error.message, true);
+        setStatus('Could not return to the previous page: ' + error.message, true);
       });
     });
     page.addEventListener('keydown', function (event) {
@@ -1074,7 +1140,7 @@
   function closePage() {
     var injector = window.angular.element(document.documentElement).injector();
     if (!injector) throw new Error('NVIDIA OSC Angular injector is unavailable.');
-    return injector.get('$state').go('main.preferences');
+    return injector.get('$state').go(gameProfilesReturnState);
   }
 
   function syncRoutePage() {

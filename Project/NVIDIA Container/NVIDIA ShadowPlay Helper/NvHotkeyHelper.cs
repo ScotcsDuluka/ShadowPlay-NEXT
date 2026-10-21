@@ -97,6 +97,9 @@ static class NvShadowPlayHelper
     // RegisterHotKey(NULL,…) ผูกกับเธรดที่เรียก — re-register ต้องเกิดบนเธรดหลักเท่านั้น
     // (watcher แค่ปักธง หลักวนมาเห็นแล้วค่อยทำ — ไม่งั้นถอดของเดิมไม่ได้ = 1409 ค้าง)
     static long _settingsChangedAt = -1;
+    static FileSystemWatcher _settingsWatcher;
+    static long _lastSettingsProbe;
+    static string _settingsFileStamp;
     static string _registeredHotkeySignature = "";
     const long SETTINGS_CHANGE_DEBOUNCE_MS = 250;
     // ★ retry: คีย์ที่ลงทะเบียนไม่ได้ตอนบูต (มีคนถือชั่วคราว เช่น grip ตอนปิดสายแท้)
@@ -147,7 +150,7 @@ static class NvShadowPlayHelper
     }
 
     // อ่านคีย์ทั้งหมด: settings ของผู้ใช้ก่อน → default มาเติมที่ขาด
-    static Dictionary<string, int[]> LoadAllKeys()
+    static Dictionary<string, int[]> LoadAllKeys(bool keepCurrentOnFailure = false)
     {
         var all = new Dictionary<string, int[]>(StringComparer.Ordinal);
         foreach (var kv in Defaults) all[kv.Key] = kv.Value;
@@ -168,6 +171,7 @@ static class NvShadowPlayHelper
         }
         catch (Exception ex)
         {
+            if (keepCurrentOnFailure) return null;
             if (ex is not FileNotFoundException && ex is not DirectoryNotFoundException)
                 Log("[settings] read failed; using defaults: " + ex.Message);
         }
@@ -180,7 +184,7 @@ static class NvShadowPlayHelper
             .Select(kv => kv.Key + "=" + string.Join(",", kv.Value)));
     }
 
-    static void RegisterAll()
+    static void RegisterAll(Dictionary<string, int[]> snapshot = null)
     {
         // ถอดของเดิมก่อน (re-register ทุกครั้งที่ settings เปลี่ยน) — เช็คผลลัพธ์ด้วย
         foreach (var kv in Registered)
@@ -190,7 +194,7 @@ static class NvShadowPlayHelper
         }
         Registered.Clear();
 
-        var all = LoadAllKeys();
+        var all = snapshot ?? LoadAllKeys();
         var signature = HotkeySignature(all);
         // ★ [P2#5 Copilot] reconcile: คีย์ที่ผู้ใช้ลบ/แก้ — ถอดออกจากตาราง retry ทั้งหมด
         var live = new System.Collections.Generic.HashSet<string>(all.Keys);
@@ -254,6 +258,54 @@ static class NvShadowPlayHelper
         Log("[hk] รวมลงทะเบียน " + Registered.Count + " ตัว");
     }
 
+    static void WatchSettings()
+    {
+        // Keep a strong reference for the lifetime of the message loop.
+        _settingsWatcher = new FileSystemWatcher(Path.GetDirectoryName(SettingsPath), "*")
+        {
+            NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size |
+                NotifyFilters.FileName | NotifyFilters.CreationTime
+        };
+        FileSystemEventHandler changed = (sender, e) =>
+        {
+            if (IsSettingsFile(e.FullPath))
+                Interlocked.Exchange(ref _settingsChangedAt, Environment.TickCount64);
+        };
+        _settingsWatcher.Changed += changed;
+        _settingsWatcher.Created += changed;
+        _settingsWatcher.Renamed += (sender, e) =>
+        {
+            if (IsSettingsFile(e.FullPath) || IsSettingsFile(e.OldFullPath))
+                Interlocked.Exchange(ref _settingsChangedAt, Environment.TickCount64);
+        };
+        _settingsWatcher.Error += (sender, e) =>
+        {
+            Log("[settings] watcher error: " + e.GetException().Message);
+            Interlocked.Exchange(ref _settingsChangedAt, Environment.TickCount64);
+        };
+        _settingsWatcher.EnableRaisingEvents = true;
+    }
+
+    static void ProbeSettings()
+    {
+        // Recover missed notifications (including directory/atomic replacements).
+        // Only stat here; parse settings when a change was actually observed.
+        if (Environment.TickCount64 - _lastSettingsProbe < 500) return;
+        _lastSettingsProbe = Environment.TickCount64;
+        try
+        {
+            var info = new FileInfo(SettingsPath);
+            if (!info.Exists) return;
+            var stamp = info.LastWriteTimeUtc.Ticks + ":" + info.Length;
+            if (stamp == _settingsFileStamp) return;
+            _settingsFileStamp = stamp;
+            if (Interlocked.Read(ref _settingsChangedAt) < 0)
+                Interlocked.Exchange(ref _settingsChangedAt, Environment.TickCount64);
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+    }
+
     static void Main()
     {
         // dedup: หลาย instance จะแย่งกัน RegisterHotKey — เหลือตัวเดียว
@@ -273,31 +325,7 @@ static class NvShadowPlayHelper
 
         // Watch the settings file before registering so an update during startup
         // cannot be missed. Saves are atomic, so listen for replacement as well.
-        var watcher = new FileSystemWatcher(Path.GetDirectoryName(SettingsPath), Path.GetFileName(SettingsPath))
-        {
-            Filter = "*",
-            NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size |
-                NotifyFilters.FileName | NotifyFilters.CreationTime,
-            EnableRaisingEvents = false
-        };
-        FileSystemEventHandler settingsChanged = delegate(object sender, FileSystemEventArgs e)
-        {
-            if (IsSettingsFile(e.FullPath))
-                Interlocked.Exchange(ref _settingsChangedAt, Environment.TickCount64);
-        };
-        watcher.Changed += settingsChanged;
-        watcher.Created += settingsChanged;
-        watcher.Renamed += delegate(object sender, RenamedEventArgs e)
-        {
-            if (IsSettingsFile(e.FullPath) || IsSettingsFile(e.OldFullPath))
-                Interlocked.Exchange(ref _settingsChangedAt, Environment.TickCount64);
-        };
-        watcher.Error += delegate(object sender, ErrorEventArgs e)
-        {
-            Log("[settings] watcher error: " + e.GetException().Message);
-            Interlocked.Exchange(ref _settingsChangedAt, Environment.TickCount64);
-        };
-        watcher.EnableRaisingEvents = true;
+        WatchSettings();
         RegisterAll();
 
         var m = new MSG();
@@ -382,16 +410,24 @@ static class NvShadowPlayHelper
                     }
                 }
             }
+            ProbeSettings();
             long settingsChangedAt = Interlocked.Read(ref _settingsChangedAt);
             if (settingsChangedAt >= 0 &&
                 Environment.TickCount64 - settingsChangedAt >= SETTINGS_CHANGE_DEBOUNCE_MS &&
                 Interlocked.CompareExchange(ref _settingsChangedAt, -1, settingsChangedAt) == settingsChangedAt)
             {
-                var signature = HotkeySignature(LoadAllKeys());
+                var keys = LoadAllKeys(keepCurrentOnFailure: true);
+                if (keys == null)
+                {
+                    Interlocked.Exchange(ref _settingsChangedAt, Environment.TickCount64);
+                    Thread.Sleep(1);
+                    continue;
+                }
+                var signature = HotkeySignature(keys);
                 if (!string.Equals(signature, _registeredHotkeySignature, StringComparison.Ordinal))
                 {
                     Log("[hk] hotkey settings changed — re-register immediately");
-                    RegisterAll();
+                    RegisterAll(keys);
                 }
             }
             Thread.Sleep(1);

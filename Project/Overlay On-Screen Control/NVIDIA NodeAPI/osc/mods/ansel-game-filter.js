@@ -430,7 +430,9 @@
           menu.showDiscoveryBanner = hideDiscovery;
           policy.menus.forEach(function (key) {
             if (!menu.tiles[key]) return;
-            menu.tiles[key].visible = true;
+            if (key === 'QuietMode2') { menu.tiles[key].visible = false; return; }
+            var visibility = window.__dulukaMainMenuVisibility || {};
+            menu.tiles[key].visible = key === 'Preferences' || typeof visibility[key] !== 'boolean' ? true : visibility[key];
             menu.tiles[key].enabled = true;
             var states = menu.tiles[key].state || {};
             Object.keys(states).forEach(function (state) {
