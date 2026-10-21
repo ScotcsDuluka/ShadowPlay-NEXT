@@ -177,3 +177,35 @@ stylesheet (the lane chips lost `.lane-chip` when render() still wrote
 - The WinForm launcher project (`Project\Launcher.exe\`) is untouched —
   rollback = restage its bin\ output to the root (or run
   `Scripts\build-dev.ps1` with the Launcher.Cef bin removed).
+
+## Launcher UI languages (2026-10-22)
+
+Launcher has its own language control in the title bar: **English (en-US) first**,
+or **ไทย (th-TH)**. Localization is intentionally separate from
+`Project/Overlay On-Screen Control/NVIDIA NodeAPI/osc/l10n` because Launcher is
+plain CEF JavaScript rather than OSC Angular Translate. The shared locale codes
+and translation style are aligned, but selecting a Launcher language does not
+change the OSC language or the service configuration.
+
+- UI owner: `ui/i18n.js` (language dictionary and DOM translation).
+- Switch: `ui/index.html` `#launcherLanguage`; `ui/app.js` renders dynamic
+  status labels, service messages, and button feedback through the same map.
+- English is the default and fallback. The language selection is stored in a
+  namespaced host cookie (cross-port persistence for the Launcher's ephemeral
+  loopback HTTP server) and also in localStorage as a same-origin fallback.
+  Neither mechanism sends a command to the overlay backend.
+- Thai font: `ui/fonts/MiSansThai.ttf` copied from the owner-supplied
+  `Project/Overlay On-Screen Control/NVIDIA NodeAPI/osc/MiSansThai.ttf`.
+  The @font-face is used when the document language is Thai, while English
+  GeForce branding stays unchanged. No font is fetched from the internet.
+- Compatible with CEF 73: no JS optional chaining or unsupported flex gap.
+- UI asset-only stage: copy `index.html`, `app.js`, `app.css`, `i18n.js`
+  and `fonts/MiSansThai.ttf` into
+  `build/NVIDIA ShadowPlay/NVIDIA Launcher/Cef/Resources/launcher/`.
+  No native C++ rebuild is required for these UI-only changes.
+
+Validation: `node --test "build_test/Launcher Localization_Test/launcher-i18n.test.cjs"`.
+The tests cover English default, live status translation, Thai dropdown, safe
+switching without service RPC, cross-port cookie persistence, invalid locale
+fallback, and static translation coverage. Full CEF visual testing is separate
+from the simulated DOM test.

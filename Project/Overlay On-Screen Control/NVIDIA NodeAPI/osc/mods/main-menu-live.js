@@ -13,10 +13,30 @@
   var defaults={version:2,left:['Screenshot','Ansel','Mods'],center:['InstantReplay','ManualRecord','Stream','Broadcast']};
   var listeners=[],current,error='',sideRows;
   var sideStorageKey='DulukaMainMenuSideRowsV1';
+  // Additive Block Type state: original V2 layout and Side rows remain untouched.
+  var typeStorageKey='DulukaMainMenuBlockTypesV1',centerTypes={};
   var nativeSideKeys=['Performance','Mic','Camera','Gallery','Settings'];
   var sideItems=[{key:'Performance',label:'Performance',icon:'icon-performance'},{key:'Mic',label:'Microphone',icon:'icon-mic_off'},{key:'Camera',label:'Camera',icon:'icon-camera'},{key:'Gallery',label:'Gallery',icon:'icon-gallery'},{key:'Settings',label:'Settings',icon:'icon-settings'}];
   function copy(value){return JSON.parse(JSON.stringify(value));}
   function known(key){return items.some(function(item){return item.key===key;});}
+  function normalizeBlockTypes(raw){
+    var result={};if(!raw||typeof raw!=='object')return result;
+    items.forEach(function(item){if(raw[item.key]==='side')result[item.key]='side';});
+    return result;
+  }
+  function loadBlockTypes(){try{return normalizeBlockTypes(JSON.parse(window.localStorage.getItem(typeStorageKey)||'null'));}catch(ignore){return {};}}
+  centerTypes=loadBlockTypes();
+  function centerGeometry(layout){
+    var result=[],column=0,row=0;
+    (layout.center||[]).forEach(function(key,index){
+      var side=centerTypes[key]==='side';
+      if(!side&&row>0){column++;row=0;}
+      result.push({key:key,group:'center',index:index,x:column*240,y:side?row*80:0,width:240,height:side?80:240,variant:side?'row':'big'});
+      if(side){row++;if(row===3){column++;row=0;}}
+      else column++;
+    });
+    return {columns:column+(row?1:0),cells:result};
+  }
   function normalize(raw){
     if(!raw||!Array.isArray(raw.left)||!Array.isArray(raw.center))return copy(defaults);
     var result={version:2,left:[],center:[]},seen={};
@@ -39,7 +59,7 @@
     sides.left.forEach(function(row,r){row.forEach(function(key,i){
       result.push({key:key,group:'left',index:r,slotIndex:i,x:-280+i*240/row.length,y:r*80,width:240/row.length,height:80,variant:row.length>1?'small':'row'});
     });});
-    layout.center.forEach(function(key,i){result.push({key:key,group:'center',index:i,x:i*240,y:0,width:240,height:240,variant:'big'});});
+    centerGeometry(layout).cells.forEach(function(cell){result.push(cell);});
     return result;
   }
   function set(layout,requestedSides){
@@ -134,6 +154,13 @@
   current=load();sideRows=loadSides(current);publish();
   var api=window.__dulukaMenuLayout={items:items,defaults:copy(defaults),get:function(){return copy(current);},normalize:normalize,cells:cells,set:set,move:move,
     remove:function(key){return sideRemove(key);},
+    getBlockTypes:function(){var result={};items.forEach(function(item){result[item.key]=centerTypes[item.key]||'big';});return result;},centerColumns:function(layout){return centerGeometry(layout||current).columns;},
+    setBlockType:function(key,type){
+      if(!known(key)||(type!=='big'&&type!=='side')){error='Select Big or Side for a center control.';return false;}
+      var next=copy(centerTypes);if(type==='big')delete next[key];else next[key]='side';
+      try{window.localStorage.setItem(typeStorageKey,JSON.stringify(next));}catch(ignore){error='Could not save Block Type. Previous layout is unchanged.';return false;}
+      centerTypes=next;error='';publish();listeners.slice().forEach(function(fn){fn(copy(current));});return true;
+    },
     reset:function(){return set(defaults,defaultSides(defaults));},getSides:function(){return copy(sideRows);},sideMove:sideMove,sideRemove:sideRemove,sideItems:sideItems,subscribe:function(fn){listeners.push(fn);return function(){listeners=listeners.filter(function(f){return f!==fn;});};}};
   Object.defineProperty(api,'error',{get:function(){return error;}});
   var activeEditor=null,wantsEditing=false;
@@ -145,7 +172,7 @@
       '<div class="nv-side-row" ng-class="{\'nv-side-slot\':row.length>1}">'+
       '<div class="nv-live-chip" ng-repeat="key in row track by key" data-menu-key="{{key}}" data-side-group="'+group+'" data-side-index="{{$parent.$index}}" data-side-cell-index="{{$index}}">'+
       '<button type="button" title="{{flexMenu.label(key)}}" ng-click="flexMenu.select(key)" ng-class="{selected:flexMenu.selected===key}" aria-label="{{flexMenu.label(key)}}"><md-icon class="share-icon {{flexMenu.iconFor(key)}}"></md-icon><span ng-if="row.length===1"><strong>{{flexMenu.label(key)}}</strong><small>{{flexMenu.subtitle(key)}}</small></span></button>'+
-      '<button type="button" class="nv-live-remove" ng-if="key!==\'Settings\'" ng-click="flexMenu.remove(key)" aria-label="Remove {{flexMenu.label(key)}}">×</button>'+
+      '<button type="button" class="nv-live-remove" ng-if="key!==\'Settings\'" ng-click="flexMenu.remove(key)" aria-label="Remove {{flexMenu.label(key)}}"><md-icon class="share-icon icon-app_close" aria-hidden="true"></md-icon></button>'+
       '</div></div>'+
       '<button type="button" class="nv-side-join" ng-if="row.length<3" ng-click="flexMenu.addToSideRow(\''+group+'\',$index)">+ Side Slot</button>'+
       '</div>'+
@@ -153,15 +180,15 @@
       '<button class="nv-live-add" ng-click="flexMenu.addSelected(\''+group+'\')">+ Block Side</button></div>';
   }
   var toolbar=[
-    '<section class="nv-live-editor" ng-if="flexMenu.editing" ng-style="{\'margin-top\':flexMenu.extraRows()+\'px\',\'max-height\':\'calc(100vh - \'+(490+flexMenu.extraRows())+\'px)\'}" aria-label="Customize Main-menu">',
+    '<section class="nv-live-editor" ng-if="flexMenu.editing" ng-style="{\'margin-top\':flexMenu.extraRows()+\'px\',\'max-height\':\'calc(100vh - \'+(412+flexMenu.extraRows())+\'px)\'}" aria-label="Customize Main-menu">',
     '<header><div><h2>Customize Main-menu</h2><p>Drag controls across three panels. Add 2–3 icons into a Side Slot. Settings cannot be removed.</p></div><button class="osc-button osc-button-gray" ng-click="flexMenu.reset()">Restore NVIDIA layout</button><button class="osc-button osc-button-green" ng-click="flexMenu.done()">Done</button></header>',
     '<div class="nv-live-workspace">',
     sidePanelMarkup('left'),
     '<div class="nv-live-panel nv-live-drop" data-menu-group="center"><h3>Center panel <span>{{flexMenu.layout.center.length}} / 4 Big</span></h3>',
-    '<div class="nv-live-chips"><div class="nv-live-chip" ng-repeat="key in flexMenu.layout.center track by key" data-menu-key="{{key}}" data-menu-group="center" data-menu-index="{{$index}}"><button ng-click="flexMenu.select(key)" aria-label="Select {{flexMenu.label(key)}}" ng-class="{selected:flexMenu.selected===key}"><md-icon class="share-icon {{flexMenu.iconFor(key)}}"></md-icon>{{flexMenu.label(key)}}</button><button class="nv-live-remove" ng-click="flexMenu.remove(key)" aria-label="Remove {{flexMenu.label(key)}}">×</button></div><p ng-if="!flexMenu.layout.center.length">Drop a control here</p></div>',
+    '<div class="nv-live-chips"><div class="nv-live-chip" ng-repeat="key in flexMenu.layout.center track by key" data-menu-key="{{key}}" data-menu-group="center" data-menu-index="{{$index}}"><button ng-click="flexMenu.select(key)" aria-label="Select {{flexMenu.label(key)}}" ng-class="{selected:flexMenu.selected===key}"><md-icon class="share-icon {{flexMenu.iconFor(key)}}"></md-icon>{{flexMenu.label(key)}}</button><select class="nv-center-block-type" aria-label="Block Type for {{flexMenu.label(key)}}" ng-model="flexMenu.blockTypes[key]" ng-change="flexMenu.changeBlockType(key,flexMenu.blockTypes[key])"><option value="big">Big</option><option value="side">Side</option></select><button class="nv-live-remove" ng-click="flexMenu.remove(key)" aria-label="Remove {{flexMenu.label(key)}}"><md-icon class="share-icon icon-app_close" aria-hidden="true"></md-icon></button></div><p ng-if="!flexMenu.layout.center.length">Drop a control here</p></div>',
     '<button class="nv-live-add" ng-click="flexMenu.addSelected(\'center\')">Place selected Big block here</button></div>',
     sidePanelMarkup('right'),
-    '<div class="nv-live-library"><h3>Controls <span>Search & scroll</span></h3><input class="nv-live-search" type="search" ng-model="flexMenu.search" placeholder="Search controls..." aria-label="Search controls"><div class="nv-live-palette"><button ng-repeat="item in flexMenu.items | filter:{label:flexMenu.search} track by item.key" data-menu-key="{{item.key}}" ng-click="flexMenu.select(item.key)" ng-class="{selected:flexMenu.selected===item.key,assigned:flexMenu.assigned(item.key)}"><md-icon class="share-icon {{flexMenu.iconFor(item.key)}}"></md-icon><span>{{item.label}}</span><span ng-if="item.key===\'Settings\'" class="nv-locked-label">Locked</span></button></div><p>Drag onto a Side row to group 2–3 icon slots. Settings stays available.</p></div></div>',
+    '<div class="nv-live-library"><h3>Controls <span>Scroll horizontally</span><button type="button" class="nv-live-library-toggle" data-controls-toggle aria-label="Toggle Controls list" aria-expanded="{{!flexMenu.libraryCollapsed}}"><md-icon class="share-icon icon-normal icon-chevron_down" ng-class="{collapsed:flexMenu.libraryCollapsed}" aria-hidden="true"></md-icon></button></h3><input class="nv-live-search" ng-show="!flexMenu.libraryCollapsed" type="search" ng-model="flexMenu.search" placeholder="Search controls..." aria-label="Search controls"><div class="nv-live-palette" ng-show="!flexMenu.libraryCollapsed"><button ng-repeat="item in flexMenu.items | filter:{label:flexMenu.search} track by item.key" data-menu-key="{{item.key}}" ng-click="flexMenu.select(item.key)" ng-class="{selected:flexMenu.selected===item.key,assigned:flexMenu.assigned(item.key)}"><md-icon class="share-icon {{flexMenu.iconFor(item.key)}}"></md-icon><span>{{item.label}}</span><span ng-if="item.key===\'Settings\'" class="nv-locked-label">Locked</span></button></div><p>Drag onto a Side row to group 2–3 icon slots. Settings stays available.</p></div></div>',
     '<footer><label>Desktop Mode display</label><md-select aria-label="Desktop Mode display" ng-model="flexMenu.desktopMonitor" ng-change="flexMenu.saveDesktopMonitor()" ng-disabled="flexMenu.desktopBusy"><md-option ng-value="\'\'">Primary display (automatic)</md-option><md-option ng-repeat="display in flexMenu.desktopDisplays" ng-value="display.device">{{display.label}}</md-option><md-option ng-if="flexMenu.desktopDisconnected" ng-value="flexMenu.desktopMonitor" disabled>Disconnected display — using primary</md-option></md-select><p role="alert" ng-if="flexMenu.error">{{flexMenu.error}}</p></footer>',
     '</section>'
   ].join('');
@@ -180,16 +207,17 @@
     }]);
   }]).directive('nvMainMenuLiveEditor',['$window','$document',function($window,$document){
     return {restrict:'A',controller:['$scope',function($scope){
-      var self=this;self.editing=false;self.items=items.concat(sideItems);self.layout=api.get();self.sides=api.getSides();self.selected='';self.search='';self.error='';
+      var self=this;self.editing=false;self.items=items.concat(sideItems);self.layout=api.get();self.sides=api.getSides();self.blockTypes=api.getBlockTypes();self.selected='';self.search='';self.libraryCollapsed=false;self.error='';
       self.extraRows=function(){return Math.max(0,self.sides.right.length-3)*80;};
       self.key=function(tile){var match=items.filter(function(item){return tile&&item.name===tile.name;})[0];return match?match.key:'';};
       self.isMovable=function(tile){return !!self.key(tile);};self.item=function(key){return self.items.filter(function(item){return item.key===key;})[0]||{};};self.label=function(key){return self.item(key).label;};
       self.subtitle=function(key){var menu=$scope.mainMenu||{},tile=(menu.tiles||{})[key];if(key==='Screenshot')return menu.screenshotHotkey||'';if(key==='Ansel')return menu.anselHotkey||'';if(key==='Settings')return 'Preferences';if(key==='Gallery')return 'Saved captures';return tile?(tile.shortcut||(tile.state&&tile.state[tile.currentState]||{}).status||tile.currentState||''):'';};
       self.iconFor=function(key){var item=self.item(key),tile=($scope.mainMenu&&$scope.mainMenu.tiles||{})[key];return tile&&(tile.state&&tile.state[tile.currentState]||{}).icon||item.icon;};
-      self.variant=function(tile){var key=self.key(tile);var groups=self.sides;for(var g in groups){for(var i=0;i<groups[g].length;i++)if(groups[g][i].indexOf(key)>=0)return groups[g][i].length>1?'small':'row';}return 'big';};
+      self.variant=function(tile){var key=self.key(tile);var groups=self.sides;for(var g in groups){for(var i=0;i<groups[g].length;i++)if(groups[g][i].indexOf(key)>=0)return groups[g][i].length>1?'small':'row';}return self.blockTypes[key]==='side'?'row':'big';};
       self.icon=function(tile){return tile.icon||(tile.state&&tile.state[tile.currentState]||{}).icon||self.item(self.key(tile)).icon;};
       self.detail=function(tile){var key=self.key(tile),menu=$scope.mainMenu||{};return key==='Screenshot'?menu.screenshotHotkey:key==='Ansel'?menu.anselHotkey:tile.shortcut||(tile.state&&tile.state[tile.currentState]||{}).status||'';};
-      function update(){if(!$scope.$$destroyed)$scope.$evalAsync(function(){self.layout=api.get();self.sides=api.getSides();self.error=api.error;});}
+      function update(){if(!$scope.$$destroyed)$scope.$evalAsync(function(){self.layout=api.get();self.sides=api.getSides();self.blockTypes=api.getBlockTypes();self.error=api.error;});}
+      self.changeBlockType=function(key,type){if(!api.setBlockType(key,type))self.error=api.error;update();};
       function editingMotion(enabled){var doc=$document&&$document[0],classes=doc&&doc.documentElement&&doc.documentElement.classList;if(classes)classes[enabled?'add':'remove']('nv-live-layout-editing');}
       self.start=function(){self.editing=true;editingMotion(true);wantsEditing=false;self.loadDesktopMonitors();update();};
       self.done=function(){self.editing=false;editingMotion(false);var key=self.selected;self.selected='';self.error='';update();$window.setTimeout(function(){if($scope.$$destroyed)return;var tile=document.querySelector('md-menu[data-nv-control="'+key+'"]>button.menu-button')||document.querySelector('md-menu.nv-flex-tile>button.menu-button:not([disabled])');if(tile)tile.focus();},0);};
@@ -207,9 +235,19 @@
     }],link:function(scope,element){
       var root=element[0],doc=$document[0],drag=null,ghost=null,target=null,clickSuppressed=false,suppressTimer=null;
       function editor(){return scope.flexMenu;}
+      // The Controls tray is one horizontal row. Support an ordinary mouse
+      // wheel when hovering it, while allowing page scroll at either end.
+      function scrollControls(event){
+        if(!editor().editing)return;
+        var tray=event.target.closest&&event.target.closest('.nv-live-palette');
+        if(!tray||tray.scrollWidth<=tray.clientWidth||Math.abs(event.deltaY)<=Math.abs(event.deltaX))return;
+        var before=tray.scrollLeft;
+        tray.scrollLeft+=event.deltaY;
+        if(tray.scrollLeft!==before)event.preventDefault();
+      }
       function closest(node,selector){return node&&node.closest?node.closest(selector):null;}
       function identify(node){var e=closest(node,'[data-menu-key],md-menu[data-nv-control]')||closest(node,'md-menu[data-nv-side-key]');return e&&(e.getAttribute('data-menu-key')||e.getAttribute('data-nv-control')||e.getAttribute('data-nv-side-key'));}
-      function captureClick(event){if(!editor().editing)return;var key=identify(event.target);if(closest(event.target,'md-menu')){event.preventDefault();event.stopImmediatePropagation();if(key&&!clickSuppressed)scope.$evalAsync(function(){editor().select(key);});}else if(clickSuppressed){event.preventDefault();event.stopImmediatePropagation();}clickSuppressed=false;}
+      function captureClick(event){if(!editor().editing)return;if(closest(event.target,'.nv-live-library-toggle')){event.preventDefault();event.stopImmediatePropagation();scope.$evalAsync(function(){editor().libraryCollapsed=!editor().libraryCollapsed;});return;}var key=identify(event.target);if(closest(event.target,'md-menu')){event.preventDefault();event.stopImmediatePropagation();if(key&&!clickSuppressed)scope.$evalAsync(function(){editor().select(key);});}else if(clickSuppressed){event.preventDefault();event.stopImmediatePropagation();}clickSuppressed=false;}
       function down(event){if(!editor().editing||event.button!==0||closest(event.target,'.nv-live-remove'))return;var key=identify(event.target);if(!known(key)&&nativeSideKeys.indexOf(key)<0)return;drag={key:key,x:event.clientX,y:event.clientY,active:false};event.preventDefault();}
       function clearTarget(){if(target&&target.node)target.node.classList.remove('nv-live-drop-target');target=null;}
       function move(event){if(!drag)return;if(!drag.active&&Math.abs(event.clientX-drag.x)+Math.abs(event.clientY-drag.y)<6)return;
@@ -230,8 +268,8 @@
         Array.prototype.forEach.call(root.querySelectorAll('md-menu>button.menu-button:not([disabled])'),function(b){if(b===button)return;var q=b.getBoundingClientRect();if(!q.width||!q.height)return;var dx=q.left+q.width/2-cx,dy=q.top+q.height/2-cy;var primary=event.key==='ArrowLeft'?-dx:event.key==='ArrowRight'?dx:event.key==='ArrowUp'?-dy:dy,secondary=/Left|Right/.test(event.key)?Math.abs(dy):Math.abs(dx);if(primary>1&&primary+secondary*3<score){score=primary+secondary*3;best=b;}});
         if(best){event.preventDefault();event.stopImmediatePropagation();best.focus();}
       }
-      root.addEventListener('click',captureClick,true);root.addEventListener('mousedown',down,true);root.addEventListener('keydown',keydown,true);doc.addEventListener('mousemove',move,true);doc.addEventListener('mouseup',up,true);$window.addEventListener('blur',cancel);
-      scope.$on('$destroy',function(){cancel();if(suppressTimer)$window.clearTimeout(suppressTimer);root.removeEventListener('click',captureClick,true);root.removeEventListener('mousedown',down,true);root.removeEventListener('keydown',keydown,true);doc.removeEventListener('mousemove',move,true);doc.removeEventListener('mouseup',up,true);$window.removeEventListener('blur',cancel);});
+      root.addEventListener('wheel',scrollControls,{passive:false});root.addEventListener('click',captureClick,true);root.addEventListener('mousedown',down,true);root.addEventListener('keydown',keydown,true);doc.addEventListener('mousemove',move,true);doc.addEventListener('mouseup',up,true);$window.addEventListener('blur',cancel);
+      scope.$on('$destroy',function(){cancel();if(suppressTimer)$window.clearTimeout(suppressTimer);root.removeEventListener('wheel',scrollControls,false);root.removeEventListener('click',captureClick,true);root.removeEventListener('mousedown',down,true);root.removeEventListener('keydown',keydown,true);doc.removeEventListener('mousemove',move,true);doc.removeEventListener('mouseup',up,true);$window.removeEventListener('blur',cancel);});
     }};
   }]);
 })(window.angular);

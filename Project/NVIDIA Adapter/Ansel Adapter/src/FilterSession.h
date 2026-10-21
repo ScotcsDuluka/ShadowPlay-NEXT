@@ -10,6 +10,13 @@
 namespace ansel {
 using Json = nlohmann::json;
 
+struct Failure : std::runtime_error {
+    int status;
+    std::string code;
+    Failure(int status, const char *code, const char *message)
+        : std::runtime_error(message), status(status), code(code) {}
+};
+
 // All methods are called on the effect runtime's render thread. Wire IDs never
 // contain ReShade handles; the implementation resolves them for each operation.
 struct Runtime {
@@ -17,14 +24,15 @@ struct Runtime {
     virtual Json catalog() = 0;
     virtual void enable(const std::string &id, bool enabled) = 0;
     virtual void value(const std::string &id, const std::string &control, const Json &values) = 0;
+    // Native runtimes can read back a known uniform handle without walking
+    // every effect and uniform on the game's present thread.
+    virtual Json read_value(const std::string &id, const std::string &control) {
+        for (const auto &filter : catalog()) if (filter.at("id") == id)
+            for (const auto &item : filter.at("controls")) if (item.at("id") == control)
+                return item.at("currentValue");
+        throw Failure(404, "FILTER_NOT_FOUND", "Filter or control no longer exists");
+    }
     virtual void reorder(const std::vector<std::string> &ids) = 0;
-};
-
-struct Failure : std::runtime_error {
-    int status;
-    std::string code;
-    Failure(int status, const char *code, const char *message)
-        : std::runtime_error(message), status(status), code(code) {}
 };
 
 class FilterSession {
@@ -79,7 +87,7 @@ class FilterSession {
     }
     void write_value(const std::string &id, const std::string &control, const Json &values) {
         runtime_.value(id, control, values);
-        const auto actual = find(find(runtime_.catalog(), id).at("controls"), control).at("currentValue");
+        const auto actual = runtime_.read_value(id, control);
         if (actual.size() != values.size()) throw Failure(409, "RUNTIME_REJECTED", "Runtime uniform dimensions changed");
         for (size_t i=0; i<values.size(); ++i) {
             const bool equal = values[i].is_boolean() ? actual[i] == values[i] :

@@ -1,5 +1,8 @@
 ﻿{
     "meta.languageName": "English",
+    "l10n.notificationOntologyCatalogUpdate": "nv-ontology catalog update available",
+    "l10n.notificationOntologyCatalogDetails": "Catalog {{arg1}}",
+    "l10n.notificationOntologyGameCount": "{{arg1}} games",
     "l10n.nvidiashadowplay": " GeForce Experience",
     "l10n.gfe": "GeForce Experience",
     "l10n.engine": "Engine",

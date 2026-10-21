@@ -11,8 +11,12 @@
 3. `NvGraphics-Adapter.js` owns `GpuPreferenceApplied` cards and polls
    `gpu/running-profile-paths` to decide whether a running EXE has an applied
    per-app GPU assignment.
+4. `Ontology-Update-Adapter.js` checks the published nv-ontology catalog version
+   every five minutes and shows one update toast per new published version.
+   Toast wording uses the native Angular translation filter; English (`en-US`)
+   is the baseline/fallback, with Thai (`th-TH`) translations where selected.
 
-All three use the same `window.Notifier`; adapters should not build their own
+All four use the same `window.Notifier`; adapters should not build their own
 toast DOM or subscribe to another adapter's server event.
 
 ## Event and card ownership
@@ -25,10 +29,12 @@ toast DOM or subscribe to another adapter's server event.
 | `/Duluka/v1/GpuPreferenceApplied` -> `nv-gpu-pref` | NvGraphics-Adapter `onPreference` | Explicit GPU preference or System Default toast |
 | `/Duluka/v1/gpu/running-profile-paths` (1s poll) | NvGraphics-Adapter `pollNvGraphicsRunningProfiles` | Running-on-GPU toast only for that EXE's explicit applied profile |
 | OpenShare `started` / `closed` / `skipped` | Internal `eventAggregator`, OSC -> NvGraphics | Lifecycle barrier only; not server events and not a source of GPU eligibility |
+| Validated GameWatcher catalog version -> `nv-ontology-local-catalog-version` | OSC-Adapter -> Ontology-Update-Adapter (internal) | Locally installed catalog version comparison, no second socket subscription |
+| `https://nv-ontology.pages.dev/api/v1/catalog/version` (5 min poll) | Ontology-Update-Adapter | Catalog update toast through shared Notifier; persisted deduplication, retries if slots protected |
 
 ## Shared toast router
 
-Both adapters call `Notifier.show`; `notifier-system/notifier.js` creates and
+The toast-producing adapters call `Notifier.show`; `notifier-system/notifier.js` creates and
 owns each toast unit and routes it into the configured one-to-three slots.
 Priority notifications use a free slot first, then can replace a steady,
 non-protected toast. Groups with a `gpu-` prefix are protected from that

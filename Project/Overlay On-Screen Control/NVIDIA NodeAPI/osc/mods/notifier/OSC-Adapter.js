@@ -245,6 +245,7 @@
 
             function onGameWatcherStatus(event) {
                 if (!isValidGameWatcherEvent(event)) return;
+                eventAggregator.trigger('nv-ontology-local-catalog-version', event.status.catalogVersion);
 
                 var currentGameInstances = Object.create(null);
                 event.status.matchedGames.forEach(function (game) {

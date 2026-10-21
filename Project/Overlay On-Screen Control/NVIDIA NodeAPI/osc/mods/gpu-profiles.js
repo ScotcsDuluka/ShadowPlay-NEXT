@@ -76,7 +76,7 @@
     // The original NVIDIA controls are retained; only their pixel geometry moves.
     var bar=root.querySelector('md-menu-bar'),layout=api.get();
     var sides=api.getSides?api.getSides():{left:layout.left.map(function(k){return [k];}),right:[['Performance','Mic','Camera'],['Gallery'],['Settings']]};
-    var centerCount=layout.center.length,hasLeft=sides.left.length>0,hasCenter=centerCount>0;
+    var centerCount=api.centerColumns?api.centerColumns(layout):layout.center.length,hasLeft=sides.left.length>0,hasCenter=centerCount>0;
     var total=240+(hasLeft?280:0)+(hasCenter?240*centerCount+40:0);
     var begin=((window.innerWidth||1920)-total)/2;
     var barX=begin+(hasLeft?280:0),rightX=hasCenter?centerCount*240+40:0;
@@ -142,7 +142,7 @@
       var element=root.querySelector('md-menu.'+map[cell.key]);
       if(!element)return;
       if(!element.classList.contains('nv-flex-tile'))element.classList.add('nv-flex-tile');
-      apply(element,cell.x,0,cell.width,240,false);
+      apply(element,cell.x,cell.y,cell.width,cell.height,false);
     });
     groups(sides.right,rightX,true);
   }

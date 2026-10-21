@@ -12,8 +12,17 @@ struct FakeRuntime final : ansel::Runtime {
         {{"id","test/filter-b"},{"name","Test B"},{"enabled",false},{"controls",ansel::Json::array()}}
     });
     int writes = 0;
+    int catalogReads = 0;
+    int directReadbacks = 0;
     bool rejectValue = false;
-    ansel::Json catalog() override { return filters; }
+    ansel::Json catalog() override { ++catalogReads; return filters; }
+    ansel::Json read_value(const std::string &id, const std::string &control) override {
+        ++directReadbacks;
+        for (const auto &f : filters) if (f.at("id") == id)
+            for (const auto &c : f.at("controls")) if (c.at("id") == control)
+                return c.at("currentValue");
+        throw ansel::Failure(404, "FILTER_NOT_FOUND", "Filter control not found");
+    }
     void enable(const std::string &id, bool enabled) override { ++writes; for(auto &f: filters) if(f["id"] == id) f["enabled"] = enabled; }
     void value(const std::string &id, const std::string &control, const ansel::Json &v) override {
         ++writes; if (rejectValue) return;
@@ -54,8 +63,16 @@ int main(int argc, char **argv) {
             return 0;
         }
         require(session.dispatch(request("select",{{"type","test/filter-a"},{"stackIdx",0}}))["ok"], "select failed");
+        require(session.dispatch(request("select",{{"type","test/filter-b"},{"stackIdx",1}}))["ok"], "second filter select failed");
+        require(session.snapshot()["stack"].size() == 2, "second filter replaced the first in the preset");
+        require(session.dispatch(request("select",{{"type","None"},{"stackIdx",1}}))["ok"], "second filter remove failed");
+        require(session.snapshot()["stack"].size() == 1 && session.snapshot()["stack"][0] == "test/filter-a",
+            "removing the second filter damaged the first");
         auto attribute = request("attribute",{{"id","test/filter-a"},{"controlId","Strength"},{"value",{0.75}},{"stackIdx",0}});
+        const int beforeCatalogReads = runtime.catalogReads;
         require(session.dispatch(attribute)["ok"], "attribute failed");
+        require(runtime.catalogReads == beforeCatalogReads + 2 && runtime.directReadbacks == 1,
+            "uniform readback repeated a full shader catalog scan");
         require(runtime.filters[0]["controls"][0]["currentValue"][0] == 0.75, "runtime did not receive uniform write");
         auto invalid = attribute; invalid["body"]["value"] = {2.0};
         const auto before = runtime.writes;

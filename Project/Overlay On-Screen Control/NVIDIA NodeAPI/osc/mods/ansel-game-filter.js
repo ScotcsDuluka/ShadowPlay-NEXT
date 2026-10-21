@@ -651,11 +651,46 @@
       };
       var addCurrentFilter = $delegate.modsHelper.addCurrentFilter;
       $delegate.modsHelper.addCurrentFilter = function (slot) {
-        return addCurrentFilter.apply(this, arguments).then(function (result) {
-          if (slot && slot.activeFilterStack.length)
-            $delegate.getCurrentFilterAttribute(slot.activeFilterStack.length - 1);
-          return result;
+        // NVIDIA's original async continuation uses slot.selectedFilter again
+        // after HTTP completes. Native notifications can replace that object
+        // while the second/third filter is still being added.
+        if (!$delegate.__anselConnected || typeof $delegate.setFilterType !== 'function') {
+          return addCurrentFilter.apply(this, arguments).then(function (result) {
+            if (slot && slot.activeFilterStack.length)
+              $delegate.getCurrentFilterAttribute(slot.activeFilterStack.length - 1);
+            return result;
+          });
+        }
+        if (!slot || !slot.selectedFilter || !Array.isArray(slot.activeFilterStack))
+          return $injector.get('$q').when(false);
+        if (slot.__dulukaAddPending) return slot.__dulukaAddPending;
+        var id = slot.selectedFilter.id;
+        if (slot.activeFilterStack.some(function (filter) { return filter.id === id; }))
+          return $injector.get('$q').when(false);
+        var index = slot.activeFilterStack.length;
+        var pending = $delegate.setFilterType(id, index).then(function (status) {
+          if (status !== 200) return false;
+          var filter = slot.filters && slot.filters.filter(function (item) { return item.id === id; })[0];
+          filter = filter || slot.selectedFilter;
+          if (!filter || filter.id !== id) return false;
+          if (!slot.activeFilterStack.some(function (item) { return item.id === id; }))
+            slot.activeFilterStack.push(filter);
+          filter.visibleInCombo = false;
+          if (!slot.selectedFilter || slot.selectedFilter.id === id)
+            slot.selectedFilter = slot.filters && slot.filters.filter(function (item) { return item.visibleInCombo; })[0];
+          if (slot === $delegate.modsActiveSlot) {
+            $delegate.modsHelper.activateFilter(slot, filter);
+            $delegate.getCurrentFilterAttribute(index);
+          }
+          return true;
+        }).finally(function () {
+          if (slot.__dulukaAddPending === pending) slot.__dulukaAddPending = null;
         });
+        // Pending promises are internal state, not part of a saved preset.
+        Object.defineProperty(slot, '__dulukaAddPending', {
+          value: pending, writable: true, configurable: true, enumerable: false
+        });
+        return pending;
       };
       // One in-flight slider update per control; retain the newest pending
       // value rather than building a queue of obsolete drag positions.

@@ -53,12 +53,18 @@ async function main() {
     let result = await call('POST', base + '/GetAvailable', {});
     assert.strictEqual(result.body.available, true);
     assert(events.some(e => e.channel === base + '/Notifications' && e.data.type === 'available' && e.data.features.includes('mods')));
+    const beforeOpenProbes = exchanges;
+    await call('POST', base + '/GetAvailable', {});
+    await call('POST', base + '/Capture/Control', {capture:true});
+    assert.strictEqual(exchanges,beforeOpenProbes,
+      'opening the editor enumerated the full catalog more than once');
     const beforeProbes = exchanges;
     await Promise.all(Array.from({length: 12}, () => call('GET', '/Duluka/v.1.0/GameFilter/State')));
     await route.poll();
     assert.strictEqual(exchanges, beforeProbes, 'availability probes or idle polling enumerated the native catalog');
     await call('GET', '/Duluka/v.1.0/GameFilter/State?refresh=1');
     assert.strictEqual(exchanges, beforeProbes + 1, 'explicit refresh must read the live runtime');
+    await call('POST', base + '/Capture/Control', {capture:false});
     const configUrl = '/Duluka/v.1.0/GameFilter/Settings';
     const enabledConfig = {mode:'reshade',allowConnection:true,connectionManager:true};
     for (const config of [Object.assign({},enabledConfig,{allowConnection:false}),Object.assign({},enabledConfig,{connectionManager:false}),Object.assign({},enabledConfig,{mode:'nvidia'})]) {
@@ -81,6 +87,16 @@ async function main() {
     assert(events.some(e => e.data.type === 'filters' && e.data.filters.length === 2));
     result = await call('POST', base + '/Filter', { type:'test/filter-a', stackIdx:0 });
     assert.strictEqual(result.status, 200);
+    result = await call('POST', base + '/Filter', { type:'test/filter-b', stackIdx:1 });
+    assert.strictEqual(result.status, 200, 'second filter was rejected: ' + JSON.stringify(result.body));
+    result = await call('GET', '/Duluka/v.1.0/GameFilter/State');
+    assert.deepStrictEqual(result.body.stack,['test/filter-a','test/filter-b'],
+      'two filters were not preserved in one preset stack');
+    result = await call('POST', base + '/Filter/Remove', { stackIdx:1 });
+    assert.strictEqual(result.status, 200, 'second filter removal was rejected');
+    result = await call('GET', '/Duluka/v.1.0/GameFilter/State');
+    assert.deepStrictEqual(result.body.stack,['test/filter-a'],
+      'removing the second filter damaged the first');
     result = await call('POST', '/NvCamera/v.1.1/Filter/' + encodeURIComponent('test/filter-a') + '/Attribute',
       {controlId:'Strength',value:[0.8],stackIdx:0});
     assert.strictEqual(result.status, 200);
@@ -129,6 +145,8 @@ async function main() {
     result = await call('GET', base + '/GetFilters', undefined, {'x-ansel-game-pid':'invalid'}); assert.strictEqual(result.status, 400);
     result = await call('POST', base + '/GetFilters', {padding:'x'.repeat(66000)}); assert.strictEqual(result.status, 413);
     const exit = new Promise(resolve => child.once('exit', resolve)); child.kill(); await exit;
+    // The injected discovery stub must mirror the OS removing the closed pipe.
+    client.list = async () => [];
     result = await call('POST', base + '/GetAvailable', {}); assert.strictEqual(result.body.available, false);
     assert(events.some(e => e.data.type === 'anselState' && e.data.connected === false));
     result = await call('POST', base + '/Filter', {type:'test/filter-a',stackIdx:0}); assert.strictEqual(result.status, 503);

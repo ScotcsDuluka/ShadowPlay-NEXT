@@ -167,3 +167,37 @@ test('initial native menu anchor ignores a temporary x=0 root position', () => {
   f.synchronize();
   assert.equal(rail.styles.transform,'translateX(360px)','Settings-only view must center using stable root width');
 });
+
+test('native Customize remove buttons use the NVIDIA E91A app close glyph',()=>{
+  const f=live(),delegate=[{template:nativeTemplate()}];
+  f.decorators.nvMainMenuDirective(delegate);
+  const output=delegate[0].template;
+  assert.equal((output.match(/share-icon icon-app_close/g)||[]).length,3,'Left, Right and Center remove buttons must use NVIDIA icon-app_close');
+  assert(!output.includes('>×</button>'),'remove controls must not render the Unicode multiplication sign');
+  assert(output.includes("ng-if=\"key!=='Settings'\"")||output.includes("key!=='Settings'"),'Settings remains protected from removal');
+  const css=fs.readFileSync(path.join(mods,'main-menu-live.css'),'utf8');
+  assert(css.includes('.nv-live-remove .share-icon'));
+  assert(gpuSource.includes('nv-settings-menu-tile'));
+});
+
+test('compact Controls tray is a single horizontal row with NVIDIA E909 collapse and mouse-wheel scrolling',()=>{
+ const f=live(),delegate=[{template:nativeTemplate()}];
+ f.decorators.nvMainMenuDirective(delegate);
+ const output=delegate[0].template;
+ assert(output.includes('class="nv-live-library-toggle"'),'Controls header has a collapse toggle');
+ assert(output.includes('icon-chevron_down'),'toggle uses the NVIDIA uniE909 glyph');
+ assert(liveSource.includes("closest(event.target,'.nv-live-library-toggle')"),'toggle uses native capture dispatch to avoid losing clicks during digest');
+ assert(liveSource.includes('editor().libraryCollapsed=!editor().libraryCollapsed'),'toggle updates the existing Angular editor state');
+ assert(output.includes('ng-show="!flexMenu.libraryCollapsed"'),'palette visibility follows toggle state');
+ assert(liveSource.includes('self.libraryCollapsed=false'),'default tray is open');
+ assert(liveSource.includes("tray.scrollLeft+=event.deltaY"),'wheel scrolls the horizontal tray');
+ assert(output.includes('flexMenu.extraRows()'),'legacy side-row offset still exists');
+ const css=fs.readFileSync(path.join(mods,'main-menu-live.css'),'utf8');
+ assert.match(css,/\.nv-live-workspace\s*\{\s*display:grid/);
+ assert.match(css,/\.nv-live-library\s*\{\s*grid-column:1\s*\/\s*-1/);
+ assert.match(css,/\.nv-live-library \.nv-live-palette\s*\{[^}]*flex-wrap:nowrap/);
+ assert.match(css,/\.nv-live-library \.nv-live-palette\s*\{[^}]*overflow-x:auto/);
+ assert.match(css,/\.nv-live-library \.nv-live-palette button\s*\{[^}]*flex:0 0 160px/);
+ assert(output.includes("key!=='Settings'"),'protected Settings remains in the template');
+ assert.match(css,/html \.nv-live-editor\s*\{[^}]*left:calc\(50% - 760px\)!important/,'Customize overrides the BG extension only for centered editor geometry');
+});

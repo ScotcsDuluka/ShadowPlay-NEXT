@@ -12,15 +12,22 @@
   <nav id="titlebar">
     <div class="nav-brand">
       <span class="nav-name">NVIDIA <b>SHADOWPLAY</b></span>
-      <span class="hero-badge">LAUNCHER</span>
+      <span class="hero-badge" data-i18n="launcher">LAUNCHER</span>
     </div>
-    <div class="winbtns">
-      <button id="btnMin" class="winbtn" title="Minimize" aria-label="Minimize">
+    <div class="titlebar-actions">
+      <label for="launcherLanguage" data-i18n="language">Language</label>
+      <select id="launcherLanguage" data-i18n-aria-label="languageSelect" aria-label="Launcher language">
+        <option value="en-US">English</option>
+        <option value="th-TH">ไทย</option>
+      </select>
+      <div class="winbtns">
+      <button id="btnMin" class="winbtn" title="Minimize" aria-label="Minimize" data-i18n-title="minimize" data-i18n-aria-label="minimize">
         <svg viewBox="0 0 12 12"><path d="M1 6h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
       </button>
-      <button id="btnClose" class="winbtn winbtn-close" title="Close" aria-label="Close">
+      <button id="btnClose" class="winbtn winbtn-close" title="Close" aria-label="Close" data-i18n-title="close" data-i18n-aria-label="close">
         <svg viewBox="0 0 12 12"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
       </button>
+      </div>
     </div>
   </nav>
 
@@ -28,19 +35,19 @@
   <main>
     <!-- HERO -->
     <section class="hero">
-      <span class="hero-badge big">GAME RECORDING SUITE</span>
+      <span class="hero-badge big" data-i18n="suite">GAME RECORDING SUITE</span>
       <h1 class="hero-title">NVIDIA ShadowPlay</h1>
-      <h2 class="animated-text-gradient hero-sub">Capture Every Moment</h2>
-      <p class="hero-desc">
+      <h2 class="animated-text-gradient hero-sub" data-i18n="subtitle">Capture Every Moment</h2>
+      <p class="hero-desc" data-i18n="description">
         Manage your overlay engine and monitor the services that power
         capture. Status and preferences are synchronized with the local system.
       </p>
       <div class="hero-cta-group">
       </div>
       <div class="hero-meta">
-        <span class="lane-chip" id="chipEngine" title="Overlay controller (NvContainer.exe)">CONTROLLER</span>
-        <span class="lane-chip" id="chipCef" title="On-screen overlay presenter (NVIDIA OSC.exe)">PRESENTER</span>
-        <span class="lane-chip" id="chipHub" title="Local API service (engine dependent)">API SERVICE</span>
+        <span class="lane-chip" id="chipEngine" title="Overlay controller (NvContainer.exe)" data-i18n="controller" data-i18n-title="controllerHint">CONTROLLER</span>
+        <span class="lane-chip" id="chipCef" title="On-screen overlay presenter (NVIDIA OSC.exe)" data-i18n="presenter" data-i18n-title="presenterHint">PRESENTER</span>
+        <span class="lane-chip" id="chipHub" title="Local API service (engine dependent)" data-i18n="apiService" data-i18n-title="apiHint">API SERVICE</span>
       </div>
     </section>
 
@@ -51,41 +58,41 @@
       <div class="obt3-runway"><span></span></div>
       <div class="obt3-inner">
         <div class="obt3-head">
-          <span class="obt3-tag">Status</span>
-          <span class="obt3-title">SERVICES</span>
-          <span class="obt3-live">&#9679; MONITORING</span>
+          <span class="obt3-tag" data-i18n="status">Status</span>
+          <span class="obt3-title" data-i18n="services">SERVICES</span>
+          <span class="obt3-live" data-i18n="monitoring">&#9679; MONITORING</span>
         </div>
         <ul class="svc">
           <li>
             <span class="dot" id="dotOverlay"></span>
             <div class="svc-text">
-              <div class="svc-name">SHADOWPLAY OVERLAY</div>
-              <div class="svc-state" id="stateOverlay">STOPPED</div>
+              <div class="svc-name" data-i18n="overlayService">SHADOWPLAY OVERLAY</div>
+              <div class="svc-state" id="stateOverlay" data-i18n="stopped">STOPPED</div>
             </div>
           </li>
           <li>
             <span class="dot" id="dotContainer"></span>
             <div class="svc-text">
-              <div class="svc-name">OVERLAY CONTROLLER</div>
-              <div class="svc-state" id="stateContainer">STOPPED</div>
+              <div class="svc-name" data-i18n="overlayController">OVERLAY CONTROLLER</div>
+              <div class="svc-state" id="stateContainer" data-i18n="stopped">STOPPED</div>
             </div>
           </li>
           <li>
             <span class="dot" id="dotNotifier"></span>
             <div class="svc-text">
-              <div class="svc-name">WINFORM NOTIFIER</div>
-              <div class="svc-state" id="stateNotifier">STOPPED</div>
+              <div class="svc-name" data-i18n="notifierService">WINFORM NOTIFIER</div>
+              <div class="svc-state" id="stateNotifier" data-i18n="stopped">STOPPED</div>
             </div>
           </li>
           <li>
             <span class="dot" id="dotNvApi"></span>
             <div class="svc-text">
-              <div class="svc-name">LOCAL API SERVICE</div>
-              <div class="svc-state" id="stateNvApi">STOPPED</div>
+              <div class="svc-name" data-i18n="localApiService">LOCAL API SERVICE</div>
+              <div class="svc-state" id="stateNvApi" data-i18n="stopped">STOPPED</div>
             </div>
           </li>
         </ul>
-        <button id="btnOpenOverlay" class="btn-primary block">OPEN OVERLAY</button>
+        <button id="btnOpenOverlay" class="btn-primary block" data-i18n="openOverlay">OPEN OVERLAY</button>
       </div>
     </section>
   </main>
@@ -95,22 +102,22 @@
     <div class="feature-card">
       <div class="feat-row">
         <div class="feat-text">
-          <span class="card-status">Overlay In-game</span>
+          <span class="card-status" data-i18n="overlayInGame">Overlay In-game</span>
           <h3>NVIDIA ShadowPlay</h3>
-          <p>Turn the selected overlay engine on or off.</p>
+          <p data-i18n="featureDescription">Turn the selected overlay engine on or off.</p>
         </div>
-        <span class="toggle" id="tglOverlay" role="switch" aria-label="Overlay enabled" aria-checked="false" tabindex="0"></span>
+        <span class="toggle" id="tglOverlay" role="switch" aria-label="Overlay enabled" data-i18n-aria-label="overlayEnabled" aria-checked="false" tabindex="0"></span>
       </div>
     </div>
     <div class="feature-card">
       <div class="mode-panel">
-        <div class="mode-title">OVERLAY ENGINE</div>
+        <div class="mode-title" data-i18n="engineTitle">OVERLAY ENGINE</div>
         <div class="mode-row">
           <span class="mode-label active" id="lblWinform" role="button" tabindex="0">WINFORM</span>
-          <span class="mode-toggle" id="tglEngine" role="switch" aria-label="Overlay engine mode" aria-checked="false" tabindex="0"><span class="mode-knob"></span></span>
+          <span class="mode-toggle" id="tglEngine" role="switch" aria-label="Overlay engine mode" data-i18n-aria-label="overlayMode" aria-checked="false" tabindex="0"><span class="mode-knob"></span></span>
           <span class="mode-label" id="lblCef" role="button" tabindex="0">CEF</span>
         </div>
-        <div class="mode-desc" id="modeDesc">Selects the engine; does not power the overlay.</div>
+        <div class="mode-desc" id="modeDesc" data-i18n="modeDescription">Selects the engine; does not power the overlay.</div>
       </div>
     </div>
   </section>
@@ -119,15 +126,16 @@
   <footer>
     <div class="foot-left">
       <span class="ver">NVIDIA SHADOWPLAY · CEF 73</span>
-      <span class="bridge" id="bridgeState" role="status" aria-live="polite">CONNECTING</span>
+      <span class="bridge" id="bridgeState" role="status" aria-live="polite" data-i18n="connecting">CONNECTING</span>
       <span class="action-status" id="actionStatus" role="status" aria-live="polite"></span>
     </div>
     <div class="foot-right">
       <button id="btnObt3" class="btn-secondary">OBT3 &rarr;</button>
-      <button id="btnExit" class="btn-danger">EXIT ALL</button>
+      <button id="btnExit" class="btn-danger" data-i18n="exitAll">EXIT ALL</button>
     </div>
   </footer>
 
+<script src="i18n.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

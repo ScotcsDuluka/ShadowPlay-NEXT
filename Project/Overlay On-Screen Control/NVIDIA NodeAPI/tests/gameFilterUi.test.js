@@ -152,7 +152,9 @@ async function scenario(existing, coldStart) {
   assert.strictEqual(camera.isModsOn(),true,'verified ReShade runtime remained gated by cloud capability');
   assert.strictEqual(menu.tiles.Mods.visible,true,'main menu still hides the local editor');
   assert.strictEqual(menu.showDiscoveryBanner(),false,'screenshot hint duplicates the visible Screenshot tile');
-  assert(Object.values(menu.tiles).every(tile=>tile.visible),'full OSC menu still hides entries');
+  assert.strictEqual(menu.tiles.QuietMode2.visible,false,'intentionally hidden Quiet Mode tile reappeared');
+  assert(Object.entries(menu.tiles).every(([key,tile])=>key==='QuietMode2'||tile.visible),
+    'active OSC menu still hides entries');
   assert.strictEqual(menu.tiles.Ansel.enabled,true,'backend navigation policy did not unlock Photo Mode entry');
   assert.strictEqual(preferences.tiles[0].visible,true,'backend policy did not unlock Settings entries');
   assert.strictEqual(preferences.tiles[0].precondition(),true);
@@ -189,6 +191,45 @@ async function scenario(existing, coldStart) {
   assert.strictEqual(catalogReads,beforeCatalog+2,'catalog request was swallowed');
   assert.deepStrictEqual(filterEvents.slice(beforeFilterEvents),[false,true,false,true],
     'real catalog requests did not reset and re-arm the self-removing native listener');
+  // The native NVIDIA helper reads selectedFilter after an async response.
+  // Simulate a catalog/selection change while adding several effects.
+  const filtersToAdd=['fx','bloom','sharpen'].map(id=>({id,visibleInCombo:true}));
+  const multiSlot={id:1,filters:filtersToAdd,activeFilterStack:[],selectedFilter:filtersToAdd[0]};
+  camera.modsActiveSlot=multiSlot;
+  camera.modsHelper.activateFilter=(slot,filter)=>{
+    slot.activeFilter=filter;slot.activeIndex=slot.activeFilterStack.indexOf(filter);
+  };
+  const filterWrites=[],filterResolvers=[],filterReadbacks=[];
+  camera.setFilterType=(id,index)=>{
+    filterWrites.push([id,index]);
+    return new Promise(resolve=>filterResolvers.push(resolve));
+  };
+  camera.getCurrentFilterAttribute=index=>{filterReadbacks.push(index);return Promise.resolve(200);};
+  const firstFilter=camera.modsHelper.addCurrentFilter(multiSlot);
+  multiSlot.selectedFilter=filtersToAdd[1];
+  assert.strictEqual(camera.modsHelper.addCurrentFilter(multiSlot),firstFilter,
+    'double click started a second write while a filter add was pending');
+  filterResolvers.shift()(200);
+  assert.strictEqual(await firstFilter,true);
+  assert.strictEqual(multiSlot.activeFilterStack[0].id,'fx',
+    'async selection change inserted the wrong filter');
+  assert.strictEqual(multiSlot.selectedFilter.id,'bloom',
+    'async completion discarded the next selected filter');
+  const secondFilter=camera.modsHelper.addCurrentFilter(multiSlot);
+  filterResolvers.shift()(200);
+  assert.strictEqual(await secondFilter,true);
+  const thirdFilter=camera.modsHelper.addCurrentFilter(multiSlot);
+  filterResolvers.shift()(200);
+  assert.strictEqual(await thirdFilter,true);
+  assert.deepStrictEqual(Array.from(multiSlot.activeFilterStack,f=>f.id),['fx','bloom','sharpen'],
+    'one preset cannot retain three separate filters');
+  assert.deepStrictEqual(filterWrites,[['fx',0],['bloom',1],['sharpen',2]],
+    'native filter stack indices were duplicated');
+  assert.deepStrictEqual(filterReadbacks,[0,1,2],
+    'added filters did not request native attribute readback');
+  multiSlot.selectedFilter=filtersToAdd[0];
+  assert.strictEqual(await camera.modsHelper.addCurrentFilter(multiSlot),false,
+    'a duplicate effect was added to the same preset');
   const beforeDragSaves=storageWrites.filter(key=>key==='ModsSlotStorage').length;
   await Promise.all([camera.setAttributeV1('fx',0,'Amount',[0.2]),camera.setAttributeV1('fx',0,'Amount',[0.4]),camera.setAttributeV1('fx',0,'Amount',[0.8])]);
   assert.deepStrictEqual(writes,[0.8],'slider drag queued obsolete positions instead of the latest value');
@@ -255,12 +296,21 @@ async function scenario(existing, coldStart) {
   services.oscDisplayService.setLocalStorage('ModsDataStorage',validModsData);
   const editedFilter=camera.modsSlots[1].filters[0];
   editedFilter.savedConfigs={'fx#Amount':[0.77]};
-  camera.modsSlots[1].activeFilterStack=[editedFilter];
+  const additionalFilters=[
+    {id:'bloom',title:'Bloom',savedConfigs:{'bloom#Strength':[0.2]}},
+    {id:'sharpen',title:'Sharpen',savedConfigs:{'sharpen#Strength':[0.6]}}
+  ];
+  camera.modsSlots[1].filters.push(...additionalFilters);
+  camera.modsSlots[1].activeFilterStack=[editedFilter,...additionalFilters];
   const beforeShutdownSaves=storageWrites.filter(key=>key==='ModsSlotStorage').length;
   assert.strictEqual(await camera.shutdownModsUI(true),true,'keep-effects shutdown result changed');
   const savedOnClose=JSON.parse(store.ModsSlotStorage);
   assert.strictEqual(savedOnClose.Game[1].filters[0].savedConfigs['fx#Amount'][0],0.77,'keep-effects shutdown lost edited slider values');
   assert.strictEqual(savedOnClose.Game[1].activeFilterStack[0].id,'fx','keep-effects shutdown lost the selected filter stack');
+  assert.deepStrictEqual(Array.from(savedOnClose.Game[1].activeFilterStack,filter=>filter.id),
+    ['fx','bloom','sharpen'],'keep-effects shutdown discarded extra filters in a preset');
+  assert.strictEqual(savedOnClose.Game[1].activeFilterStack[2].savedConfigs['sharpen#Strength'][0],0.6,
+    'keep-effects shutdown discarded extra filter settings');
   assert.deepStrictEqual(savedOnClose.OtherGame,data.OtherGame,'saving the current game overwrote another game preset');
   assert.deepStrictEqual(shutdownCalls,[true],'keep-effects shutdown did not reach native exactly once');
   assert.strictEqual(storageWrites.filter(key=>key==='ModsSlotStorage').length,beforeShutdownSaves+1,'shutdown did not save exactly one preset snapshot');

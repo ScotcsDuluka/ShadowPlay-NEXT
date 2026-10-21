@@ -56,7 +56,7 @@ function mount(app, io, options) {
   }
   const client = options.client || new AnselClient();
   let last = null, lastCatalog = '', stopped = false, polling = false, pendingEnable, editingTarget = null, needsSession = false;
-  let cachedTarget = null, stateRead = null;
+  let cachedTarget = null, stateRead = null, cachedAt = 0;
   // Availability probes must not enumerate thousands of uniforms on the game
   // render thread. Interaction reads and verified command replies refresh this.
   async function cachedState(pid, refresh, version) {
@@ -73,6 +73,7 @@ function mount(app, io, options) {
     flight.promise = client.state(pid, () => requireBridge(version)).then(target => {
       requireBridge(version);
       cachedTarget = target;
+      cachedAt = Date.now();
       return target;
     }).finally(() => { if (stateRead === flight) stateRead = null; });
     stateRead = flight;
@@ -220,8 +221,11 @@ function mount(app, io, options) {
         if (editingTarget && (!pid || pid === editingTarget.state.pid) && (mutation || route === '/GetFilters' || route === '/Filter/GetInfo'))
           target = editingTarget;
         else target = await cachedState(pid,
-          route === '/GetAvailable' || route === '/Capture/Control' && body.capture === true ||
-          route === '/State' && req.query && req.query.refresh === '1', version);
+          // Opening the panel often calls GetAvailable, then Capture/Control.
+          // Avoid two expensive catalog walks in the same opening sequence;
+          // retain a fresh read for older editing sessions and explicit refresh.
+          (route === '/Capture/Control' && body.capture === true && Date.now() - cachedAt > 5000) ||
+          (route === '/State' && req.query && req.query.refresh === '1'), version);
         requireBridge(version);
       }
       catch (error) {

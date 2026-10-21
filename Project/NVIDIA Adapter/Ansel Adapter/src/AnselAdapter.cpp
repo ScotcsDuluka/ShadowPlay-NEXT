@@ -121,6 +121,29 @@ struct ReShadeRuntime final : Runtime {
         else if (format == api::format::r32_uint) { uint32_t v[4]{}; for(size_t i=0;i<count;++i) v[i]=values[i].get<uint32_t>(); runtime->set_uniform_value_uint(uniform, v, count); }
         else { bool v[4]{}; for(size_t i=0;i<count;++i) v[i]=values[i].get<bool>(); runtime->set_uniform_value_bool(uniform, v, count); }
     }
+    Json read_value(const std::string &id, const std::string &control) override {
+        const auto uniform = uniforms.at(id + "\n" + control);
+        api::format format; uint32_t rows = 0, columns = 0, length = 0;
+        runtime->get_uniform_variable_type(uniform, &format, &rows, &columns, &length);
+        const size_t count = static_cast<size_t>(rows) * columns;
+        if (!count || count > 4 || length > 1 || columns > 1)
+            throw Failure(409, "RUNTIME_REJECTED", "Uniform shape changed during write");
+        Json result = Json::array();
+        if (format == api::format::r32_float) {
+            float values[4]{}; runtime->get_uniform_value_float(uniform, values, count);
+            for (size_t i=0;i<count;++i) result.push_back(values[i]);
+        } else if (format == api::format::r32_sint) {
+            int32_t values[4]{}; runtime->get_uniform_value_int(uniform, values, count);
+            for (size_t i=0;i<count;++i) result.push_back(values[i]);
+        } else if (format == api::format::r32_uint) {
+            uint32_t values[4]{}; runtime->get_uniform_value_uint(uniform, values, count);
+            for (size_t i=0;i<count;++i) result.push_back(values[i]);
+        } else if (format == api::format::r32_typeless) {
+            bool values[4]{}; runtime->get_uniform_value_bool(uniform, values, count);
+            for (size_t i=0;i<count;++i) result.push_back(values[i]);
+        } else throw Failure(409, "RUNTIME_REJECTED", "Uniform type changed during write");
+        return result;
+    }
     void reorder(const std::vector<std::string> &ids) override {
         std::vector<api::effect_technique> order;
         for (const auto &id : ids) order.push_back(techniques.at(id));

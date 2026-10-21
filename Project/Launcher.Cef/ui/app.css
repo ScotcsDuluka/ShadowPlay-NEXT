@@ -446,3 +446,40 @@ button { cursor: pointer; }
 .action-status.error { color: var(--red); }
 .svc li { min-height: 34px; }
 .hero-meta { row-gap: 8px; }
+
+/* Launcher localization — owner-supplied MiSansThai; no NVIDIA redesign. */
+@font-face {
+  font-family: 'MiSansThai';
+  src: url('fonts/MiSansThai.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+.titlebar-actions { display: flex; align-items: center; }
+.titlebar-actions > * + * { margin-left: 8px; }
+.titlebar-actions label { font-size: 11px; color: var(--text-gray); white-space: nowrap; }
+#launcherLanguage {
+  min-width: 96px; height: 30px; padding: 3px 8px;
+  border: 1px solid rgba(118,185,0,.48); color: var(--text-white);
+  background: #151715; font: 12px 'Segoe UI', sans-serif;
+  outline-offset: 2px; cursor: pointer;
+}
+#launcherLanguage:focus { outline: 1px solid var(--nvidia-green); }
+html[lang='th'] body, html[lang='th'] #launcherLanguage {
+  font-family: 'MiSansThai', 'Segoe UI', sans-serif;
+}
+html[lang='th'] .hero-badge, html[lang='th'] .hero-sub,
+html[lang='th'] .mode-title, html[lang='th'] .mode-desc,
+html[lang='th'] .mode-label, html[lang='th'] .lane-chip,
+html[lang='th'] .obt3-title, html[lang='th'] .obt3-tag,
+html[lang='th'] .svc-name, html[lang='th'] .svc-state,
+html[lang='th'] button, html[lang='th'] .ver, html[lang='th'] .bridge {
+  font-family: 'MiSansThai', 'Segoe UI', sans-serif;
+  letter-spacing: 0;
+}
+html[lang='th'] .hero-title, html[lang='th'] .nav-name {
+  font-family: 'GeForce', 'Inter', sans-serif;
+}
+html[lang='th'] .hero-sub { font-size: 20px; line-height: 1.45; }
+html[lang='th'] .mode-desc { line-height: 1.45; }
+html[lang='th'] .svc-name { font-size: 12px; }

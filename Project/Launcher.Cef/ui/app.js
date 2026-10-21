@@ -11,6 +11,14 @@
   'use strict';
 
   function $(id) { return document.getElementById(id); }
+  var i18n = window.LauncherI18n;
+  function tr(key) { return i18n.t(key); }
+  function setText(node, key) {
+    if (!node) return;
+    node.setAttribute('data-i18n', key);
+    node.textContent = tr(key);
+  }
+  i18n.apply();
 
   // ── RPC bridge ──────────────────────────────────────────────────────
   var bridgeUp = typeof window.cefQuery === 'function';
@@ -64,10 +72,10 @@
   }
   if (bridgeTag) {
     if (!bridgeUp) {
-      bridgeTag.textContent = 'BRIDGE OFFLINE';
+      setText(bridgeTag, 'bridgeOffline');
       bridgeTag.className = 'bridge off';
     } else {
-      bridgeTag.textContent = 'BRIDGE LIVE';
+      setText(bridgeTag, 'bridgeLive');
     }
   }
 
@@ -102,6 +110,8 @@
     if (node) node.addEventListener(ev, fn);
   }
 
+  on($('launcherLanguage'), 'change', function () { i18n.setLanguage(this.value); });
+
   function activateByKeyboard(node, fn) {
     on(node, 'keydown', function (event) {
       if (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'Spacebar') return;
@@ -113,11 +123,13 @@
   var statusTimer = null;
   function announce(message, failed) {
     if (!el.actionStatus) return;
-    el.actionStatus.textContent = message;
+    if (message) setText(el.actionStatus, message);
+    else { el.actionStatus.removeAttribute('data-i18n'); el.actionStatus.textContent = ''; }
     el.actionStatus.className = 'action-status' + (failed ? ' error' : '');
     if (statusTimer) clearTimeout(statusTimer);
     if (message && !failed) {
       statusTimer = setTimeout(function () {
+        el.actionStatus.removeAttribute('data-i18n');
         el.actionStatus.textContent = '';
         el.actionStatus.className = 'action-status';
       }, 2500);
@@ -132,32 +144,34 @@
   function setDot(dot, stateEl, cls, label) {
     if (!dot) return;
     dot.className = 'dot' + (cls ? ' ' + cls : '');
-    if (stateEl) stateEl.textContent = label;
+    if (stateEl) setText(stateEl, label);
   }
 
   // ── Render ──────────────────────────────────────────────────────────
+  var latestState = null;
   function render(s) {
     if (!s) return;
+    latestState = s;
 
     // OVERLAY API: running+ready -> RUNNING, running only -> LOADING,
     // else STOPPED (Main.vb IF_APP_Tick contract).
     if (s.overlayApi && s.overlayApi.running && s.overlayApi.ready) {
-      setDot(el.dotOverlay, el.stateOverlay, 'running', 'RUNNING');
+      setDot(el.dotOverlay, el.stateOverlay, 'running', 'running');
     } else if (s.overlayApi && s.overlayApi.running) {
-      setDot(el.dotOverlay, el.stateOverlay, 'loading', 'LOADING');
+      setDot(el.dotOverlay, el.stateOverlay, 'loading', 'loading');
     } else {
-      setDot(el.dotOverlay, el.stateOverlay, '', 'STOPPED');
+      setDot(el.dotOverlay, el.stateOverlay, '', 'stopped');
     }
 
     setDot(el.dotNotifier, el.stateNotifier,
       (s.notifierApi && s.notifierApi.running) ? 'running' : '',
-      (s.notifierApi && s.notifierApi.running) ? 'RUNNING' : 'STOPPED');
+      (s.notifierApi && s.notifierApi.running) ? 'running' : 'stopped');
     setDot(el.dotNvApi, el.stateNvApi,
       (s.nvApi && s.nvApi.running) ? 'running' : '',
-      (s.nvApi && s.nvApi.running) ? 'RUNNING' : 'STOPPED');
+      (s.nvApi && s.nvApi.running) ? 'running' : 'stopped');
     setDot(el.dotContainer, el.stateContainer,
       (s.lanes && s.lanes.container) ? 'running' : '',
-      (s.lanes && s.lanes.container) ? 'RUNNING' : 'STOPPED');
+      (s.lanes && s.lanes.container) ? 'running' : 'stopped');
 
     var lanes = s.lanes || {};
     if (el.chipEngine) el.chipEngine.className = 'lane-chip' + (lanes.container ? ' on' : '');
@@ -200,13 +214,17 @@
     // the active label highlight above is the state indicator.
   }
 
+  window.onLauncherLanguageChanged = function () {
+    if (latestState) render(latestState);
+  };
+
   // ── Host push (launcher_script.h augmentation) ──────────────────────
   window.__onLauncherState(function (s) { render(s); });
 
   // Pull fallback: never let the page sit on stale state.
   function pull() {
     rpc('LAUNCHER_GET_STATE').then(render).catch(function (error) {
-      if (bridgeUp) reportFailure('STATE SYNC FAILED', error);
+      if (bridgeUp) reportFailure('stateSyncFailed', error);
     });
   }
   pull();
@@ -220,10 +238,10 @@
     this.setAttribute('aria-checked', on ? 'true' : 'false');
     rpc('LAUNCHER_SET_OVERLAY', { value: on }).then(function (result) {
       if (!result || result.ok === false) throw new Error('setting was not saved');
-      announce('SETTING SAVED', false);
+      announce('settingSaved', false);
     }).catch(function (error) {
       el.tglOverlay.dataset.userHold = '';
-      reportFailure('COULD NOT SAVE SETTING', error);
+      reportFailure('saveFailed', error);
       pull();
     });
   });
@@ -239,10 +257,10 @@
     applyMode(cef);
     rpc('LAUNCHER_SET_ENGINE_OVERLAY', { value: cef }).then(function (result) {
       if (!result || result.ok === false) throw new Error('mode was not saved');
-      announce(cef ? 'CEF ENGINE STARTING' : 'WINFORM ENGINE SELECTED', false);
+      announce(cef ? 'cefStarting' : 'winformSelected', false);
     }).catch(function (error) {
       el.tglEngine.dataset.userHold = '';
-      reportFailure('COULD NOT CHANGE ENGINE', error);
+      reportFailure('changeEngineFailed', error);
       pull();
     });
   }
@@ -271,19 +289,19 @@
     var b = this;
     if (overlayBusy) return;
     overlayBusy = true;
-    b.textContent = 'SENDING';
+    setText(b, 'sending');
     rpc('LAUNCHER_OPEN_OVERLAY').then(function (r) {
-      b.textContent = (r && r.ok) ? 'SENT' : 'HUB OFFLINE';
-      announce((r && r.ok) ? 'OVERLAY REQUEST SENT' : 'OVERLAY SERVICE OFFLINE',
+      setText(b, (r && r.ok) ? 'sent' : 'hubOffline');
+      announce((r && r.ok) ? 'overlayRequestSent' : 'overlayServiceOffline',
         !(r && r.ok));
       setTimeout(function () {
-        b.textContent = 'OPEN OVERLAY';
+        setText(b, 'openOverlay');
         overlayBusy = false;
       }, 1200);
     }).catch(function (error) {
-      b.textContent = 'OPEN OVERLAY';
+      setText(b, 'openOverlay');
       overlayBusy = false;
-      reportFailure('OVERLAY REQUEST FAILED', error);
+      reportFailure('overlayRequestFailed', error);
     });
   });
 
@@ -291,7 +309,7 @@
     rpc('LAUNCHER_OPEN_OBT3').then(function (result) {
       if (!result || result.ok === false) throw new Error('browser could not be opened');
     }).catch(function (error) {
-      reportFailure('COULD NOT OPEN OBT3', error);
+      reportFailure('openObt3Failed', error);
     });
   });
 
@@ -303,21 +321,21 @@
     if (b.classList.contains('armed')) {
       clearTimeout(exitArm);
       b.classList.remove('armed');
-      b.textContent = 'EXITING';
+      setText(b, 'exiting');
       rpc('LAUNCHER_EXIT_ALL').then(function (result) {
         if (!result || result.ok === false) throw new Error('shutdown request failed');
       }).catch(function (error) {
         b.classList.remove('armed');
-        b.textContent = 'EXIT ALL';
-        reportFailure('EXIT ALL FAILED', error);
+        setText(b, 'exitAll');
+        reportFailure('exitFailed', error);
       });
       return;
     }
     b.classList.add('armed');
-    b.textContent = 'CLICK AGAIN';
+    setText(b, 'clickAgain');
     exitArm = setTimeout(function () {
       b.classList.remove('armed');
-      b.textContent = 'EXIT ALL';
+      setText(b, 'exitAll');
     }, 3000);
   });
 
@@ -333,7 +351,7 @@
   if (titlebar) {
     titlebar.addEventListener('mousedown', function (e) {
       if (e.button !== 0) return;
-      if (e.target.closest && e.target.closest('button')) return;
+      if (e.target.closest && e.target.closest('button, select, option, label')) return;
       rpc('LAUNCHER_DRAG').catch(function () {});
     });
   }

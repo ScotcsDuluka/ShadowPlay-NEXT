@@ -1,5 +1,8 @@
 {
     "l10n.gfe": "GeForce Experience",
+    "l10n.notificationOntologyCatalogUpdate": "มีอัปเดตแค็ตตาล็อก nv-ontology",
+    "l10n.notificationOntologyCatalogDetails": "แค็ตตาล็อก {{arg1}}",
+    "l10n.notificationOntologyGameCount": "{{arg1}} เกม",
     "l10n.instantReplay": "เล่นซ้ำทันที",
     "l10n.manualRecord": "บันทึก",
     "l10n.stream": "สตรีม",
