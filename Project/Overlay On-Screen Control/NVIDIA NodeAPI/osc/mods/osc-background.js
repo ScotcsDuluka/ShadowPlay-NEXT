@@ -28,11 +28,11 @@
     function draw(delta){if(!ctx)return;ctx.clearRect(0,0,width,height);
       particles.forEach(function(p){
         if(delta){p.x+=p.speedX*delta;p.y+=p.speedY*delta;if(p.x>width||p.x<0){p.x=Math.max(0,Math.min(width,p.x));p.speedX*=-1;}if(p.y>height||p.y<0){p.y=Math.max(0,Math.min(height,p.y));p.speedY*=-1;}
-          if(current.react&&mouse.x!==null&&mouse.y!==null){var dx=p.x-mouse.x,dy=p.y-mouse.y,d=Math.sqrt(dx*dx+dy*dy);if(d<120){var force=(120-d)/120,angle=Math.atan2(dy,dx);p.x+=Math.cos(angle)*force*3*delta;p.y+=Math.sin(angle)*force*3*delta;}}
+          if(current.react&&mouse.x!==null&&mouse.y!==null){var dx=p.x-mouse.x,dy=p.y-mouse.y,squared=dx*dx+dy*dy;if(squared<14400){var d=Math.sqrt(squared);if(d<120){var force=(120-d)/120,angle=Math.atan2(dy,dx);p.x+=Math.cos(angle)*force*3*delta;p.y+=Math.sin(angle)*force*3*delta;}}}
         }
         ctx.fillStyle='rgba(118,185,0,'+Math.min(1,p.opacity)+')';ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill();
       });
-      if(current.links)for(var a=0;a<particles.length;a++)for(var b=a+1;b<particles.length;b++){var dx=particles[a].x-particles[b].x,dy=particles[a].y-particles[b].y,distance=Math.sqrt(dx*dx+dy*dy);if(distance<110){ctx.strokeStyle='rgba(118,185,0,'+((110-distance)/120*.95)+')';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(particles[a].x,particles[a].y);ctx.lineTo(particles[b].x,particles[b].y);ctx.stroke();}}
+      if(current.links)for(var a=0;a<particles.length;a++)for(var b=a+1;b<particles.length;b++){var dx=particles[a].x-particles[b].x,dy=particles[a].y-particles[b].y,squared=dx*dx+dy*dy;if(squared>=12100)continue;var distance=Math.sqrt(squared);if(distance<110){ctx.strokeStyle='rgba(118,185,0,'+((110-distance)/120*.95)+')';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(particles[a].x,particles[a].y);ctx.lineTo(particles[b].x,particles[b].y);ctx.stroke();}}
     }
     function animated(){return visible&&current.mode==='website'&&current.opacity>0&&current.motion&&!(reduced&&reduced.matches)&&!document.hidden;}
     function tick(now){frame=null;if(!animated())return;if(!lastTime||now-lastTime>=32){var delta=lastTime?Math.min(3,(now-lastTime)/16.667)*current.speed:1;lastTime=now;draw(delta);}frame=window.requestAnimationFrame(tick);}
