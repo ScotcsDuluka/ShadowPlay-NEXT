@@ -1,0 +1,13 @@
+/* Whole native menu band moves together; no saved layout coordinates are changed. */
+html.nv-motion-preparing nv-main-menu:not([data-customize-preview]) .main-menu-container>md-toolbar.list,
+html.nv-motion-preparing nv-osc-top-bar .top-bar{opacity:0!important}
+html.nv-motion-preparing #nv-osc-background{opacity:0!important}
+html.nv-motion-preparing:not(.nv-osc-bg-website) .nv-osc{background:transparent!important}
+html.nv-motion-active [data-nv-motion-group]{transform:var(--nv-motion-base,translate3d(0,0,0)) translate3d(var(--nv-motion-x,0px),0,0)!important;opacity:1!important;will-change:transform;transition:none!important;animation:none!important}
+html.nv-motion-active [data-nv-motion-block]{transform:var(--nv-motion-base,translate3d(0,0,0)) scale(var(--nv-motion-scale,1))!important;transform-origin:left bottom!important;opacity:1!important;will-change:transform;animation:none!important}
+html.nv-motion-active [data-nv-motion-top]{transform:var(--nv-motion-base,translate3d(0,0,0)) translate3d(0,var(--nv-motion-y,0px),0)!important;opacity:1!important;will-change:transform;transition:none!important;animation:none!important}
+html.nv-motion-active #nv-osc-background{opacity:var(--nv-motion-bg-alpha,.5)!important;transition:none!important}
+html.nv-motion-active:not(.nv-osc-bg-website) .nv-osc{background:rgba(0,0,0,var(--nv-motion-bg-alpha,.5))!important}
+html.nv-motion-active .nv-flex-face{animation:none!important}
+html.nv-motion-opening .nv-osc md-menu,html.nv-motion-closing .nv-osc md-menu,html.nv-motion-active .md-open-menu-container{pointer-events:none!important}
+html.nv-motion-active .md-open-menu-container{opacity:0!important}

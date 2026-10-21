@@ -54,9 +54,9 @@ test('missing Whisper Mode disables its submenu action',()=>{
  const f=menu();delete f.tiles.QuietMode2;f.synchronize();const item=f.tiles.Preferences.state.Menu.items[3];
  assert.equal(item.visible,false);assert.equal(item.enabled,false);assert.doesNotThrow(()=>item.click());
 });
-test('all five fixed right controls stay visible despite obsolete saved hide preferences',()=>{
+test('right controls may be hidden but Settings always remains visible',()=>{
  const f=menu({Performance:false,Gallery:false,Mic:false,Camera:false,Preferences:false});for(let i=0;i<3;i++)f.synchronize();
- for(const key of ['Performance','Gallery','Mic','Camera','Preferences'])assert.equal(f.tiles[key].visible,true,key);
+ for(const key of ['Performance','Gallery','Mic','Camera'])assert.equal(f.tiles[key].visible,false,key);assert.equal(f.tiles.Preferences.visible,true);
  assert.equal(f.tiles.GameProfiles,undefined);
 });
 test('native feature support controls Performance availability independently of visibility',()=>{
@@ -66,8 +66,8 @@ test('native feature support controls Performance availability independently of 
 test('native menu elements accept cross-panel positions without replacing action or keyboard handlers',()=>{
  const f=menu(),handlers=Object.fromEntries(Object.entries(f.nodes).map(([name,node])=>[name,node.handlers]));
  assert.equal(f.api.set({version:2,left:['Stream'],center:['Screenshot','Mods']}),true);f.synchronize();
- assert.equal(f.nodes['stream-tile'].styles.left,'-280px');assert.equal(f.nodes['stream-tile'].styles.top,'0px');assert.equal(f.nodes['stream-tile'].styles.width,'240px');assert.equal(f.nodes['stream-tile'].styles.height,'240px');
- assert.equal(f.nodes['screenshot-tile'].styles.left,'0px');assert.equal(f.nodes['screenshot-tile'].styles.width,'480px');assert.equal(f.nodes['mods-tile'].styles.left,'480px');assert.equal(f.nodes['mods-tile'].styles.height,'240px');
+ assert.equal(f.nodes['stream-tile'].styles.left,'-280px');assert.equal(f.nodes['stream-tile'].styles.top,'0px');assert.equal(f.nodes['stream-tile'].styles.width,'240px');assert.equal(f.nodes['stream-tile'].styles.height,'80px');
+ assert.equal(f.nodes['screenshot-tile'].styles.left,'0px');assert.equal(f.nodes['screenshot-tile'].styles.width,'240px');assert.equal(f.nodes['mods-tile'].styles.left,'240px');assert.equal(f.nodes['mods-tile'].styles.height,'240px');
  assert.equal(f.tiles.Ansel.visible,false);assert.equal(f.tiles.ManualRecord.visible,false);
  for(const [name,node]of Object.entries(f.nodes))assert.equal(node.handlers,handlers[name]);
 });
@@ -123,3 +123,47 @@ test('Escape cancels a drag and destruction removes every installed input listen
  f.destroy.forEach(fn=>fn());assert.deepEqual(Object.keys(f.rootEvents),[]);assert.deepEqual(Object.keys(f.documentEvents),[]);assert.deepEqual(Object.keys(f.windowEvents),[]);
 });
 
+
+test('center rail shrinks without resizing tiles, recentering locked right Settings', () => {
+  const f=menu();
+  const originalQuery=f.root.querySelector;
+  const rail=styledNode('md-menu-bar');
+  f.root.querySelector=selector=>selector==='md-menu-bar'?rail:originalQuery(selector);
+  const full=f.api.get();
+  for (let count=4;count>=0;count--) {
+    assert.equal(f.api.set({version:2,left:full.left,center:full.center.slice(0,count)}),true);
+    f.synchronize();
+    assert.equal(rail.styles.width,(240*count)+'px');
+    assert.equal(rail.styles['min-width'],(240*count)+'px');
+    assert.equal(rail.styles.transform,'translateX('+(count===0?500:(4-count)*120)+'px)');
+    const controls=f.api.cells(f.api.get()).filter(x=>x.group==='center');
+    assert(controls.every((c,i)=>c.width===240&&c.x===i*240&&c.height===240));
+    assert.equal(f.tiles.Preferences.name,'nv-settings-menu');
+    assert.equal(f.tiles.Preferences.visible,true);
+    assert.equal(f.api.remove('Preferences'),false);
+    assert.equal(f.api.move('Preferences','center',0),false);
+    assert.equal(f.api.remove('Settings'),false);
+    assert.equal(f.api.move('Settings','left',0),false);
+  }
+  assert.equal(f.api.set({version:2,left:[],center:[],right:[]}),false);
+  assert.equal(f.api.set({version:2,left:['Settings'],center:[]}),false);
+  assert.equal(f.tiles.Preferences.state.Menu.items[0].id,'settings');
+});
+
+test('initial native menu anchor ignores a temporary x=0 root position', () => {
+  const f=menu(),rail=styledNode('md-menu-bar'),original=f.root.querySelector;
+  f.root.querySelector=sel=>sel==='md-menu-bar'?rail:original(sel);
+  f.context.window.innerWidth=1920;
+  f.root.getBoundingClientRect=()=>({left:0,width:0});
+  f.synchronize();
+  assert.equal(rail.styles.transform,'translateX(0px)','zero-sized Angular view must not shift native controls');
+  f.root.getBoundingClientRect=()=>({left:0,width:1040});
+  f.synchronize();
+  assert.equal(rail.styles.transform,'translateX(0px)','must not follow transient x=0 root');
+  f.root.getBoundingClientRect=()=>({left:440,width:1040});
+  f.synchronize();
+  assert.equal(rail.styles.transform,'translateX(0px)','settled CSS position must not move the rail');
+  assert.equal(f.api.set({version:2,left:[],center:[]}),true);
+  f.synchronize();
+  assert.equal(rail.styles.transform,'translateX(360px)','Settings-only view must center using stable root width');
+});

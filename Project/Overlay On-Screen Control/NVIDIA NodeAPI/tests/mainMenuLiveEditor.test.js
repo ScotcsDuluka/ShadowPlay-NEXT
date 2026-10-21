@@ -131,7 +131,7 @@ test('a V2 layout takes precedence and malformed saved JSON falls back to defaul
   assert.deepEqual(plain(fixture({ [storageKey]: '{', DulukaMainMenuLayout: '{', DulukaMainMenuVisibility: '{' }).api.get()), defaults);
 });
 
-test('left panel uses one large block or equally divided two/three row blocks', () => {
+test('left panel uses fixed Side rows with no phantom height', () => {
   const f = fixture();
   for (let count = 1; count <= 3; count++) {
     const cells = Array.from(f.api.cells({ version: 2, left: defaults.left.slice(0, count), center: [] }));
@@ -141,16 +141,16 @@ test('left panel uses one large block or equally divided two/three row blocks', 
       assert.equal(cell.group, 'left');
       assert.equal(cell.index, index);
       assert.equal(cell.x, -280);
-      assert.equal(cell.y, index * 240 / count);
+      assert.equal(cell.y, index * 80);
       assert.equal(cell.width, 240);
-      assert.equal(cell.height, 240 / count);
-      assert.equal(cell.variant, count === 1 ? 'big' : 'row');
+      assert.equal(cell.height, 80);
+      assert.equal(cell.variant, 'row');
     });
-    assert.equal(cells.reduce((area, cell) => area + cell.width * cell.height, 0), 240 * 240);
+    assert.equal(cells.reduce((area, cell) => area + cell.width * cell.height, 0), count * 240 * 80);
   }
 });
 
-test('center controls stay large and divide the complete panel with no overlap', () => {
+test('center controls keep fixed 240x240 blocks without stretching as count decreases', () => {
   const f = fixture();
   for (const count of [1, 2, 3, 4]) {
     const cells = Array.from(f.api.cells({ version: 2, left: [], center: defaults.center.slice(0, count) }));
@@ -160,13 +160,13 @@ test('center controls stay large and divide the complete panel with no overlap',
       assert.equal(cell.key, defaults.center[index]);
       assert.equal(cell.index, index);
       assert.equal(cell.variant, 'big');
-      assert.equal(cell.x, index * 960 / count);
+      assert.equal(cell.x, index * 240);
       assert.equal(cell.y, 0);
-      assert.equal(cell.width, 960 / count);
+      assert.equal(cell.width, 240);
       assert.equal(cell.height, 240);
       if (index) assert.equal(cells[index - 1].x + cells[index - 1].width, cell.x);
     });
-    assert.equal(cells.reduce((area, cell) => area + cell.width * cell.height, 0), 960 * 240);
+    assert.equal(cells.reduce((area, cell) => area + cell.width * cell.height, 0), count * 240 * 240);
   }
   assert.deepEqual(plain(f.api.cells({ version: 2, left: [], center: [] })), []);
 });
@@ -238,7 +238,10 @@ test('invalid edits and attempts to change locked controls do not mutate the liv
     assert.equal(f.api.set(layout), false, JSON.stringify(layout));
     assert.deepEqual(plain(f.api.get()), before);
   }
-  for (const key of ['Mic', 'Camera', 'Gallery', 'Performance', 'Preferences']) {
+  for (const key of ['Mic', 'Camera', 'Gallery', 'Performance']) {
+    assert.equal(f.api.move(key, 'left', 0), false);
+  }
+  for (const key of ['Preferences', 'Settings']) {
     assert.equal(f.api.remove(key), false);
     assert.equal(f.api.move(key, 'left', 0), false);
   }
@@ -406,4 +409,82 @@ test('Settings live editor keeps saved panels after Done, teardown and a cold in
   assert.deepEqual(plain(reopened.controller.layout), saved);
   assert.deepEqual(navigations, ['main.main-menu', 'main.main-menu']);
   reopened.events.$destroy();
+});
+
+test('Side rows support 1 named control or groups of 2–3 icons while preserving Settings', () => {
+  const f=fixture();
+  assert.deepEqual(plain(f.api.getSides().right),[['Performance','Mic','Camera'],['Gallery'],['Settings']]);
+  assert.equal(f.api.sideRemove('Mic'),true);
+  assert.equal(f.api.sideMove('Settings','right',0,true),true);
+  assert.deepEqual(plain(f.api.getSides().right[0]),['Performance','Camera','Settings']);
+  assert.equal(f.api.sideMove('Settings','right',0,true),true);
+  assert.equal(f.api.sideMove('Camera','right',1,true),true);
+  assert.deepEqual(plain(f.api.getSides().right),[['Performance','Settings'],['Gallery','Camera']]);
+  assert.equal(f.api.sideRemove('Settings'),false);
+  assert.equal(f.api.remove('Settings'),false);
+  assert.equal(f.api.move('Settings','center',0),false);
+  assert.equal(f.api.sideMove('Settings','left',0,true),false);
+  assert.equal(f.api.sideMove('Mods','right',0,true),true);
+  assert.deepEqual(plain(f.api.getSides().right[0]),['Performance','Settings','Mods']);
+  assert.equal(f.api.get().left.includes('Mods'),false);
+  const cold=fixture(f.values);
+  assert.deepEqual(plain(cold.api.getSides()),plain(f.api.getSides()));
+  assert.equal(cold.window.__dulukaMainMenuVisibility.Preferences,true);
+});
+
+test('empty left and center panels retain just the mandatory Settings Side block', () => {
+  const f=fixture();
+  for(const key of ['Performance','Mic','Camera','Gallery'])assert.equal(f.api.sideRemove(key),true);
+  assert.equal(f.api.set({version:2,left:[],center:[]}),true);
+  assert.deepEqual(plain(f.api.getSides()),{left:[],right:[['Settings']]});
+  assert.equal(f.window.__dulukaMainMenuVisibility.Preferences,true);
+  for(const key of ['Performance','Mic','Camera','Gallery'])assert.equal(f.window.__dulukaMainMenuVisibility[key],false);
+  const cold=fixture(f.values);
+  assert.deepEqual(plain(cold.api.getSides()),{left:[],right:[['Settings']]});
+  assert.equal(cold.api.reset(),true);
+  assert.deepEqual(plain(cold.api.getSides().right),[['Performance','Mic','Camera'],['Gallery'],['Settings']]);
+});
+
+test('the native editor includes all three panels and a searchable scrollable control catalog',()=>{
+  const html=fs.readFileSync(sourcePath,'utf8');
+  assert(html.includes("sidePanelMarkup('right')"));
+  assert(html.includes("sidePanelMarkup('left')"));
+  assert(html.includes('nv-live-search'));
+  assert(html.includes('filter:{label:flexMenu.search}'));
+  assert(html.includes("key!==\\'Settings\\'")||html.includes("key!=='Settings'"));
+});
+
+test('Side Slot icons can be reordered within the same row without duplicating Settings',()=>{
+  const f=fixture();
+  assert.equal(f.api.sideMove('Mic','right',0,true,0),true);
+  assert.deepEqual(plain(f.api.getSides().right[0]),['Mic','Performance','Camera']);
+  assert.equal(f.api.sideMove('Settings','right',1,true,0),true);
+  assert.deepEqual(plain(f.api.getSides().right[1]),['Settings','Gallery']);
+  assert.equal(f.api.sideMove('Gallery','right',1,true,0),true);
+  assert.deepEqual(plain(f.api.getSides().right[1]),['Gallery','Settings']);
+  assert.equal(plain(f.api.getSides().right).flat().filter(k=>k==='Settings').length,1);
+});
+
+test('extra right Side rows move the Customize toolbar below the taller native panel',()=>{
+  const f=fixture(),{controller}=editorController(f,()=>{});
+  assert.equal(controller.extraRows(),0);
+  assert.equal(f.api.sideMove('Mods','right',3,false),true);
+  assert.equal(f.api.getSides().right.length,4);
+  assert.equal(controller.extraRows(),80);
+  assert.equal(f.api.sideMove('Ansel','right',4,false),true);
+  assert.equal(controller.extraRows(),160);
+  assert.equal(f.api.reset(),true);
+  assert.equal(controller.extraRows(),0);
+});
+
+test('actual Side Slot model reports two and three icon-only rectangles',()=>{
+  const f=fixture();
+  assert.equal(f.api.sideMove('Ansel','left',0,true),true);
+  let c=Array.from(f.api.cells(f.api.get())).filter(x=>x.group==='left');
+  assert.deepEqual(c.map(x=>[x.key,x.x,x.y,x.width,x.height,x.variant]),[
+    ['Screenshot',-280,0,120,80,'small'],['Ansel',-160,0,120,80,'small'],['Mods',-280,80,240,80,'row']
+  ]);
+  assert.equal(f.api.sideMove('Mods','left',0,true),true);
+  c=Array.from(f.api.cells(f.api.get())).filter(x=>x.group==='left');
+  assert.deepEqual(c.map(x=>[x.x,x.width,x.height,x.variant]),[[-280,80,80,'small'],[-200,80,80,'small'],[-120,80,80,'small']]);
 });

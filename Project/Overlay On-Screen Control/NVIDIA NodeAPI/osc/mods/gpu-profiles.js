@@ -72,9 +72,79 @@
     var api=window.__dulukaMenuLayout;if(!api||!root)return;
     var map={};api.items.forEach(function(item){map[item.key]=item.name;});
     function setStyle(element,key,value){if(element.style.getPropertyValue(key)!==value||element.style.getPropertyPriority(key)!=='important')element.style.setProperty(key,value,'important');}
-    api.cells(api.get()).forEach(function(cell){var element=root.querySelector('md-menu.'+map[cell.key]);if(!element)return;
-      if(!element.classList.contains('nv-flex-tile'))element.classList.add('nv-flex-tile');setStyle(element,'position','absolute');setStyle(element,'left',cell.x+'px');setStyle(element,'top',cell.y+'px');setStyle(element,'width',cell.width+'px');setStyle(element,'height',cell.height+'px');setStyle(element,'right','auto');
+    // A side panel disappears entirely when all of its blocks are removed.
+    // The original NVIDIA controls are retained; only their pixel geometry moves.
+    var bar=root.querySelector('md-menu-bar'),layout=api.get();
+    var sides=api.getSides?api.getSides():{left:layout.left.map(function(k){return [k];}),right:[['Performance','Mic','Camera'],['Gallery'],['Settings']]};
+    var centerCount=layout.center.length,hasLeft=sides.left.length>0,hasCenter=centerCount>0;
+    var total=240+(hasLeft?280:0)+(hasCenter?240*centerCount+40:0);
+    var begin=((window.innerWidth||1920)-total)/2;
+    var barX=begin+(hasLeft?280:0),rightX=hasCenter?centerCount*240+40:0;
+    if(bar){
+      // The native container briefly starts at x=0 during the first Angular
+      // render, then moves to its CSS-centered position. Anchoring the rail
+      // against that transient rect caused a +440px slide on first open.
+      // Use the container's settled CSS center instead of its current x.
+      var rootWidth=root.getBoundingClientRect?root.getBoundingClientRect().width:1040;
+      // The native root can be zero-sized while Angular is linking the view.
+      // Never use that transient width to position or animate the rail.
+      if(!isFinite(rootWidth)||rootWidth<960)rootWidth=1040;
+      var stableBarOrigin=((window.innerWidth||1920)-rootWidth)/2+40;
+      setStyle(bar,'width',(centerCount*240)+'px');
+      setStyle(bar,'min-width',(centerCount*240)+'px');
+      setStyle(bar,'transform','translateX('+(barX-stableBarOrigin)+'px)');
+    }
+    function apply(element,x,y,w,h,small){
+      if(!element)return;
+      setStyle(element,'position','absolute');setStyle(element,'left',x+'px');setStyle(element,'top',y+'px');
+      setStyle(element,'width',w+'px');setStyle(element,'height',h+'px');setStyle(element,'right','auto');
+      if(element.classList.contains('nv-side-small-tile')!==small)element.classList[small?'add':'remove']('nv-side-small-tile');
+      if(element.classList.contains('nv-side-full-tile')===small)element.classList[small?'remove':'add']('nv-side-full-tile');
+    }
+    function groups(rows,offset,right){
+      rows.forEach(function(row,r){row.forEach(function(key,c){
+        var nativeMap={Performance:'performance-tile',Mic:'mic-tile',Camera:'camera-tile',Gallery:'gallery-tile',Settings:'nv-settings-menu-tile'};
+        var name=right&&nativeMap[key]?nativeMap[key]:map[key];
+        var element=root.querySelector('md-menu.'+name);
+        if(element){
+          if(!right&&!element.classList.contains('nv-flex-tile'))element.classList.add('nv-flex-tile');
+          apply(element,offset+c*240/row.length,r*80,240/row.length,80,row.length>1);
+          if(right){
+            element.setAttribute('data-nv-side-key',key);
+            if(key==='Performance'||key==='Mic'||key==='Camera'){
+              var button=element.querySelector&&element.querySelector('button.menu-button');
+              if(button){
+                var info=button.querySelector('.nv-side-native-info');
+                if(!info){
+                  info=document.createElement('span');
+                  info.className='nv-side-native-info';
+                  var title=document.createElement('strong'),sub=document.createElement('small');
+                  info.appendChild(title);info.appendChild(sub);button.appendChild(info);
+                }
+                var labels={Performance:'Performance',Mic:'Microphone',Camera:'Camera'};
+                var titleText=labels[key],subText='';
+                var tileState=window.angular&&window.angular.element(root).scope();
+                while(tileState&&!tileState.mainMenu)tileState=tileState.$parent;
+                var nativeTile=tileState&&tileState.mainMenu&&tileState.mainMenu.tiles&&tileState.mainMenu.tiles[key];
+                if(nativeTile)subText=nativeTile.shortcut||(nativeTile.state&&nativeTile.state[nativeTile.currentState]||{}).status||nativeTile.currentState||'';
+                if(info.firstChild.textContent!==titleText)info.firstChild.textContent=titleText;
+                if(info.lastChild.textContent!==subText)info.lastChild.textContent=subText;
+                if(info.style.display!==(row.length===1?'block':'none'))info.style.display=row.length===1?'block':'none';
+              }
+            }
+          }
+        }
+      });});
+    }
+    groups(sides.left,-280,false);
+    api.cells(layout).forEach(function(cell){
+      if(cell.group!=='center')return;
+      var element=root.querySelector('md-menu.'+map[cell.key]);
+      if(!element)return;
+      if(!element.classList.contains('nv-flex-tile'))element.classList.add('nv-flex-tile');
+      apply(element,cell.x,0,cell.width,240,false);
     });
+    groups(sides.right,rightX,true);
   }
 
   function updateMainMenuPerformance() {
@@ -168,7 +238,7 @@
     // Gallery. Measuring during the first Angular digest created stale inline
     // positions and sometimes covered Instant Replay; never pin pixel offsets.
     var visibility = window.__dulukaMainMenuVisibility || {};
-    ['Performance','Mic','Camera','Gallery','Preferences'].forEach(function(name){if(tiles[name]&&tiles[name].visible!==true){tiles[name].visible=true;changed=true;}});
+    ['Performance','Mic','Camera','Gallery','Preferences'].forEach(function(name){var desired=name==='Preferences'||visibility[name]!==false;if(tiles[name]&&tiles[name].visible!==desired){tiles[name].visible=desired;changed=true;}});
     Object.keys(visibility).forEach(function (name) {
       if (['Performance','Mic','Camera','Gallery','Preferences'].indexOf(name)>=0 || typeof visibility[name] !== 'boolean' || !tiles[name]) return;
       if (tiles[name].visible !== visibility[name]) { tiles[name].visible = visibility[name]; changed = true; }
