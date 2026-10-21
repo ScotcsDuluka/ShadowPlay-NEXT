@@ -247,13 +247,13 @@ process.on('SIGINT',()=>{void shutdown()});process.on('SIGTERM',()=>{void shutdo
        const info=await js(`(function(){
           var m=window.__dulukaOscMotion,st=m&&m.getState&&m.getState(),s=angular.element(document.documentElement).injector().get('$state');
           return {route:s.current.name,motionPhase:m&&m.phase,motionTarget:st&&st.target,
-            editor:!!document.querySelector('.nv-live-editor')};
+            editor:!!document.querySelector('.nv-live-editor'),
+            editing:document.documentElement.classList.contains('nv-live-layout-editing')};
        })()`);
-       if(!captured&&info.motionTarget==='open'&&info.motionPhase==='idle'&&info.route==='main.main-menu'){
-         if(!info.editor){
-           await js("window.__dulukaStartMainMenuEditor();true");
-           await sleep(300);
-         }
+       // The user must explicitly open Customize. Monitoring Alt+Z alone
+       // must never navigate or enter an editor.
+       if(!captured&&info.motionTarget==='open'&&info.motionPhase==='idle'&&
+          info.route==='main.main-menu'&&info.editor&&info.editing){
          const report=await samples();
          if(report.tiles===12&&report.allNative&&report.fits&&report.faceInfo&&report.faceInfo.icon&&report.faceInfo.icon.rect.w>=25){
            await captureScreen();
@@ -282,7 +282,10 @@ process.on('SIGINT',()=>{void shutdown()});process.on('SIGTERM',()=>{void shutdo
    a.set(s);return true;
  })()`);
  await sleep(200);
- await js("window.__dulukaStartMainMenuEditor();true");
+ // This legacy fallback is deliberately non-interactive. Do not
+ // synthesize an editor-open action even when this path is reached.
+ const manuallyEditing=await js('document.documentElement.classList.contains("nv-live-layout-editing")');
+ if(!manuallyEditing)throw Error('Waiting for the user to open Customize manually');
  await sleep(560);
  const report=await samples();
  fs.writeFileSync(reportPath,JSON.stringify({report,assets:seen,exceptions},null,2));
