@@ -7,6 +7,7 @@ internal static class Program
 {
     private const uint ProcessCreateThread = 0x0002;
     private const uint ProcessQueryInformation = 0x0400;
+    private const uint ProcessQueryLimitedInformation = 0x1000;
     private const uint ProcessVmOperation = 0x0008;
     private const uint ProcessVmWrite = 0x0020;
     private const uint MemCommit = 0x1000;
@@ -29,6 +30,15 @@ internal static class Program
             {
                 using var game = Process.GetProcessById(options.GamePid);
                 ValidateGameIdentity(game, options.GameExecutable);
+
+                // Passive diagnostics do not load a DLL or modify the game.
+                // Observing a runtime module is evidence of presence only;
+                // it does not prove that the corresponding API presents frames.
+                if (options.ProbeOnly)
+                {
+                    LogGraphicsApiEvidence(game, options.GameName);
+                    return 0;
+                }
 
                 var targetIs64Bit = IsSupportedX64Process(game.Handle);
                 if (targetIs64Bit != Environment.Is64BitProcess)
@@ -71,6 +81,7 @@ internal static class Program
             }
             catch (Win32Exception ex) when (
                 ex.NativeErrorCode == 5 &&
+                !options.ProbeOnly &&
                 !options.ElevationRetry &&
                 !IsAdministrator())
             {
@@ -86,7 +97,7 @@ internal static class Program
         }
     }
 
-    private static (int GamePid, string GameName, string GameExecutable, bool ElevationRetry, bool AnselOnly) ParseArguments(string[] args)
+    private static (int GamePid, string GameName, string GameExecutable, bool ElevationRetry, bool AnselOnly, bool ProbeOnly) ParseArguments(string[] args)
     {
         var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         for (var i = 0; i + 1 < args.Length; i += 2)
@@ -110,8 +121,14 @@ internal static class Program
             bool.TryParse(retryText, out var retryRequested) && retryRequested;
         var anselOnly = values.TryGetValue("--ansel-only", out var anselText) &&
             bool.TryParse(anselText, out var anselRequested) && anselRequested;
-        return (pid, name, Path.GetFullPath(executable), elevationRetry, anselOnly);
+        var probeOnly = values.TryGetValue("--probe-only", out var probeText) &&
+            bool.TryParse(probeText, out var probeRequested) && probeRequested;
+        return (pid, name, Path.GetFullPath(executable), elevationRetry, anselOnly, probeOnly);
     }
+
+    // Read-only module evidence; graphics renderer support is separate.
+    private static void LogGraphicsApiEvidence(Process game, string gameName)
+        => Log(GraphicsApiProbe.Observe(game, gameName));
 
     private static bool IsAdministrator()
     {
@@ -173,11 +190,41 @@ internal static class Program
 
     private static void ValidateGameIdentity(Process game, string expectedExecutable)
     {
-        var actualExecutable = Path.GetFullPath(game.MainModule?.FileName
-            ?? throw new InvalidOperationException("Could not read the target process image path."));
+        string? actualExecutable = null;
+        try
+        {
+            actualExecutable = game.MainModule?.FileName;
+        }
+        catch (Win32Exception)
+        {
+            // MainModule can fail for a cross-bitness process or due to a
+            // restricted module list; query its image name with limited rights.
+        }
+
+        if (string.IsNullOrWhiteSpace(actualExecutable))
+        {
+            var handle = OpenProcess(ProcessQueryLimitedInformation, false, game.Id);
+            if (handle == IntPtr.Zero)
+                throw new Win32Exception(Marshal.GetLastWin32Error(),
+                    "Could not open the target process to verify its image path.");
+            try
+            {
+                var pathBuffer = new System.Text.StringBuilder(32768);
+                var chars = pathBuffer.Capacity;
+                if (!QueryFullProcessImageNameW(handle, 0, pathBuffer, ref chars))
+                    throw new Win32Exception(Marshal.GetLastWin32Error(),
+                        "Could not verify the target process image path.");
+                actualExecutable = pathBuffer.ToString();
+            }
+            finally
+            {
+                CloseHandle(handle);
+            }
+        }
+
+        actualExecutable = Path.GetFullPath(actualExecutable);
         if (!string.Equals(actualExecutable, expectedExecutable, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("The target PID no longer matches the expected game executable.");
-
     }
 
     private static bool IsSupportedX64Process(IntPtr process)
@@ -263,6 +310,12 @@ internal static class Program
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern IntPtr OpenProcess(uint access, [MarshalAs(UnmanagedType.Bool)] bool inheritHandle, int processId);
+
+    [DllImport("kernel32.dll", EntryPoint = "QueryFullProcessImageNameW",
+        SetLastError = true, CharSet = CharSet.Unicode, ExactSpelling = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool QueryFullProcessImageNameW(
+        IntPtr process, uint flags, System.Text.StringBuilder imagePath, ref int characters);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern IntPtr VirtualAllocEx(IntPtr process, IntPtr address, nuint size, uint allocationType, uint protect);
