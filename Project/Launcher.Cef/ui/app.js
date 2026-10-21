@@ -110,7 +110,9 @@
     if (node) node.addEventListener(ev, fn);
   }
 
-  on($('launcherLanguage'), 'change', function () { i18n.setLanguage(this.value); });
+  on($('launcherLanguage'), 'change', function () {
+    publishLanguage(i18n.setLanguage(this.value));
+  });
 
   function activateByKeyboard(node, fn) {
     on(node, 'keydown', function (event) {
@@ -218,6 +220,15 @@
     if (latestState) render(latestState);
   };
 
+  function publishLanguage(lang) {
+    rpc('LAUNCHER_SET_LANGUAGE', { language: lang }).then(function (result) {
+      if (!result || result.ok !== true) throw new Error('language was not synchronized');
+    }).catch(function (error) {
+      if (window.console && console.warn)
+        console.warn('[launcher-language] Could not synchronize OSC language', error);
+    });
+  }
+
   // ── Host push (launcher_script.h augmentation) ──────────────────────
   window.__onLauncherState(function (s) { render(s); });
 
@@ -228,6 +239,7 @@
     });
   }
   pull();
+  publishLanguage(i18n.getLanguage());
 
   // ── Toggles (user action only — config.json is the source of truth) ─
   on(el.tglOverlay, 'click', function () {

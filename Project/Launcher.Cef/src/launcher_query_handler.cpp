@@ -19,6 +19,48 @@ namespace {
 
 volatile LONG g_exit_all_started = 0;
 
+// Launcher and OSC share an explicit locale file in the OSC static tree.
+// Only allow locale IDs which have a bundled OSC dictionary; never accept a
+// caller-controlled path. The two UIs do not share browser cookies/origins.
+bool SaveLauncherLanguage(const std::string& language) {
+  const size_t dash = language.find('-');
+  if (dash != 2 || language.size() < 5 || language.size() > 6) return false;
+  for (size_t i = 0; i < language.size(); ++i) {
+    if (i == dash) continue;
+    const char c = language[i];
+    if (i < dash ? (c < 'a' || c > 'z') : (c < 'A' || c > 'Z'))
+      return false;
+  }
+  const std::wstring osc_root = launcherutil::JoinPath(
+      launcherutil::GetRootDir(),
+      L"Overlay On-Screen Control\\NVIDIA NodeAPI\\osc");
+  const std::wstring locale_path = launcherutil::JoinPath(
+      launcherutil::JoinPath(osc_root, L"l10n"),
+      launcherutil::Utf8ToWide(language + ".json"));
+  if (GetFileAttributesW(locale_path.c_str()) == INVALID_FILE_ATTRIBUTES)
+    return false;
+
+  const std::wstring target = launcherutil::JoinPath(
+      launcherutil::JoinPath(osc_root, L"mods"), L"launcher-language.json");
+  const std::wstring temp = target + L".tmp";
+  const std::string json = "{\"language\":\"" + language + "\"}\n";
+  HANDLE file = CreateFileW(temp.c_str(), GENERIC_WRITE, 0, NULL,
+                            CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+  if (file == INVALID_HANDLE_VALUE) return false;
+  DWORD written = 0;
+  const bool ok = WriteFile(file, json.data(),
+                            static_cast<DWORD>(json.size()), &written, NULL) != 0 &&
+                  written == json.size() && FlushFileBuffers(file) != 0;
+  CloseHandle(file);
+  if (!ok || !MoveFileExW(temp.c_str(), target.c_str(),
+                           MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+    DeleteFileW(temp.c_str());
+    return false;
+  }
+  return true;
+}
+
+
 // EXIT ALL runs the process shutdown in a worker and posts the final window
 // close back to CEF's UI thread after the owned processes have been handled.
 class QueryHandlerUiTask : public CefTask {
@@ -75,6 +117,13 @@ bool LauncherQueryHandler::OnQuery(CefRefPtr<CefBrowser> browser,
   const std::string cmd = launcherjson::GetStr(req, "command");
   if (cmd.empty()) {
     RespondFail(callback, -3, "no command");
+    return true;
+  }
+
+  if (cmd == "LAUNCHER_SET_LANGUAGE") {
+    const std::string lang = launcherjson::GetStr(req, "language");
+    const bool ok = SaveLauncherLanguage(lang);
+    RespondOk(callback, ok ? "{\"ok\":true}" : "{\"ok\":false}");
     return true;
   }
 

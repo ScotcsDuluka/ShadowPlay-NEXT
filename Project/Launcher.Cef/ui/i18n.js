@@ -116,6 +116,27 @@
     }
   };
 
+  // Reuse the existing OSC locale names and suitable translated labels.
+  // Launcher-specific messages not present in OSC fall back to English.
+  var oscLocales = window.LauncherOscLocales || {};
+  Object.keys(oscLocales).forEach(function (code) {
+    if (!messages[code]) messages[code] = oscLocales[code].messages || {};
+  });
+
+  function populateLanguages() {
+    var select = document.getElementById('launcherLanguage');
+    if (!select) return;
+    var codes = Object.keys(oscLocales).sort();
+    for (var i = 0; i < codes.length; i++) {
+      var code = codes[i];
+      if (code === 'en-US' || code === 'th-TH') continue;
+      var option = document.createElement('option');
+      option.value = code;
+      option.textContent = oscLocales[code].name || code;
+      select.appendChild(option);
+    }
+  }
+
   function supported(lang) {
     return Object.prototype.hasOwnProperty.call(messages, lang);
   }
@@ -147,7 +168,7 @@
   }
 
   function apply() {
-    document.documentElement.lang = language === 'th-TH' ? 'th' : 'en';
+    document.documentElement.lang = language.slice(0, 2);
     var nodes = document.querySelectorAll('[data-i18n], [data-i18n-title], [data-i18n-aria-label]');
     for (var i = 0; i < nodes.length; i++) {
       var node = nodes[i];
@@ -175,6 +196,8 @@
       window.onLauncherLanguageChanged(language);
     return language;
   }
+
+  populateLanguages();
 
   window.LauncherI18n = {
     t: t,
