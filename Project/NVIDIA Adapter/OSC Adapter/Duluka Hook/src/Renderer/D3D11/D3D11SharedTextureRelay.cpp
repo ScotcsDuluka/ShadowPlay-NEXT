@@ -68,9 +68,9 @@ namespace duluka::d3d11
         return result;
     }
 
-    HRESULT SharedTextureRelay::Refresh()
+    HRESULT SharedTextureRelay::Refresh(DWORD timeoutMs)
     {
-        HRESULT result = sourceMutex_->AcquireSync(0, 2);
+        HRESULT result = sourceMutex_->AcquireSync(0, timeoutMs);
         if (result != S_OK) return result;
         result = relayMutex_->AcquireSync(0, 0);
         if (result == S_OK)

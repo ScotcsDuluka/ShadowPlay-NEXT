@@ -688,16 +688,19 @@ namespace
 
         if (!g_overlayCacheValid || frameNumber != g_cachedFrameNumber)
         {
+            // Keep the game thread moving when a previous overlay frame is available.
+            // Retain the initial-frame wait; a busy producer otherwise uses the cache.
+            const DWORD mutexTimeoutMs = g_overlayCacheValid ? 0 : 2;
             bool acquired = true;
             if (g_textureRelay)
             {
-                result = g_textureRelay->Refresh();
+                result = g_textureRelay->Refresh(mutexTimeoutMs);
                 acquired = result == S_OK;
                 if (!acquired) SetDiagnosticStage("shared-texture-relay-not-ready", result);
             }
             if (acquired && g_overlayKeyedMutex)
             {
-                result = g_overlayKeyedMutex->AcquireSync(0, 2);
+                result = g_overlayKeyedMutex->AcquireSync(0, mutexTimeoutMs);
                 acquired = result == WAIT_OBJECT_0;
                 if (!acquired && result != WAIT_TIMEOUT)
                     SetDiagnosticStage("shared-texture-mutex-failed", result);

@@ -15,7 +15,7 @@ namespace duluka::d3d11
         ~SharedTextureRelay();
         HRESULT Open(ID3D11Device *gameDevice, const wchar_t *name,
             ID3D11Texture2D **gameTexture);
-        HRESULT Refresh();
+        HRESULT Refresh(DWORD timeoutMs = 2);
     private:
         ID3D11Device *device_ = nullptr;
         ID3D11DeviceContext *context_ = nullptr;
