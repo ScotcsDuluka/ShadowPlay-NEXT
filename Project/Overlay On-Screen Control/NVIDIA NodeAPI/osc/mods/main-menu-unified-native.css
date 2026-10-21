@@ -1,0 +1,78 @@
+/* NVIDIA OSC Flexible Layout V4 — native md-menu nodes only.
+   Enabled only with DulukaMainMenuUnifiedV4Enabled=1; V2 remains untouched. */
+.main-menu-container md-menu-bar.nv-unified-bar{overflow:visible!important}
+.main-menu-container md-menu.nv-unified-tile{box-sizing:border-box!important;overflow:hidden!important}
+.main-menu-container md-menu.nv-unified-tile>button.menu-button{width:100%!important;height:100%!important;min-width:0!important;min-height:0!important;overflow:hidden!important}
+.main-menu-container md-menu.nv-unified-tile.nv-unified-big .nv-flex-face.big{width:100%;height:100%;display:flex}
+.main-menu-container md-menu.nv-unified-tile.nv-side-small-tile .nv-flex-face.small{display:flex;justify-content:center;align-items:center;padding:0!important}
+.main-menu-container md-menu.nv-unified-tile.nv-side-small-tile .nv-flex-face.small .nv-flex-title,.main-menu-container md-menu.nv-unified-tile.nv-side-small-tile .nv-flex-face.small .nv-flex-detail{display:none}
+.main-menu-container md-menu.nv-unified-tile.nv-side-small-tile .nv-flex-face.small .nv-flex-icon{position:static;width:36px;height:36px;font-size:36px;line-height:36px;margin:0;flex:0 0 36px}
+.main-menu-container md-menu.nv-unified-tile.nv-side-small-tile .nv-side-native-info{display:none!important}
+.main-menu-container md-menu.nv-unified-tile.nv-unified-big.performance-tile .gallery-tile-align,
+.main-menu-container md-menu.nv-unified-tile.nv-unified-big.mic-tile .gallery-tile-align,
+.main-menu-container md-menu.nv-unified-tile.nv-unified-big.camera-tile .gallery-tile-align{height:100%!important;align-items:center!important;justify-content:center!important}
+.main-menu-container md-menu.nv-unified-tile.nv-unified-big .nv-side-native-info{top:auto!important;bottom:12px!important;left:8px!important;right:8px!important;text-align:center!important}
+html.nv-live-layout-editing:not(.nv-motion-active):not(.nv-motion-preparing) .main-menu-container .nv-unified-bar{
+ transition:transform .18s cubic-bezier(.2,.75,.2,1),width .18s cubic-bezier(.2,.75,.2,1)!important}
+html.nv-live-layout-editing:not(.nv-motion-active):not(.nv-motion-preparing) .main-menu-container md-menu.nv-unified-tile{
+ transition:left .18s cubic-bezier(.2,.75,.2,1),top .18s cubic-bezier(.2,.75,.2,1),
+ width .18s cubic-bezier(.2,.75,.2,1),height .18s cubic-bezier(.2,.75,.2,1)!important}
+.nv-live-editor.nv-unified-editor-active{padding:14px 18px!important}
+.nv-live-editor.nv-unified-editor-active>.nv-live-workspace{display:none!important}
+.nv-unified-editor{display:block;color:#f1f4f1;font-family:Arial,"Segoe UI",sans-serif;margin:10px 0}
+.nv-unified-editor *{box-sizing:border-box}
+.nv-unified-panel-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:start}
+.nv-unified-panel{background:#191f20;border:1px solid #424c4a;min-width:0;padding:12px}
+.nv-unified-panel>h3{display:flex;justify-content:space-between;margin:0 0 10px;font-size:13px;letter-spacing:.8px}
+.nv-unified-count{font-size:10px;color:#a8b5b2;font-weight:normal;letter-spacing:normal}
+.nv-unified-block-list{height:auto;min-height:84px;max-height:245px;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;padding-right:4px}
+.nv-unified-block{background:#30383b;border:1px solid #505b5a;margin-bottom:7px;padding:7px}
+.nv-unified-block-head{display:flex;gap:5px;align-items:center}
+.nv-unified-block-head select{flex:1;min-width:0;height:31px;padding:4px;background:#22292c;color:#fff;border:1px solid #55615e;font-size:12px}
+.nv-unified-block-head span{font-size:11px;color:#abbbad;white-space:nowrap}
+.nv-unified-block-head button,.nv-unified-remove{flex:0 0 25px;width:25px;height:27px;background:#273032;color:#e8eeee;border:1px solid #4b5957;cursor:pointer}
+.nv-unified-members{display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-top:7px}
+.nv-unified-member{flex:1 1 62px;min-width:0;max-width:100%;height:34px;display:flex;align-items:center;gap:6px;padding:4px 6px;background:#22292c;border:1px solid #404d4b;color:#fff;cursor:grab}
+.nv-unified-member:hover,.nv-unified-palette button:hover{border-color:#76b900}
+.nv-unified-member span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px}
+.nv-unified-member md-icon,.nv-unified-palette md-icon{font-size:21px!important;line-height:24px;width:23px;height:24px;min-width:23px;margin:0;color:#fff}
+.nv-unified-remove md-icon{width:16px;height:16px;font-size:15px!important;margin:0}
+.nv-unified-lock{font-size:12px;color:#76b900}
+.nv-unified-join,.nv-unified-panel>button{display:block;background:#303b33;color:#d9e9c8;border:1px solid #52644a;width:100%;min-height:29px;margin-top:7px;cursor:pointer;font-size:11px}
+.nv-unified-join:disabled{opacity:.4;cursor:not-allowed}
+.nv-unified-panel>button{margin-top:10px;min-height:36px}
+.nv-unified-empty{font-size:12px;color:#9ea9a5;padding:12px}
+.nv-unified-controls{margin:12px 0 0;padding:11px;background:#191f20;border:1px solid #424c4a}
+.nv-unified-controls>header{margin-bottom:8px;display:flex;align-items:center;gap:14px}
+.nv-unified-controls h3{margin:0;font-size:14px}
+.nv-unified-selection{color:#a7b7ac;font-size:11px}
+.nv-unified-search{width:100%;height:31px;padding:5px 9px;background:#12191a;border:1px solid #56645e;color:#f6fbf4}
+.nv-unified-palette{display:flex;gap:7px;overflow-x:auto;overflow-y:hidden;max-height:61px;min-height:52px;margin:8px 0 0;padding-bottom:7px;white-space:nowrap}
+.nv-unified-palette button{display:flex;align-items:center;gap:6px;flex:0 0 155px;min-width:0;height:36px;padding:3px 8px;background:#30383b;color:#f8fcf7;border:1px solid #444c49;text-align:left;cursor:grab}
+.nv-unified-palette button.selected{border-color:#76b900;box-shadow:inset 0 0 0 1px #76b900}
+.nv-unified-palette button.unplaced{border-left:3px solid #76b900}
+.nv-unified-palette button>span{overflow:hidden;text-overflow:ellipsis;font-size:12px}
+.nv-unified-palette button b{margin-left:auto;color:#76b900}
+.nv-unified-controls p{font-size:11px;line-height:17px;margin:5px 0;color:#a0a8a4}
+.nv-unified-message{font-size:11px;color:#a4d06f;min-height:16px;margin-top:6px}
+@media(max-width:1200px){.nv-unified-panel-row{gap:6px}.nv-unified-panel{padding:7px}.nv-unified-palette button{flex-basis:136px}}
+@media(max-width:750px){.nv-unified-panel-row{grid-template-columns:1fr}.nv-unified-block-list{max-height:150px}}
+@media(prefers-reduced-motion:reduce){.main-menu-container .nv-unified-bar,.main-menu-container md-menu.nv-unified-tile{transition:none!important}}
+
+/* Icon-first 3x3 grouped Control blocks; no cramped label/delete pairs. */
+.nv-unified-member-cell{position:relative;min-width:0;display:flex;align-items:center}
+.nv-unified-member-cell .nv-unified-member{width:100%;min-width:0;max-width:none;flex:1 1 auto}
+.nv-unified-member-cell .nv-unified-remove{position:absolute;top:0;right:0;z-index:1;width:18px;height:18px;flex:none;display:flex;align-items:center;justify-content:center;padding:0;border-color:#56615f;background:#30383b}
+.nv-unified-member-cell .nv-unified-remove md-icon{font-size:10px!important;width:11px;height:11px;line-height:11px;margin:0}
+.nv-unified-member-cell .nv-unified-lock{position:absolute;right:4px;top:3px;font-size:10px;color:#8bc836}
+.nv-unified-block:not([data-v4-count="1"]) .nv-unified-members{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
+.nv-unified-block:not([data-v4-count="1"]) .nv-unified-member-cell{min-width:0}
+.nv-unified-block:not([data-v4-count="1"]) .nv-unified-member-cell .nv-unified-member{height:40px;justify-content:center;padding:4px}
+.nv-unified-block:not([data-v4-count="1"]) .nv-unified-member-cell .nv-unified-member span{display:none}
+.nv-unified-block[data-v4-count="1"] .nv-unified-member-cell{width:100%}
+.nv-unified-block[data-v4-count="1"] .nv-unified-member-cell .nv-unified-member{padding-right:23px}
+
+/* Keep the Control library header balanced at narrow resolutions. */
+.nv-live-editor .nv-unified-controls>header{display:flex!important;justify-content:space-between!important;align-items:center!important;gap:16px!important;margin:0 0 8px!important;width:100%}
+.nv-live-editor .nv-unified-controls>header h3{margin:0!important;flex:0 0 auto}
+.nv-live-editor .nv-unified-controls .nv-unified-selection{margin-left:auto;min-width:0;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

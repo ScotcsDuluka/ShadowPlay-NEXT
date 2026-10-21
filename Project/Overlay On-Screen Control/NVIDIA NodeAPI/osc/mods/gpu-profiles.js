@@ -69,6 +69,8 @@
   // Reposition the original NVIDIA md-menu elements without replacing any
   // Angular controllers, click actions, or focus/keyboard behavior.
   function syncNativeMainMenuSlots(root) {
+    var unified=window.__dulukaUnifiedMainMenu;
+    if(unified&&unified.enabled()){unified.nativeGeometry(root);return;}
     var api=window.__dulukaMenuLayout;if(!api||!root)return;
     var map={};api.items.forEach(function(item){map[item.key]=item.name;});
     function setStyle(element,key,value){if(element.style.getPropertyValue(key)!==value||element.style.getPropertyPriority(key)!=='important')element.style.setProperty(key,value,'important');}
@@ -238,6 +240,12 @@
     // Gallery. Measuring during the first Angular digest created stale inline
     // positions and sometimes covered Instant Replay; never pin pixel offsets.
     var visibility = window.__dulukaMainMenuVisibility || {};
+    var unified=window.__dulukaUnifiedMainMenu;
+    if(unified&&unified.enabled()){
+      var present=unified.visible(),next={Preferences:!!present.Settings};
+      unified.model.CONTROLS.forEach(function(c){next[c.key]=!!present[c.key];});
+      visibility=next;
+    }
     ['Performance','Mic','Camera','Gallery','Preferences'].forEach(function(name){var desired=name==='Preferences'||visibility[name]!==false;if(tiles[name]&&tiles[name].visible!==desired){tiles[name].visible=desired;changed=true;}});
     Object.keys(visibility).forEach(function (name) {
       if (['Performance','Mic','Camera','Gallery','Preferences'].indexOf(name)>=0 || typeof visibility[name] !== 'boolean' || !tiles[name]) return;
@@ -253,6 +261,10 @@
       button.setAttribute('aria-label', 'Game Profiles');
     }
   }
+
+  // Only the adapter's selected layout geometry changes; original menu
+  // controllers, native click actions and status bindings are untouched.
+  window.__nvUnifiedV4RequestNativeSync=updateMainMenuPerformance;
 
   function registerPerformanceSupportListener() {
     if (performanceSupportListenerRegistered || !window.angular) return;
