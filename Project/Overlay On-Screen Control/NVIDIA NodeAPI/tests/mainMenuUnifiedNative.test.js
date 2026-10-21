@@ -80,3 +80,30 @@ test('V4 migration retains the saved Center Side type from the existing V2 edito
  assert.equal(s.panels.center[0].type,'side');
  assert.equal(f.values.DulukaMainMenuBlockTypesV1,undefined);
 });
+
+test('native renderer aligns the rail to the actual NVIDIA md-toolbar anchor',()=>{
+  const f=fake(),api=f.api;api.setEnabled(true);
+  let state=api.get();
+  state=M.toBlock(state,'Settings','center',0,'big');
+  M.CONTROLS.filter(x=>x.key!=='Settings').slice(0,8).forEach(x=>state=M.join(state,x.key,'center',0));
+  api.set(state);
+  const values={};
+  const bar={
+    offsetLeft:0,
+    parentElement:{getBoundingClientRect:()=>({left:2202,width:960})},
+    style:{getPropertyValue:k=>values[k]||'',getPropertyPriority:()=>'',setProperty:(k,v)=>{values[k]=v}},
+    classList:{add(){}}
+  };
+  const root={querySelector:q=>q==='md-menu-bar'?bar:null,getBoundingClientRect:()=>({width:1040})};
+  const g=api.nativeGeometry(root);
+  assert.equal(g.cells.length,12);
+  const tx=Number(/translateX\((-?[\d.]+)px\)/.exec(values.transform)[1]);
+  assert(Math.abs(2202+tx-(1920-g.actualWidth)/2)<.01,
+    'V4 must align to the translated NVIDIA toolbar, not assume the outer root x');
+});
+test('a CLOSED OSC Motion phase cannot be overridden by V4 layout sync',()=>{
+  const f=fake(),api=f.api;api.setEnabled(true);
+  f.windows.__dulukaOscMotion={phase:'idle',getState:()=>({target:'closed'})};
+  const root={querySelector(){throw Error('Should not query native DOM while closed')}};
+  assert.equal(api.nativeGeometry(root),null);
+});

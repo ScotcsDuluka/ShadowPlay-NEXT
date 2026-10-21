@@ -61,6 +61,9 @@
     // Never compete with OSC Motion's entrance/exit. It drives the same native
     // rail position during 'opening' and restores it at 'idle'.
     var motion=window.__dulukaOscMotion,phase=motion&&motion.phase;
+    // A routed CEF page can remain visible while OSC Motion is CLOSED.
+    // Do not force native geometry over a real close/exit animation.
+    if(motion&&motion.getState&&motion.getState().target==='closed')return null;
     if(phase&&phase!=='idle'){
       if(pendingIdle===null&&window.setTimeout)pendingIdle=window.setTimeout(function(){
         pendingIdle=null;
@@ -80,9 +83,18 @@
     setStyle(bar,'width',g.width+'px');
     setStyle(bar,'min-width',g.width+'px');
     setStyle(bar,'height',g.height+'px');
-    var rootW=root.getBoundingClientRect?root.getBoundingClientRect().width:1040;
-    if(!isFinite(rootW)||rootW<960)rootW=1040;
-    var stableX=(screenW-rootW)/2+40;
+    var railParent=bar.parentElement||bar.offsetParent;
+    var stableX;
+    if(railParent&&railParent.getBoundingClientRect){
+      // The NVIDIA md-toolbar can be translated far outside the centered
+      // .main-menu-container. Anchor relative to the actual toolbar, not
+      // an assumed 1040px root (otherwise live edits drift off screen).
+      stableX=railParent.getBoundingClientRect().left+(bar.offsetLeft||0);
+    }else{
+      var rootW=root.getBoundingClientRect?root.getBoundingClientRect().width:1040;
+      if(!isFinite(rootW)||rootW<960)rootW=1040;
+      stableX=(screenW-rootW)/2+40;
+    }
     setStyle(bar,'transform-origin','top left');
     setStyle(bar,'transform','translateX('+(x-stableX)+'px) scale('+g.scale+')');
     bar.classList.add('nv-unified-bar');
