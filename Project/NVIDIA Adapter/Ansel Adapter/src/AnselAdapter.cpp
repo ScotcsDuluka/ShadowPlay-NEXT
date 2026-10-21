@@ -2,6 +2,7 @@
 #include <reshade.hpp>
 #include "FilterSession.h"
 #include "ReShadeUiMetadata.h"
+#include "GamePresetRoot.h"
 #include <array>
 #include <cstring>
 #include <filesystem>
@@ -20,12 +21,26 @@ struct ReShadeRuntime final : Runtime {
     std::map<std::string, api::effect_technique> techniques;
     std::map<std::string, api::effect_uniform_variable> uniforms;
     std::map<std::string, Json> defaults;
+    mutable std::filesystem::path cachedGameRoot;
     explicit ReShadeRuntime(api::effect_runtime *r) : runtime(r) {}
-    std::filesystem::path game_directory() const {
+    std::filesystem::path executable_directory() const {
         wchar_t executable[32768]{};
-        if (!GetModuleFileNameW(nullptr, executable, 32768))
+        const DWORD len = GetModuleFileNameW(nullptr, executable, 32768);
+        if (!len || len >= 32768)
             throw Failure(500, "GAME_PATH_UNAVAILABLE", "Cannot identify the game's executable folder");
         return std::filesystem::path(executable).parent_path();
+    }
+    std::filesystem::path game_directory() const {
+        if (!cachedGameRoot.empty()) return cachedGameRoot;
+        wchar_t executable[32768]{};
+        const DWORD len = GetModuleFileNameW(nullptr, executable, 32768);
+        if (!len || len >= 32768)
+            throw Failure(500, "GAME_PATH_UNAVAILABLE", "Cannot identify the game installation");
+        const auto resolved = ansel::game_presets::resolve_root(std::filesystem::path(executable));
+        if (resolved.empty())
+            throw Failure(409, "GAME_ROOT_UNRESOLVED", "Cannot resolve a safe Game Root for ReShade presets");
+        cachedGameRoot = resolved; // Determined once, not once per present.
+        return cachedGameRoot;
     }
     std::filesystem::path preset_file(unsigned slot) const {
         if (slot < 1 || slot > 3)
@@ -73,13 +88,21 @@ struct ReShadeRuntime final : Runtime {
         }
         if (ec) throw Failure(403, "PRESET_IO_ERROR", "Cannot inspect the game's preset directory");
         if (!exists) {
-            // ReShade is the sole preset serializer. Preserve all effect data,
-            // even the uniforms OSC cannot display, when initializing a slot.
+            // Preserve legacy presets stored next to a nested shipping EXE.
+            // Never overwrite the corresponding INI already at Game Root,
+            // and never remove the legacy original.
+            const auto legacy = executable_directory() / target.filename();
+            std::error_code legacyError;
+            const bool hasLegacy = legacy != target &&
+                std::filesystem::is_regular_file(legacy, legacyError) && !legacyError;
+            // ReShade serializes the active shader settings including uniforms
+            // OSC cannot represent, before any copy or preset switch.
             runtime->save_current_preset();
-            if (!std::filesystem::is_regular_file(source, ec) || ec)
+            const auto seed = hasLegacy ? legacy : source;
+            if (!std::filesystem::is_regular_file(seed, ec) || ec)
                 throw Failure(409, "PRESET_UNAVAILABLE", "Current ReShade preset is not a readable INI file");
-            std::filesystem::copy_file(source, target, std::filesystem::copy_options::none, ec);
-            if (ec) throw Failure(403, "PRESET_IO_ERROR", "Cannot create preset INI in the game's directory");
+            std::filesystem::copy_file(seed, target, std::filesystem::copy_options::none, ec);
+            if (ec) throw Failure(403, "PRESET_IO_ERROR", "Cannot create preset INI at Game Root");
         }
         runtime->set_current_preset_path(target.u8string().c_str());
         runtime->set_effects_state(true);

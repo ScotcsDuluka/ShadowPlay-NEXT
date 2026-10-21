@@ -2,6 +2,7 @@
 // overlapped pipe used in the game, with an explicitly fake effect runtime.
 #include "../src/AnselAdapter.cpp"
 #include <iostream>
+#include <fstream>
 
 struct FakeRuntime final : ansel::Runtime {
     ansel::Json filters = ansel::Json::array({
@@ -83,6 +84,44 @@ int main(int argc, char **argv) {
             }
             return 0;
         }
+        // All path scenarios use a disposable temp tree, never an installed
+        // game or the ReShade configuration of a running process.
+        namespace fs = std::filesystem;
+        const auto testRoot = fs::temp_directory_path() /
+            (L"DulukaPresetRoot-" + std::to_wstring(GetCurrentProcessId()) +
+             L"-" + std::to_wstring(GetTickCount64()));
+        struct Cleanup { fs::path root; ~Cleanup() { std::error_code ec; fs::remove_all(root, ec); } } cleanup{testRoot};
+        const auto touch = [](const fs::path &file) {
+            fs::create_directories(file.parent_path());
+            std::ofstream stream(file, std::ios::binary);
+            if (!stream) throw std::runtime_error("Could not create temporary path test fixture");
+            stream << "test";
+        };
+        const auto launcherRoot = testRoot / L"InstalledGame";
+        touch(launcherRoot / L"ReShade.ini");
+        touch(launcherRoot / L"GameLauncher.exe");
+        const auto nestedExecutable = launcherRoot / L"Game" / L"Binaries" / L"Win64" / L"Game-Win64-Shipping.exe";
+        touch(nestedExecutable);
+        require(ansel::game_presets::resolve_root(nestedExecutable) == launcherRoot,
+            "Unreal nested shipping executable used Binaries/Win64 instead of Game Root");
+        require(ansel::game_presets::resolve_root(launcherRoot / L"GameLauncher.exe") == launcherRoot,
+            "Root-level executable was incorrectly promoted to parent folder");
+        const auto ueRoot = testRoot / L"UEGame";
+        const auto ueExecutable = ueRoot / L"Binaries" / L"Win64" / L"UEGame.exe";
+        touch(ueExecutable);
+        require(ansel::game_presets::resolve_root(ueExecutable) == ueRoot,
+            "Binaries/Win64 binary should save presets at its immediate game root");
+        const auto projectRoot = testRoot / L"ProjectInstall" / L"Project";
+        const auto projectExecutable = projectRoot / L"Binaries" / L"Win64" / L"Project.exe";
+        touch(projectExecutable);
+        require(ansel::game_presets::resolve_root(projectExecutable) == projectRoot,
+            "Nested project without a root launcher ascended beyond the game project");
+        const auto binGameRoot = testRoot / L"BinGame";
+        touch(binGameRoot / L"ReShade.ini");
+        const auto binExe = binGameRoot / L"bin64" / L"bin-game.exe";
+        touch(binExe);
+        require(ansel::game_presets::resolve_root(binExe) == binGameRoot,
+            "bin64 executable failed to resolve the adjacent ReShade config root");
         // ReShade ui_items is NUL-delimited, including the final terminator.
         const char rawItems[] = "Off\0Low\0High\0";
         const auto parsed = reshade_ui::split_items(std::string(rawItems, sizeof(rawItems) - 1));

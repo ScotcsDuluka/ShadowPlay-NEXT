@@ -81,15 +81,25 @@ rounding is normalized.
 
 With a live ReShade add-on, OSC Game Filter mirrors ReShade rather than treating
 its browser-local `ModsSlotStorage` data as the source of truth. OSC's buttons
-1/2/3 select actual game-directory INI files:
+1/2/3 select real INI files at the **Game Root** (installation directory), not
+inside a nested `Binaries/Win64` directory:
 
-- `<game executable directory>/NVIDIA-GameFilter-Preset1.ini`
-- `<game executable directory>/NVIDIA-GameFilter-Preset2.ini`
-- `<game executable directory>/NVIDIA-GameFilter-Preset3.ini`
+- `<Game Root>/NVIDIA-GameFilter-Preset1.ini`
+- `<Game Root>/NVIDIA-GameFilter-Preset2.ini`
+- `<Game Root>/NVIDIA-GameFilter-Preset3.ini`
+
+The native path resolver recognizes Unreal Engine's `Game/Binaries/Win64`
+layout and uses root-level game launchers, `ReShade.ini`, `Engine` and
+install markers to find the correct Game Root. For conventional games whose
+executable already sits at Game Root, it uses that directory. The resolved
+path is cached, and exposed in `GameFilter/State.preset.directory`.
 
 Selecting a missing INI initializes it by asking ReShade to save the currently
-active preset and copying that file. Existing target INIs are never replaced by
-that initialization step. ReShade's `set_current_preset_path` saves the outgoing
+active preset and copying that file. If an older version of OSC stored
+the same slot INI alongside a nested game executable, that INI is copied to
+Game Root instead; the original is kept. Existing Game Root target INIs are
+never overwritten by initialization or migration. ReShade's
+`set_current_preset_path` saves the outgoing
 preset and activates the target; `save_current_preset` persists OSC edits after
 750 ms without additional edits. OSC's Off toggles the ReShade global effects
 flag without deleting the saved technique stack. The Node bridge never writes
