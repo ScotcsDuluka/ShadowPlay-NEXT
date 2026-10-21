@@ -132,6 +132,28 @@ Partial Public Class UI_Engine
                 Return $"{{""ok"":true,""engine"":""NvCapture"",""ready"":{_engineReady.ToString().ToLowerInvariant()},""recording"":{RestRecording().ToString().ToLowerInvariant()}}}"
             End If
 
+            ' Diagnostic catalog: the current NEW RecordingEngine initializes native
+            ' DXGI Desktop Duplication + NVENC. It does not implement engine switching.
+            If path = "/engines" AndAlso method = "GET" Then
+                Dim configuredCodec As String = ""
+                If _engineReady AndAlso _recordingEngine IsNot Nothing AndAlso
+                   _recordingEngine.StartupEcho IsNot Nothing Then
+                    configuredCodec = If(_recordingEngine.StartupEcho.CodecKey, "")
+                End If
+                Return JsonSerializer.Serialize(New With {
+                    .schemaVersion = 1,
+                    .readOnly = True,
+                    .ready = _engineReady,
+                    .recording = RestRecording(),
+                    .captureId = "duluka:dxgi",
+                    .encoderId = "nvidia:nvenc-h264",
+                    .actualEncoderCodec = configuredCodec,
+                    .runtimeWired = True,
+                    .otherProvidersWired = False,
+                    .failure = If(_engineReady, "", If(_engineInitFailReason, "engine_not_ready"))
+                })
+            End If
+
             If path = "/state" Then
                 SyncLock _restLock
                 End SyncLock

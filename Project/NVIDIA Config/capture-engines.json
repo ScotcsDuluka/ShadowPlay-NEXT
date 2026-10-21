@@ -1,0 +1,25 @@
+{
+  "$schemaNote": "Phase 1 diagnostic policy; does not select or start a recording engine. No OBS/NvFBC activation.",
+  "schemaVersion": 1,
+  "selectionLocked": true,
+  "activeCaptureId": "duluka:dxgi",
+  "activeEncoderId": "nvidia:nvenc-h264",
+  "providers": {
+    "Duluka": {
+      "configured": true,
+      "note": "Existing NvCapture DXGI + native NVENC path; health is verified at runtime."
+    },
+    "FFmpeg": {
+      "configured": false,
+      "note": "Existing FFmpeg tools and source; route switch not wired to NvCapture."
+    },
+    "OBS": {
+      "configured": false,
+      "note": "OBS WebSocket connectivity exists in NvContainer, not a Capture Engine backend yet."
+    },
+    "NVIDIA": {
+      "configured": false,
+      "note": "NvFBC capture is reserved until SDK/platform permissions and implementation verified."
+    }
+  }
+}

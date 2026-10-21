@@ -130,6 +130,15 @@ static class NvContainer
         return ConfigBool("captureRuntime", "enabled", false);
     }
 
+    // Diagnostics only. Never starts a recorder or switches the production backend.
+    static object GetCaptureEngineCatalog()
+    {
+        var enabled = CaptureRuntimeEnabled();
+        var ready = enabled && NvCaptureReady();
+        return CaptureEngineCatalog.Snapshot(
+            Path.Combine(BuildRoot, "NVIDIA Config", "capture-engines.json"), enabled, ready);
+    }
+
     static int CaptureRuntimeApiPort()
     {
         return ConfigInt("captureRuntime", "apiPort", 59077, 1, 65535);
@@ -783,7 +792,8 @@ static class NvContainer
             GameWatcher.Start();
             TestApi = new ContainerTestApi(TestModeEnabled(), ControlApiPort(), Log,
                 PublishContainerEvents, ObsRuntime, MarkNvGraphicsReady, NvGraphicsStatus,
-                OpenNvGraphics, ApplicationOntologyClient, GameWatcher, OscAdapterLifecycle);
+                OpenNvGraphics, ApplicationOntologyClient, GameWatcher, OscAdapterLifecycle,
+                GetCaptureEngineCatalog);
             TestApi.Start();
             Log("[test-api] test mode " + (TestModeEnabled() ? "enabled: capture/filter actions are simulated" : "disabled"));
             HoldPairing();

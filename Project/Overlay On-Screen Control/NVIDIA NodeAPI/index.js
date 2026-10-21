@@ -659,6 +659,9 @@ app.use(function (req, res, next) {
     next();
 });
 
+// Read-only multi-engine capability bridge. No OSC UI dependency or recording commands.
+require('./shims/capture-engine-status.js')(app);
+
 // route-floor: OSC API route facade with persisted settings and runtime state.
 require('./shims/route-floor.js')(app, io);
 // ★ เว็บเวอร์ชันของ OSC ของเรา — http://127.0.0.1:<port>/osc/
