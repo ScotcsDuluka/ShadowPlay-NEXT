@@ -38,7 +38,7 @@ function nativeTemplate(){
 test('Settings keeps native actions and starts customization directly on the real Main-menu',()=>{
  const f=menu(),settings=f.tiles.Preferences;
  assert.equal(settings.name,'nv-settings-menu');assert.equal(typeof settings.click,'undefined');
- assert.deepEqual(Array.from(settings.state.Menu.items,item=>item.name),['Settings','Customize Main-menu','Game Profiles','Whisper Mode']);
+ assert.deepEqual(Array.from(settings.state.Menu.items,item=>item.name),['Settings','Customize Main-menu','Game Profiles','Whisper Mode','Overlay FPS','Renderer Mode']);
  settings.state.Menu.items[0].click();settings.state.Menu.items[1].click();settings.state.Menu.items[2].click();
  assert.deepEqual(f.routes,['main.preferences','main.gpu-profiles']);assert.equal(f.editStarts(),1);assert.equal(settings.state.Menu.items[1].icon,'icon-share');
  assert.equal(f.tiles.Mic.state.On.items[0].click,f.micAction);assert.equal(f.tiles.Camera.state.Off.items[0].click,f.cameraAction);assert.equal(f.tiles.Gallery.click,f.galleryAction);
@@ -49,6 +49,20 @@ test('Whisper Mode stays in Settings and follows a replacement native control',(
  assert.equal(f.tiles.Preferences.state.Menu.items,items,'Synchronizing must not rebuild an open submenu');
  f.tiles.QuietMode2={visible:true,enabled:true,click:()=>f.quietCalls.push('new toggle')};f.synchronize();quietItem.click();
  assert.equal(f.tiles.QuietMode2.visible,false);assert.deepEqual(f.quietCalls,['toggle','new toggle']);
+});
+
+test('Overlay FPS opens from Settings and remains single after synchronization',()=>{
+ const f=menu(),items=f.tiles.Preferences.state.Menu.items;
+ const fps=items.find(item=>item.id==='overlay-fps');assert(fps&&fps.visible&&fps.enabled);fps.click();
+ assert.deepEqual(f.routes,['main.osc-fps']);for(let i=0;i<3;i++)f.synchronize();
+ assert.equal(f.tiles.Preferences.state.Menu.items,items);assert.equal(items.filter(item=>item.id==='overlay-fps').length,1);
+});
+test('Renderer Mode opens from Settings and remains unique after synchronization',()=>{
+ const f=menu(),items=f.tiles.Preferences.state.Menu.items;
+ const item=items.find(x=>x.id==='renderer-mode');assert(item&&item.visible&&item.enabled);item.click();
+ assert.deepEqual(f.routes,['main.osc-renderer']);
+ for(let i=0;i<3;i++)f.synchronize();
+ assert.equal(items.filter(x=>x.id==='renderer-mode').length,1);
 });
 test('missing Whisper Mode disables its submenu action',()=>{
  const f=menu();delete f.tiles.QuietMode2;f.synchronize();const item=f.tiles.Preferences.state.Menu.items[3];
@@ -86,7 +100,7 @@ test('the actual NVIDIA template receives editable faces while retaining native 
 test('Settings icon and label exist in the first native template render',()=>{
  const f=live(),delegate=[{template:nativeTemplate()}];f.decorators.nvMainMenuDirective(delegate);
  assert(delegate[0].template.includes('ng-switch-when=preferences-tile><div layout=row'));assert(delegate[0].template.includes('ng-switch-when=nv-settings-menu>'));
- assert.equal((delegate[0].template.match(/<p class=gallery>Settings<\/p>/g)||[]).length,2);assert(!gpuSource.includes('settingsButton.innerHTML'));
+ assert.equal((delegate[0].template.match(/<p class="gallery" translate="l10n.settings">Settings<\/p>/g)||[]).length,2);assert(!gpuSource.includes('settingsButton.innerHTML'));
 });
 test('the old customization URL opens live editing without a separate preview page',()=>{
  const f=live(),routes=[],state=f.states['main.customize-main-menu'];assert.equal(typeof state.template,'undefined');state.onEnter.at(-1)({go:name=>routes.push(name)});assert.deepEqual(routes,['main.main-menu']);
@@ -96,7 +110,10 @@ function interaction(){
  const root={addEventListener:(n,fn)=>{rootEvents[n]=fn;},removeEventListener:n=>{delete rootEvents[n];},classList:{add:n=>classNames.add(n),remove:n=>classNames.delete(n)},querySelector:()=>null};
  const document={addEventListener:(n,fn)=>{documentEvents[n]=fn;},removeEventListener:n=>{delete documentEvents[n];},createElement:()=>({style:{},remove(){this.removed=true;}}),body:{appendChild:node=>ghosts.push(node)},elementFromPoint:()=>document.target};
  const window={addEventListener:(n,fn)=>{windowEvents[n]=fn;},removeEventListener:n=>{delete windowEvents[n];},setTimeout:fn=>{timers.push(fn);return timers.length;},clearTimeout(){}},f=live(window,document),definition=f.directives.nvMainMenuLiveEditor(window,[document]);
- const scope={$evalAsync:fn=>fn(),$on:(n,fn)=>{if(n==='$destroy')destroy.push(fn);}},editor={};definition.controller.at(-1).call(editor,scope);definition.link(scope,[root]);
+ const scope={$evalAsync:fn=>fn(),$on:(n,fn)=>{if(n==='$destroy')destroy.push(fn);}},editor={};
+ const translated={'l10n.settings':'การตั้งค่า','l10n.camera':'กล้อง','l10n.microphone':'ไมโครโฟน'};
+ const filter=name=>{assert.equal(name,'translate');return key=>translated[key]||key;};
+ definition.controller.at(-1).call(editor,scope,filter);definition.link(scope,[root]);
  function target(key,group,index,isTile=true){
   const attributes={'data-menu-key':key,'data-nv-control':key,'data-menu-group':group,'data-menu-index':String(index)},node={classList:{add(){},remove(){}},getAttribute:n=>attributes[n]};
   node.closest=sel=>{if(sel==='.nv-live-remove'||sel==='.nv-live-drop'||sel==='md-menu-content')return null;if(sel==='[data-menu-key][data-menu-group]')return group&&!isTile?node:null;if(sel==='md-menu'||sel==='md-menu[data-nv-control]')return isTile?node:null;if(sel==='[data-menu-key],md-menu[data-nv-control]')return node;return null;};return node;
@@ -200,4 +217,15 @@ test('compact Controls tray is a single horizontal row with NVIDIA E909 collapse
  assert.match(css,/\.nv-live-library \.nv-live-palette button\s*\{[^}]*flex:0 0 160px/);
  assert(output.includes("key!=='Settings'"),'protected Settings remains in the template');
  assert.match(css,/html \.nv-live-editor\s*\{[^}]*left:calc\(50% - 760px\)!important/,'Customize overrides the BG extension only for centered editor geometry');
+});
+
+test('Customize control labels use OSC locale keys without changing NVIDIA glyphs',()=>{
+ const f=interaction();
+ assert.equal(f.editor.label('Settings'),'การตั้งค่า');
+ assert.equal(f.editor.label('Camera'),'กล้อง');
+ assert.equal(f.editor.label('Mic'),'ไมโครโฟน');
+ assert.equal(f.editor.label('Screenshot'),'Screenshot','Missing key uses native English fallback');
+ const template=nativeTemplate(),delegate=[{template}];f.decorators.nvMainMenuDirective(delegate);
+ assert.match(delegate[0].template,/translate="l10n\.settings"/);
+ assert.match(delegate[0].template,/class="share-icon icon48 icon-normal icon-settings"/);
 });

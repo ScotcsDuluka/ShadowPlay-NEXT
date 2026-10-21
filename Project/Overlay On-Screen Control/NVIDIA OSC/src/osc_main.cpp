@@ -40,6 +40,8 @@
 #include <mutex>
 #include <thread>
 #include <condition_variable>
+#include <chrono>
+#include <memory>
 // ★ GPU compositor ทั้งสายแบบของแท้ (offscreen_renderer_d3d11.cpp):
 //   CEF shared texture (D3D11) → shader premultiply → swapchain alpha → DComp
 //   ไม่มีพิกเซลแตะ CPU เลย (เดิม: premultiply 7MB/เฟรมใน C++ = กระตุก + กิน CPU)
@@ -47,6 +49,7 @@
 #include <d3d11_4.h>   // [FIX-D] ID3D11Multithread (SetMultithreadProtected)
 #include <d3d11_3.h>   // ID3D11Device1 + OpenSharedResource1 (NT handle ของ CEF)
 #include <dxgi1_2.h>
+#include <dxgi1_3.h>
 #include <dcomp.h>
 #include <d3dcompiler.h>
 #include <cstring>
@@ -54,6 +57,10 @@
 #include "OscFramePublisher/OscD3D9FramePublisher/OscD3D9FramePublisher.h"
 #include "OscFramePublisher/OscD3D11FramePublisher/OscD3D11FramePublisher.h"
 #include "OscFramePublisher/Common/OscFrameUtilities.h"
+#include "OscDesktopFrameQueue.h"
+#include "OscDesktopFps.h"
+#include "OscAtomicConfigFile.h"
+#include "OscRendererPolicy.h"
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "dcomp.lib")
@@ -82,9 +89,20 @@ struct OscConfig {
     bool show_fps = true;          // ★ FPS meter บน overlay (นับเฟรมที่แสดงจริง)
     bool gdi_compositor = false;   // true = UpdateLayeredWindow (แสดงผลชัวร์) แทน DComp
     int render_mode = 0;           // "renderMode": 0=auto (GPU หลัก) 1=บังคับ gpu 2=บังคับ cpu
+    osc::RendererChoice ui_renderer = osc::RendererChoice::Auto;
+    osc::RendererChoice desktop_renderer = osc::RendererChoice::Auto;
+    osc::RendererChoice bg_renderer = osc::RendererChoice::Auto;
 };
 static OscConfig g_cfg;
 static std::wstring g_build_root;
+static std::wstring g_osc_config_path;
+static std::atomic<int> g_desktop_fps_limit{ 60 };
+static std::atomic<bool> g_config_save_pending{ false };
+static osc::RendererChoice g_desired_ui_renderer = osc::RendererChoice::Auto;
+static osc::RendererChoice g_desired_desktop_renderer = osc::RendererChoice::Auto;
+static osc::RendererChoice g_desired_bg_renderer = osc::RendererChoice::Auto;
+static osc::RendererPolicy g_active_renderer_policy{ false, false, true };
+static std::atomic<bool> g_active_ui_gpu{ true };
 
 static std::wstring GetExecutablePath() {
     std::wstring path(32768, L'\0');
@@ -160,13 +178,9 @@ static void LoadConfig() {
     if (!std::filesystem::exists(cfg_candidate, cfg_ec))
         cfg_candidate = std::filesystem::path(g_build_root) /
             L"NvConfig" / L"nvidia-osc.json";
-    const auto config_path = cfg_candidate.wstring();
-    HANDLE f = CreateFileW(config_path.c_str(),
-        GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
-    if (f == INVALID_HANDLE_VALUE) return;
-    char buf[8192]; DWORD n = 0; ReadFile(f, buf, sizeof(buf) - 1, &n, nullptr); CloseHandle(f);
-    buf[n] = 0;
-    std::string json(buf);
+    g_osc_config_path = cfg_candidate.wstring();
+    std::string json, configError;
+    if (!osc::ReadConfigFile(g_osc_config_path, json, configError)) return;
     std::wstring page = CfgStr(json, "page");
     if (!page.empty()) {
         // page = ...\osc\index.html → dir = ...\osc
@@ -194,13 +208,24 @@ static void LoadConfig() {
     g_cfg.debug_port = (int)CfgNum(json, "debugPort", 59099);
     g_cfg.gdi_compositor = CfgStr(json, "compositor") == L"gdi";
     g_cfg.windowed = CfgNum(json, "windowed", 1) != 0;
-    g_cfg.max_fps = (int)CfgNum(json, "maxFps", 60);
-    if (g_cfg.max_fps < 1 || g_cfg.max_fps > 240) g_cfg.max_fps = 240;
+    const double savedFps = CfgNum(json, "maxFps", 60);
+    g_cfg.max_fps = osc::IsValidDesktopFps(savedFps) ? static_cast<int>(savedFps) : 60;
+    g_desktop_fps_limit.store(g_cfg.max_fps, std::memory_order_release);
     g_cfg.show_fps = CfgNum(json, "showFps", 1) != 0;
     std::wstring renderModeStr = CfgStr(json, "renderMode");
     if (renderModeStr == L"gpu") g_cfg.render_mode = 1;
     else if (renderModeStr == L"cpu") g_cfg.render_mode = 2;
     else g_cfg.render_mode = 0;
+    auto readRenderer = [&json](const char* key, osc::RendererChoice& choice) {
+        const auto value = CfgStr(json, key);
+        osc::ParseRendererChoice(std::string(value.begin(), value.end()), choice);
+    };
+    readRenderer("uiRenderer", g_cfg.ui_renderer);
+    readRenderer("desktopRenderer", g_cfg.desktop_renderer);
+    readRenderer("bgRenderer", g_cfg.bg_renderer);
+    g_desired_ui_renderer = g_cfg.ui_renderer;
+    g_desired_desktop_renderer = g_cfg.desktop_renderer;
+    g_desired_bg_renderer = g_cfg.bg_renderer;
 }
 
 static HANDLE g_log = INVALID_HANDLE_VALUE;
@@ -457,7 +482,7 @@ static std::atomic<bool> g_devtools_open{ false };
 static std::atomic<ULONGLONG> g_devtools_close_grace_until{ 0 };
 static std::atomic<unsigned> g_page_retry_attempts{ 0 };
 static std::string g_page_url;          // URL หน้า OSC — กู้คืนเมื่อ renderer ตายกลางทาง
-static int g_pending_page_action = -1;   // external show/hide received before browser creation
+static std::atomic<int> g_pending_page_action{ -1 }; // cross-thread pre-browser show/hide
 static std::atomic<bool> g_visible{ false };
 static bool g_close_registered = false;
 static CefRefPtr<CefMessageRouterBrowserSide::Callback> g_close_callback;
@@ -480,6 +505,7 @@ static void EnsureShownOnce();  // (นิยามอยู่หลัง show
 static ID3D11Device* g_gpu_dev = nullptr;
 static ID3D11DeviceContext* g_gpu_ctx = nullptr;
 static IDXGISwapChain1* g_gpu_swap = nullptr;
+static HANDLE g_desktop_frame_latency_event = nullptr;
 static ID3D11RenderTargetView* g_gpu_rtv = nullptr;
 static ID3D11PixelShader* g_gpu_ps = nullptr;        // premul (upload path)
 static ID3D11PixelShader* g_gpu_ps_pass = nullptr;   // passthrough (shared path)
@@ -491,6 +517,7 @@ static std::atomic<bool> g_gpu_frame{ false };
 static bool g_gpu_shared = false;       // ขอ shared texture จาก CEF (เต็ม GPU)
 static ULONGLONG g_page_loaded_ms = 0;  // เฝ้า: shared ไม่ยิงใน 8 วิ → สลับโหมด upload
 static ID3D11Texture2D* g_up_tex = nullptr;   // texture รับ upload (โหมดกึ่ง GPU)
+static ID3D11ShaderResourceView* g_up_srv = nullptr;
 static int g_up_w = 0, g_up_h = 0;
 static bool g_up_initialized = false;
 static IDCompositionDevice* g_dcomp_dev = nullptr;
@@ -546,7 +573,9 @@ static RECT OscRenderScreenRect() {
 
 static constexpr UINT WM_OSC_FOCUS_MODE = WM_APP + 0x41;
 static constexpr UINT WM_OSC_GPU_FRAME_READY = WM_APP + 0x42;
-// Desktop shared-texture rendering stays on the CEF callback; only Present is queued.
+// CEF owns texture access and ownRT drawing. The worker owns swap-chain access.
+// Frame queue state is protected by the publisher GPU mutex.
+static osc::DesktopFrameQueue g_desktop_frames;
 static std::mutex g_desktop_present_queue_mutex;
 static HANDLE g_desktop_present_frame_event = nullptr; // auto-reset
 static HANDLE g_desktop_present_stop_event = nullptr;  // manual-reset
@@ -718,12 +747,13 @@ enum class OscPresentResult { Presented, Busy, Failed, Queued };
 static bool OscQueueDesktopPresentFrame();
 static OscPresentResult PresentCurrentBackBuffer(bool forceNonBlocking);
 
-// The CEF callback copies the already-composited RT to the swap-chain buffer.
-// In Desktop shared-texture mode it queues only Present(), never the shared handle.
-static OscPresentResult PresentToSwap(int w, int h, bool deferDesktopPresent = false) {
+// Called under the GPU mutex, after the desktop worker has waited for DXGI.
+// Never queue a CEF shared handle: GPU command ordering protects our persistent ownRT.
+static bool CopyOwnRTToSwap(int w, int h) {
+    if (!g_gpu_swap || !g_own_rt) return false;
     ID3D11Texture2D* back = nullptr;
     if (FAILED(g_gpu_swap->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)&back)) || !back)
-        return OscPresentResult::Failed;
+        return false;
 
     if(!g_game_focused.load(std::memory_order_acquire)&&g_dcomp_visual&&w>0&&h>0) {
         const RECT screen=OscRenderScreenRect();
@@ -741,13 +771,24 @@ static OscPresentResult PresentToSwap(int w, int h, bool deferDesktopPresent = f
     back->Release();
     g_osc_perf.copyCalls.fetch_add(1, std::memory_order_relaxed);
     OscPerfAccumulate(g_osc_perf.copyCallTotalUs, g_osc_perf.copyCallMaxUs, copyCallUs);
+    return true;
+}
 
+static OscPresentResult PresentToSwap(int w, int h, bool deferDesktopPresent = false) {
+    if (g_game_focused.load(std::memory_order_acquire)) {
+        // Upload fallback must also leave the hidden desktop swap chain alone.
+        g_gpu_frame.store(true, std::memory_order_release);
+        return OscPresentResult::Queued;
+    }
     if (deferDesktopPresent &&
         !g_game_focused.load(std::memory_order_acquire)) {
         if (OscQueueDesktopPresentFrame())
             return OscPresentResult::Queued;
-        Log("[gpu] Desktop Present worker unavailable; falling back to synchronous Present");
+        // Keep Desktop pacing in one place; retry worker creation on the next
+        // paint rather than presenting synchronously outside its frame limit.
+        return OscPresentResult::Failed;
     }
+    if (!CopyOwnRTToSwap(w, h)) return OscPresentResult::Failed;
     return PresentCurrentBackBuffer(false);
 }
 
@@ -775,8 +816,8 @@ static OscPresentResult PresentCurrentBackBuffer(bool forceNonBlocking) {
         nonBlockingPresent ? DXGI_PRESENT_DO_NOT_WAIT : 0);
     const auto presentUs = OscPerfNowUs() - presentStartUs;
     if (nonBlockingPresent && hp == DXGI_ERROR_WAS_STILL_DRAWING) {
-        // Hook keeps the existing drop policy. Desktop worker retries the latest
-        // back-buffer contents without asking CEF to render/copy the frame again.
+        // Desktop retries the same copied buffer until accepted. New CEF paints
+        // continue updating ownRT and will be coalesced into the next copy.
         OscPerfRecordPresent(presentUs, 0, !forceNonBlocking,
             forceNonBlocking, false);
         return OscPresentResult::Busy;
@@ -903,8 +944,28 @@ static bool GpuCompositorInit(HWND hwnd, int w, int h) {
         //   ตัวสำรองพองานยังไม่เสร็จ โดยไม่เพิ่มเวลาแฝงจริง (DWM sync จังหวะสร้างเอง)
         sc.BufferCount = 3; sc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
         sc.AlphaMode = DXGI_ALPHA_MODE_PREMULTIPLIED;
-        if (FAILED(hr = fac->CreateSwapChainForComposition(g_gpu_dev, &sc, nullptr, &swap)))
+        sc.Flags = DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
+        hr = fac->CreateSwapChainForComposition(g_gpu_dev, &sc, nullptr, &swap);
+        if (FAILED(hr)) {
+            // Keep the existing composition path on drivers without waitable support.
+            sc.Flags = 0;
+            if (swap) { swap->Release(); swap = nullptr; }
+            hr = fac->CreateSwapChainForComposition(g_gpu_dev, &sc, nullptr, &swap);
+        }
+        if (FAILED(hr))
             { Log("[gpu] step swapchain hr=" + std::to_string((long)hr)); goto fail; }
+        if (sc.Flags) {
+            IDXGISwapChain2* swap2 = nullptr;
+            if (SUCCEEDED(swap->QueryInterface(__uuidof(IDXGISwapChain2),
+                    reinterpret_cast<void**>(&swap2)))) {
+                if (SUCCEEDED(swap2->SetMaximumFrameLatency(1)))
+                    g_desktop_frame_latency_event = swap2->GetFrameLatencyWaitableObject();
+                swap2->Release();
+            }
+        }
+        Log(g_desktop_frame_latency_event ?
+            "[gpu] desktop frame pacing=DXGI waitable, maximum latency=1" :
+            "[gpu] desktop frame pacing=worker retry fallback");
         Log("[gpu] swapchain OK (premultiplied)");
     }
     {   // DComp: ผูก swapchain เข้าหน้าต่าง
@@ -973,6 +1034,10 @@ static bool GpuCompositorInit(HWND hwnd, int w, int h) {
     Log("[gpu] D3D11 compositor ready (shared texture + DComp premultiplied)");
     return true;
 fail:
+    if (g_desktop_frame_latency_event) {
+        CloseHandle(g_desktop_frame_latency_event);
+        g_desktop_frame_latency_event = nullptr;
+    }
     if (swap) swap->Release(); if (ps) ps->Release(); if (vs) vs->Release();
     if (shared_vs) shared_vs->Release(); if (samp) samp->Release();
     if (fac) fac->Release(); if (dxgiDev) dxgiDev->Release();
@@ -1008,6 +1073,7 @@ static bool IsOverlayInputClickThrough() {
 static ID3D11Texture2D* g_shared_tex = nullptr;   // ★ cache: handle เดิม = เปิด/SRV ใหม่ไม่ต้อง (12:1x)
 static ID3D11ShaderResourceView* g_shared_srv = nullptr;
 static uint64_t g_shared_handle_cached = 0;
+static D3D11_TEXTURE2D_DESC g_shared_desc{}; // Immutable for the cached texture lifetime.
 
 static ID3D11Device* OscHostGpuDevice() { return g_gpu_dev; }
 static ID3D11DeviceContext* OscHostGpuContext() { return g_gpu_ctx; }
@@ -1036,7 +1102,7 @@ static OscPresentResult GpuComposite(uint64_t shared_handle, int w, int h,
             Log(b); b1 = b2 = b3 = b4 = 0; n = 0;
         }
     }
-    ID3D11Resource* tex = nullptr;
+    ID3D11Texture2D* tex = nullptr;
     ID3D11ShaderResourceView* srv = nullptr;
     if (g_shared_tex && g_shared_srv && g_shared_handle_cached == shared_handle) {
         // ★ cache hit: CEF ใช้ handle เดิมทุกเฟรม — ไม่ต้อง open+SRV ใหม่ (คอขวด 6-14fps)
@@ -1044,16 +1110,18 @@ static OscPresentResult GpuComposite(uint64_t shared_handle, int w, int h,
     } else {
         if (g_shared_tex) { g_shared_tex->Release(); g_shared_tex = nullptr; }
         if (g_shared_srv) { g_shared_srv->Release(); g_shared_srv = nullptr; }
+        g_shared_handle_cached = 0;
+        g_shared_desc = {};
         {
             // CEF มอบ NT shared handle → เปิดผ่าน OpenSharedResource1 (แบบ legacy ล้มกับ NT)
             ID3D11Device1* dev1 = nullptr;
             bool opened = false;
             if (SUCCEEDED(g_gpu_dev->QueryInterface(__uuidof(ID3D11Device1), (void**)&dev1))) {
                 opened = SUCCEEDED(dev1->OpenSharedResource1((HANDLE)(uintptr_t)shared_handle,
-                    __uuidof(ID3D11Resource), (void**)&tex));
+                    __uuidof(ID3D11Texture2D), (void**)&tex));
                 if (!opened)   // บางแหล่งส่ง legacy handle — ลองแบบเก่าคือถูก
                     opened = SUCCEEDED(g_gpu_dev->OpenSharedResource((HANDLE)(uintptr_t)shared_handle,
-                        __uuidof(ID3D11Resource), (void**)&tex));
+                        __uuidof(ID3D11Texture2D), (void**)&tex));
                 dev1->Release();
             }
             if (!opened) {
@@ -1076,7 +1144,8 @@ static OscPresentResult GpuComposite(uint64_t shared_handle, int w, int h,
                 tex->Release(); return OscPresentResult::Failed;
             }
         }
-        g_shared_tex = static_cast<ID3D11Texture2D*>(tex);
+        g_shared_tex = tex;
+        tex->GetDesc(&g_shared_desc);
         g_shared_srv = srv;
         g_shared_handle_cached = shared_handle;
         Log("[gpu] shared texture cached handle=0x" + std::to_string((unsigned long long)shared_handle));
@@ -1085,8 +1154,10 @@ static OscPresentResult GpuComposite(uint64_t shared_handle, int w, int h,
     //   [P2#7 Copilot] อ่านเป็น y*RowPitch + x*4 พร้อม bounds check (เดิมสลับแกน+อ่านเกิน)
     {
         static int dumped = 0;
-        char pdg[4] = { 0 };
-        bool pdOn = (GetEnvironmentVariableA("OSC_GPUDUMP", pdg, 4) > 0 && pdg[0] == '1');
+        static const bool pdOn = []() {
+            char pdg[4] = { 0 };
+            return GetEnvironmentVariableA("OSC_GPUDUMP", pdg, 4) > 0 && pdg[0] == '1';
+        }();
         dumped++;
         if (pdOn && (dumped < 3 || dumped % 300 == 0)) {
             ID3D11Texture2D* t2 = nullptr;
@@ -1121,23 +1192,18 @@ static OscPresentResult GpuComposite(uint64_t shared_handle, int w, int h,
         }
     }
 
-    OscPresentResult result = OscPresentResult::Failed;
-    if (EnsureOwnRT(w, h)) {
-        ID3D11Texture2D* source = nullptr;
-        if (SUCCEEDED(tex->QueryInterface(__uuidof(ID3D11Texture2D),
-                (void**)&source)) && source) {
-            D3D11_TEXTURE2D_DESC desc{};
-            source->GetDesc(&desc);
-            if ((int)desc.Width == w && (int)desc.Height == h) {
-                result = DrawSharedTexture(srv, w, h);
-            } else {
-                Log("[gpu] shared texture size mismatch");
-            }
-            source->Release();
-        }
+    if ((int)g_shared_desc.Width != w || (int)g_shared_desc.Height != h) {
+        Log("[gpu] shared texture size mismatch");
+        return OscPresentResult::Failed;
+    }
+    if (g_game_focused.load(std::memory_order_acquire)) {
+        // The hook consumes the original CEF texture. It needs neither ownRT
+        // allocation nor a draw/copy/Present on the hidden desktop swap chain.
+        g_gpu_frame.store(true, std::memory_order_release);
+        return OscPresentResult::Queued;
     }
     // ★ tex/srv = cache ของ g_shared_tex/g_shared_srv — ห้าม release ต่อ frame (12:1x)
-    return result;
+    return DrawSharedTexture(srv, w, h);
 }
 
 // โหมดกึ่ง GPU (fallback): CEF ส่ง BGRA มาทาง CPU ครั้งเดียว → upload → shader premultiply
@@ -1146,6 +1212,7 @@ static void GpuUploadComposite(const void* bgra, int w, int h,
     const std::vector<CefRect>& dirty_rects) {
     if (!g_gpu_ok) return;
     if (!g_up_tex || g_up_w != w || g_up_h != h) {
+        if (g_up_srv) { g_up_srv->Release(); g_up_srv = nullptr; }
         if (g_up_tex) { g_up_tex->Release(); g_up_tex = nullptr; }
         D3D11_TEXTURE2D_DESC td{};
         td.Width = w; td.Height = h; td.MipLevels = 1; td.ArraySize = 1;
@@ -1195,8 +1262,7 @@ static void GpuUploadComposite(const void* bgra, int w, int h,
             Log(buf);
         }
     }
-    ID3D11ShaderResourceView* srv = nullptr;
-    if (FAILED(g_gpu_dev->CreateShaderResourceView(g_up_tex, nullptr, &srv))) {
+    if (!g_up_srv && FAILED(g_gpu_dev->CreateShaderResourceView(g_up_tex, nullptr, &g_up_srv))) {
         static int usf = 0; if (usf++ < 3) Log("[gpu] upload SRV FAILED"); return;
     }
 
@@ -1204,29 +1270,40 @@ static void GpuUploadComposite(const void* bgra, int w, int h,
         D3D11_VIEWPORT vp{ 0, 0, (float)w, (float)h, 0, 1 };
         g_gpu_ctx->OMSetRenderTargets(1, &g_gpu_rtv, nullptr);
         g_gpu_ctx->RSSetViewports(1, &vp);
-        g_gpu_ctx->PSSetShaderResources(0, 1, &srv);
+        g_gpu_ctx->PSSetShaderResources(0, 1, &g_up_srv);
         g_gpu_ctx->PSSetSamplers(0, 1, &g_gpu_samp);
         g_gpu_ctx->VSSetShader(g_gpu_vs, nullptr, 0);
         g_gpu_ctx->PSSetShader(g_gpu_ps, nullptr, 0);
         g_gpu_ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         g_gpu_ctx->Draw(3, 0);
-        PresentToSwap(w, h);
+        ID3D11ShaderResourceView* nullSrv = nullptr;
+        g_gpu_ctx->PSSetShaderResources(0, 1, &nullSrv);
+        PresentToSwap(w, h, true);
     }
-    srv->Release();
 }
 
 // Desktop Present worker ---------------------------------------------------------
-// CEF reads its shared texture and copies the composited result into the swap-chain
-// buffer during the callback. This worker only calls Present(), so CEF never holds
-// its callback open while DWM/DXGI applies back-pressure.
+// CEF updates ownRT. Wait for swap-chain capacity OUTSIDE the GPU mutex, then
+// copy the latest ownRT and Present. Busy retries preserve the copied buffer.
 static DWORD WINAPI OscDesktopPresentWorkerProc(LPVOID) {
     HANDLE waits[2] = { g_desktop_present_stop_event, g_desktop_present_frame_event };
+    struct PacingTimer {
+        HANDLE handle = CreateWaitableTimerExW(nullptr, nullptr,
+            CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
+        PacingTimer() {
+            if (!handle) handle = CreateWaitableTimerW(nullptr, FALSE, nullptr);
+        }
+        ~PacingTimer() { if (handle) CloseHandle(handle); }
+    } pacingTimer;
+    osc::DesktopFpsLimiter fpsLimiter;
+    bool latencyPermit = false;
+    bool useLatencyEvent = g_desktop_frame_latency_event != nullptr;
     for (;;) {
         const DWORD wait = WaitForMultipleObjects(2, waits, FALSE, INFINITE);
         if (wait == WAIT_OBJECT_0 || wait == WAIT_FAILED) break;
         if (g_game_focused.load(std::memory_order_acquire)) continue;
 
-        const ULONGLONG retryStartedMs = GetTickCount64();
+        ULONGLONG retryStartedMs = GetTickCount64();
         int consecutiveBusy = 0;   // ★ backoff: ยิ่ง Busy ซ้ำ ยิ่งยืดช่วงรอ (ลดการชิง mutex)
         for (;;) {
             if (WaitForSingleObject(g_desktop_present_stop_event, 0) == WAIT_OBJECT_0)
@@ -1234,30 +1311,94 @@ static DWORD WINAPI OscDesktopPresentWorkerProc(LPVOID) {
             if (g_game_focused.load(std::memory_order_acquire))
                 break;
 
+            bool needsCopy = false;
+            {
+                std::lock_guard<std::mutex> gpuLock(osc::d3d11_frame_publisher::Mutex());
+                if (g_game_focused.load(std::memory_order_acquire) ||
+                    !g_desktop_frames.HasPendingFrame()) break;
+                needsCopy = g_desktop_frames.NeedsCopy();
+            }
+            const auto remainingUs = fpsLimiter.RemainingUs(OscPerfNowUs(),
+                g_desktop_fps_limit.load(std::memory_order_acquire));
+            if (remainingUs) {
+                DWORD pacedWait = WAIT_FAILED;
+                if (pacingTimer.handle) {
+                    LARGE_INTEGER due{};
+                    due.QuadPart = -static_cast<LONGLONG>(remainingUs * 10);
+                    if (SetWaitableTimer(pacingTimer.handle, &due, 0, nullptr, nullptr, FALSE)) {
+                        HANDLE pacingWaits[3] = { waits[0], waits[1], pacingTimer.handle };
+                        pacedWait = WaitForMultipleObjects(3, pacingWaits, FALSE, INFINITE);
+                    }
+                }
+                if (pacedWait == WAIT_FAILED) {
+                    pacedWait = WaitForMultipleObjects(2, waits, FALSE,
+                        static_cast<DWORD>((remainingUs + 999) / 1000));
+                }
+                if (pacedWait == WAIT_OBJECT_0 || pacedWait == WAIT_FAILED)
+                    return 0;
+                // New paints/rate changes wake this wait, then recompute the
+                // deadline. Every paint still updates ownRT under the GPU lock.
+                continue;
+            }
+            if (needsCopy && useLatencyEvent && !latencyPermit) {
+                HANDLE capacityWaits[2] = {
+                    g_desktop_present_stop_event, g_desktop_frame_latency_event };
+                const DWORD capacity = WaitForMultipleObjects(2, capacityWaits, FALSE, 50);
+                if (capacity == WAIT_OBJECT_0) return 0;
+                if (capacity == WAIT_FAILED) {
+                    Log("[gpu] desktop capacity wait failed; using nonblocking retry fallback");
+                    useLatencyEvent = false;
+                    continue;
+                }
+                if (capacity == WAIT_TIMEOUT) continue;
+                latencyPermit = true;
+            }
+
             OscPresentResult result = OscPresentResult::Failed;
             {
                 std::lock_guard<std::mutex> gpuLock(osc::d3d11_frame_publisher::Mutex());
-                if (g_game_focused.load(std::memory_order_acquire))
+                if (g_game_focused.load(std::memory_order_acquire) ||
+                    !g_desktop_frames.HasPendingFrame())
                     break;
+                if (g_desktop_frames.NeedsCopy()) {
+                    if (!CopyOwnRTToSwap(g_own_w, g_own_h)) {
+                        g_desktop_frames.Reset();
+                        break;
+                    }
+                    g_desktop_frames.MarkCopied();
+                }
                 result = PresentCurrentBackBuffer(true);
+                if (result == OscPresentResult::Presented) {
+                    g_desktop_frames.MarkPresented();
+                    fpsLimiter.MarkPresented(OscPerfNowUs());
+                    latencyPermit = false;
+                } else if (result == OscPresentResult::Failed) {
+                    g_desktop_frames.Reset();
+                }
             }
 
             if (result == OscPresentResult::Presented) {
                 consecutiveBusy = 0;
+                retryStartedMs = GetTickCount64();
                 if (g_hwnd) PostMessageW(g_hwnd, WM_OSC_GPU_FRAME_READY, 0, 0);
-                break;
+                // A newer CEF frame may already be pending. The generation check
+                // above also absorbs stale auto-reset signals without duplicate Presents.
+                continue;
             }
             if (result == OscPresentResult::Failed)
                 break;
 
             if (GetTickCount64() - retryStartedMs >= 1500) {
                 g_osc_perf.presentBusyDrops.fetch_add(1, std::memory_order_relaxed);
-                Log("[gpu] desktop Present retry timed out after 1500ms; latest frame dropped");
+                {
+                    std::lock_guard<std::mutex> gpuLock(osc::d3d11_frame_publisher::Mutex());
+                    g_desktop_frames.Reset();
+                }
+                Log("[gpu] desktop Present retry timed out after 1500ms; pending frame dropped");
                 break;
             }
 
-            // New CEF frames signal the same auto-reset event after updating the
-            // back buffer. Retry promptly on a new frame, otherwise poll gently.
+            // New CEF frames update ownRT only. Retry the already-copied buffer.
             // ★ 2026-10-20: วัดผลจริง — GPU ติดช่วงสั้น retry 2ms โอเค แต่ GPU ติดนาน
             //   (WAS_STILL_DRAWING ยาว) วน 500 ครั้ง/วินาที = 5,443 retries ใน log ที่
             //   แต่ละครั้งแย่ง publisher mutex กับ CEF callback (ที่ต้องใช้ composite)
@@ -1317,7 +1458,7 @@ static bool OscStartDesktopPresentWorker() {
         g_desktop_present_stop_event = nullptr;
         return false;
     }
-    Log("[gpu] desktop Present worker started (Present-only; nonblocking retry)");
+    Log("[gpu] desktop Present worker started (paced latest-frame copy + nonblocking Present)");
     return true;
 }
 
@@ -1330,8 +1471,11 @@ static bool OscQueueDesktopPresentFrame() {
     std::lock_guard<std::mutex> lock(g_desktop_present_queue_mutex);
     if (g_desktop_present_shutting_down.load(std::memory_order_acquire))
         return true;
+    // Caller owns the publisher GPU mutex, as do all worker queue accesses.
+    g_desktop_frames.QueueFrame();
     if (!g_desktop_present_frame_event ||
         !SetEvent(g_desktop_present_frame_event)) {
+        g_desktop_frames.Reset();
         Log("[gpu] desktop Present worker signal failed err=" +
             std::to_string(GetLastError()));
         return false;
@@ -1356,6 +1500,10 @@ static void OscStopDesktopPresentWorker() {
                 CloseHandle(g_desktop_present_stop_event);
                 g_desktop_present_stop_event = nullptr;
             }
+            if (g_desktop_frame_latency_event) {
+                CloseHandle(g_desktop_frame_latency_event);
+                g_desktop_frame_latency_event = nullptr;
+            }
             return;
         }
     }
@@ -1378,6 +1526,10 @@ static void OscStopDesktopPresentWorker() {
     if (g_desktop_present_stop_event) {
         CloseHandle(g_desktop_present_stop_event);
         g_desktop_present_stop_event = nullptr;
+    }
+    if (g_desktop_frame_latency_event) {
+        CloseHandle(g_desktop_frame_latency_event);
+        g_desktop_frame_latency_event = nullptr;
     }
 }
 
@@ -1554,7 +1706,7 @@ static void ParseDisplayRects(const std::string& req) {
         std::lock_guard<std::mutex> lock(g_ui_rects_mutex);
         g_ui_rects.swap(parsedRects);
     }
-    if (g_ui_open != open)
+    if (g_ui_open_snapshot.load(std::memory_order_acquire) != open)
         Log(std::string("[ui] displayRects: ") + (open ? (std::to_string(rectCount) + " rects") : "empty"));
     // ★ state machine (สเปก OWNER): rects = ขอบเขตคลิกเท่านั้น — ห้ามแตะสถานะเด็ดขาด!
     //   (บั๊ก 10:4x: rects ตอนบูตพาง g_ui_open=true → hook กลืนคลิกทั้งจอทันทีที่เปิดโปรแกรม
@@ -2052,6 +2204,333 @@ static void OscLoadDesktopMonitor() {
     OscRefreshDesktopMonitor();
 }
 
+static std::string OscFpsError(const std::string& message) {
+    auto data = CefDictionaryValue::Create();
+    data->SetString("error", message);
+    auto value = CefValue::Create();
+    value->SetDictionary(data);
+    return CefWriteJSON(value, JSON_WRITER_DEFAULT).ToString();
+}
+
+static std::string OscFpsStateOnUi() {
+    CEF_REQUIRE_UI_THREAD();
+    if (!g_browser || !g_browser->GetHost())
+        return OscFpsError("OSC browser is not ready");
+    auto data = CefDictionaryValue::Create();
+    data->SetInt("fps", g_desktop_fps_limit.load(std::memory_order_acquire));
+    data->SetInt("cefFps", g_browser->GetHost()->GetWindowlessFrameRate());
+    data->SetInt("min", osc::DesktopFpsMin);
+    data->SetInt("max", osc::DesktopFpsMax);
+    data->SetString("scope", "desktop");
+    auto value = CefValue::Create();
+    value->SetDictionary(data);
+    return CefWriteJSON(value, JSON_WRITER_DEFAULT).ToString();
+}
+
+static void OscApplyCefFpsOnUi() {
+    CEF_REQUIRE_UI_THREAD();
+    if (g_browser && g_browser->GetHost()) {
+        const int cefFps = g_game_focused.load(std::memory_order_acquire) ? 60 :
+            osc::CefDesktopFps(g_desktop_fps_limit.load(std::memory_order_acquire));
+        g_browser->GetHost()->SetWindowlessFrameRate(cefFps);
+    }
+}
+
+class OscApplyCefFpsTask : public CefTask {
+public:
+    void Execute() override { OscApplyCefFpsOnUi(); }
+    IMPLEMENT_REFCOUNTING(OscApplyCefFpsTask);
+};
+
+class OscFpsSavedTask : public CefTask {
+public:
+    OscFpsSavedTask(int fps, bool saved, const std::string& error,
+        const std::function<void(const std::string&)>& reply)
+        : fps_(fps), saved_(saved), error_(error), reply_(reply) {}
+    void Execute() override {
+        CEF_REQUIRE_UI_THREAD();
+        g_config_save_pending.store(false, std::memory_order_release);
+        if (!saved_) {
+            reply_(OscFpsError(error_));
+            return;
+        }
+        g_cfg.max_fps = fps_;
+        g_desktop_fps_limit.store(fps_, std::memory_order_release);
+        OscApplyCefFpsOnUi();
+        {
+            std::lock_guard<std::mutex> lock(g_desktop_present_queue_mutex);
+            if (g_desktop_present_frame_event)
+                SetEvent(g_desktop_present_frame_event);
+        }
+        Log("[fps-limit] saved Desktop limit=" + std::to_string(fps_) +
+            "; CEF ceiling=" + std::to_string(osc::CefDesktopFps(fps_)));
+        reply_(OscFpsStateOnUi());
+    }
+private:
+    int fps_;
+    bool saved_;
+    std::string error_;
+    std::function<void(const std::string&)> reply_;
+    IMPLEMENT_REFCOUNTING(OscFpsSavedTask);
+};
+
+class OscSaveFpsTask : public CefTask {
+public:
+    OscSaveFpsTask(const std::wstring& path, int fps,
+        const std::function<void(const std::string&)>& reply)
+        : path_(path), fps_(fps), reply_(reply) {}
+    void Execute() override {
+        std::string contents, error;
+        bool saved = false;
+        if (osc::ReadConfigFile(path_, contents, error)) {
+            auto value = CefParseJSON(contents, JSON_PARSER_RFC);
+            if (!value || value->GetType() != VTYPE_DICTIONARY) {
+                error = "OSC config is not a valid JSON object";
+            } else {
+                auto config = value->GetDictionary();
+                auto window = config->GetDictionary("window");
+                bool updatedFps = window ? window->SetInt("maxFps", fps_) :
+                    config->SetInt("maxFps", fps_);
+                // Synchronize a legacy duplicate without relying on JSON key order.
+                if (window && config->HasKey("maxFps"))
+                    updatedFps = config->SetInt("maxFps", fps_) && updatedFps;
+                if (!updatedFps) {
+                    error = "Cannot update maxFps in OSC config";
+                } else {
+                    const auto updated = CefWriteJSON(value, JSON_WRITER_PRETTY_PRINT).ToString();
+                    if (updated.empty()) error = "Cannot serialize OSC config";
+                    else saved = osc::WriteConfigFileAtomically(path_, updated, error);
+                }
+            }
+        }
+        if (!CefPostTask(TID_UI, new OscFpsSavedTask(fps_, saved, error, reply_))) {
+            g_config_save_pending.store(false, std::memory_order_release);
+            reply_(OscFpsError("Cannot apply FPS setting: CEF UI is unavailable"));
+        }
+    }
+private:
+    std::wstring path_;
+    int fps_;
+    std::function<void(const std::string&)> reply_;
+    IMPLEMENT_REFCOUNTING(OscSaveFpsTask);
+};
+
+static void OscHandleFpsQueryOnUi(const std::string& req,
+    const std::function<void(const std::string&)>& reply) {
+    CEF_REQUIRE_UI_THREAD();
+    auto value = CefParseJSON(req, JSON_PARSER_RFC);
+    if (!value || value->GetType() != VTYPE_DICTIONARY) {
+        reply(OscFpsError("Invalid FPS request"));
+        return;
+    }
+    auto request = value->GetDictionary();
+    const auto command = request->GetString("command").ToString();
+    if (command == "QUERY_OSC_GET_FPS") {
+        reply(OscFpsStateOnUi());
+        return;
+    }
+    const auto type = request->GetType("fps");
+    const double fps = type == VTYPE_INT ? request->GetInt("fps") :
+        type == VTYPE_DOUBLE ? request->GetDouble("fps") : 0;
+    if (command != "QUERY_OSC_SET_FPS" || !osc::IsValidDesktopFps(fps)) {
+        reply(OscFpsError("FPS must be an integer from 15 to 240"));
+        return;
+    }
+    if (!g_browser || !g_browser->GetHost()) {
+        reply(OscFpsError("OSC browser is not ready"));
+        return;
+    }
+    if (g_config_save_pending.exchange(true, std::memory_order_acq_rel)) {
+        reply(OscFpsError("Another OSC setting is already being saved"));
+        return;
+    }
+    if (!CefPostTask(TID_FILE_USER_BLOCKING,
+        new OscSaveFpsTask(g_osc_config_path, static_cast<int>(fps), reply))) {
+        g_config_save_pending.store(false, std::memory_order_release);
+        reply(OscFpsError("Cannot schedule FPS config save"));
+    }
+}
+
+// Renderer preferences are persisted together. UI and Desktop selections take
+// effect on the next HOST boot; BG selects the particle canvas path at runtime.
+static std::string OscRendererStateOnUi() {
+    CEF_REQUIRE_UI_THREAD();
+    auto data = CefDictionaryValue::Create();
+    data->SetString("ui", osc::RendererName(g_desired_ui_renderer));
+    data->SetString("desktop", osc::RendererName(g_desired_desktop_renderer));
+    data->SetString("background", osc::RendererName(g_desired_bg_renderer));
+    data->SetString("activeUi", osc::RendererName(g_cfg.ui_renderer));
+    data->SetString("activeDesktop", osc::RendererName(g_cfg.desktop_renderer));
+    data->SetBool("restartRequired",
+        g_desired_ui_renderer != g_cfg.ui_renderer ||
+        g_desired_desktop_renderer != g_cfg.desktop_renderer);
+    auto value = CefValue::Create();
+    value->SetDictionary(data);
+    return CefWriteJSON(value, JSON_WRITER_DEFAULT).ToString();
+}
+
+class OscRenderersSavedTask : public CefTask {
+public:
+    OscRenderersSavedTask(osc::RendererChoice ui, osc::RendererChoice desktop,
+        osc::RendererChoice background, bool saved, const std::string& error,
+        const std::function<void(const std::string&)>& reply)
+        : ui_(ui), desktop_(desktop), background_(background),
+          saved_(saved), error_(error), reply_(reply) {}
+    void Execute() override {
+        CEF_REQUIRE_UI_THREAD();
+        g_config_save_pending.store(false, std::memory_order_release);
+        if (!saved_) { reply_(OscFpsError(error_)); return; }
+        g_desired_ui_renderer = ui_;
+        g_desired_desktop_renderer = desktop_;
+        g_desired_bg_renderer = background_;
+        Log(std::string("[renderer] saved UI=") + osc::RendererName(ui_) +
+            " Desktop=" + osc::RendererName(desktop_) +
+            " BG=" + osc::RendererName(background_) + " (restart UI/Desktop)");
+        reply_(OscRendererStateOnUi());
+    }
+private:
+    osc::RendererChoice ui_, desktop_, background_;
+    bool saved_;
+    std::string error_;
+    std::function<void(const std::string&)> reply_;
+    IMPLEMENT_REFCOUNTING(OscRenderersSavedTask);
+};
+
+class OscSaveRenderersTask : public CefTask {
+public:
+    OscSaveRenderersTask(const std::wstring& path, osc::RendererChoice ui,
+        osc::RendererChoice desktop, osc::RendererChoice background,
+        const std::function<void(const std::string&)>& reply)
+        : path_(path), ui_(ui), desktop_(desktop),
+          background_(background), reply_(reply) {}
+    void Execute() override {
+        std::string contents, error;
+        bool saved = false;
+        if (osc::ReadConfigFile(path_, contents, error)) {
+            auto value = CefParseJSON(contents, JSON_PARSER_RFC);
+            if (!value || value->GetType() != VTYPE_DICTIONARY)
+                error = "OSC config is not a valid JSON object";
+            else {
+                auto root = value->GetDictionary();
+                auto window = root->GetDictionary("window");
+                auto target = window ? window : root;
+                if (!target->SetString("uiRenderer", osc::RendererName(ui_)) ||
+                    !target->SetString("desktopRenderer", osc::RendererName(desktop_)) ||
+                    !target->SetString("bgRenderer", osc::RendererName(background_))) {
+                    error = "Cannot update renderer configuration";
+                } else {
+                    // Old top-level keys must not override the new window values
+                    // when LoadConfig searches for a key by name.
+                    if (window) {
+                        if (root->HasKey("uiRenderer")) root->Remove("uiRenderer");
+                        if (root->HasKey("desktopRenderer")) root->Remove("desktopRenderer");
+                        if (root->HasKey("bgRenderer")) root->Remove("bgRenderer");
+                    }
+                    const auto updated = CefWriteJSON(value, JSON_WRITER_PRETTY_PRINT).ToString();
+                    if (updated.empty()) error = "Cannot serialize OSC config";
+                    else saved = osc::WriteConfigFileAtomically(path_, updated, error);
+                }
+            }
+        }
+        if (!CefPostTask(TID_UI, new OscRenderersSavedTask(
+                ui_, desktop_, background_, saved, error, reply_))) {
+            g_config_save_pending.store(false, std::memory_order_release);
+            reply_(OscFpsError("Cannot apply renderer setting: CEF UI unavailable"));
+        }
+    }
+private:
+    std::wstring path_;
+    osc::RendererChoice ui_, desktop_, background_;
+    std::function<void(const std::string&)> reply_;
+    IMPLEMENT_REFCOUNTING(OscSaveRenderersTask);
+};
+
+static void OscHandleRendererQueryOnUi(const std::string& req,
+    const std::function<void(const std::string&)>& reply) {
+    CEF_REQUIRE_UI_THREAD();
+    auto value = CefParseJSON(req, JSON_PARSER_RFC);
+    if (!value || value->GetType() != VTYPE_DICTIONARY) {
+        reply(OscFpsError("Invalid renderer request")); return;
+    }
+    auto request = value->GetDictionary();
+    const auto command = request->GetString("command").ToString();
+    if (command == "QUERY_OSC_GET_RENDERERS") {
+        reply(OscRendererStateOnUi()); return;
+    }
+    osc::RendererChoice ui, desktop, background;
+    if (command != "QUERY_OSC_SET_RENDERERS" ||
+        request->GetType("ui") != VTYPE_STRING ||
+        request->GetType("desktop") != VTYPE_STRING ||
+        request->GetType("background") != VTYPE_STRING ||
+        !osc::ParseRendererChoice(request->GetString("ui").ToString(), ui) ||
+        !osc::ParseRendererChoice(request->GetString("desktop").ToString(), desktop) ||
+        !osc::ParseRendererChoice(request->GetString("background").ToString(), background)) {
+        reply(OscFpsError("Renderer must be auto, gpu or cpu")); return;
+    }
+    if (g_config_save_pending.exchange(true, std::memory_order_acq_rel)) {
+        reply(OscFpsError("Another OSC setting is already being saved")); return;
+    }
+    if (!CefPostTask(TID_FILE_USER_BLOCKING, new OscSaveRenderersTask(
+            g_osc_config_path, ui, desktop, background, reply))) {
+        g_config_save_pending.store(false, std::memory_order_release);
+        reply(OscFpsError("Cannot schedule renderer settings save"));
+    }
+}
+
+class OscFpsQueryTask : public CefTask {
+public:
+    OscFpsQueryTask(const std::string& req,
+        const std::function<void(const std::string&)>& reply)
+        : request_(req), reply_(reply) {}
+    void Execute() override {
+        if (request_.find("QUERY_OSC_GET_RENDERERS") != std::string::npos ||
+            request_.find("QUERY_OSC_SET_RENDERERS") != std::string::npos)
+            OscHandleRendererQueryOnUi(request_, reply_);
+        else OscHandleFpsQueryOnUi(request_, reply_);
+    }
+private:
+    std::string request_;
+    std::function<void(const std::string&)> reply_;
+    IMPLEMENT_REFCOUNTING(OscFpsQueryTask);
+};
+
+static void OscHandleFpsQuery(const std::string& req,
+    const std::function<void(const std::string&)>& reply) {
+    if (CefCurrentlyOn(TID_UI)) {
+        if (req.find("QUERY_OSC_GET_RENDERERS") != std::string::npos ||
+            req.find("QUERY_OSC_SET_RENDERERS") != std::string::npos)
+            OscHandleRendererQueryOnUi(req, reply);
+        else OscHandleFpsQueryOnUi(req, reply);
+        return;
+    }
+    // HTTP /cefquery expects a synchronous reply. The posted task owns this
+    // state even after timeout; it never captures the server's stack response.
+    struct Result {
+        std::mutex mutex;
+        std::condition_variable ready;
+        bool complete = false;
+        std::string response;
+    };
+    auto result = std::make_shared<Result>();
+    if (!CefPostTask(TID_UI, new OscFpsQueryTask(req,
+        [result](const std::string& response) {
+            std::lock_guard<std::mutex> lock(result->mutex);
+            result->response = response;
+            result->complete = true;
+            result->ready.notify_one();
+        }))) {
+        reply(OscFpsError("CEF UI is unavailable"));
+        return;
+    }
+    std::unique_lock<std::mutex> lock(result->mutex);
+    const bool complete = result->ready.wait_for(lock, std::chrono::seconds(5),
+        [&result] { return result->complete; });
+    const std::string response = complete ? result->response :
+        OscFpsError("FPS request timed out");
+    lock.unlock();
+    reply(response);
+}
+
 static void HandleOscQuery(const std::string& req, bool persistent,
     const std::function<void(const std::string&)>& reply) {
     std::string cmd;
@@ -2065,6 +2544,11 @@ static void HandleOscQuery(const std::string& req, bool persistent,
     if (qcount++ < 25 || cmd != "QUERY_OSC_SET_PAINTING")
         Log(std::string("[cefQuery] ") + cmd + (persistent ? " (persistent)" : ""));
 
+    if (cmd == "QUERY_OSC_GET_FPS" || cmd == "QUERY_OSC_SET_FPS" ||
+        cmd == "QUERY_OSC_GET_RENDERERS" || cmd == "QUERY_OSC_SET_RENDERERS") {
+        OscHandleFpsQuery(req, reply);
+        return;
+    }
 
     if(cmd=="QUERY_OSC_DESKTOP_MONITORS") {
         auto response=CefDictionaryValue::Create();auto list=CefListValue::Create();
@@ -2206,7 +2690,10 @@ static void HandleOscQuery(const std::string& req, bool persistent,
 
     if (cmd == "QUERY_WIN_CLOSE_OSC") {
         // แบบของแท้: หน้าเพจเป็นเจ้าของ UI — ปิดเองทาง socket แล้ว
-        g_ui_rects.clear();
+        {
+            std::lock_guard<std::mutex> lock(g_ui_rects_mutex);
+            g_ui_rects.clear();
+        }
         ClearNotifierRects();
         // [P1#1 Copilot] ส่งแค่ intent — สถานะให้ UI thread (WM_OSC_VIS) เป็นผู้เขียน
         if (g_hwnd) PostMessageW(g_hwnd, WM_OSC_VIS, 0, 0);
@@ -2237,7 +2724,8 @@ static void HandleOscQuery(const std::string& req, bool persistent,
         // main-menu ping-pong. Only honor it when the page actually left
         // the base route (a real open), or when we are already open (no-op
         // anyway). A boot ask on #/base while closed is just an ack.
-        if (!g_ui_open && g_route_clickthrough.load(std::memory_order_acquire)) {
+        if (!g_ui_open_snapshot.load(std::memory_order_acquire) &&
+            g_route_clickthrough.load(std::memory_order_acquire)) {
             reply("{}");
             return;
         }
@@ -2531,11 +3019,9 @@ public:
                     "})();",
                     browser->GetMainFrame()->GetURL(), 0);
             }
-            if (g_pending_page_action >= 0) {
-                bool open = g_pending_page_action != 0;
-                g_pending_page_action = -1;
-                QueueOscPageAction(open);
-            }
+            const int pendingAction = g_pending_page_action.exchange(-1);
+            if (pendingAction >= 0)
+                QueueOscPageAction(pendingAction != 0);
             // ★ same-origin แบบแท้ (10:5x): โหลดหน้าจาก node :59011 + ใช้ cefQuery
             //   แท้ผ่าน CEF message router (RouterEnabled=true) — ไม่ฉีด HTTP shim แล้ว
             //   (shim เก่า override window.cefQuery ทับ bridge แท้ = ต้องง้อ HTTP)
@@ -2595,7 +3081,10 @@ public:
             " → LoadURL page");
         // ★ state machine: renderer ตาย = หน้าไม่มีทางส่ง WIN_CLOSE เอง → บังคับปิด
         //   (กันค้าง "เปิดล่องหน": กินคลิก/โฟกัสทั้งจอทั้งที่จอไม่มีอะไร)
-        g_ui_rects.clear();
+        {
+            std::lock_guard<std::mutex> lock(g_ui_rects_mutex);
+            g_ui_rects.clear();
+        }
         ClearNotifierRects();
         // [P1#1 Copilot] ส่ง intent — UI thread เป็นผู้เขียนสถานะ
         if (g_hwnd) PostMessageW(g_hwnd, WM_OSC_VIS, 0, 0);
@@ -2732,7 +3221,7 @@ public:
         const int frameH = (int)lround((double)g_view_h * g_render_dsf);
         UpdateDisplayGeometry(frameW, frameH);
         // Keep shared-texture access and draw submission inside CEF's callback;
-        // PresentToSwap queues only the already-copied back buffer for Desktop.
+        // Desktop queues our persistent ownRT; CEF handles never leave this callback.
         {
             std::lock_guard<std::mutex> lock(osc::d3d11_frame_publisher::Mutex());
             const auto compositeStartUs = OscPerfNowUs();
@@ -2814,8 +3303,8 @@ static void CreateBrowserNow() {
     // สเปก 2 โหมด (GPU เป็นหลัก): renderMode ใน nvidia-osc.json = auto|gpu|cpu
     //  cpu → ปิด shared texture ขึ้น CPU path ทั้งที่ GPU พร้อม (ทดสอบ/เครื่องปัญหา)
     //  gpu → ยึด GPU แม้ gpu-off.flag เก่าจากรอบก่อน (watchdog ไม่รีสตาร์ทวนลูป)
-    if (g_cfg.render_mode == 2) g_gpu_shared = false;
-    else if (g_cfg.render_mode == 1 && !g_gpu_shared) {
+    if (g_cfg.render_mode == 2 || g_cfg.ui_renderer == osc::RendererChoice::Cpu) g_gpu_shared = false;
+    else if ((g_cfg.render_mode == 1 || g_cfg.ui_renderer == osc::RendererChoice::Gpu) && !g_gpu_shared) {
         g_gpu_shared = true;
         Log("[mode] renderMode=gpu overrides gpu-off.flag (old fallback)");
     }
@@ -2841,9 +3330,11 @@ static void CreateBrowserNow() {
         " sharedTexture=" + std::to_string(wi.shared_texture_enabled));
     CefBrowserSettings bs;
     bs.background_color = CefColorSetARGB(0, 0, 0, 0);
-    bs.windowless_frame_rate = g_cfg.max_fps;
-    Log("[cfg] requested OSR frame rate=" + std::to_string(g_cfg.max_fps) +
-        " fps; shared_texture=" + std::to_string(wi.shared_texture_enabled));
+    bs.windowless_frame_rate = g_game_focused.load(std::memory_order_acquire) ? 60 :
+        osc::CefDesktopFps(g_cfg.max_fps);
+    Log("[cfg] Desktop frame limit=" + std::to_string(g_cfg.max_fps) +
+        " fps; CEF requested=" + std::to_string(bs.windowless_frame_rate) +
+        "; shared_texture=" + std::to_string(wi.shared_texture_enabled));
     // CEF 73 passes external_begin_frame_enabled as force_software_compositor
     // to ui::Compositor. Keep its internal scheduler so shared-texture OSR stays on GPU.
     wi.external_begin_frame_enabled = false;
@@ -3336,6 +3827,13 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     if (msg == WM_OSC_FOCUS_MODE) {
         const bool hookMode = w != FALSE;
         g_game_focused.store(hookMode, std::memory_order_release);
+        // The user's Desktop cap must not throttle the Hook's CEF source.
+        CefPostTask(TID_UI, new OscApplyCefFpsTask());
+        {
+            std::lock_guard<std::mutex> lock(osc::d3d11_frame_publisher::Mutex());
+            // Mode changes must wait for a fresh desktop paint, not an old ownRT.
+            g_desktop_frames.Reset();
+        }
         g_overlay_keyboard_capture.store(false, std::memory_order_release);
         ApplyOpenShareInputMode();
         ApplyGenuineZoom();   // โหมดเปลี่ยน (desktop↔hook) → สูตร zoom เปลี่ยนตาม
@@ -3961,10 +4459,21 @@ static void ServeClient(SOCKET c) {
         //   ตัดสินใจที่ WM_OSC_VIS handler (เจ้าของสถานะคนเดียว)
         //   repeats กันที่ helper ด้วย MOD_NOREPEAT (ไม่ใช้ time debounce แล้ว)
         int intent = (path == "/show") ? 1 : (path == "/hide") ? 0 : 2;
-        PostMessageW(g_hwnd, WM_OSC_VIS, intent, 1);
-        const char* r = "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok";
-        send(c, r, (int)strlen(r), 0); closesocket(c);
-        Log("[toggle] " + path + " intent=" + std::to_string(intent));
+        // Wait for the HWND owner to apply the native state, instead of
+        // reporting 200 before the message can even be posted.
+        DWORD_PTR ignored = 0;
+        const bool dispatched = g_hwnd &&
+            SendMessageTimeoutW(g_hwnd, WM_OSC_VIS, intent, 1,
+                SMTO_ABORTIFHUNG | SMTO_BLOCK, 1200, &ignored) != 0;
+        const bool applied = dispatched &&
+            (intent == 2 || g_ui_open_snapshot.load(std::memory_order_acquire) == (intent == 1));
+        const char* r = applied
+            ? "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok"
+            : "HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\n\r\n";
+        send(c, r, (int)strlen(r), 0);
+        closesocket(c);
+        Log("[toggle] " + path + " intent=" + std::to_string(intent) +
+            " applied=" + (applied ? "true" : "false"));
         return;
     }
 
@@ -4151,7 +4660,8 @@ public:
             cmd->AppendSwitch("single-process");   // วินิจฉัย: ข้ามการ spawn child
             Log("[cmd] OSC_SINGLE=1 → single-process");
         }
-        if (sw || (nglen > 0 && ng[0] == '1')) {
+        if (sw || g_cfg.ui_renderer == osc::RendererChoice::Cpu ||
+            (nglen > 0 && ng[0] == '1')) {
             // ปิด GPU ทั้งเชิงม้า + display compositor (เกม exclusive จะ CHECK ตาย)
             cmd->AppendSwitch("disable-gpu");
             cmd->AppendSwitch("disable-gpu-compositing");
@@ -4225,7 +4735,8 @@ public:
             //   D3D11/DComp เลย (CreateTargetForHwnd topmost วางทับ child + swapchain
             //   ไม่ได้รับเฟรมจาก CEF native = surface ว่างบังหน้า)
             Log("[gpu] windowed mode → CEF native render (ไม่มี custom compositor)");
-        } else if (g_cfg.gdi_compositor) {
+        } else if (g_cfg.desktop_renderer == osc::RendererChoice::Cpu ||
+            (g_cfg.desktop_renderer == osc::RendererChoice::Auto && g_cfg.gdi_compositor)) {
             // โหมด GDI: layered window + UpdateLayeredWindow (เส้นทางที่พิสูจน์แล้วว่าแสดงผล)
             SetWindowLongW(g_hwnd, GWL_EXSTYLE,
                 GetWindowLongW(g_hwnd, GWL_EXSTYLE) | WS_EX_LAYERED);

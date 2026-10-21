@@ -214,13 +214,27 @@
           click:function () {
             var current = scope.mainMenu.tiles.QuietMode2;
             if (current && typeof current.click === 'function') return current.click();
-          }}
+          }},
+        {id:'overlay-fps',name:'Overlay FPS',icon:'icon-performance',visible:true,enabled:true,
+          click:function () { return injector.get('$state').go('main.osc-fps'); }},
+        {id:'renderer-mode',name:'Renderer Mode',icon:'icon-performance',visible:true,enabled:true,
+          click:function () { return injector.get('$state').go('main.osc-renderer'); }}
       ]}};
       delete settings.click;
       settings.__dulukaSettingsSubmenu = true;
       changed = true;
     }
     if (settings && settings.__dulukaSettingsSubmenu) {
+      if (!settings.state.Menu.items.some(function (item) { return item.id === 'overlay-fps'; })) {
+        settings.state.Menu.items.push({id:'overlay-fps',name:'Overlay FPS',icon:'icon-performance',visible:true,enabled:true,
+          click:function () { return window.angular.element(document.documentElement).injector().get('$state').go('main.osc-fps'); }});
+        changed = true;
+      }
+      if (!settings.state.Menu.items.some(function (item) { return item.id === 'renderer-mode'; })) {
+        settings.state.Menu.items.push({id:'renderer-mode',name:'Renderer Mode',icon:'icon-performance',visible:true,enabled:true,
+          click:function () { return window.angular.element(document.documentElement).injector().get('$state').go('main.osc-renderer'); }});
+        changed = true;
+      }
       var quietItem = settings.state.Menu.items.filter(function (item) { return item.id === 'quiet-mode'; })[0];
       var customizeItem = settings.state.Menu.items.filter(function (item) { return item.id === 'customize-main-menu'; })[0];
       if (customizeItem && customizeItem.icon !== 'icon-share') {

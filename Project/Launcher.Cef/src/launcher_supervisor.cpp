@@ -229,6 +229,12 @@ void LauncherSupervisor::StartBaseChain() {
 }
 
 void LauncherSupervisor::StartEngineOverlayChain() {
+  const auto should_run_cef = []() {
+    return launcherutil::ReadConfigBool(L"Overlay", L"UseOverlayEnabled", false) &&
+           launcherutil::ReadConfigBool(L"Overlay", L"EngineOverlayMode", false);
+  };
+  // A background chain can outlive a power/mode toggle. Abort stale starts.
+  if (!should_run_cef() || stop_) return;
   LogLine("engine overlay chain: begin");
   // NvContainer is the sole owner of the Node API helper and CEF host.
   StartIfMissing(kContainer, RootP(L"NVIDIA Container", L"NvContainer.exe"));
@@ -236,10 +242,12 @@ void LauncherSupervisor::StartEngineOverlayChain() {
     LogLine("NvContainer API backend did not become ready on port 59011");
     return;
   }
+  if (!should_run_cef() || stop_) return;
   if (!launcherutil::WaitForTcpPort(59013, 15000)) {
     LogLine("NvContainer CEF host did not become ready on port 59013");
     return;
   }
+  if (!should_run_cef() || stop_) return;
   LogLine("NvContainer-managed API and CEF host ready (presenter remains hidden)");
   LogLine("engine overlay chain: done");
 }
@@ -264,6 +272,11 @@ void LauncherSupervisor::StartEngineOverlayChainAsync() {
 }
 
 void LauncherSupervisor::StopCefOverlay() {
+  // Ignore a queued hide from a previous OFF/WinForm selection if the
+  // user has since switched back to powered-on CEF.
+  if (launcherutil::ReadConfigBool(L"Overlay", L"UseOverlayEnabled", false) &&
+      launcherutil::ReadConfigBool(L"Overlay", L"EngineOverlayMode", false))
+    return;
   // NvContainer owns the OSC process; hide it rather than killing a child
   // that the container watchdog would immediately restart.
   if (!launcherutil::HttpPostLocal(59013, L"/hide")) {
@@ -272,6 +285,12 @@ void LauncherSupervisor::StopCefOverlay() {
 }
 
 bool LauncherSupervisor::SendOpenOverlay() {
+  // Power OFF always wins: never wake an old resident CEF host or WinForm hub.
+  if (!launcherutil::ReadConfigBool(L"Overlay", L"UseOverlayEnabled", false) ||
+      stop_) {
+    LogLine("OPEN OVERLAY rejected: system disabled or stopping");
+    return false;
+  }
   if (launcherutil::ReadConfigBool(L"Overlay", L"EngineOverlayMode", false)) {
     // CEF lane: ask the NvContainer-owned OSC host to show, not toggle.
     if (!launcherutil::IsTcpPortOpen(59011) ||
@@ -280,8 +299,17 @@ bool LauncherSupervisor::SendOpenOverlay() {
       StartEngineOverlayChain();
     }
     if (!launcherutil::WaitForTcpPort(59013, 500)) return false;
+    // A concurrent power-off or mode switch may have happened during the
+    // backend wait: do not let this old request reopen a closed overlay.
+    if (stop_ ||
+        !launcherutil::ReadConfigBool(L"Overlay", L"UseOverlayEnabled", false) ||
+        !launcherutil::ReadConfigBool(L"Overlay", L"EngineOverlayMode", false))
+      return false;
     return launcherutil::HttpPostLocal(59013, L"/show");
   }
+  if (stop_ || !launcherutil::ReadConfigBool(L"Overlay", L"UseOverlayEnabled", false) ||
+      launcherutil::ReadConfigBool(L"Overlay", L"EngineOverlayMode", false))
+    return false;
   // WINFORM lane: TcpClientHelper.Send("open_overlay") wire parity:
   //   "[Send] NVIDIA  APP|open_overlay\r\n" to 127.0.0.1:5001.
   return launcherutil::SendHubLine("[Send] NVIDIA  APP|open_overlay");

@@ -113,6 +113,21 @@ static void ReleaseAdapterFrameTexture() {
 }
 
 static bool GetDeviceAdapterLuid(ID3D11Device* device, LUID& luid) {
+    // The publisher mutex serializes this cache. Retaining the device prevents
+    // a released device's address from being mistaken for a replacement.
+    struct DeviceAdapterCache {
+        ID3D11Device* device = nullptr;
+        LUID luid{};
+        ~DeviceAdapterCache() { if (device) device->Release(); }
+    };
+    static DeviceAdapterCache cache;
+    if (!device)
+        return false;
+    if (cache.device == device) {
+        luid = cache.luid;
+        return true;
+    }
+
     IDXGIDevice* dxgiDevice = nullptr;
     IDXGIAdapter* adapter = nullptr;
     DXGI_ADAPTER_DESC adapterDesc{};
@@ -126,6 +141,11 @@ static bool GetDeviceAdapterLuid(ID3D11Device* device, LUID& luid) {
     if (dxgiDevice) dxgiDevice->Release();
     if (FAILED(result))
         return false;
+    device->AddRef();
+    if (cache.device)
+        cache.device->Release();
+    cache.device = device;
+    cache.luid = adapterDesc.AdapterLuid;
     luid = adapterDesc.AdapterLuid;
     return true;
 }
@@ -154,7 +174,6 @@ osc_frame_bridge::ConsumerAdapterInfo* GetConsumerAdapterInfo() {
     return g_consumer_adapter_info;
 }
 
-static void WaitPublishWorkerDrained();
 static void StartPublishWorker();
 static void StopPublishWorker();
 
@@ -163,22 +182,21 @@ static void StopPublishWorker();
 static HANDLE g_publish_worker_stop_event = nullptr;
 static HANDLE g_publish_worker_thread = nullptr;
 static std::atomic<long> g_publish_inflight{ 0 };
-static std::atomic<bool> g_publish_worker_paused{ false };
+static std::atomic<bool> g_publish_worker_stopping{ false };
 
-struct PublishWorkerPauseGuard {
-    PublishWorkerPauseGuard() {
-        g_publish_worker_paused.store(true, std::memory_order_release);
+// Callers hold g_adapter_publish_mutex. The worker reserves its resource access
+// under the same mutex, so zero cannot become nonzero during a rebuild.
+static bool DeferResourceTransitionLocked() {
+    if (g_publish_inflight.load(std::memory_order_acquire) == 0)
+        return false;
+    g_adapter_force_full_readback = true;
+    static ULONGLONG lastLogMs = 0;
+    const ULONGLONG now = GetTickCount64();
+    if (!lastLogMs || now - lastLogMs >= 1000) {
+        lastLogMs = now;
+        PublisherLog("[adapter-bridge] resource change deferred until active publication completes");
     }
-    ~PublishWorkerPauseGuard() {
-        g_publish_worker_paused.store(false, std::memory_order_release);
-    }
-};
-
-static void WaitPublishWorkerDrained() {
-    // Bounded: one publish pass costs at most ~20 ms.
-    g_publish_worker_paused.store(true, std::memory_order_release);
-    for (int i = 0; i < 200 && g_publish_inflight.load() > 0; ++i)
-        Sleep(1);
+    return true;
 }
 
 static bool EnsureAdapterFrameDevice() {
@@ -225,6 +243,8 @@ static bool EnsureAdapterFrameDevice() {
              sourceLuid.HighPart == targetLuid.HighPart &&
              consumerApi != osc_frame_bridge::ConsumerRenderApiD3D9);
 
+    if (DeferResourceTransitionLocked())
+        return false;
     ReleaseAdapterFrameTexture();
     if (sourceLuid.LowPart == targetLuid.LowPart &&
         sourceLuid.HighPart == targetLuid.HighPart &&
@@ -321,7 +341,8 @@ static bool EnsureAdapterFrameDevice() {
 }
 
 static bool EnsureAdapterFrameTexture(ID3D11Texture2D* sourceTexture) {
-    if (!sourceTexture || !EnsureAdapterFrameDevice())
+    if (g_publish_worker_stopping.load(std::memory_order_acquire) ||
+        !sourceTexture || !EnsureAdapterFrameDevice())
         return false;
     D3D11_TEXTURE2D_DESC sourceDesc{};
     sourceTexture->GetDesc(&sourceDesc);
@@ -337,10 +358,10 @@ static bool EnsureAdapterFrameTexture(ID3D11Texture2D* sourceTexture) {
         g_adapter_frame_format == sourceDesc.Format)
         return true;
 
-    // [FIX-B] pause + drain the publish worker while textures are rebuilt.
-    // RAII: every exit below (rebuild success or failure) resumes the worker.
-    PublishWorkerPauseGuard publishWorkerPause;
-    WaitPublishWorkerDrained();
+    // Never wait while holding the mutex needed by worker completion. Keep the
+    // current resources alive and let the next frame retry the transition.
+    if (DeferResourceTransitionLocked())
+        return false;
     ReleaseAdapterFrameTexture();
     if (!EnsureAdapterFrameDevice())
         return false;
@@ -456,6 +477,8 @@ static bool PublishCompletedAdapterFrame() {
     const HRESULT mapResult = HostGpuContext()->Map(
         slot.texture, 0, D3D11_MAP_READ, D3D11_MAP_FLAG_DO_NOT_WAIT, &mapped);
     bool published = false;
+    bool requestFullReadback = false;
+    bool completedFullFrame = false;
     if (SUCCEEDED(mapResult)) {
         const HRESULT acquireResult = g_adapter_frame_mutex->AcquireSync(0, 0);
         if (acquireResult == S_OK) {
@@ -493,13 +516,11 @@ static bool PublishCompletedAdapterFrame() {
                 if (slot.fullFrame)
                     osc::frame_utilities::LogAdapterFramePixelProof(pixelFingerprint);
                 if (!d3d9Published)
-                    g_adapter_force_full_readback = true;
-                else if (slot.fullFrame) {
-                    g_adapter_frame_initialized = true;
-                    g_adapter_force_full_readback = false;
-                }
+                    requestFullReadback = true;
+                else if (slot.fullFrame)
+                    completedFullFrame = true;
             } else {
-                g_adapter_force_full_readback = true;
+                requestFullReadback = true;
                 PublisherLog("[adapter-bridge] shared texture mutex release failed: " +
                     std::to_string(static_cast<long>(releaseResult)));
             }
@@ -507,14 +528,14 @@ static bool PublishCompletedAdapterFrame() {
             HostGpuContext()->Unmap(slot.texture, 0);
             if (acquireResult == WAIT_TIMEOUT)
                 return false;
-            g_adapter_force_full_readback = true;
+            requestFullReadback = true;
             PublisherLog("[adapter-bridge] shared texture mutex acquire failed: " +
                 std::to_string(static_cast<long>(acquireResult)));
         }
     } else if (mapResult == DXGI_ERROR_WAS_STILL_DRAWING) {
         return false;
     } else {
-        g_adapter_force_full_readback = true;
+        requestFullReadback = true;
         PublisherLog("[adapter-bridge] completed readback map failed: " +
             std::to_string(static_cast<long>(mapResult)));
     }
@@ -522,6 +543,12 @@ static bool PublishCompletedAdapterFrame() {
     {
         // [FIX-B] publish back the slot so the UI thread may reuse it.
         std::lock_guard<std::mutex> lock(g_adapter_publish_mutex);
+        if (requestFullReadback)
+            g_adapter_force_full_readback = true;
+        else if (completedFullFrame) {
+            g_adapter_frame_initialized = true;
+            g_adapter_force_full_readback = false;
+        }
         slot.pending = false;
         slot.fullFrame = false;
         slot.dirtyBoxes.clear();
@@ -533,6 +560,8 @@ static bool PublishCompletedAdapterFrame() {
 
 bool QueueFrameReadbackLocked(ID3D11Texture2D* sourceTexture,
     const std::vector<CefRect>& dirtyRects) {
+    if (g_publish_worker_stopping.load(std::memory_order_acquire))
+        return false;
     AdapterReadbackSlot& slot =
         g_adapter_readback_slots[g_adapter_readback_write];
     D3D11_TEXTURE2D_DESC sourceDesc{};
@@ -743,74 +772,67 @@ void PublishFrameLocked(ID3D11Texture2D* sourceTexture,
 // focused (112 fps when not). The worker owns all heavy steps now.
 static DWORD WINAPI OscPublishWorkerProc(LPVOID) {
     for (;;) {
-        if (g_publish_worker_paused.load(std::memory_order_acquire)) {
-            if (WaitForSingleObject(g_publish_worker_stop_event, 2) ==
-                WAIT_OBJECT_0)
-                break;
-            continue;
-        }
         const DWORD wait =
             WaitForSingleObject(g_publish_worker_stop_event, 4);
-        if (wait == WAIT_OBJECT_0) break;
-        if (!g_adapter_frame_device) continue;
+        if (wait == WAIT_OBJECT_0 || wait == WAIT_FAILED) break;
 
-        bool hasPending = false;
         {
             std::lock_guard<std::mutex> lock(g_adapter_publish_mutex);
-            hasPending = std::any_of(
+            if (g_publish_worker_stopping.load(std::memory_order_acquire))
+                break;
+            if (!g_adapter_frame_device)
+                continue;
+            const bool hasPending = std::any_of(
                 std::begin(g_adapter_readback_slots),
                 std::end(g_adapter_readback_slots),
                 [](const AdapterReadbackSlot& slot) {
                     return slot.pending;
                 });
-        }
-        if (!hasPending) {
-            // Idle maintenance (was timer 6's job): requeue deferred dirty
-            // rects or a forced full readback while the overlay is visible.
-            const bool hookMode =
-                HostGameFocused();
-            const bool overlayVisible = HostOverlayVisible();
-            const bool allowVisibleFrame = hookMode && overlayVisible;
-            if (!g_adapter_frame_device || !HostSharedTexture()) continue;
-            std::lock_guard<std::mutex> lock(g_adapter_publish_mutex);
-            const bool stillPending = std::any_of(
-                std::begin(g_adapter_readback_slots),
-                std::end(g_adapter_readback_slots),
-                [](const AdapterReadbackSlot& slot) {
-                    return slot.pending;
-                });
-            if (stillPending) continue;
-            if (allowVisibleFrame && g_adapter_force_full_readback) {
-                const std::vector<CefRect> fullFrame{
-                    CefRect(0, 0, HostViewWidth(), HostViewHeight()) };
-                QueueFrameReadbackLocked(HostSharedTexture(), fullFrame);
-            } else if (!g_adapter_deferred_dirty_rects.empty()) {
-                if (allowVisibleFrame) {
-                    QueueFrameReadbackLocked(HostSharedTexture(), {});
-                } else {
-                    g_adapter_deferred_dirty_rects.clear();
-                    g_adapter_force_full_readback = true;
+            if (!hasPending) {
+                // Idle maintenance uses the same lock as resource rebuilding.
+                // The host texture pointer cannot be replaced during this copy.
+                ID3D11Texture2D* sharedTexture = HostSharedTexture();
+                if (!sharedTexture)
+                    continue;
+                const bool allowVisibleFrame =
+                    HostGameFocused() && HostOverlayVisible();
+                if (allowVisibleFrame && g_adapter_force_full_readback) {
+                    const std::vector<CefRect> fullFrame{
+                        CefRect(0, 0, HostViewWidth(), HostViewHeight()) };
+                    QueueFrameReadbackLocked(sharedTexture, fullFrame);
+                } else if (!g_adapter_deferred_dirty_rects.empty()) {
+                    if (allowVisibleFrame) {
+                        QueueFrameReadbackLocked(sharedTexture, {});
+                    } else {
+                        g_adapter_deferred_dirty_rects.clear();
+                        g_adapter_force_full_readback = true;
+                    }
                 }
+                continue;
             }
-            continue;
+
+            // Reserve before dropping the mutex. Rebuild checks this count
+            // while holding the mutex and defers instead of freeing live data.
+            g_publish_inflight.fetch_add(1, std::memory_order_acq_rel);
         }
 
-        g_publish_inflight.fetch_add(1, std::memory_order_acq_rel);
-        const bool hookMode =
-            HostGameFocused();
-        const bool overlayVisible = HostOverlayVisible();
-        bool published = false;
-        if (!g_publish_worker_paused.load(std::memory_order_acquire))
-            published = PublishCompletedAdapterFrame();
-        g_publish_inflight.fetch_sub(1, std::memory_order_acq_rel);
-        if (published)
-            PublishMetadataLocked(
-                !(hookMode && overlayVisible));
+        const bool published = PublishCompletedAdapterFrame();
+        {
+            std::lock_guard<std::mutex> lock(g_adapter_publish_mutex);
+            if (published &&
+                !g_publish_worker_stopping.load(std::memory_order_acquire))
+                PublishMetadataLocked(
+                    !(HostGameFocused() && HostOverlayVisible()));
+            // Metadata also references the resource dimensions/id, so finish
+            // the reservation only after publishing it under the same lock.
+            g_publish_inflight.fetch_sub(1, std::memory_order_acq_rel);
+        }
     }
     return 0;
 }
 
 static void StartPublishWorker() {
+    if (g_publish_worker_stopping.load(std::memory_order_acquire)) return;
     if (g_publish_worker_thread) return;
     if (!g_publish_worker_stop_event)
         g_publish_worker_stop_event =
@@ -823,13 +845,31 @@ static void StartPublishWorker() {
 }
 
 static void StopPublishWorker() {
-    if (!g_publish_worker_thread) return;
-    g_publish_worker_paused.store(true, std::memory_order_release);
-    if (g_publish_worker_stop_event)
-        SetEvent(g_publish_worker_stop_event);
-    WaitForSingleObject(g_publish_worker_thread, 1000);
-    CloseHandle(g_publish_worker_thread);
-    g_publish_worker_thread = nullptr;
+    HANDLE thread = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_adapter_publish_mutex);
+        g_publish_worker_stopping.store(true, std::memory_order_release);
+        thread = g_publish_worker_thread;
+        if (g_publish_worker_stop_event)
+            SetEvent(g_publish_worker_stop_event);
+    }
+    if (!thread) return;
+
+    // Completion takes the publisher mutex. Join only after releasing it and
+    // keep handles/resources valid until the thread has actually exited.
+    if (WaitForSingleObject(thread, INFINITE) != WAIT_OBJECT_0) {
+        PublisherLog("[adapter-bridge] publish worker join failed; retaining its handles");
+        return;
+    }
+    std::lock_guard<std::mutex> lock(g_adapter_publish_mutex);
+    if (g_publish_worker_thread == thread) {
+        CloseHandle(g_publish_worker_thread);
+        g_publish_worker_thread = nullptr;
+        if (g_publish_worker_stop_event) {
+            CloseHandle(g_publish_worker_stop_event);
+            g_publish_worker_stop_event = nullptr;
+        }
+    }
 }
 
 

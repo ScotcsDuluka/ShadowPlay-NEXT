@@ -44,6 +44,9 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\osc_main.cpp" />
+    <ClInclude Include="src\OscDesktopFrameQueue.h" />
+    <ClInclude Include="src\OscDesktopFps.h" />
+    <ClInclude Include="src\OscAtomicConfigFile.h" />
     <ClCompile Include="src\OscFramePublisher\OscD3D9FramePublisher\OscD3D9FramePublisher.cpp" />
     <ClCompile Include="src\OscFramePublisher\Common\OscFrameUtilities.cpp" />
     <ClCompile Include="src\OscFramePublisher\OscD3D11FramePublisher\OscD3D11FramePublisher.cpp" />

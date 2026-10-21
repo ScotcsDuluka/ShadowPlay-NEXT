@@ -514,13 +514,47 @@ static class NvContainer
             Log("[boot] ไม่พบ " + processName + " (" + exe + ")");
             return;
         }
-        if (ProcessAtPathAlive(exe))
+        // The OSC host can be alive even when process-module inspection fails.
+        // Its dedicated loopback listener is a stronger liveness signal than
+        // MainModule.FileName (which may throw for protected child processes).
+        if ((processName == "NVIDIA OSC" && OscAlive()) || ProcessAtPathAlive(exe))
         {
-            // A healthy child is the steady state. The watchdog calls this
-            // repeatedly, so logging here would append the same line every cycle.
             return;
         }
         Spawn(exe, wd ?? Path.GetDirectoryName(exe), args);
+    }
+
+    // MainModule.FileName can fail across integrity levels or early process
+    // startup. QueryFullProcessImageName uses only limited query rights and
+    // preserves the exact-path boundary against NVIDIA's genuine processes.
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern IntPtr OpenProcess(uint access, bool inherit, int processId);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true, EntryPoint = "QueryFullProcessImageNameW")]
+    static extern bool QueryFullProcessImageName(IntPtr process, uint flags, StringBuilder path, ref uint size);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern bool CloseHandle(IntPtr handle);
+
+    static string ProcessImagePath(Process process)
+    {
+        try
+        {
+            var mainModulePath = process.MainModule?.FileName;
+            if (!string.IsNullOrWhiteSpace(mainModulePath)) return mainModulePath;
+        }
+        catch { }
+
+        IntPtr handle = IntPtr.Zero;
+        try
+        {
+            const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+            handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, process.Id);
+            if (handle == IntPtr.Zero) return null;
+            uint size = 32768;
+            var path = new StringBuilder((int)size);
+            return QueryFullProcessImageName(handle, 0, path, ref size) ? path.ToString() : null;
+        }
+        catch { return null; }
+        finally { if (handle != IntPtr.Zero) CloseHandle(handle); }
     }
 
     static bool ProcessAtPathAlive(string exe)
@@ -533,7 +567,9 @@ static class NvContainer
             {
                 try
                 {
-                    if (string.Equals(Path.GetFullPath(p.MainModule?.FileName ?? ""),
+                    var path = ProcessImagePath(p);
+                    if (path != null &&
+                        string.Equals(Path.GetFullPath(path),
                                       expected, StringComparison.OrdinalIgnoreCase)) return true;
                 }
                 catch { }
@@ -552,7 +588,9 @@ static class NvContainer
             {
                 try
                 {
-                    if (string.Equals(Path.GetFullPath(p.MainModule?.FileName ?? ""),
+                    var path = ProcessImagePath(p);
+                    if (path != null &&
+                        string.Equals(Path.GetFullPath(path),
                                       expected, StringComparison.OrdinalIgnoreCase) &&
                         DateTime.Now - p.StartTime < TimeSpan.FromSeconds(seconds)) return true;
                 }
@@ -605,7 +643,9 @@ static class NvContainer
             {
                 try
                 {
-                    if (!string.Equals(Path.GetFullPath(p.MainModule?.FileName ?? ""),
+                    var path = ProcessImagePath(p);
+                    if (path == null ||
+                        !string.Equals(Path.GetFullPath(path),
                                        expected, StringComparison.OrdinalIgnoreCase)) continue;
                     Log("[overlay] stop " + Path.GetFileName(expected) + " PID " + p.Id);
                     p.Kill();
@@ -638,7 +678,7 @@ static class NvContainer
     {
         try
         {
-            var path = p.MainModule?.FileName;
+            var path = ProcessImagePath(p);
             if (path == null) return false;
             var root = OurRoot().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
                 + Path.DirectorySeparatorChar;
@@ -799,6 +839,7 @@ static class NvContainer
         try { interval = C.GetProperty("watchdog").GetProperty("intervalSeconds").GetInt32(); } catch { }
         var spills = 0;
         var unhealthyNodeApiChecks = 0;
+        long lastOscSpawnAttempt = -30000;
         var enabled = CefOverlayEnabled();
         var elapsed = 0;
 
@@ -874,7 +915,9 @@ static class NvContainer
                                 {
                                     try
                                     {
-                                        if (!string.Equals(Path.GetFullPath(p.MainModule?.FileName ?? ""),
+                                        var path = ProcessImagePath(p);
+                                        if (path == null ||
+                                            !string.Equals(Path.GetFullPath(path),
                                                            Path.GetFullPath(host), StringComparison.OrdinalIgnoreCase)) continue;
                                         Log("[watchdog] NvNode/API ไม่ตอบ health 3 ครั้งติดที่ :" +
                                             nodeApiPort + " — restart Web Helper PID " + p.Id);
@@ -901,12 +944,23 @@ static class NvContainer
                 //   → ถ้า process ยังอยู่และอายุ < 60 วิ = กำลังบูต ห้ามฆ่า
                 if (osc != null && File.Exists(osc))
                 {
+                    // A live toggle listener wins over an unreliable
+                    // Process.MainModule lookup. Without this guard the mother
+                    // attempted to spawn a second OSC every five seconds.
+                    if (OscAlive()) continue;
                     if (!Alive("NVIDIA OSC"))
                     {
-                        Log("[watchdog] NVIDIA OSC process หาย — spawn ใหม่");
-                        Spawn(osc, Child("oscWd") ?? Path.GetDirectoryName(osc));
+                        // Rate-limit failed cold starts; OSC's single-instance
+                        // mutex alone must not be our spawn-loop protection.
+                        long now = Environment.TickCount64;
+                        if (now - lastOscSpawnAttempt >= 30000)
+                        {
+                            lastOscSpawnAttempt = now;
+                            Log("[watchdog] NVIDIA OSC listener/process unavailable — spawn (30s backoff)");
+                            Spawn(osc, Child("oscWd") ?? Path.GetDirectoryName(osc));
+                        }
                     }
-                    else if (!OscAlive() && !YoungOscAlive())
+                    else if (!YoungOscAlive())
                     {
                         // รีสตาร์ตเฉพาะ OSC ของเรา ไม่แตะ NVIDIA App ที่ใช้ชื่อ process เดียวกัน
                         foreach (var p in Process.GetProcessesByName("NVIDIA OSC"))
@@ -923,11 +977,16 @@ static class NvContainer
                                 catch { }
                             }
                         }
-                        if (!Alive("NVIDIA OSC"))
+                        if (!Alive("NVIDIA OSC") && !OscAlive())
                         {
-                            Thread.Sleep(1000);
-                            Log("[watchdog] NVIDIA OSC ไม่ตอบพอร์ต :" + OscTogglePort + " — spawn ใหม่");
-                            Spawn(osc, Child("oscWd") ?? Path.GetDirectoryName(osc));
+                            long now = Environment.TickCount64;
+                            if (now - lastOscSpawnAttempt >= 30000)
+                            {
+                                lastOscSpawnAttempt = now;
+                                Thread.Sleep(1000);
+                                Log("[watchdog] NVIDIA OSC ไม่ตอบพอร์ต :" + OscTogglePort + " — spawn ใหม่");
+                                Spawn(osc, Child("oscWd") ?? Path.GetDirectoryName(osc));
+                            }
                         }
                     }
                 }

@@ -372,38 +372,34 @@ static class NvShadowPlayHelper
             foreach (var key in released) _awaitingKeyRelease.Remove(key);
             if ((FailedKeys.Count > 0 || UpgradableKeys.Count > 0) && Environment.TickCount64 - _lastRetry > 10000) {
                 _lastRetry = Environment.TickCount64;
-                // ★ upgrade: คีย์ที่ใช้ fallback — ถอด fallback ลองคีย์หลัก ถ้าไม่ได้ใส่ fallback กลับ
+                // Try upgrading to the primary key while preserving the active fallback.
                 var ups = new Dictionary<string, Tuple<uint, uint>>(UpgradableKeys);
                 foreach (var kv in ups) {
-                    var toRemove = new System.Collections.Generic.List<int>();
-                    foreach (var reg in Registered) { if (reg.Value.Item1 == kv.Key) toRemove.Add(reg.Key); }
-                    foreach (var ridOld in toRemove) {
-                        UnregisterHotKey(IntPtr.Zero, ridOld);
-                        Registered.Remove(ridOld);
-                    }
-                    int nid = _nextId++;
+                    // Probe the primary binding while keeping the working
+                    // fallback registered. A failed probe must not leave the
+                    // user without a hotkey even for a short interval.
+                    int nid = _nextId;
                     if (RegisterHotKey(IntPtr.Zero, nid, kv.Value.Item1 | MOD_NOREPEAT, kv.Value.Item2)) {
+                        _nextId++;
+                        var oldIds = Registered.Where(reg => reg.Value.Item1 == kv.Key)
+                            .Select(reg => reg.Key).ToArray();
+                        foreach (var oldId in oldIds) {
+                            UnregisterHotKey(IntPtr.Zero, oldId);
+                            Registered.Remove(oldId);
+                        }
                         Registered[nid] = Tuple.Create(kv.Key, kv.Value.Item1, kv.Value.Item2);
                         UpgradableKeys.Remove(kv.Key);
+                        FailedKeys.Remove(kv.Key);
                         Log("[hk] upgrade สำเร็จ: " + kv.Key + " ได้คีย์หลักกลับ (id " + nid + ")");
-                    } else {
-                        // ★ [P2#5 Copilot] เช็คผล fallback ก่อนลง Registered
-                        int rid2 = _nextId++;
-                        uint fallbackMods = kv.Value.Item1 | MOD_SHIFT;
-                        if (RegisterHotKey(IntPtr.Zero, rid2, fallbackMods | MOD_NOREPEAT, kv.Value.Item2)) {
-                            Registered[rid2] = Tuple.Create(kv.Key, fallbackMods, kv.Value.Item2);
-                            FailedKeys.Remove(kv.Key);
-                            Log("[hk] upgrade ยังไม่ว่าง — ใช้ fallback ต่อ: " + kv.Key + " (id " + rid2 + ")");
-                        } else {
-                            FailedKeys[kv.Key] = kv.Value;
-                            Log("[hk] upgrade fallback FAILED: " + kv.Key + " → ลง FailedKeys");
-                        }
                     }
+                    // Failed registration does not consume an ID or unregister
+                    // the fallback; retry quietly on the next interval.
                 }
                 var retry = new Dictionary<string, Tuple<uint, uint>>(FailedKeys);
                 foreach (var kv in retry) {
-                    int rid = _nextId++;
+                    int rid = _nextId;
                     if (RegisterHotKey(IntPtr.Zero, rid, kv.Value.Item1 | MOD_NOREPEAT, kv.Value.Item2)) {
+                        _nextId++;
                         Registered[rid] = Tuple.Create(kv.Key, kv.Value.Item1, kv.Value.Item2);
                         FailedKeys.Remove(kv.Key);
                         Log("[hk] retry สำเร็จ: " + kv.Key + " = " + kv.Value.Item1 + "+" + kv.Value.Item2 + " (id " + rid + ")");

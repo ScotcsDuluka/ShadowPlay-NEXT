@@ -1,71 +1,38 @@
 /*
- * OSC Thai typography.
- * Apply only while the OSC HTML document language is Thai.
- * Keep NVIDIA nvgcshare, share-icon, md-icon, glyphs, SVGs and the other
- * languages' existing font stacks unchanged.
- * Chromium/CEF 73 compatible.
+ * Global OSC language typography (CEF/Chromium 73 compatible).
+ *
+ * Every text surface under osc/index.html uses MiSansThai when th-TH is active,
+ * including Angular-generated menus, Material dialogs, notifications, and mods.
+ * Glyph icons are deliberately EXCLUDED. Do not apply font-family to ::before
+ * or ::after; NVIDIA's own icon rules retain nvgcshare and other glyph fonts.
+ *
+ * Selecting a non-Thai language removes the override automatically.
  */
 @font-face {
   font-family: 'MiSansThaiOSC';
   src: url('/MiSansThai.ttf') format('truetype');
-  font-style: normal;
   font-weight: 400;
+  font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: 'MiSansThaiOSC';
   src: url('/MiSansThai.ttf') format('truetype');
-  font-style: normal;
   font-weight: 700;
+  font-style: normal;
   font-display: swap;
 }
 
-/* Keep the rest of NVIDIA's typography unchanged until th-TH is selected. */
-html[lang="th"] body,
-html[lang="th"] .osc-content,
-html[lang="th"] .osc-central-div,
-html[lang="th"] .main-menu-container,
-html[lang="th"] .preferences-root-panel,
-html[lang="th"] .nv-notifier-stack,
-html[lang="th"] .md-dialog-content,
-html[lang="th"] .md-select-menu-container {
-  font-family: 'MiSansThaiOSC', 'Segoe UI', Arial, sans-serif;
-}
-
-/* Native content widgets set their own font families. Explicitly override
- * text-bearing surfaces but NOT icon elements (md-icon, .share-icon, etc.).
+/* Apply globally rather than keeping an incomplete list of page selectors.
+ * Repeated :not(single-selector) works with Chromium 73 (CEF used by OSC).
+ * Exclusions cover NVIDIA md-icon/share-icon and alternate icon systems.
  */
-html[lang="th"] .nv-flex-title,
-html[lang="th"] .nv-flex-detail,
-html[lang="th"] .nv-side-native-info strong,
-html[lang="th"] .nv-side-native-info small,
-html[lang="th"] .osc-tile-header,
-html[lang="th"] .osc-tile-footer,
-html[lang="th"] .nv-live-editor h2,
-html[lang="th"] .nv-live-editor h3,
-html[lang="th"] .nv-live-editor p,
-html[lang="th"] .nv-live-editor label,
-html[lang="th"] .nv-live-chip strong,
-html[lang="th"] .nv-live-chip small,
-html[lang="th"] .md-title,
-html[lang="th"] .md-subhead,
-html[lang="th"] .md-body-1,
-html[lang="th"] .md-body-2,
-html[lang="th"] .md-caption,
-html[lang="th"] .md-select-value,
-html[lang="th"] md-option .md-text,
-html[lang="th"] md-input-container label,
-html[lang="th"] .md-button:not(.share-icon),
-html[lang="th"] .osc-button:not(.share-icon),
-html[lang="th"] .nv-live-editor button:not(.share-icon),
-html[lang="th"] input:not([type="checkbox"]):not([type="radio"]),
-html[lang="th"] textarea,
-html[lang="th"] .notif-text,
-html[lang="th"] .notifier,
-html[lang="th"] nv-osc-notifier .notifier,
-html[lang="th"] .nv-notifier-title,
-html[lang="th"] .nv-notifier-message {
+html[lang="th"] body,
+html[lang="th"] body *:not(md-icon):not(i):not(svg):not(path):not(use):not(symbol):not(.share-icon):not(.nv-flex-icon):not(.osc-tile-icon):not(.material-icons):not(.nvgcshare):not([class^="icon-"]):not([class*=" icon-"]):not([class^="icon48"]):not([class*=" icon48"]):not([class^="glyphicon"]):not([class*=" glyphicon"]):not([class^="fa-"]):not([class*=" fa-"]) {
   font-family: 'MiSansThaiOSC', 'Segoe UI', Arial, sans-serif !important;
 }
 
-/* Icon glyphs keep their original NVIDIA-specific font-family rules. */
+/* Preserve original font for every icon. Existing NVIDIA CSS still controls
+ * icon font-family, glyphs, dimensions, animations, and pseudo-elements.
+ * In particular, DO NOT set font-family on .share-icon or md-icon here.
+ */
