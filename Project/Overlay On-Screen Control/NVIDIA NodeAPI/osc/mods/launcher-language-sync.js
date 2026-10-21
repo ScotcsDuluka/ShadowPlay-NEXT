@@ -15,10 +15,14 @@
 
     function applyLocale(lang) {
       if (!validLocale.test(lang)) return;
-      if (lastApplied === lang && $translate.use() === lang) return;
+      if (lastApplied === lang && $translate.use() === lang) {
+        document.documentElement.lang = lang.slice(0, 2);
+        return;
+      }
       if (nextLanguage === lang) return;
       if ($translate.use() === lang) {
         lastApplied = lang;
+        document.documentElement.lang = lang.slice(0, 2);
         return;
       }
       nextLanguage = lang;
