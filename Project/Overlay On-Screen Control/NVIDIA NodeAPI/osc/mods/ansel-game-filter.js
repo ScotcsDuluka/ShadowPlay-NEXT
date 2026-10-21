@@ -10,6 +10,11 @@
       catch (error) { return {}; }
     }
     function selectedSlot(camera) {
+      if (camera.__dulukaNativePresets) {
+        if (camera.__dulukaNativeEffectsOn === false) return -1;
+        var nativeSlot = camera.__dulukaNativePreset && camera.__dulukaNativePreset.activeSlot;
+        return nativeSlot >= 1 && nativeSlot <= 3 ? nativeSlot - 1 : undefined;
+      }
       var choices = readSelections(), choice = choices && choices[camera.__dulukaModsExecutable];
       return Number.isInteger(choice) && choice >= -1 && choice < camera.NUM_MODS_SLOTS ? choice : undefined;
     }
@@ -62,6 +67,7 @@
         var buttons = button.closest('mods-menu').querySelectorAll('.mods-slot');
         var index = Array.prototype.indexOf.call(buttons, button);
         if (index < 0 || index > camera.NUM_MODS_SLOTS) return;
+        camera.__dulukaPresetClick = {slot:index + 1,off:index === camera.NUM_MODS_SLOTS};
         var choices = readSelections();
         if (!choices || typeof choices !== 'object' || Array.isArray(choices)) return;
         choices[game] = index === camera.NUM_MODS_SLOTS ? -1 : index;
@@ -87,6 +93,43 @@
       camera.__dulukaModsRuntime = identity;
       camera.__dulukaModsExecutable = identity && state.executable || '';
       camera.__anselConnected = !!identity;
+      camera.__dulukaNativePresets = !!(identity && state.preset && state.preset.supported === true);
+      camera.__dulukaNativePreset = camera.__dulukaNativePresets ? state.preset : null;
+      camera.__dulukaNativeEffectsOn = camera.__dulukaNativePresets &&
+        state.enabled !== false && state.effectsEnabled !== false;
+    }
+    function syncNativeSlot(camera, state, selectedIndex) {
+      if (!state || !Array.isArray(state.filters) || !Array.isArray(state.stack) ||
+          selectedIndex < 0 || selectedIndex > 2) return null;
+      var game = state.executable || camera.__dulukaModsExecutable;
+      if (!game) return null;
+      var slots = camera.persistSlots && camera.persistSlots[game] || camera.modsSlots;
+      if (!Array.isArray(slots) || slots.length < 3)
+        slots = [1, 2, 3, 4].map(function (id) {
+          return {id:id,filters:[],activeFilterStack:[],activeIndex:-1};
+        });
+      var models = state.filters.map(function (filter) {
+        var savedConfigs = {};
+        (filter.controls || []).forEach(function (control) {
+          if (Array.isArray(control.currentValue))
+            savedConfigs[filter.id + '#' + control.id] = control.currentValue.slice();
+        });
+        return {id:filter.id,title:filter.name,savedConfigs:savedConfigs,controls:[],
+          visibleInCombo:state.stack.indexOf(filter.id) < 0};
+      });
+      var slot = slots[selectedIndex];
+      slot.filters = models;
+      slot.activeFilterStack = state.stack.map(function (id) {
+        return models.filter(function (model) { return model.id === id; })[0];
+      }).filter(Boolean);
+      slot.selectedFilter = models.filter(function (model) { return model.visibleInCombo; })[0];
+      slot.activeFilter = slot.activeFilterStack[0];
+      slot.activeIndex = slot.activeFilter ? 0 : -1;
+      if (camera.persistSlots) camera.persistSlots[game] = slots;
+      camera.modsSlots = slots;
+      camera.modsActiveSlot = slot;
+      camera.lastSlot = camera.lastActiveSlot = selectedIndex;
+      return slot;
     }
     function canReuseMods(camera) {
       var slot = camera.modsSlots && camera.modsSlots[camera.lastSlot];
@@ -309,6 +352,7 @@
       function reconcileEditorState(name) {
         if (name !== 'mods' && name !== 'nvcamera')
           $injector.get('nvCameraService').UIRunning = false;
+        if (name === 'mods') $injector.get('$timeout')(fixFilterAccordion, 0, false);
       }
       $injector.get('$rootScope').$on('$stateChangeSuccess', function (event, state) {
         if (state) reconcileEditorState(state.name);
@@ -479,6 +523,13 @@
     if (window.__dulukaAnselUiInstalled) return;
     window.__dulukaAnselUiInstalled = true;
     function adoptInitialRuntime(camera, state, $injector) {
+      if (camera.__dulukaNativePresets) {
+        var active = state.preset && state.preset.activeSlot || 1;
+        syncNativeSlot(camera, state, active - 1);
+        camera.anselInitialSlot = camera.__dulukaNativeEffectsOn ? active : null;
+        if (!camera.__dulukaNativeEffectsOn) camera.modsActiveSlot = undefined;
+        return;
+      }
       if (selectedSlot(camera) !== undefined) return;
       if (!state.stack.length || camera.UIRunning) return;
       var storage = $injector.get('$window').localStorage;
@@ -525,7 +576,9 @@
       // local ReShade runtime is the authority for our adapter instead. Do not
       // grant availability merely because Container is in UI test mode.
       var $http = $injector.get('$http');
-      return $http.get('/Duluka/v.1.0/GameFilter/State', { cache: false, timeout: 2500 }).then(function (response) {
+      // On a cold entry, prefer the current ReShade INI over a previous OSC
+      // cache. Prepared fast-reopens still avoid redundant shader scans.
+      return $http.get('/Duluka/v.1.0/GameFilter/State?refresh=1', { cache: false, timeout: 2500 }).then(function (response) {
         if (!response.data || response.data.connected !== true) {
           rememberRuntime($injector.get('nvCameraService'), null);
           return supportedGameRequired();
@@ -726,9 +779,78 @@
         schedule();
         return deferred.promise;
       };
+      // In ReShade mirror mode NVIDIA's legacy applySlot() would replay the
+      // browser localStorage stack and overwrite the real game .ini preset.
+      // Keep its synchronous return contract for ModsMenuController, but send
+      // the actual change through ReShade's native preset API.
+      var applyNativePreset = $delegate.applySlot;
+      $delegate.applySlot = function (slot) {
+        if (!$delegate.__dulukaNativePresets) return applyNativePreset.apply(this, arguments);
+        var click = $delegate.__dulukaPresetClick;
+        $delegate.__dulukaPresetClick = null;
+        if (!slot && (!click || !click.off)) return $delegate.modsActiveSlot;
+        var previous = $delegate.modsActiveSlot;
+        var action, payload;
+        if (!slot) {
+          action = 'Toggle'; payload = {enabled:false};
+          $delegate.modsActiveSlot = undefined;
+          $delegate.lastActiveSlot = -1;
+        } else if (slot.id >= 1 && slot.id <= 3) {
+          action = 'Select'; payload = {slot:slot.id};
+          $delegate.modsActiveSlot = slot;
+          $delegate.lastSlot = $delegate.lastActiveSlot = slot.id - 1;
+        } else return previous;
+        var queue = $delegate.__dulukaPresetQueue || $injector.get('$q').when(true);
+        var task = queue.catch(function () { return true; }).then(function () {
+          return $injector.get('$http').post('/Duluka/v.1.0/GameFilter/Preset/' + action, payload);
+        }).then(function (reply) {
+          if (!reply.data || !reply.data.success || !reply.data.state)
+            throw new Error('ReShade preset response missing state');
+          var state = reply.data.state;
+          rememberRuntime($delegate, Object.assign({connected:true}, state));
+          if (slot) {
+            var synced = syncNativeSlot($delegate, state, slot.id - 1);
+            if (synced) state.stack.forEach(function (_, idx) {
+              $delegate.getCurrentFilterAttribute(idx);
+            });
+          }
+          return true;
+        }).catch(function (error) {
+          console.error('[game-filter] ReShade preset transition failed', error);
+          $delegate.modsActiveSlot = previous;
+          if (previous) $delegate.lastSlot = $delegate.lastActiveSlot = previous.id - 1;
+          if (typeof Notifier !== 'undefined')
+            Notifier.show('ReShade preset', {subtext:error.data && error.data.message ||
+              'The game did not accept this preset. Check the game folder permissions.',
+              group:'reshade-preset-error',icon:'\\uE940'});
+          return false;
+        });
+        $delegate.__dulukaPresetQueue = task;
+        return slot;
+      };
       return $delegate;
     })($injector.get('nvCameraService'));
 
+    // The stock NVIDIA handler recreates the entire control list on mouse-
+    // down, before the accordion receives click. Prevent that first-click
+    // race: selecting a filter updates only the active reference.
+    function fixFilterAccordion() {
+      if (!document.querySelector || !angular.element) return;
+      var menu = document.querySelector('mods-menu');
+      if (!menu) return;
+      var control = angular.element(menu).controller('modsMenu');
+      if (!control || control.__dulukaAccordionReady) return;
+      control.__dulukaAccordionReady = true;
+      control.activateFilter = function (filter) {
+        if (!this.slot || !filter) return;
+        $injector.get('nvCameraService').modsHelper.activateFilter(this.slot, filter);
+        this.activeFilter = filter;
+        this.activeIndex = this.slot.activeIndex;
+      };
+      control.toggleSubMenuVisibility = function () {};
+    }
+    if ($injector.get('$state').current.name === 'mods')
+      $injector.get('$timeout')(fixFilterAccordion, 0, false);
   }
   var injector = angular.element(document).injector();
   if (injector) install(injector);

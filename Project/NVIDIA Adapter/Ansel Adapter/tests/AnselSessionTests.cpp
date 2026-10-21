@@ -15,6 +15,25 @@ struct FakeRuntime final : ansel::Runtime {
     int catalogReads = 0;
     int directReadbacks = 0;
     bool rejectValue = false;
+    bool presetMode = false, globalEffectsOn = true;
+    unsigned activePreset = 1;
+    int presetSaves = 0;
+    std::map<unsigned, ansel::Json> presetImages;
+    ansel::Json preset_info() const override {
+        return presetMode ? ansel::Json{{"supported",true},{"activeSlot",activePreset}}
+                          : ansel::Json{{"supported",false}};
+    }
+    void select_preset(unsigned slot) override {
+        if (!presetMode) throw ansel::Failure(501,"NOT_SUPPORTED","No ReShade preset runtime");
+        presetImages[activePreset] = filters;
+        if (!presetImages.count(slot)) presetImages[slot] = filters;
+        filters = presetImages[slot]; activePreset = slot; globalEffectsOn = true;
+    }
+    void save_preset() override {
+        if (!presetMode) throw ansel::Failure(501,"NOT_SUPPORTED","No ReShade preset runtime");
+        presetImages[activePreset] = filters; ++presetSaves;
+    }
+    void toggle_preset_effects(bool enabled) override { globalEffectsOn = enabled; }
     ansel::Json catalog() override { ++catalogReads; return filters; }
     ansel::Json read_value(const std::string &id, const std::string &control) override {
         ++directReadbacks;
@@ -47,7 +66,9 @@ int main(int argc, char **argv) {
             const auto until = GetTickCount64() + 90000;
             while (GetTickCount64() < until) {
                 pipe.tick([&](const ansel::Json &r) {
-                    if (r.value("op", std::string()) == "testReload") {
+                    if (r.value("op", std::string()) == "testReload" ||
+                        r.value("op", std::string()) == "testEnablePresets") {
+                        if (r.value("op", std::string()) == "testEnablePresets") runtime.presetMode = true;
                         session.reload(); auto reply = ansel::Json{{"ok",true},{"state",session.snapshot()}};
                         reply["state"]["foreground"] = true; return reply;
                     }
@@ -118,7 +139,26 @@ int main(int argc, char **argv) {
         require(session.dispatch(stale)["status"] == 409, "stale effect handles accepted after reload");
         require(session.dispatch(request("clear",ansel::Json::object()))["ok"], "clear failed");
         require(session.snapshot()["stack"].empty(), "stack did not clear");
-        std::cout << "PASS: native catalog, uniforms, range validation, expiry, preset validation/order, toggle, reset and reload guards\n";
+        runtime.presetMode = true;
+        session.reload();
+        require(session.dispatch(request("select",{{"type","test/filter-a"},{"stackIdx",0}}))["ok"], "first INI filter activation failed");
+        require(session.dispatch(request("attribute",{{"id","test/filter-a"},{"controlId","Strength"},{"value",{0.6}},{"stackIdx",0}}))["ok"], "first INI parameter failed");
+        require(session.dispatch(request("presetSave",ansel::Json::object()))["ok"], "first INI preset save failed");
+        require(session.dispatch(request("presetSelect",{{"slot",2}}))["ok"], "switch to INI 2 failed");
+        require(session.dispatch(request("attribute",{{"id","test/filter-a"},{"controlId","Strength"},{"value",{0.2}},{"stackIdx",0}}))["ok"], "second INI parameter failed");
+        require(session.dispatch(request("presetSave",ansel::Json::object()))["ok"], "second INI preset save failed");
+        require(session.dispatch(request("presetSelect",{{"slot",1}}))["ok"], "switch back to INI 1 failed");
+        require(session.snapshot()["preset"]["activeSlot"] == 1 &&
+            runtime.filters[0]["controls"][0]["currentValue"][0] == 0.6,
+            "switching INI presets lost first preset uniform");
+        require(session.dispatch(request("presetToggle",{{"enabled",false}}))["ok"] && !runtime.globalEffectsOn,
+            "Off changed preset instead of global effect enable");
+        require(session.snapshot()["stack"].size() == 1, "Off deleted the saved preset stack");
+        require(session.dispatch(request("presetSelect",{{"slot",1}}))["ok"] && runtime.globalEffectsOn,
+            "reselecting active preset failed to restore effects");
+        require(session.dispatch(request("presetSelect",{{"slot",4}}))["status"] == 400,
+            "unsafe preset slot accepted");
+        std::cout << "PASS: native catalog, uniforms, INI preset mirror/save/restore/off, range, expiry, order and reload guards\n";
         return 0;
     } catch(const std::exception &error) { std::cerr << "FAIL: " << error.what() << '\n'; return 1; }
 }

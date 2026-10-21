@@ -43,6 +43,10 @@ async function scenario(existing, coldStart) {
       return Promise.resolve('opened');
     }};
   const menu={tiles:{Mods:{visible:false,enabled:false},Ansel:{visible:false,enabled:false},Screenshot:{visible:false},Stream:{visible:false},QuietMode2:{visible:false}}}, menuElement={},preferencesElement={};
+  const accordionItems=[{id:'a'},{id:'b'}],modsMenuElement={};
+  let accordionRerenders=0;
+  const accordion={slot:{activeFilterStack:accordionItems},activeFilter:accordionItems[0],
+    activateFilter:()=>{accordionRerenders++;},toggleSubMenuVisibility:()=>{accordionRerenders++;}};
   const preferences={tiles:[{visible:false,precondition:()=>false}]},entered=[],notifications=[];
   let refreshMenu,checkGame,closeListener;
   const windowClickListeners=[];
@@ -58,8 +62,8 @@ async function scenario(existing, coldStart) {
     $state:{current:{name:'main.main-menu'},go:route=>{services.$state.current.name=route;entered.push(route);return Promise.resolve(route);}},
     $q:{when:Promise.resolve.bind(Promise),defer:()=>{let resolve,reject;const promise=new Promise((r,j)=>{resolve=r;reject=j;});return{promise,resolve,reject};}}};
   const injector={get:key=>{assert(services[key],'unexpected service '+key);return services[key];}};
-  const angular={element:element=>({injector:()=>injector,controller:()=>element===menuElement?menu:preferences})};
-  const context={window:{angular,addEventListener:(name,fn)=>{if(name==='click')windowClickListeners.push(fn);}},document:{addEventListener:(name,fn)=>{closeListener=fn;},querySelector:selector=>selector==='nv-main-menu'?menuElement:preferencesElement},console};
+  const angular={element:element=>({injector:()=>injector,controller:()=>element===modsMenuElement?accordion:element===menuElement?menu:preferences})};
+  const context={window:{angular,addEventListener:(name,fn)=>{if(name==='click')windowClickListeners.push(fn);}},document:{addEventListener:(name,fn)=>{closeListener=fn;},querySelector:selector=>selector==='mods-menu'?modsMenuElement:selector==='nv-main-menu'?menuElement:preferencesElement},console};
   const emitWindowClick=event=>windowClickListeners.forEach(listener=>listener(event));
   function selectStyle(index){
     const buttons=[0,1,2,3].map(()=>({closest:selector=>selector==='mods-menu'?{querySelectorAll:()=>buttons}:null}));
@@ -125,6 +129,18 @@ async function scenario(existing, coldStart) {
   assert.strictEqual(camera.UIRunning,true,'active editor flag was cleared');
   listeners.$stateChangeSuccess({}, {name:'main.main-menu'});
   assert.strictEqual(camera.UIRunning,false,'leaving editor did not clear launch guard');
+  await new Promise(resolve=>setTimeout(resolve,5));
+  assert.strictEqual(accordion.__dulukaAccordionReady,true,
+    'mods accordion patch did not reach the real NVIDIA controller');
+  camera.modsHelper.activateFilter=(slot,filter)=>{
+    slot.activeFilter=filter;slot.activeIndex=slot.activeFilterStack.indexOf(filter);
+  };
+  accordion.activateFilter(accordionItems[1]);
+  accordion.toggleSubMenuVisibility({stopImmediatePropagation:()=>{throw new Error('Accordion click was swallowed');}},accordionItems[1]);
+  assert.strictEqual(accordion.activeFilter,accordionItems[1],
+    'clicking a filter did not update active selection');
+  assert.strictEqual(accordionRerenders,0,
+    'filter mousedown still rebuilt the accordion before the click');
   const installed = camera.launchUIForMods;
   vm.runInNewContext(source,context);
   assert.strictEqual(camera.launchUIForMods,installed,'hot mod loaded twice');
@@ -354,6 +370,40 @@ async function scenario(existing, coldStart) {
   assert.strictEqual(await camera.launchUIForMods(),'opened','late old-session enable prepared the new runtime');
   assert(httpReads>replacedReads,'session replacement failed to invalidate readiness');
   assert.strictEqual(nativeEntries,replacedEntries+1,'replaced session skipped native preparation');
+  // ReShade mirror mode must switch actual game INIs instead of replaying the
+  // legacy OSC-local filter cache, while respecting applySlot's sync return.
+  const nativeRequests=[];
+  const nativeHttpPost=services.$http.post;
+  const nativeState=Object.assign({},state,{connected:true,
+    stack:['fx'],preset:{supported:true,activeSlot:2},
+    filters:[{id:'fx',name:'FX',controls:[{id:'Amount',currentValue:[0.33]}]}]});
+  services.$http.post=(url,body)=>{
+    nativeRequests.push({url,body});
+    return Promise.resolve({data:{success:true,state:nativeState,preset:nativeState.preset}});
+  };
+  camera.__dulukaNativePresets=true;
+  camera.__dulukaNativePreset={supported:true,activeSlot:1};
+  camera.__dulukaModsExecutable='Game';
+  camera.modsSlots=[1,2,3,4].map(id=>({id,filters:[],activeFilterStack:[]}));
+  camera.persistSlots.Game=camera.modsSlots;
+  const secondIniSlot=camera.modsSlots[1];
+  assert.strictEqual(camera.applySlot(secondIniSlot),secondIniSlot,
+    'native preset switch broke the synchronous NVIDIA slot API');
+  assert.strictEqual(await camera.__dulukaPresetQueue,true);
+  assert.strictEqual(nativeRequests[0].url,'/Duluka/v.1.0/GameFilter/Preset/Select');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(nativeRequests[0].body)),{slot:2});
+  assert.strictEqual(camera.modsSlots[1].activeFilterStack[0].id,'fx',
+    'OSC slot did not mirror ReShade INI technique state');
+  assert.strictEqual(camera.modsSlots[1].filters[0].savedConfigs['fx#Amount'][0],0.33,
+    'OSC slot preferred an obsolete browser-side uniform over ReShade');
+  selectStyle(3);
+  camera.applySlot(undefined);
+  assert.strictEqual(await camera.__dulukaPresetQueue,true);
+  assert.strictEqual(nativeRequests[1].url,'/Duluka/v.1.0/GameFilter/Preset/Toggle');
+  assert.strictEqual(nativeRequests[1].body.enabled,false,
+    'Off cleared the INI stack instead of temporarily disabling effects');
+  camera.__dulukaNativePresets=false;
+  services.$http.post=nativeHttpPost;
   state.connected=false;checkGame();
   await new Promise(resolve=>setImmediate(resolve));
   refreshMenu();

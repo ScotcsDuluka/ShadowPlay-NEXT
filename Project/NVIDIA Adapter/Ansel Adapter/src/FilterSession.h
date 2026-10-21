@@ -33,6 +33,10 @@ struct Runtime {
         throw Failure(404, "FILTER_NOT_FOUND", "Filter or control no longer exists");
     }
     virtual void reorder(const std::vector<std::string> &ids) = 0;
+    virtual Json preset_info() const { return {{"supported", false}}; }
+    virtual void select_preset(unsigned) { throw Failure(501, "NOT_SUPPORTED", "ReShade preset switching is unavailable"); }
+    virtual void save_preset() { throw Failure(501, "NOT_SUPPORTED", "ReShade preset saving is unavailable"); }
+    virtual void toggle_preset_effects(bool) { throw Failure(501, "NOT_SUPPORTED", "ReShade global effects toggle is unavailable"); }
 };
 
 class FilterSession {
@@ -116,9 +120,18 @@ public:
             if (filter.at("enabled").get<bool>()) stack_.push_back(filter.at("id"));
     }
     Json snapshot() {
+        const auto preset = runtime_.preset_info();
+        // In mirror mode the ReShade runtime, not an OSC localStorage cache,
+        // owns the currently enabled technique list and its saved parameters.
+        auto filters = runtime_.catalog();
+        if (preset.value("supported", false)) {
+            stack_.clear();
+            for (const auto &filter : filters)
+                if (filter.at("enabled").get<bool>()) stack_.push_back(filter.at("id"));
+        }
         return {{"protocol", 1}, {"pid", pid_}, {"session", session_},
             {"generation", generation_}, {"enabled", enabled_}, {"stack", stack_},
-            {"filters", runtime_.catalog()}};
+            {"preset", preset}, {"filters", std::move(filters)}};
     }
     Json dispatch(const Json &request) {
         try {
@@ -133,6 +146,33 @@ public:
             if (request.value("session", std::string()) != session_ || request.value("generation", 0u) != generation_)
                 throw Failure(409, "STALE_SESSION", "Runtime or effect catalog changed; refresh before retrying");
             const auto body = request.value("body", Json::object());
+            if (op == "presetSelect") {
+                if (!body.contains("slot") || !body["slot"].is_number_integer() ||
+                    body["slot"].get<int>() < 1 || body["slot"].get<int>() > 3)
+                    throw Failure(400, "INVALID_ARGUMENT", "Preset slot must be 1, 2 or 3");
+                const auto slot = body["slot"].get<unsigned>();
+                const bool alreadyActive = runtime_.preset_info().value("activeSlot", 0u) == slot;
+                if (alreadyActive) {
+                    runtime_.toggle_preset_effects(true);
+                    enabled_ = true;
+                } else {
+                    runtime_.select_preset(slot);
+                    // New ReShade preset owns the stack and uniform values.
+                    reload();
+                }
+                return {{"ok", true}, {"state", snapshot()}};
+            }
+            if (op == "presetSave") {
+                runtime_.save_preset();
+                return {{"ok", true}, {"state", snapshot()}};
+            }
+            if (op == "presetToggle") {
+                if (!body.contains("enabled") || !body["enabled"].is_boolean())
+                    throw Failure(400, "INVALID_ARGUMENT", "enabled must be a boolean");
+                enabled_ = body["enabled"].get<bool>();
+                runtime_.toggle_preset_effects(enabled_);
+                return {{"ok", true}, {"state", snapshot()}};
+            }
             const auto catalog = runtime_.catalog();
             if (op == "replace") {
                 const auto &filters = body.at("filters");

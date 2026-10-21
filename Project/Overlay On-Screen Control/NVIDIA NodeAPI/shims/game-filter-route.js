@@ -56,7 +56,33 @@ function mount(app, io, options) {
   }
   const client = options.client || new AnselClient();
   let last = null, lastCatalog = '', stopped = false, polling = false, pendingEnable, editingTarget = null, needsSession = false;
-  let cachedTarget = null, stateRead = null, cachedAt = 0;
+  let cachedTarget = null, stateRead = null, cachedAt = 0, presetSaveTimer = null;
+  function cancelPresetSave() {
+    if (presetSaveTimer) clearTimeout(presetSaveTimer);
+    presetSaveTimer = null;
+  }
+  function schedulePresetSave(target, version) {
+    cancelPresetSave();
+    if (!target.state.preset || !(target.state.preset.activeSlot >= 1 && target.state.preset.activeSlot <= 3)) return;
+    // Coalesce slider drags. ReShade writes the INI, never the Node bridge.
+    presetSaveTimer = setTimeout(async () => {
+      presetSaveTimer = null;
+      if (!bridgeEnabled() || version !== configurationVersion ||
+          !cachedTarget || cachedTarget.name !== target.name ||
+          cachedTarget.state.session !== target.state.session ||
+          cachedTarget.state.preset.activeSlot !== target.state.preset.activeSlot) return;
+      try {
+        const updated = await client.command(cachedTarget, 'presetSave', {}, () => requireBridge(version));
+        requireBridge(version);
+        cachedTarget = {name:target.name,state:updated};
+        if (editingTarget && editingTarget.name === target.name)
+          editingTarget = cachedTarget;
+      } catch (error) {
+        console.error('[game-filter] ReShade preset autosave failed:', error.message);
+      }
+    }, 750);
+    if (presetSaveTimer.unref) presetSaveTimer.unref();
+  }
   // Availability probes must not enumerate thousands of uniforms on the game
   // render thread. Interaction reads and verified command replies refresh this.
   async function cachedState(pid, refresh, version) {
@@ -113,6 +139,7 @@ function mount(app, io, options) {
       emit({ type: 'filters', filters: [] });
     }
     if (editingTarget) needsSession = true;
+    cancelPresetSave();
     editingTarget = null; last = null; lastCatalog = ''; cachedTarget = null;
   }
   async function poll() {
@@ -150,9 +177,10 @@ function mount(app, io, options) {
     const match = req.path.match(/^\/NvCamera\/v\.1\.[01](\/.*)?$/);
     const focus = req.path === '/Duluka/v.1.0/GameFilter/Focus';
     const settingsRoute = req.path === '/Duluka/v.1.0/GameFilter/Settings';
-    const diagnostic = focus || settingsRoute || req.path === '/Duluka/v.1.0/GameFilter/State';
+    const presetRoute = req.path.match(/^\/Duluka\/v\.1\.0\/GameFilter\/Preset\/(Select|Save|Toggle)$/);
+    const diagnostic = focus || settingsRoute || !!presetRoute || req.path === '/Duluka/v.1.0/GameFilter/State';
     if (!match && !diagnostic) return next();
-    const route = diagnostic ? '/State' : match[1] || '/';
+    const route = presetRoute ? '/Preset/' + presetRoute[1] : diagnostic ? '/State' : match[1] || '/';
     try {
       const body = req.method === 'POST' ? await readBody(req) : {};
       if (settingsRoute) {
@@ -214,7 +242,8 @@ function mount(app, io, options) {
       }
       let target;
       const version = configurationVersion;
-      const mutation = route === '/EnableMods' || /^\/Filter(?:\/|$)/.test(route) && route !== '/Filter/GetInfo';
+      const mutation = route === '/EnableMods' || route.startsWith('/Preset/') ||
+        /^\/Filter(?:\/|$)/.test(route) && route !== '/Filter/GetInfo';
       if (mutation && req.method !== 'POST') throw failure(405, 'METHOD_NOT_ALLOWED', 'Mutations require POST');
       try {
         if (mutation && needsSession && !pid && last) throw failure(409, 'STALE_SESSION', 'Reopen the filter editor after the runtime changes');
@@ -271,6 +300,29 @@ function mount(app, io, options) {
         emit({ type: 'captureControlChange', capture: 1 });
         return res.json({ success: true });
       }
+      if (route === '/Preset/Select' || route === '/Preset/Save' || route === '/Preset/Toggle') {
+        if (req.method !== 'POST') throw failure(405, 'METHOD_NOT_ALLOWED', 'POST is required');
+        if (!state.preset || state.preset.supported !== true)
+          throw failure(501, 'NOT_SUPPORTED', 'This runtime does not support ReShade INI presets');
+        if (route === '/Preset/Select' && (!Number.isInteger(body.slot) || body.slot < 1 || body.slot > 3))
+          throw failure(400, 'INVALID_ARGUMENT', 'Preset slot must be 1, 2 or 3');
+        if (route === '/Preset/Toggle' && typeof body.enabled !== 'boolean')
+          throw failure(400, 'INVALID_ARGUMENT', 'enabled must be a boolean');
+        // ReShade saves the outgoing preset when switching; a previously
+        // scheduled write must never accidentally target the incoming slot.
+        cancelPresetSave();
+        const updated = await client.command(target,
+          route === '/Preset/Select' ? 'presetSelect' : route === '/Preset/Save' ? 'presetSave' : 'presetToggle',
+          route === '/Preset/Select' ? {slot:body.slot} : route === '/Preset/Toggle' ? {enabled:body.enabled} : {},
+          () => requireBridge(version));
+        requireBridge(version);
+        cachedTarget = {name:target.name,state:updated};
+        editingTarget = editingTarget && editingTarget.name === target.name ? cachedTarget : editingTarget;
+        lastCatalog = ''; // Force NVIDIA's filter listener to rebuild the list.
+        publish(updated);
+        updated.stack.forEach((_, idx) => emit(currentFilter(updated, idx)));
+        return res.json({success:true,preset:updated.preset,state:updated});
+      }
       if (route === '/Filter/GetInfo') {
         if (!Number.isInteger(body.stackIdx) || body.stackIdx < 0 || body.stackIdx >= state.stack.length)
           throw failure(404, 'FILTER_NOT_FOUND', 'Stack slot is empty');
@@ -297,6 +349,8 @@ function mount(app, io, options) {
       if (op === 'mods') pendingEnable = undefined;
       publish(updated, event === 'currentFilter' || event === 'filterAndAttributes');
       if (editingTarget && editingTarget.name === target.name) editingTarget = { name: target.name, state: updated };
+      if (['select','attribute','replace','reset','clear'].includes(op))
+        schedulePresetSave(cachedTarget, version);
       if (event === 'currentFilter') emit(currentFilter(updated, body.stackIdx));
       else if (event === 'filterAndAttributes') {
         updated.stack.forEach((_, slot) => {
@@ -318,6 +372,6 @@ function mount(app, io, options) {
         codeText: error.code || 'ANSEL_ERROR', message: error.message });
     }
   });
-  return { close: () => { stopped = true; if (timer) clearInterval(timer); }, poll };
+  return { close: () => { stopped = true; cancelPresetSave(); if (timer) clearInterval(timer); }, poll };
 }
 module.exports = mount;

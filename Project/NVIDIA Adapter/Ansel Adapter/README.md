@@ -79,11 +79,30 @@ transaction/rollback guarantee. Existing out-of-editor-range preset values can
 be reapplied unchanged; new out-of-range values are rejected. Float32 boundary
 rounding is normalized.
 
-OSC retains ownership of its existing three per-game preset slots and shared
-storage. The first editor launch imports a live ReShade stack only when no OSC
-slot exists for that game. Existing OSC presets and other games are preserved.
-This adapter does not save or overwrite ReShade preset files. Reset means the
-session's loaded-preset baseline, not the shader's original source initializer.
+With a live ReShade add-on, OSC Game Filter mirrors ReShade rather than treating
+its browser-local `ModsSlotStorage` data as the source of truth. OSC's buttons
+1/2/3 select actual game-directory INI files:
+
+- `<game executable directory>/NVIDIA-GameFilter-Preset1.ini`
+- `<game executable directory>/NVIDIA-GameFilter-Preset2.ini`
+- `<game executable directory>/NVIDIA-GameFilter-Preset3.ini`
+
+Selecting a missing INI initializes it by asking ReShade to save the currently
+active preset and copying that file. Existing target INIs are never replaced by
+that initialization step. ReShade's `set_current_preset_path` saves the outgoing
+preset and activates the target; `save_current_preset` persists OSC edits after
+750 ms without additional edits. OSC's Off toggles the ReShade global effects
+flag without deleting the saved technique stack. The Node bridge never writes
+Shader INI syntax itself. Saving requires write access to the game's folder;
+when this is denied the native command fails explicitly (403) and keeps the
+existing preset. No INI file is created until OSC activates a slot (including
+its initial default slot when the editor first opens).
+Old OSC localStorage entries remain a UI cache and are not automatically
+converted into INIs. A new game's first slot starts as a copy of the currently
+active ReShade preset. Reset still means the session's loaded-preset baseline.
+
+The earlier standalone OSC preset implementation is still used for test runtimes
+without native ReShade preset support.
 
 The live middleware owns NvCamera before Container's UI simulations, including
 when Container test mode is enabled. Unsupported photography/camera commands

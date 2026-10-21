@@ -3,6 +3,7 @@
 #include "FilterSession.h"
 #include "ReShadeUiMetadata.h"
 #include <array>
+#include <cstring>
 #include <filesystem>
 #include <map>
 #include <memory>
@@ -20,6 +21,81 @@ struct ReShadeRuntime final : Runtime {
     std::map<std::string, api::effect_uniform_variable> uniforms;
     std::map<std::string, Json> defaults;
     explicit ReShadeRuntime(api::effect_runtime *r) : runtime(r) {}
+    std::filesystem::path game_directory() const {
+        wchar_t executable[32768]{};
+        if (!GetModuleFileNameW(nullptr, executable, 32768))
+            throw Failure(500, "GAME_PATH_UNAVAILABLE", "Cannot identify the game's executable folder");
+        return std::filesystem::path(executable).parent_path();
+    }
+    std::filesystem::path preset_file(unsigned slot) const {
+        if (slot < 1 || slot > 3)
+            throw Failure(400, "INVALID_ARGUMENT", "Preset slot must be 1, 2 or 3");
+        return game_directory() / (L"NVIDIA-GameFilter-Preset" + std::to_wstring(slot) + L".ini");
+    }
+    std::filesystem::path active_preset_file() const {
+        size_t bytes = 0;
+        runtime->get_current_preset_path(nullptr, &bytes);
+        if (bytes <= 1 || bytes > 32768) return {};
+        std::string buffer(bytes, '\0');
+        runtime->get_current_preset_path(buffer.data(), &bytes);
+        buffer.resize(std::strlen(buffer.c_str()));
+        return std::filesystem::u8path(buffer);
+    }
+    Json preset_info() const override {
+        const auto current = active_preset_file();
+        // Avoid filesystem probes for each shader snapshot; Windows compares
+        // preset path names case-insensitively.
+        std::error_code pathError;
+        const auto absolute = current.empty() ? current : std::filesystem::absolute(current, pathError);
+        const auto normalized = (pathError ? current : absolute).lexically_normal().wstring();
+        Json items = Json::array();
+        unsigned selected = 0;
+        for (unsigned slot = 1; slot <= 3; ++slot) {
+            const auto path = preset_file(slot);
+            const auto expected = path.lexically_normal().wstring();
+            if (!current.empty() && CompareStringOrdinal(normalized.c_str(), -1,
+                expected.c_str(), -1, TRUE) == CSTR_EQUAL) selected = slot;
+            items.push_back({{"slot", slot}, {"filename", path.filename().u8string()}});
+        }
+        return {{"supported", true}, {"activeSlot", selected}, {"directory", game_directory().u8string()},
+                {"currentPath", current.u8string()}, {"files", items}};
+    }
+    void select_preset(unsigned slot) override {
+        const auto target = preset_file(slot);
+        const auto source = active_preset_file();
+        if (source.empty())
+            throw Failure(409, "PRESET_UNAVAILABLE", "ReShade has no active preset to copy");
+        std::error_code ec;
+        const bool exists = std::filesystem::exists(target, ec);
+        if (exists && std::filesystem::equivalent(source, target, ec) && !ec) {
+            runtime->set_effects_state(true);
+            return;
+        }
+        if (ec) throw Failure(403, "PRESET_IO_ERROR", "Cannot inspect the game's preset directory");
+        if (!exists) {
+            // ReShade is the sole preset serializer. Preserve all effect data,
+            // even the uniforms OSC cannot display, when initializing a slot.
+            runtime->save_current_preset();
+            if (!std::filesystem::is_regular_file(source, ec) || ec)
+                throw Failure(409, "PRESET_UNAVAILABLE", "Current ReShade preset is not a readable INI file");
+            std::filesystem::copy_file(source, target, std::filesystem::copy_options::none, ec);
+            if (ec) throw Failure(403, "PRESET_IO_ERROR", "Cannot create preset INI in the game's directory");
+        }
+        runtime->set_current_preset_path(target.u8string().c_str());
+        runtime->set_effects_state(true);
+        std::error_code verifyError;
+        if (!std::filesystem::equivalent(active_preset_file(), target, verifyError) || verifyError)
+            throw Failure(409, "PRESET_SWITCH_FAILED", "ReShade did not activate the requested preset");
+    }
+    void toggle_preset_effects(bool enabled) override {
+        runtime->set_effects_state(enabled);
+    }
+    void save_preset() override {
+        const auto info = preset_info();
+        if (!info.value("activeSlot", 0u))
+            throw Failure(409, "PRESET_NOT_SELECTED", "Select a game-local preset before saving");
+        runtime->save_current_preset();
+    }
     Json catalog() override {
         techniques.clear(); uniforms.clear();
         Json filters = Json::array();
