@@ -56,15 +56,15 @@
     if(el.style.getPropertyValue(name)!==value||el.style.getPropertyPriority(name)!=='important')
       el.style.setProperty(name,value,'important');
   }
-  function nativeGeometry(root){
+  function nativeGeometry(root,preMotion){
     if(!enabled()||!root)return null;
     // Never compete with OSC Motion's entrance/exit. It drives the same native
     // rail position during 'opening' and restores it at 'idle'.
     var motion=window.__dulukaOscMotion,phase=motion&&motion.phase;
     // A routed CEF page can remain visible while OSC Motion is CLOSED.
     // Do not force native geometry over a real close/exit animation.
-    if(motion&&motion.getState&&motion.getState().target==='closed')return null;
-    if(phase&&phase!=='idle'){
+    if(!preMotion&&motion&&motion.getState&&motion.getState().target==='closed')return null;
+    if(!preMotion&&phase&&phase!=='idle'){
       if(pendingIdle===null&&window.setTimeout)pendingIdle=window.setTimeout(function(){
         pendingIdle=null;
         if(enabled()&&window.__nvUnifiedV4RequestNativeSync)window.__nvUnifiedV4RequestNativeSync();
@@ -301,6 +301,7 @@
     storageKey:KEY,flagKey:FLAG,enabled:enabled,setEnabled:enableTemporary,
     get:get,set:set,reset:function(){return set(backupLegacy());},
     visible:visible,cell:cell,geometry:geometry,nativeGeometry:nativeGeometry,
+    prepareForMotion:function(root){return enabled()&&nativeGeometry(root,true);},
     toBlock:function(k,p,i,t){return change(function(s){return M.toBlock(s,k,p,i,t);},'Control moved');},
     join:function(k,p,i){return change(function(s){return M.join(s,k,p,i);},'Grouped Controls');},
     changeType:function(p,i,t){return change(function(s){return M.changeType(s,p,i,t);},'Block Type updated');},

@@ -103,7 +103,7 @@ function fixture(options = {}) {
       if (selector === 'md-menu') return tiles;
       return [];
     },
-    querySelector(selector) { if (options.missing) return null; if (selector === '.nv-osc') return overlay; return this.querySelectorAll(selector)[0] || null; },
+    querySelector(selector) { if (options.missing) return null; if (selector === '.nv-osc') return overlay; if(options.unified&&selector==='nv-main-menu:not([data-customize-preview]) .main-menu-container')return group; return this.querySelectorAll(selector)[0] || null; },
     addEventListener(type, fn) { (documentEvents[type] ||= []).push(fn); }, createElement(name) { return element(name); },
   };
   const media = { matches: !!options.reduced, addListener(fn) { media.change = fn; }, addEventListener(type, fn) { media.change = fn; } };
@@ -310,4 +310,36 @@ test('Customize transitions are gated behind editing mode, not startup or OSC mo
   assert.match(css,/html\.nv-live-layout-editing:not\(\.nv-motion-preparing\):not\(\.nv-motion-active\)[^\{]*md-menu-bar/);
   assert.match(js,/self\.start=function\(\)\{self\.editing=true;editingMotion\(true\)/);
   assert.match(js,/self\.done=function\(\)\{self\.editing=false;editingMotion\(false\)/);
+});
+
+test('V4 positions its native tiles before OSC Motion captures geometry, then freezes them throughout opening',()=>{
+  const f=fixture({unified:true});let placements=0,preparedBeforeCapture=false;
+  f.window.__dulukaUnifiedMainMenu={
+    enabled:()=>true,
+    prepareForMotion(root){
+      placements++;
+      assert.equal(root,f.group);
+      preparedBeforeCapture=!root.hasAttribute('data-nv-motion-group');
+      f.bar.style.setProperty('transform','translateX(160px) scale(.8)','important');
+      return true;
+    }
+  };
+  f.api.prepareOpen();f.api.playOpen();f.clock.frame();f.clock.frame();
+  assert.equal(placements,1,'V4 preflight must run once before first capture');
+  assert.equal(preparedBeforeCapture,true,'Motion must capture V4 positions, not legacy V2 positions');
+  assert.equal(f.group.hasAttribute('data-nv-motion-group'),true);
+  assert.equal(f.bar.style.getPropertyValue('transform'),'translateX(160px) scale(.8)');
+  f.clock.advance(175);
+  assert.equal(placements,1,'No geometry writes during opening frames');
+  f.clock.settle();
+  assert.equal(placements,1);
+  assert.equal(f.bar.style.getPropertyValue('transform'),'translateX(160px) scale(.8)');
+  assert.equal(f.api.getState().target,'open');assertNativeClean(f);assertStopped(f);
+});
+test('V2 animation remains unchanged without V4 feature flag',()=>{
+  const f=fixture({unified:true});
+  let count=0;
+  f.window.__dulukaUnifiedMainMenu={enabled:()=>false,prepareForMotion(){count++}};
+  open(f);assert.equal(count,0);
+  f.api.cancel();f.clock.settle();assertNativeClean(f);
 });

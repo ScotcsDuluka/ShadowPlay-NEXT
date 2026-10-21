@@ -83,6 +83,15 @@
     function start(){
       linkFrame=null;
       if(!prepared)return;
+      // V4 needs to settle the native md-menu geometry BEFORE collect()
+      // captures screen rectangles for the opening animation. Otherwise
+      // controls use their old V2 coordinates during opening and jump at idle.
+      // This is a one-off preflight, never a reposition on animation frames.
+      var unified=window.__dulukaUnifiedMainMenu;
+      if(unified&&unified.enabled&&unified.enabled()&&unified.prepareForMotion){
+        var nativeRoot=document.querySelector('nv-main-menu:not([data-customize-preview]) .main-menu-container');
+        if(nativeRoot)unified.prepareForMotion(nativeRoot);
+      }
       if(!collect()){if(++linkAttempts<4){linkFrame=window.requestAnimationFrame(start);return;}prepared=false;releaseVisual();if(wanted==='closed')commitClose();return;}
       if(!makeController(false)){prepared=false;releaseVisual();if(wanted==='closed')commitClose();return;}
       var requested=wanted;controller.open();if(requested==='closed')controller.close();

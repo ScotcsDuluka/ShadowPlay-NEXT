@@ -121,3 +121,23 @@ test('V4 editor supports pointer dragging, visible drop targets, undo and escape
  assert(css.includes('.nv-unified-drop-target'));
  assert(css.includes('.nv-unified-drag-ghost'));
 });
+
+test('V4 preflight positions menu before Motion, but normal sync is frozen during entrance',()=>{
+  const f=fake(),u=f.api;u.setEnabled(true);
+  let phase='preparing',writes=0;
+  f.windows.__dulukaOscMotion={get phase(){return phase;},getState:()=>({target:'open'})};
+  const values={};
+  const bar={offsetLeft:0,parentElement:{getBoundingClientRect:()=>({left:440,width:1040})},
+    style:{getPropertyValue:k=>values[k]||'',getPropertyPriority:()=>'',setProperty:(k,v)=>{values[k]=v;writes++;}},
+    classList:{add(){}},querySelector:()=>null};
+  const root={querySelector:q=>q==='md-menu-bar'?bar:null,getBoundingClientRect:()=>({width:1040})};
+  assert.equal(u.nativeGeometry(root),null,'regular sync cannot move tiles in preparing phase');
+  const first=u.prepareForMotion(root);
+  assert(first&&first.cells.length===12,'preflight must be allowed to layout before Motion capture');
+  const baseline=values.transform,baselineWrites=writes;
+  phase='opening';assert.equal(u.nativeGeometry(root),null);
+  assert.equal(values.transform,baseline,'opening cannot move the native rail');
+  assert.equal(writes,baselineWrites,'opening makes no geometry style writes');
+  phase='idle';u.nativeGeometry(root);
+  assert.equal(values.transform,baseline,'idle must keep the same anchored positions as preflight');
+});
