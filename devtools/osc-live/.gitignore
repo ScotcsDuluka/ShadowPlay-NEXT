@@ -1,0 +1,7 @@
+preview-*.json
+preview-*.png
+preview-last-layout.json
+preview-localstorage-backup.json
+recovered-*.json
+read-cef.js
+STOP_PREVIEW
