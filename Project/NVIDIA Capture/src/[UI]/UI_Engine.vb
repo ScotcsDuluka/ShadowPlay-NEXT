@@ -222,8 +222,8 @@ Partial Public Class UI_Engine
         Dim boot As New System.Threading.Thread(Sub()
                                                     Try
                                                         Dim up As Boolean = _rest.WaitForBackend(TimeSpan.FromSeconds(10))
-                                                        DebugLog(If(up, "[REST] backend :59001 up -- command poller starting (phase 1 wire-through, log-only)",
-                                                                       "[REST] backend :59001 not up after 10s -- poller keeps retrying (standalone rule)"))
+                                                        DebugLog(If(up, "[REST] NvNode backend ready -- live capture poller starting",
+                                                                       "[REST] NvNode backend unavailable -- poller keeps retrying (standalone rule)"))
                                                     Catch
                                                         DebugLog("[REST] boot probe error -- poller keeps retrying")
                                                     End Try
@@ -287,8 +287,18 @@ Partial Public Class UI_Engine
             ' RecordingEngine (Ddagrab + NVENC + ffmpeg mux).
             If String.Equals(OverlayConfig.GetEngineMode(), "nvidia", StringComparison.OrdinalIgnoreCase) Then
                 HandleNvidiaRecordStart(outPath)
+                If Not _nvRecording Then
+                    DebugLog("[REST] record start rejected by NVIDIA lane; not confirming actual=Recording")
+                    Return
+                End If
             Else
                 Await HandleRecordingStart(outPath, "", restSettings)
+                ' The handler can reject an unavailable engine or fail before
+                ' creating its session task. Never claim Recording in that case.
+                If _recordingTask Is Nothing OrElse _recordingTask.IsCompleted Then
+                    DebugLog("[REST] record start failed/no active capture task; not confirming actual=Recording")
+                    Return
+                End If
             End If
             _rest.ConfirmRecordStarted()
             DebugLog("[REST] confirmed actual=Recording -- backend pushes to osc page")
@@ -304,7 +314,11 @@ Partial Public Class UI_Engine
 
     Private Async Sub StopRestRecording()
         Try
-            If _recordingTask IsNot Nothing AndAlso Not _recordingTask.IsCompleted Then
+            If _nvRecording Then
+                ' The installed NVIDIA lane has no Duluka session task.
+                ' Stopping only the task would leave the real hotkey recorder running.
+                HandleNvidiaRecordStop("")
+            ElseIf _recordingTask IsNot Nothing AndAlso Not _recordingTask.IsCompleted Then
                 Await HandleRecordingStop("")
             Else
                 DebugLog("[REST] no active session task -- confirming Idle")

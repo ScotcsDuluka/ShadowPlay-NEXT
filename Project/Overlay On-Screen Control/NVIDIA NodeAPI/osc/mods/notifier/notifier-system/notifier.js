@@ -720,15 +720,17 @@ function updateNotifier(message, entry, group) {
     var slotCount = configuredSlotCount();   /* อ่านใหม่ทุก toast (แท้บรรทัด 510) */
 
     if (entry.priority) {
-        if (entry.updaterUi) {
-            for (var updateSlot = 1; updateSlot <= slotCount; updateSlot++) {
-                var updateUnit = notifierRouter.slots[updateSlot];
-                if (!updateUnit || !sameToastGroup(updateUnit.group, group)) continue;
-                if (!updateUnit.inTransition || updateUnit.dancing) {
-                    danceToast(updateUnit, message, entry, group);
-                    return;
-                }
-            }
+        /* Same semantic priority group always owns one card, even while
+           entering or leaving. Repeat events use the existing Updater UI,
+           never allocate a second slot just because a card is transitioning. */
+        for (var updateSlot = 1; updateSlot <= slotCount; updateSlot++) {
+            var updateUnit = notifierRouter.slots[updateSlot];
+            if (!updateUnit || !sameToastGroup(updateUnit.group, group)) continue;
+            if (entry.updaterUi && (!updateUnit.inTransition || updateUnit.dancing))
+                danceToast(updateUnit, message, entry, group);
+            /* An exiting card is finishing its animation; the next genuinely
+               new event can appear after it leaves, not beside it. */
+            return;
         }
         for (var freeSlot = 1; freeSlot <= slotCount; freeSlot++) {
             if (!notifierRouter.slots[freeSlot]) {

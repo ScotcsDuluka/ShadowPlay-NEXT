@@ -73,6 +73,13 @@
                 return String(path || '').replace(/\//g, '\\').toLowerCase();
             }
 
+            function openShareToastGroup(game) {
+                /* PID/matchedUtc distinguish runs for deduplication, but the
+                   visible card belongs to the catalog gameId (not each process
+                   or EXE path). Multiple detections of one game share one UI. */
+                return 'gpu-game-openshare:' + game.gameId.toLowerCase();
+            }
+
             function executableName(path) {
                 var parts = String(path || '').split(/[\\/]/);
                 return parts[parts.length - 1] || path || 'Game.exe';
@@ -220,7 +227,7 @@
                 });
             }
 
-            function showOpenShareGameCard(game, instanceKey, iconPath, shortcut, updaterUi, onClosed) {
+            function showOpenShareGameCard(game, instanceKey, iconPath, shortcut, updaterUi, onClosed, toastGroup) {
                 var exeName = typeof game.displayName === 'string' && game.displayName.trim()
                     ? game.displayName.trim()
                     : executableName(game.executablePath).replace(/\.exe$/i, '');
@@ -234,7 +241,7 @@
                     key: 'gpu-game-openshare:' + instanceKey,
                     iconPath: iconPath || '',
                     fallbackIcon: EXE_ICON_FALLBACK,
-                    group: 'gpu-game-openshare:' + instanceKey,
+                    group: toastGroup || ('gpu-game-openshare:' + instanceKey),
                     width: gpuCardWidth(exeName, subtext),
                     subtext: subtext,
                     priority: true,
@@ -251,10 +258,14 @@
                 event.status.matchedGames.forEach(function (game) {
                     var instanceKey = game.gameId.toLowerCase() + ':' +
                         game.processId + ':' + game.matchedUtc;
+                    var toastGroup = openShareToastGroup(game);
                     currentGameInstances[instanceKey] = true;
+                    /* The same status snapshot is not a new event: don't
+                       restart the flip every GameWatcher polling interval.
+                       A new run of the same game does use Updater UI. */
                     if (observedGameInstances[instanceKey] ||
-                        pendingGameNotifications[instanceKey]) return;
-                    pendingGameNotifications[instanceKey] = true;
+                        pendingGameNotifications[toastGroup]) return;
+                    pendingGameNotifications[toastGroup] = true;
 
                     function onClosed() {
                         eventAggregator.trigger('nv-openshare-game-card-closed', {
@@ -286,10 +297,12 @@
                             iconPath: iconPath
                         };
                         try {
+                            var alreadyVisible = window.Notifier.hasActiveGroupPrefix(
+                                toastGroup);
                             var card = showOpenShareGameCard(game, instanceKey, iconPath,
-                                shortcut, false, onClosed);
+                                shortcut, alreadyVisible, onClosed, toastGroup);
                             var isVisible = !!card || window.Notifier.hasActiveGroupPrefix(
-                                'gpu-game-openshare:' + instanceKey);
+                                toastGroup);
                             if (isVisible) {
                                 observedGameInstances[instanceKey] = true;
                                 saveObservedGameInstances(observedGameInstances);
@@ -303,7 +316,7 @@
                             eventAggregator.trigger('nv-openshare-game-card-skipped', cardData);
                             $log.warn('[notifier] OpenShare card failed', error);
                         }
-                        delete pendingGameNotifications[instanceKey];
+                        delete pendingGameNotifications[toastGroup];
                     }
 
                     var iconPromise = getExecutableIcon(game.executablePath).catch(function (error) {

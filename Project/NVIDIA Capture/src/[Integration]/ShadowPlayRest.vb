@@ -1,14 +1,14 @@
 ' ShadowPlayRest.vb — CAPTURE-REST-PLAN: REST command channel client + poller
 ' (the two classes UI_Engine.vb expects — contract per CAPTURE-REST-PLAN.md)
 '
-' Backend plane (our NvNode shim :59001):
+' Backend plane (our NvNode API: config NVIDIA Config/nvcontainer.json nodeApiPort, default 59011):
 '   GET  /Backend/v.1.0/health      → 200 = backend up (wait loop)
 '   GET  /Duluka/v.1.0/State        → {recordState, irState, savePath}  (edge source)
 '   POST /Duluka/v.1.0/Actual       → {running:bool}   (engine confirms actuals)
 '   GET  /ShadowPlay/v.1.0/Record/Settings → quality/resolution/fps/bitrate (osc page authority)
 '
-' Cookie: X_LOCAL_SECURITY_COOKIE from %LOCALAPPDATA%\NVIDIA Corporation\NvNode\nvnode-init.json
-' (the same pairing file every genuine component reads).
+' Cookie: X_LOCAL_SECURITY_COOKIE from %LOCALAPPDATA%\NVIDIA Corporation\NvNode\nvnode-init-duluka.json
+' (Duluka-only pairing; do not read genuine NVIDIA's pairing file).
 Imports System.IO
 Imports System.Net
 Imports System.Text
@@ -31,27 +31,50 @@ Public Class DulukaState
     Public Property SavePath As String = ""
 End Class
 
-''' <summary>Minimal REST client for the :59001 backend (cookie-authenticated).</summary>
+''' <summary>Minimal REST client for our active NvNode API (config-driven port).</summary>
 Public Class ShadowPlayRestClient
     Private ReadOnly _base As String
     Private ReadOnly _cookie As String
 
     Public Sub New()
-        Dim port = 59001
+        ' The NvNode pairing file can still name the legacy :59001 port.
+        ' The live API is owned by nvcontainer.json (normally :59011).
+        ' Never let stale pairing metadata redirect our capture poller.
+        Dim port As Integer = 59011
+        Try
+            Dim configFile = AppLayout.P("NVIDIA Config", "nvcontainer.json")
+            Using doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(configFile))
+                Dim nodePort As System.Text.Json.JsonElement = Nothing
+                Dim configured As Integer
+                If doc.RootElement.TryGetProperty("nodeApiPort", nodePort) AndAlso
+                   nodePort.TryGetInt32(configured) AndAlso
+                   configured > 0 AndAlso configured <= 65535 Then
+                    port = configured
+                End If
+            End Using
+        Catch
+            ' Use the default local Node API port during cold/missing config.
+        End Try
+
         Dim secret = "0ca906d2784f0d14e399874f5c5ed4a1"
         Try
-            ' ★ coexistence: ไฟล์ของเรา (-duluka) — ห้ามอ่านของแท้ (cookie มันต่าง)
+            ' Keep the Duluka pairing cookie, never read genuine NVIDIA data.
             Dim ini = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                                    "NVIDIA Corporation", "NvNode", "nvnode-init-duluka.json")
             Dim json = File.ReadAllText(ini)
-            Dim pm = System.Text.RegularExpressions.Regex.Match(json, """port""\s*:\s*(\d+)")
             Dim sm = System.Text.RegularExpressions.Regex.Match(json, """secret""\s*:\s*""([0-9a-fA-F]+)""")
-            If pm.Success Then port = Integer.Parse(pm.Groups(1).Value)
             If sm.Success Then secret = sm.Groups(1).Value
         Catch
-            ' fallback: fixed pairing (our shim node)
         End Try
+
         _base = "http://127.0.0.1:" & port.ToString()
+        Dim envBase = Environment.GetEnvironmentVariable("NVSP_BACKEND_URL")
+        Dim overrideUri As Uri = Nothing
+        If Not String.IsNullOrWhiteSpace(envBase) AndAlso
+           Uri.TryCreate(envBase, UriKind.Absolute, overrideUri) AndAlso
+           overrideUri.Scheme = Uri.UriSchemeHttp AndAlso overrideUri.IsLoopback Then
+            _base = overrideUri.GetLeftPart(UriPartial.Authority)
+        End If
         _cookie = secret
     End Sub
 

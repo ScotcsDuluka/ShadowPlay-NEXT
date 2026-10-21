@@ -25,7 +25,7 @@ toast DOM or subscribe to another adapter's server event.
 | --- | --- | --- |
 | `notificationEvent` (OSC / app event aggregator) | OSC-Adapter `showNotification` | Registry/localized standard OSC toast |
 | `/Duluka/v1/OBSNotification` -> `nv-obs-notification` | OSC-Adapter `showObsNotification` | Whitelisted recording, replay, and broadcast toast; event IDs are deduplicated |
-| `/Duluka/v1/GameWatcherStatus` -> `nv-game-watcher` | OSC-Adapter `onGameWatcherStatus` | ApplicationOntology OpenShare toast; game ID + PID + `matchedUtc` identifies one run |
+| `/Duluka/v1/GameWatcherStatus` -> `nv-game-watcher` | OSC-Adapter `onGameWatcherStatus` | OpenShare toast; game ID + PID + `matchedUtc` identify one run, but the visible toast is grouped by catalog game ID and repeated runs use Updater UI |
 | `/Duluka/v1/GpuPreferenceApplied` -> `nv-gpu-pref` | NvGraphics-Adapter `onPreference` | Explicit GPU preference or System Default toast |
 | `/Duluka/v1/gpu/running-profile-paths` (1s poll) | NvGraphics-Adapter `pollNvGraphicsRunningProfiles` | Running-on-GPU toast only for that EXE's explicit applied profile |
 | OpenShare `started` / `closed` / `skipped` | Internal `eventAggregator`, OSC -> NvGraphics | Lifecycle barrier only; not server events and not a source of GPU eligibility |
@@ -43,9 +43,12 @@ decline a toast; adapters must check that a group actually became active before
 considering the notification delivered.
 
 Normal OSC notifications coalesce by their semantic groups (recording, replay,
-broadcast, screenshot). OpenShare and running-GPU cards use unique per-run
-groups so they are independent cards rather than updates to a shared game
-toast.
+broadcast, screenshot). OpenShare cards now use **one visible group per catalog game ID**. The adapter
+still deduplicates exact GameWatcher instances by game ID, PID, and `matchedUtc`,
+but a newly detected instance for the same game updates its existing card using
+Updater UI (the original dance) instead of consuming another slot. Identical
+polling snapshots are ignored to avoid repeated flips. Running-GPU cards remain
+independently grouped by their NvGraphics ownership.
 
 ## Game-start notification flow
 
@@ -54,7 +57,8 @@ NvContainer GameWatcher
   -> NodeAPI /Backend/v.1.0/ContainerEvents
   -> Socket.IO /Duluka/v1/GameWatcherStatus
   -> OSC-Adapter validates catalog match and de-duplicates game instance
-       -> one OpenShare toast (EXE + configured shortcut)
+       -> one OpenShare toast per game ID (EXE + configured shortcut)
+       -> new instance of an already visible game updates the same toast via Updater UI
        -> nv-openshare-game-card-started / -closed / -skipped (internal only)
   -> NvGraphics-Adapter independently polls running-profile-paths
        -> exact EXE profile + nonempty lastAppliedAdapterId + adapter name
@@ -81,7 +85,9 @@ OpenShare is an OSC-Adapter toast, not an NvGraphics variant.
 ## Duplicate and ordering safeguards
 
 - A GameWatcher instance is keyed by game id, PID, and `matchedUtc`, then
-  persisted while the instance remains in the current snapshot.
+  persisted while the instance remains in the current snapshot. Its *visible*
+  toast group is stable by game ID and does not include PID, time or executable
+  path. This prevents multiple copies of the same game's card in the stack.
 - OpenShare presentation has a one-second fallback that uses the bundled
   NVIDIA icon while the EXE icon is still loading. It submits exactly one toast,
   avoiding a second `Notifier.show(... updaterUi: true)` call that used to

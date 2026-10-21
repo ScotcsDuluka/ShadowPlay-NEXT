@@ -92,6 +92,10 @@ body > nv-osc-notifier.notifier-slider {
     transition-duration: var(--nv-slide-ms);
     transition-delay: var(--nv-follow-delay);   /* แท้: .25s */
     background-color: var(--nv-green);
+    /* CEF fractional-position rounding can expose one green raster row
+       below the black card. Mask only the backing layer's last pixel;
+       do not alter the card, stack pitch, left strip or slide animation. */
+    clip-path: inset(0 0 1px 0);
 }
 
 /* ---- ชั้นดำ (.notifier-black แท้) --------------------------------------------
