@@ -5,7 +5,11 @@
 #nv-osc-background .nv-osc-bg-specks{background-image:radial-gradient(2px 2px at 20% 30%,rgba(118,185,0,.4),transparent),radial-gradient(2px 2px at 40% 70%,rgba(118,185,0,.3),transparent),radial-gradient(2px 2px at 80% 40%,rgba(0,212,255,.3),transparent),radial-gradient(2px 2px at 90% 80%,rgba(0,212,255,.2),transparent);background-size:200% 200%;animation:nv-osc-bg-float var(--nv-osc-bg-float-duration,20s) linear infinite}
 #nv-osc-background.nv-osc-bg-paused,#nv-osc-background.nv-osc-bg-paused .nv-osc-bg-specks{animation-play-state:paused}
 html.nv-osc-bg-website .nv-osc{background:transparent!important}
-html.nv-osc-bg-classic .nv-osc{background:rgba(0,0,0,var(--nv-osc-bg-opacity,.5))!important}
+/* Classic uses the same fixed full-screen surface as Website. Rendering it
+   on .nv-osc alone leaves its top-bar / native overlay edges transparent. */
+html.nv-osc-bg-classic #nv-osc-background{background:#000!important;background-size:auto!important;animation:none!important}
+html.nv-osc-bg-classic #nv-osc-background .nv-osc-bg-glow,html.nv-osc-bg-classic #nv-osc-background .nv-osc-bg-specks,html.nv-osc-bg-classic #nv-osc-background canvas{display:none!important}
+html.nv-osc-bg-classic .nv-osc{background:transparent!important}
 /* Fill the available lower screen while retaining the native menu's upper band. */
 .nv-live-editor{position:fixed!important;left:0!important;right:0!important;bottom:0!important;top:448px!important;width:auto!important;max-height:none!important;overflow:auto!important}
 .nv-osc-background-settings{display:block;margin-top:22px;padding-top:20px;border-top:1px solid #41484c}

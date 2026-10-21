@@ -282,7 +282,8 @@ test('turning motion off or opacity down to zero cancels animation immediately',
 test('classic mode restores the native backdrop class and closing OSC stops rendering', () => {
   const f = renderer({ hash: '#/base/main-menu' });
   f.api.set({ ...defaults, mode: 'classic', opacity: 65 });
-  assert.equal(f.root.style.display, 'none');
+  assert.equal(f.root.style.display, 'block', 'Classic must reuse the full-viewport background surface');
+  assert.equal(f.root.style.opacity, '0.65', 'Classic opacity must not be applied twice');
   assert.equal(f.frames.size, 0);
   assert.equal(f.html.classList.contains('nv-osc-bg-website'), false);
   assert.equal(f.html.classList.contains('nv-osc-bg-classic'), true);
@@ -402,4 +403,23 @@ test('a successful Reset background clears a previous save error in the settings
   controller.reset();
   assert.equal(controller.error, '', 'A successful reset must not keep displaying the earlier storage error');
   assert.deepEqual(plain(controller.settings), defaults);
+});
+
+test('classic and website backgrounds use the same fixed full-screen canvas', () => {
+  const f = renderer({ hash: '#/base/main-menu' });
+  const css = fs.readFileSync(path.join(__dirname, '../osc/mods/osc-background.css'), 'utf8');
+  const motion = fs.readFileSync(path.join(__dirname, '../osc/mods/osc-motion.css'), 'utf8');
+  assert.match(css, /#nv-osc-background\s*\{[^}]*position:fixed[^}]*top:0;right:0;bottom:0;left:0/);
+  assert.match(css, /html\.nv-osc-bg-classic\s+#nv-osc-background\s*\{[^}]*background:#000!important/);
+  assert.match(css, /html\.nv-osc-bg-classic\s+\.nv-osc\s*\{background:transparent!important\}/);
+  assert.match(motion, /nv-motion-active:not\(\.nv-osc-bg-website\) \.nv-osc\{background:transparent!important\}/);
+  f.api.set({ ...defaults, mode:'classic', opacity:80 });
+  assert.equal(f.root.style.display,'block');
+  assert.equal(f.root.style.opacity,'0.8');
+  assert.equal(f.frames.size,0,'Classic should have no particle animation');
+  f.api.set({ ...defaults, mode:'website', opacity:80 });
+  assert.equal(f.root.style.display,'block');
+  assert.equal(f.frames.size,1,'Website animation should remain unaffected');
+  f.navigate('#/base');
+  assert.equal(f.root.style.display,'none','Neither surface may remain on the closed OSC route');
 });

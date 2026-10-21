@@ -39,7 +39,10 @@
     function update(){
       visible=document.documentElement.hasAttribute('data-osc-bg-preview')||!!(window.location.hash&&window.location.hash!=='#/base'&&window.location.hash!=='#/base/');
       var website=visible&&current.mode==='website';
-      root.style.display=website?'block':'none';root.style.opacity=String(current.opacity/100);
+      // Both Classic and Website must paint the same fixed full-viewport
+      // surface. The native .nv-osc content begins below the top bar and
+      // cannot serve as the fullscreen Classic backdrop.
+      root.style.display=visible?'block':'none';root.style.opacity=String(current.opacity/100);
       document.documentElement.classList.toggle('nv-osc-bg-website',website);document.documentElement.classList.toggle('nv-osc-bg-classic',visible&&!website);
       document.documentElement.style.setProperty('--nv-osc-bg-opacity',String(current.opacity/100));
       root.style.setProperty('--nv-osc-bg-gradient-duration',(15/current.speed)+'s');root.style.setProperty('--nv-osc-bg-float-duration',(20/current.speed)+'s');
