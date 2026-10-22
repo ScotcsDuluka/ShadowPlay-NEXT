@@ -154,3 +154,12 @@ html.nv-live-layout-editing:not(.nv-motion-active):not(.nv-motion-preparing) .ma
 @media(max-width:1000px){.nv-live-editor.nv-unified-editor-active .nv-unified-panel-row{gap:6px}.nv-live-editor.nv-unified-editor-active .nv-unified-panel{padding:7px}.nv-live-editor.nv-unified-editor-active .nv-unified-palette button{flex-basis:119px}}
 @media(max-width:750px){.nv-live-editor.nv-unified-editor-active .nv-unified-panel-row{grid-template-columns:1fr}.nv-live-editor.nv-unified-editor-active .nv-unified-block-list{max-height:160px}}
 @media(prefers-reduced-motion:reduce){.nv-live-editor.nv-unified-editor-active .nv-unified-block,.nv-live-editor.nv-unified-editor-active .nv-unified-member-cell .nv-unified-remove{transition:none}}
+
+/* Balanced panel columns: all three panels receive equal usable scrolling
+   space even when one panel contains 12 Controls across multiple Blocks. */
+.nv-live-editor.nv-unified-editor-active .nv-unified-panel-row{align-items:stretch!important;grid-template-columns:repeat(3,minmax(0,1fr))!important}
+.nv-live-editor.nv-unified-editor-active .nv-unified-panel{height:auto;min-height:0;display:flex;flex-direction:column}
+.nv-live-editor.nv-unified-editor-active .nv-unified-block-list{height:clamp(225px,29vh,410px);max-height:none!important;min-height:0!important;flex:1 1 auto;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-width:thin}
+.nv-live-editor.nv-unified-editor-active .nv-unified-add-drop{flex:0 0 30px}
+@media(max-height:750px){.nv-live-editor.nv-unified-editor-active .nv-unified-block-list{height:clamp(150px,24vh,220px)}}
+@media(max-width:750px){.nv-live-editor.nv-unified-editor-active .nv-unified-panel-row{grid-template-columns:1fr!important}}

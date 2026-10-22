@@ -236,10 +236,13 @@
     }],link:function(scope,element){
       var root=element[0],doc=$document[0],drag=null,ghost=null,target=null,clickSuppressed=false,suppressTimer=null;
       function editor(){return scope.flexMenu;}
+      // V4 owns dragging and panel capacity when enabled. V2 listeners stay
+      // installed for rollback, but must never edit V2 or show V2 limits.
+      function usingUnified(){var u=$window.__dulukaUnifiedMainMenu;return !!(u&&u.enabled&&u.enabled());}
       // The Controls tray is one horizontal row. Support an ordinary mouse
       // wheel when hovering it, while allowing page scroll at either end.
       function scrollControls(event){
-        if(!editor().editing)return;
+        if(!editor().editing||usingUnified())return;
         var tray=event.target.closest&&event.target.closest('.nv-live-palette');
         if(!tray||tray.scrollWidth<=tray.clientWidth||Math.abs(event.deltaY)<=Math.abs(event.deltaX))return;
         var before=tray.scrollLeft;
@@ -248,10 +251,15 @@
       }
       function closest(node,selector){return node&&node.closest?node.closest(selector):null;}
       function identify(node){var e=closest(node,'[data-menu-key],md-menu[data-nv-control]')||closest(node,'md-menu[data-nv-side-key]');return e&&(e.getAttribute('data-menu-key')||e.getAttribute('data-nv-control')||e.getAttribute('data-nv-side-key'));}
-      function captureClick(event){if(!editor().editing)return;if(closest(event.target,'.nv-live-library-toggle')){event.preventDefault();event.stopImmediatePropagation();scope.$evalAsync(function(){editor().libraryCollapsed=!editor().libraryCollapsed;});return;}var key=identify(event.target);if(closest(event.target,'md-menu')){event.preventDefault();event.stopImmediatePropagation();if(key&&!clickSuppressed)scope.$evalAsync(function(){editor().select(key);});}else if(clickSuppressed){event.preventDefault();event.stopImmediatePropagation();}clickSuppressed=false;}
-      function down(event){if(!editor().editing||event.button!==0||closest(event.target,'.nv-live-remove'))return;var key=identify(event.target);if(!known(key)&&nativeSideKeys.indexOf(key)<0)return;drag={key:key,x:event.clientX,y:event.clientY,active:false};event.preventDefault();}
+      function captureClick(event){if(!editor().editing)return;if(usingUnified()){
+        var key=identify(event.target),nativeTile=closest(event.target,'md-menu');
+        if(nativeTile){event.preventDefault();event.stopImmediatePropagation();if(key&&!clickSuppressed&&$window.__dulukaUnifiedMainMenu.selectControl)$window.__dulukaUnifiedMainMenu.selectControl(key);}
+        if(clickSuppressed){event.preventDefault();event.stopImmediatePropagation();}
+        clickSuppressed=false;return;
+      }if(closest(event.target,'.nv-live-library-toggle')){event.preventDefault();event.stopImmediatePropagation();scope.$evalAsync(function(){editor().libraryCollapsed=!editor().libraryCollapsed;});return;}var key=identify(event.target);if(closest(event.target,'md-menu')){event.preventDefault();event.stopImmediatePropagation();if(key&&!clickSuppressed)scope.$evalAsync(function(){editor().select(key);});}else if(clickSuppressed){event.preventDefault();event.stopImmediatePropagation();}clickSuppressed=false;}
+      function down(event){if(!editor().editing||usingUnified()||event.button!==0||closest(event.target,'.nv-live-remove'))return;var key=identify(event.target);if(!known(key)&&nativeSideKeys.indexOf(key)<0)return;drag={key:key,x:event.clientX,y:event.clientY,active:false};event.preventDefault();}
       function clearTarget(){if(target&&target.node)target.node.classList.remove('nv-live-drop-target');target=null;}
-      function move(event){if(!drag)return;if(!drag.active&&Math.abs(event.clientX-drag.x)+Math.abs(event.clientY-drag.y)<6)return;
+      function move(event){if(!drag||usingUnified())return;if(!drag.active&&Math.abs(event.clientX-drag.x)+Math.abs(event.clientY-drag.y)<6)return;
         if(!drag.active){drag.active=true;ghost=doc.createElement('div');ghost.className='nv-live-drag-ghost';ghost.textContent=editor().label(drag.key);doc.body.appendChild(ghost);root.classList.add('nv-live-dragging');}
         ghost.style.left=(event.clientX+14)+'px';ghost.style.top=(event.clientY+14)+'px';clearTarget();
         var node=doc.elementFromPoint(event.clientX,event.clientY),sideRow=closest(node,'[data-side-row][data-side-group]'),chip=closest(node,'[data-menu-key][data-menu-group]'),panel=closest(node,'.nv-live-drop'),tile=closest(node,'md-menu[data-nv-control]')||closest(node,'md-menu[data-nv-side-key]');
@@ -262,8 +270,8 @@
         if(target)target.node.classList.add('nv-live-drop-target');event.preventDefault();
       }
       function cancel(){clearTarget();if(ghost)ghost.remove();ghost=null;drag=null;root.classList.remove('nv-live-dragging');}
-      function up(){if(!drag)return;if(drag.active){clickSuppressed=true;if(suppressTimer)$window.clearTimeout(suppressTimer);suppressTimer=$window.setTimeout(function(){clickSuppressed=false;suppressTimer=null;},0);if(target){var key=drag.key,g=target.group,i=target.index,side=target.side,join=target.join,slot=target.slot;scope.$evalAsync(function(){if(side)editor().sideMove(key,g,i,join,slot);else editor().move(key,g,i);});}}cancel();}
-      function keydown(event){if(event.key==='Escape'&&drag){cancel();event.preventDefault();event.stopImmediatePropagation();return;}if(editor().editing&&closest(event.target,'md-menu')&&(event.key==='Enter'||event.key===' '||event.keyCode===13||event.keyCode===32)){captureClick(event);return;}
+      function up(){if(!drag)return;if(usingUnified()){cancel();return;}if(drag.active){clickSuppressed=true;if(suppressTimer)$window.clearTimeout(suppressTimer);suppressTimer=$window.setTimeout(function(){clickSuppressed=false;suppressTimer=null;},0);if(target){var key=drag.key,g=target.group,i=target.index,side=target.side,join=target.join,slot=target.slot;scope.$evalAsync(function(){if(side)editor().sideMove(key,g,i,join,slot);else editor().move(key,g,i);});}}cancel();}
+      function keydown(event){if(usingUnified()&&drag)cancel();if(event.key==='Escape'&&drag){cancel();event.preventDefault();event.stopImmediatePropagation();return;}if(editor().editing&&closest(event.target,'md-menu')&&(event.key==='Enter'||event.key===' '||event.keyCode===13||event.keyCode===32)){captureClick(event);return;}
         if(editor().editing||!/^Arrow/.test(event.key)||closest(event.target,'md-menu-content')||doc.querySelector('.md-open-menu-container.md-active'))return;
         var button=closest(event.target,'button.menu-button');if(!button)return;var r=button.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,best=null,score=Infinity;
         Array.prototype.forEach.call(root.querySelectorAll('md-menu>button.menu-button:not([disabled])'),function(b){if(b===button)return;var q=b.getBoundingClientRect();if(!q.width||!q.height)return;var dx=q.left+q.width/2-cx,dy=q.top+q.height/2-cy;var primary=event.key==='ArrowLeft'?-dx:event.key==='ArrowRight'?dx:event.key==='ArrowUp'?-dy:dy,secondary=/Left|Right/.test(event.key)?Math.abs(dy):Math.abs(dx);if(primary>1&&primary+secondary*3<score){score=primary+secondary*3;best=b;}});

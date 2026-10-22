@@ -411,7 +411,9 @@
     join:function(k,p,i){return change(function(s){return M.join(s,k,p,i);},'Grouped Controls');},
     changeType:function(p,i,t){return change(function(s){return M.changeType(s,p,i,t);},'Block Type updated');},
     remove:function(k){return change(function(s){return M.remove(s,k);},'Control removed');},
-    openEditor:getEditor,observeEditor:observeEditor,lastError:function(){return lastError;},model:M
+    openEditor:getEditor,observeEditor:observeEditor,
+    selectControl:function(k){if(!enabled()||!members[k])return false;selected=k;if(editor)drawEditor();return true;},
+    lastError:function(){return lastError;},model:M
   };
   if(window.setInterval)window.setInterval(observeEditor,320);
 })(window,document);
