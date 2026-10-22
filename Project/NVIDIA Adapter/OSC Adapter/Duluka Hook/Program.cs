@@ -40,6 +40,9 @@ internal static class Program
                     return 0;
                 }
 
+                // Record evidence during normal adapter launches too. The
+                // detector does not control or claim graphics API support.
+                LogGraphicsApiEvidence(game, options.GameName);
                 var targetIs64Bit = IsSupportedX64Process(game.Handle);
                 if (targetIs64Bit != Environment.Is64BitProcess)
                 {

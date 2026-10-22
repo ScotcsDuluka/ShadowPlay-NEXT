@@ -15,14 +15,11 @@ function Run-Probe([string]$hostPath,[string]$tag,[string]$expectedPath) {
   $start = [Diagnostics.ProcessStartInfo]::new($hostPath)
   $start.UseShellExecute = $false
   $start.CreateNoWindow = $true
-  $start.ArgumentList.Add('--game-pid')
-  $start.ArgumentList.Add([string]$me.Id)
-  $start.ArgumentList.Add('--game-name')
-  $start.ArgumentList.Add($tag)
-  $start.ArgumentList.Add('--game-executable')
-  $start.ArgumentList.Add($expectedPath)
-  $start.ArgumentList.Add('--probe-only')
-  $start.ArgumentList.Add('true')
+  # Windows PowerShell 5.1 targets .NET Framework (no ArgumentList).
+  # The test tags have no spaces; only the executable path needs quotes.
+  $start.Arguments = '--game-pid ' + $me.Id +
+    ' --game-name ' + $tag +
+    ' --game-executable "' + $expectedPath + '" --probe-only true'
   $child = [Diagnostics.Process]::Start($start)
   if(-not $child) { throw 'Adapter host process did not start' }
   try {
