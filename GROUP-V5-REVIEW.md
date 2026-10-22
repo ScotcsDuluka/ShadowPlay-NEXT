@@ -29,3 +29,14 @@ Do not auto-deploy. Review against the other session's live V5 editor changes, t
 - Combined Main-menu/Customize/Motion/V5 model/editor tests: 119/119 passed in isolation.
 - Checked that `gpu-profiles.js` already maps unified visibility into native `tiles[name].visible`; did not change native geometry or claim to verify live CEF visuals.
 - Runtime flags, active OSC windows, and the main project remained untouched by this review.
+
+## Follow-up: Native Top View and missed clicks (2026-10-22)
+
+- User reported that the top viewing area vanished and some native buttons were not clickable.
+- The current V5 geometry can grow beyond the transparent top band of the fullscreen Settings shell. Regression fixture reproduced native tiles ending at viewport y≈548 while the opaque panel began at y=420 for 1920×1200.
+- Shared `--nv-top-preview-height` (380px; 272px for shorter viewports) between CSS and native layout sizing. While V5 Customize is active, the renderer measures the real rail anchor and caps scaled geometry eight pixels inside the transparent viewing strip. Normal non-editing geometry is unchanged.
+- Added `tests/mainMenuTopPreviewV5.test.js`. Isolated review suite: 122/122 passed; tests run against the deployed main project: 116/116 passed.
+- Deployed review versions of five targeted JS/CSS files into main Source and runtime. Backup: `C:\My Project\NVIDIA-Shadowplay\build_test\NVIDIA GroupLayout TopPreview Fix 20261022\source` and `...\runtime`.
+- Reloaded **CEF page only**, `Page.reload(ignoreCache=true)`. CDP confirmed route remained `#/base`, V5 enabled, updated renderer contains `--nv-top-preview-height`, and Side ratio is `[3,1]`.
+- Actual click-target hit testing on the Customize route is still outstanding: CEF was on `#/base` during verification. Do not claim that a live visual/click test has passed yet. Do not restart the game to verify.
+- The main worktree already contained unrelated changes; do not cherry-pick this review branch indiscriminately over those uncommitted changes.

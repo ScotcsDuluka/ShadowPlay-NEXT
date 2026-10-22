@@ -48,7 +48,11 @@
   }
   function geometry(screen){
     var h=window.innerHeight||1080,w=window.innerWidth||1920;
-    return M.layout(get(),Math.max(320,w-64),screen||Math.max(240,Math.min(h*.42,h-190)),{gap:36});
+    var height=screen||Math.max(240,Math.min(h*.42,h-190));
+    var group=window.__dulukaGroupLayoutA;
+    if(group&&group.enabled&&group.enabled())
+      return group.model.geometry(group.get(),Math.max(320,w-64),height);
+    return M.layout(get(),Math.max(320,w-64),height,{gap:36});
   }
   function namedTile(root,key){var tile=members[key];return tile&&root.querySelector('md-menu.'+tile.name);}
   function setStyle(el,name,value){
@@ -79,6 +83,26 @@
     var bar=root.querySelector('md-menu-bar');if(!bar)return null;
     var screenW=window.innerWidth||1920,screenH=window.innerHeight||1080;
     var available=editor?Math.max(180,Math.min(screenH*.35,440)):Math.max(220,Math.min(screenH*.54,700));
+    // In V5 Customize, native tiles must fit inside the transparent upper
+    // viewing strip, NOT behind the opaque Settings content or its click layer.
+    var group=window.__dulukaGroupLayoutA;
+    var editing=document.documentElement&&document.documentElement.classList&&
+      document.documentElement.classList.contains('nv-live-layout-editing');
+    if(editing&&group&&group.enabled&&group.enabled()&&window.getComputedStyle){
+      var settings=document.querySelector('.nv-live-editor');
+      var rail=bar.parentElement||bar.offsetParent;
+      if(settings&&rail&&settings.getBoundingClientRect&&rail.getBoundingClientRect){
+        var css=window.getComputedStyle(settings);
+        var band=parseFloat(css.getPropertyValue('--nv-top-preview-height'));
+        var shellTop=settings.getBoundingClientRect().top+band;
+        var railTop=rail.getBoundingClientRect().top+(bar.offsetTop||0);
+        if(isFinite(band)&&band>0&&isFinite(railTop)&&railTop>=0&&railTop<shellTop){
+          // geometry() reserves 40px vertical margin. Add it back so the final
+          // scaled Group extent still ends eight pixels before the shell.
+          available=Math.min(available,Math.max(52,shellTop-railTop-8+40));
+        }
+      }
+    }
     var g=geometry(available);
     var x=(screenW-g.actualWidth)/2;
     // NVIDIA sizes and centers .main-menu-container from md-menu-bar.
@@ -127,9 +151,12 @@
     M.CONTROLS.forEach(function(c){var el=namedTile(root,c.key);if(el&&!present[c.key]){el.classList.remove('nv-unified-tile');}});
     return g;
   }
-  function visible(){var s=get(),set={};M.PANELS.forEach(function(p){s.panels[p].forEach(function(b){b.controls.forEach(function(k){set[k]=true;});});});return set;}
+  function visible(){var group=window.__dulukaGroupLayoutA;
+    if(group&&group.enabled&&group.enabled()){var r={};group.model.slots(group.get()).forEach(function(k){r[k]=true;});return r;}
+    var s=get(),set={};M.PANELS.forEach(function(p){s.panels[p].forEach(function(b){b.controls.forEach(function(k){set[k]=true;});});});return set;
+  }
   function cell(key){
-    var g=M.layout(get(),1920,550);return g.cells.filter(function(c){return c.key===key;})[0]||null;
+    var g=geometry(550);return g.cells.filter(function(c){return c.key===key;})[0]||null;
   }
   function escapeText(s){return String(s).replace(/[&<>"']/g,function(ch){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch];});}
   function drawEditor(){
@@ -408,7 +435,7 @@
     // moving an already positioned menu or resetting persisted controls.
     var root=document.querySelector('nv-main-menu:not([data-customize-preview]) .main-menu-container');
     if(root&&root.querySelectorAll&&
-       root.querySelectorAll('md-menu.nv-unified-tile').length<M.CONTROLS.length){
+       root.querySelectorAll('md-menu.nv-unified-tile').length<Object.keys(visible()).length){
       nativeGeometry(root);
     }
   }
@@ -448,7 +475,7 @@
           if(!enabled()||!$state.current||$state.current.name!=='main.main-menu'){clearRouteMask();return;}
           var root=document.querySelector('nv-main-menu:not([data-customize-preview]) .main-menu-container');
           var result=root&&nativeGeometry(root);
-          if(result&&root.querySelectorAll('md-menu.nv-unified-tile').length===M.CONTROLS.length){
+          if(result&&root.querySelectorAll('md-menu.nv-unified-tile').length===Object.keys(visible()).length){
             var bar=root.querySelector('md-menu-bar'),box=bar&&bar.getBoundingClientRect();
             var correctX=(window.innerWidth-result.actualWidth)/2;
             if(box&&Math.abs(box.left-correctX)<=3)clearRouteMask();
