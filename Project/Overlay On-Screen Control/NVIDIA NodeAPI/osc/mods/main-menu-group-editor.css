@@ -15,7 +15,7 @@
 .nv-g-library-head{display:flex;gap:15px;justify-content:space-between;align-items:baseline;margin-bottom:7px}
 .nv-g-library-head strong{font-size:13px}
 .nv-g-library-head span{font-size:10px;color:#a9bbaa}
-.nv-g-search{display:block;width:100%;height:30px;background:#111718;color:#f2f7f1;padding:5px 10px;border:1px solid #48544d;font-size:12px}
+.nv-g-search{display:block;box-sizing:border-box;width:100%;height:30px;background:#111718;color:#f2f7f1;padding:5px 10px;border:1px solid #48544d;font-size:12px}
 .nv-g-search:focus{outline:1px solid #76b900}
 .nv-g-catalog{display:flex;gap:5px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;margin-top:7px;padding-bottom:4px}
 .nv-g-catalog button{flex:0 0 116px;height:35px;display:flex;align-items:center;gap:6px;background:#2a3134;color:#e2e9e1;border:1px solid #434e49;padding:4px 7px;font-size:11px;text-align:left}
@@ -60,3 +60,84 @@
 .nv-group-layout-on .nv-unified-controls,.nv-group-layout-on .nv-unified-panel-row{display:none!important}
 @media(max-width:930px){.nv-g-panels{gap:5px}.nv-g-panel{padding:6px}.nv-g-group-head>span{display:none}}
 @media(max-width:650px){.nv-g-panels{grid-template-columns:1fr}.nv-g-panel{max-height:235px;min-height:180px}}
+
+/* V5 Customize: keep every Settings section within the 40px native shell.
+   The three Group lists and Background settings scroll independently, rather
+   than growing the fullscreen editor beyond the viewport. */
+html.nv-live-layout-editing body .nv-live-editor.nv-group-layout-on {
+  display:flex!important;
+  flex-direction:column!important;
+  overflow-x:hidden!important;
+  overflow-y:hidden!important;
+}
+html.nv-live-layout-editing body .nv-live-editor.nv-group-layout-on > header,
+html.nv-live-layout-editing body .nv-live-editor.nv-group-layout-on > footer {
+  flex:0 0 auto;
+}
+html.nv-live-layout-editing body .nv-live-editor.nv-group-layout-on > .nv-group-layout-editor {
+  display:flex!important;
+  flex:1 1 auto;
+  min-height:0;
+  min-width:0;
+  flex-direction:column;
+  overflow:hidden;
+  margin:0 0 10px;
+}
+html.nv-live-layout-editing body .nv-live-editor.nv-group-layout-on .nv-g-toolbar,
+html.nv-live-layout-editing body .nv-live-editor.nv-group-layout-on .nv-g-library,
+html.nv-live-layout-editing body .nv-live-editor.nv-group-layout-on .nv-g-message {
+  flex:0 0 auto;
+}
+html.nv-live-layout-editing body .nv-live-editor.nv-group-layout-on .nv-g-panels {
+  flex:1 1 auto;
+  min-height:0;
+  grid-template-rows:minmax(0,1fr);
+  overflow:hidden;
+  align-items:stretch;
+}
+html.nv-live-layout-editing body .nv-live-editor.nv-group-layout-on .nv-g-panel {
+  min-height:0;
+  max-height:none;
+  height:100%;
+  box-sizing:border-box;
+  overflow:hidden;
+}
+html.nv-live-layout-editing body .nv-live-editor.nv-group-layout-on > footer {
+  margin-top:3px;
+}
+html.nv-live-layout-editing body .nv-live-editor.nv-group-layout-on > nv-osc-background-settings {
+  display:block!important;
+  box-sizing:border-box;
+  flex:0 0 110px;
+  min-height:68px;
+  max-height:110px;
+  overflow-x:hidden!important;
+  overflow-y:auto!important;
+  overscroll-behavior:contain;
+}
+/* Short windows cannot fit a readable Top View and three-column editor at once.
+   Retain scroll access to all content rather than cutting off Controls. */
+@media(max-height:1050px) {
+  html.nv-live-layout-editing body .nv-live-editor.nv-group-layout-on {
+    display:block!important;
+    overflow-y:auto!important;
+  }
+  html.nv-live-layout-editing body .nv-live-editor.nv-group-layout-on > .nv-group-layout-editor {
+    display:block!important;
+    overflow:visible!important;
+  }
+  html.nv-live-layout-editing body .nv-live-editor.nv-group-layout-on .nv-g-panels {
+    display:grid;
+    grid-template-rows:auto;
+    overflow:visible;
+  }
+  html.nv-live-layout-editing body .nv-live-editor.nv-group-layout-on .nv-g-panel {
+    height:auto;
+    min-height:220px;
+    max-height:300px;
+  }
+  html.nv-live-layout-editing body .nv-live-editor.nv-group-layout-on > nv-osc-background-settings {
+    max-height:none;
+    overflow-y:visible!important;
+  }
+}

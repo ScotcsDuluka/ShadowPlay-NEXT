@@ -63,3 +63,13 @@ Do not auto-deploy. Review against the other session's live V5 editor changes, t
 - Deployed only this CSS to Source and runtime with backups at `C:\My Project\NVIDIA-Shadowplay\build_test\NVIDIA OSC TopBar Restore 20261023`.
 - Live CEF confirmed permanent stylesheet loaded and temporary override removed. Top bar visible/clickable, Close/X hit-target valid, 12/12 native menu centers hit their original tiles. No close or Capture action was triggered; no game restart.
 - Permanent live screenshot: `build_test\NVIDIA OSC TopBar Restore 20261023\live-after-native-topbar.png`.
+
+## V5 Customize overflowing its Settings shell (2026-10-23)
+
+- User correctly reported the entire Customize Main-menu UI overflowed the fullscreen Settings shell. Initial CEF audit at 1920x1200: 40px-inset editor rect (40,40,1840,1120) but `scrollHeight=1384` vs `clientHeight=1118`. Footer (y=1137..1170) and Background Settings (y=1170..1385) spilled below the shell content edge at y=1120.
+- Fixed **only V5 Customize** CSS in `osc/mods/main-menu-group-editor.css`: flex columns within the existing Settings shell, constrain Group grid with `grid-template-rows:minmax(0,1fr)`, keep the three `.nv-g-group-list` elements independently scrollable, keep Footer in view and give Background Settings its own bounded scroll region. `box-sizing:border-box` fixes search input horizontal overhang. Small viewports (height <=1050) retain whole-shell scrolling to avoid losing content.
+- Initial temporary CSS in live CEF proved shell `scrollHeight=1117` and full footer+background inside y<=1119; adjusted BG area from shrinking to a fixed 110px and tested the live permanent stylesheet after deploy.
+- Deployed **only Group Editor CSS** to Source and runtime with original files backed up at `C:\My Project\NVIDIA-Shadowplay\build_test\NVIDIA OSC Customize Overflow Fix 20261023`.
+- Live CEF verified permanent stylesheet loaded and no temporary CSS remained. CEF viewport 1920x1200: shell clientHeight1118/scrollHeight1117; Footer y976..1009; background y1009..1119; Group list clientHeight118/scrollHeight260 (can scroll), BG clientHeight110/scrollHeight214 (can scroll). Horizontal overflow none.
+- Native top bar, Capture backend and OSC Motion untouched. Visual: `build_test/NVIDIA OSC Customize Overflow Fix 20261023/live-after-overflow-fix.png`. Note: Group columns are deliberately more compact; long lists remain available by scrolling inside each column.
+- Isolated review regression 130/130; deployed main project regression 124/124.
