@@ -17,3 +17,15 @@ This branch is an isolated review of the in-progress `main-menu-group-model.js`,
 ## Integration note
 
 Do not auto-deploy. Review against the other session's live V5 editor changes, then merge only the intended model and tests. This does not verify CEF visuals or pixel alignment.
+
+## Follow-up: V5 Editor correctness and lifecycle
+
+- Imported the current native Group Editor JS and CSS into the isolated review branch for diagnosis (without changing the main project).
+- Fixed atomic layout saving: localStorage failure leaves the original in-memory model intact.
+- Fixed V5 off/on toggling: the editor is hidden while disabled and the Settings host regains the V5 CSS class when re-enabled.
+- Fixed document mouseup listener cleanup after the editor host is detached to prevent handlers accumulating during Settings navigation.
+- Fixed native Sync failure after a successful save: editor reports pending refresh but keeps Undo history intact.
+- Added `tests/mainMenuGroupEditorV5.test.js` covering Reset/Undo, failed save, editor toggle, repeated mount, and transient native Sync errors.
+- Combined Main-menu/Customize/Motion/V5 model/editor tests: 119/119 passed in isolation.
+- Checked that `gpu-profiles.js` already maps unified visibility into native `tiles[name].visible`; did not change native geometry or claim to verify live CEF visuals.
+- Runtime flags, active OSC windows, and the main project remained untouched by this review.
