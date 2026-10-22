@@ -132,25 +132,25 @@
     M.PANELS.forEach(function(p){
       var el=editor.querySelector('.nv-unified-panel[data-panel="'+p+'"] .nv-unified-block-list'),html='';
       s.panels[p].forEach(function(b,i){
-        html+='<article class="nv-unified-block" data-v4-count="'+b.controls.length+'" data-v4-block="'+p+':'+i+'"><div class="nv-unified-block-head"><span class="nv-unified-grip" title="Drag this Block to another panel" role="button" tabindex="0" aria-label="Drag Block">⠿</span>'+
-          '<select aria-label="Block Type" data-v4-type="'+p+':'+i+'">'+M.TYPES.map(function(type){return '<option value="'+type+'"'+(type===b.type?' selected':'')+'>'+({big:'Big',side:'Side',slot:'Side Slot'}[type])+'</option>';}).join('')+
-          '</select><span>'+b.controls.length+'/9</span><button data-v4-shift="'+p+':'+i+':-1" aria-label="Move block earlier">↑</button>'+
-          '<button data-v4-shift="'+p+':'+i+':1" aria-label="Move block later">↓</button></div><div class="nv-unified-members">';
+        html+='<article class="nv-unified-block" data-v4-count="'+b.controls.length+'" data-v4-block="'+p+':'+i+'"><div class="nv-unified-block-head">'+
+          '<span class="nv-unified-grip" title="ลากเพื่อย้ายทั้ง Block" role="button" tabindex="0" aria-label="ย้าย Block">⠿</span>'+
+          '<span class="nv-unified-block-meta"><strong>Block '+(i+1)+'</strong><small>'+({big:'Big',side:'Side',slot:'Side Slot'}[b.type])+' · '+b.controls.length+'/9</small></span>'+
+          '<button type="button" class="nv-unified-block-options" data-v4-menu="'+p+':'+i+'" title="ตั้งค่า Block" aria-label="ตั้งค่า Block '+(i+1)+'">⋯</button></div><div class="nv-unified-members">';
         b.controls.forEach(function(k){
           html+='<div class="nv-unified-member-cell"><button title="'+escapeText(members[k].label)+'" class="nv-unified-member" data-v4-select="'+k+'" draggable="true" data-v4-drag="'+k+'"><md-icon class="share-icon '+members[k].icon+'"></md-icon><span>'+escapeText(members[k].label)+'</span></button>'+
             (k==='Settings'?'<span class="nv-unified-lock" title="Settings cannot be removed">◆</span>':
              '<button class="nv-unified-remove" data-v4-remove="'+k+'" aria-label="Remove '+escapeText(members[k].label)+'"><md-icon class="share-icon icon-app_close"></md-icon></button>')+'</div>';
         });
-        html+='</div><button class="nv-unified-join" data-v4-join="'+p+':'+i+'"'+(b.controls.length>=9?' disabled':'')+'>+ Add selected to Block</button></article>';
+        html+='</div></article>';
       });
-      el.innerHTML=html||'<p class="nv-unified-empty">Drop a Control here</p>';
+      el.innerHTML=html||'<p class="nv-unified-empty">ลาก Control มาวางที่แผงนี้</p>';
       editor.querySelector('.nv-unified-panel[data-panel="'+p+'"] .nv-unified-count').textContent=s.panels[p].reduce(function(n,b){return n+b.controls.length;},0)+' Controls';
     });
     var catalog=editor.querySelector('.nv-unified-palette');
     catalog.innerHTML=M.CONTROLS.filter(function(c){return !q||c.label.toLowerCase().indexOf(q)>=0||c.key.toLowerCase().indexOf(q)>=0;}).map(function(c){
       var pos=M.locate(s,c.key);return '<button data-v4-select="'+c.key+'" draggable="true" data-v4-drag="'+c.key+'" class="'+(selected===c.key?'selected ':'')+(pos?'placed':'unplaced')+'"><md-icon class="share-icon '+c.icon+'"></md-icon><span>'+escapeText(c.label)+'</span>'+(c.key==='Settings'?'<b>◆</b>':'')+'</button>';
     }).join('');
-    var sel=editor.querySelector('.nv-unified-selection');sel.textContent=selected?'Selected: '+members[selected].label:'Select a Control, then add it to a panel or Block.';
+    var sel=editor.querySelector('.nv-unified-selection');sel.textContent=selected?'เลือก: '+members[selected].label+' · คลิก Block เพื่อจัดเข้ากลุ่ม':'ลากจากคลังลงแผง หรือคลิก Control แล้วคลิก Block';
     var msg=editor.querySelector('.nv-unified-message');if(msg)msg.textContent=lastError;
   }
   function getEditor(){
@@ -160,7 +160,7 @@
     if(editor===legacy&&legacy.querySelector('.nv-unified-editor'))return editor;
     editor=legacy;editor.classList.add('nv-unified-editor-active');
     var description=legacy.querySelector('header p');
-    if(description)description.textContent='Arrange Big, Side or Side Slot in any panel. Each Block holds 1–9 Controls. Settings cannot be removed.';
+    if(description)description.textContent='ลาก Controls เพื่อจัดเมนู · คลิก ⋯ เพื่อเปลี่ยน Big / Side / Side Slot · 1 Block รองรับ 9 Controls';
     // Intercept the legacy Restore button: in V4 this resets only the V4
     // arrangement. The saved V2 layout must never be reset or overwritten.
     editor.addEventListener('click',function(event){
@@ -171,19 +171,39 @@
       }
     },true);
     var wrap=document.createElement('section');wrap.className='nv-unified-editor';wrap.setAttribute('aria-label','Flexible Main-menu Customize');
-    wrap.innerHTML='<div class="nv-unified-guide"><span>Drag to arrange · Right-click a tile in the preview to change its Block Type.</span><button type="button" data-v4-undo aria-label="Undo last layout change">↶ Undo</button></div><div class="nv-unified-panel-row">'+M.PANELS.map(function(p){
-      return '<section class="nv-unified-panel" data-panel="'+p+'"><h3>'+p.toUpperCase()+' <span class="nv-unified-count"></span></h3><div class="nv-unified-block-list"></div><button data-v4-add="'+p+'">+ New Block</button></section>';
-    }).join('')+'</div><div class="nv-unified-controls"><header><h3>Controls</h3><span class="nv-unified-selection"></span></header>'+
-      '<input type="search" class="nv-unified-search" placeholder="Search Controls..." aria-label="Search Controls"><div class="nv-unified-palette"></div>'+
-      '<p>Each Block holds up to 9 Controls. Drag to group, or select and press Add. Settings can move but cannot be removed.</p></div><footer class="nv-unified-message" role="status"></footer>';
+    wrap.innerHTML='<div class="nv-unified-guide"><div class="nv-unified-guide-text"><strong>จัดวางเมนู</strong><span>ลากเพื่อย้าย · คลิก ⋯ บน Block เพื่อเปลี่ยนรูปแบบ · กด ESC เพื่อยกเลิกการลาก</span></div><button type="button" data-v4-undo aria-label="ย้อนกลับการจัดล่าสุด">↶ ย้อนกลับ</button></div>'+
+      '<div class="nv-unified-controls"><header><h3>คลัง Controls</h3><span class="nv-unified-selection"></span></header>'+
+      '<input type="search" class="nv-unified-search" placeholder="ค้นหา Controls..." aria-label="ค้นหา Controls"><div class="nv-unified-palette"></div></div>'+
+      '<div class="nv-unified-panel-row">'+M.PANELS.map(function(p){
+        return '<section class="nv-unified-panel" data-panel="'+p+'"><h3><span>'+({left:'LEFT',center:'CENTER',right:'RIGHT'}[p])+'</span><span class="nv-unified-count"></span></h3><div class="nv-unified-block-list"></div><button class="nv-unified-add-drop" data-v4-add="'+p+'" title="เลือก Control จากคลังแล้วคลิก หรือลากมาวาง">+ วางเพื่อสร้าง Block ใหม่</button></section>';
+      }).join('')+'</div><footer class="nv-unified-message" role="status"></footer>';
     var old=legacy.querySelector('.nv-live-workspace');if(old)legacy.insertBefore(wrap,old);else legacy.appendChild(wrap);
     var pending='';
     wrap.addEventListener('input',function(ev){if(ev.target.classList.contains('nv-unified-search'))drawEditor();});
-    wrap.addEventListener('change',function(ev){var id=ev.target.getAttribute('data-v4-type');if(!id)return;var parts=id.split(':');
-      change(function(s){return M.changeType(s,parts[0],Number(parts[1]),ev.target.value);},'Block Type updated');
-    });
+    var ribbon=wrap.querySelector('.nv-unified-palette');
+    ribbon.addEventListener('wheel',function(ev){
+      if(ribbon.scrollWidth<=ribbon.clientWidth)return;
+      if(ev.cancelable)ev.preventDefault();
+      ribbon.scrollLeft+=Math.abs(ev.deltaX)>Math.abs(ev.deltaY)?ev.deltaX:ev.deltaY;
+    },{passive:false});
     wrap.addEventListener('click',function(ev){
-      var target=ev.target.closest&&ev.target.closest('button');if(!target)return;
+      var target=ev.target.closest&&ev.target.closest('button');
+      if(!target){
+        var block=ev.target.closest&&ev.target.closest('[data-v4-block]');
+        if(selected&&block&&!ev.target.closest('.nv-unified-grip')){
+          var part=block.getAttribute('data-v4-block').split(':');
+          change(function(s){return M.join(s,selected,part[0],Number(part[1]));},'เพิ่ม Control ลง Block แล้ว');
+        }
+        return;
+      }
+      var option=target.getAttribute('data-v4-menu');
+      if(option){
+        var index=option.split(':'),s=get();
+        var block=s.panels[index[0]]&&s.panels[index[0]][Number(index[1])];
+        if(block)showBlockContext({panel:index[0],index:Number(index[1])},block.controls[0],
+          target.getBoundingClientRect().left,target.getBoundingClientRect().bottom+4);
+        return;
+      }
       if(target.hasAttribute('data-v4-undo')){if(undoStack.length){set(undoStack.pop());lastError='Undone';drawEditor();}return;}
       var k=target.getAttribute('data-v4-select');if(k){selected=k;drawEditor();return;}
       var del=target.getAttribute('data-v4-remove');if(del){change(function(s){return M.remove(s,del);},'Control removed');return;}
@@ -210,45 +230,70 @@
       if(blockContextPopup&&blockContextPopup.parentNode)blockContextPopup.parentNode.removeChild(blockContextPopup);
       blockContextPopup=null;
     }
+    function showBlockContext(where,key,x,y){
+      closeBlockContext();
+      var current=get(),block=current.panels[where.panel]&&current.panels[where.panel][where.index];
+      if(!block)return;
+      var names={big:'Block Big',side:'Block Side',slot:'Block Side Slot'};
+      var popup=document.createElement('div');popup.className='nv-unified-context';
+      popup.setAttribute('role','menu');popup.setAttribute('aria-label','ตั้งค่า Block');
+      popup.innerHTML='<div class="nv-unified-context-title">Block '+(where.index+1)+
+        '<small>'+where.panel.toUpperCase()+' · '+block.controls.length+'/9 Controls</small></div>'+
+        '<div class="nv-unified-context-label">รูปแบบ Block</div>'+
+        M.TYPES.map(function(type){
+          return '<button type="button" role="menuitemradio" aria-checked="'+(block.type===type)+
+            '" data-v4-context-type="'+type+'"><span>'+names[type]+'</span>'+
+            (block.type===type?'<strong>✓</strong>':'')+'</button>';
+        }).join('')+
+        '<div class="nv-unified-context-label">ย้าย Block ไปแผง</div>'+
+        M.PANELS.map(function(panel){
+          return '<button type="button" data-v4-context-panel="'+panel+'"><span>'+panel.toUpperCase()+'</span>'+
+            (panel===where.panel?'<strong>✓</strong>':'')+'</button>';
+        }).join('')+
+        (key!=='Settings'?'<button type="button" class="nv-unified-context-danger" data-v4-context-remove="'+key+'">นำ '+escapeText(members[key].label)+' ออก</button>':'');
+      document.body.appendChild(popup);blockContextPopup=popup;
+      var w=popup.offsetWidth||240,h=popup.offsetHeight||310;
+      popup.style.left=Math.max(8,Math.min(x,(window.innerWidth||1920)-w-8))+'px';
+      popup.style.top=Math.max(8,Math.min(y,(window.innerHeight||1080)-h-8))+'px';
+      popup.__v4Panel=where.panel;popup.__v4Index=where.index;
+    }
     function openBlockContext(event){
       if(!enabled()||!editor||!editor.isConnected||
         !document.documentElement.classList.contains('nv-live-layout-editing'))return;
       if(!event.target.closest)return;
       var nativeTile=event.target.closest('md-menu[data-nv-unified-key]');
-      if(!nativeTile)return;
-      var nativeMenu=nativeTile.closest('nv-main-menu');
-      if(!nativeMenu||nativeMenu.hasAttribute('data-customize-preview'))return;
-      var key=nativeTile.getAttribute('data-nv-unified-key'),current=get(),where=M.locate(current,key);
+      var editorBlock=event.target.closest('.nv-unified-block');
+      var key,where;
+      if(nativeTile){
+        var nativeMenu=nativeTile.closest('nv-main-menu');
+        if(!nativeMenu||nativeMenu.hasAttribute('data-customize-preview'))return;
+        key=nativeTile.getAttribute('data-nv-unified-key');
+        where=M.locate(get(),key);
+      }else if(editorBlock&&editorBlock.closest('.nv-unified-editor')){
+        var parts=editorBlock.getAttribute('data-v4-block').split(':');
+        where={panel:parts[0],index:Number(parts[1])};
+        key=get().panels[where.panel][where.index].controls[0];
+      }
       if(!where)return;
       event.preventDefault();event.stopImmediatePropagation();
-      closeBlockContext();
-      var block=current.panels[where.panel][where.index];
-      var names={big:'Block Big',side:'Block Side',slot:'Block Side Slot'};
-      var popup=document.createElement('div');popup.className='nv-unified-context';
-      popup.setAttribute('role','menu');popup.setAttribute('aria-label','Block type options');
-      popup.innerHTML='<div class="nv-unified-context-title">'+escapeText(members[key].label)+
-        '<small>'+escapeText(where.panel.toUpperCase())+' · '+block.controls.length+'/9 Controls</small></div>'+
-        M.TYPES.map(function(type){
-          return '<button type="button" role="menuitemradio" aria-checked="'+(block.type===type)+
-            '" data-v4-context-type="'+type+'"><span>'+names[type]+'</span>'+
-            (block.type===type?'<strong>✓</strong>':'')+'</button>';
-        }).join('');
-      document.body.appendChild(popup);blockContextPopup=popup;
-      var w=popup.offsetWidth||220,h=popup.offsetHeight||160;
-      popup.style.left=Math.max(8,Math.min(event.clientX,(window.innerWidth||1920)-w-8))+'px';
-      popup.style.top=Math.max(8,Math.min(event.clientY,(window.innerHeight||1080)-h-8))+'px';
-      popup.__v4Panel=where.panel;popup.__v4Index=where.index;
+      showBlockContext(where,key,event.clientX,event.clientY);
     }
     function clickBlockContext(event){
       if(!blockContextPopup)return;
-      var target=event.target.closest&&event.target.closest('[data-v4-context-type]');
+      var target=event.target.closest&&event.target.closest('[data-v4-context-type],[data-v4-context-panel],[data-v4-context-remove]');
       if(target&&blockContextPopup.contains(target)){
         event.preventDefault();event.stopImmediatePropagation();
-        var type=target.getAttribute('data-v4-context-type');
         var panel=blockContextPopup.__v4Panel,index=blockContextPopup.__v4Index;
+        var type=target.getAttribute('data-v4-context-type');
+        var destination=target.getAttribute('data-v4-context-panel');
+        var removeKey=target.getAttribute('data-v4-context-remove');
         closeBlockContext();
-        if(M.TYPES.indexOf(type)>=0)
-          change(function(s){return M.changeType(s,panel,index,type);},'Block Type: '+type);
+        if(type&&M.TYPES.indexOf(type)>=0)
+          change(function(s){return M.changeType(s,panel,index,type);},'เปลี่ยนรูปแบบ Block แล้ว');
+        else if(destination&&M.PANELS.indexOf(destination)>=0)
+          change(function(s){return M.moveBlock(s,panel,index,destination,s.panels[destination].length);},'ย้าย Block แล้ว');
+        else if(removeKey&&removeKey!=='Settings')
+          change(function(s){return M.remove(s,removeKey);},'นำ Control ออกแล้ว');
         return;
       }
       if(!blockContextPopup.contains(event.target))closeBlockContext();

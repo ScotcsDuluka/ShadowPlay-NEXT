@@ -147,12 +147,15 @@ test('context menu edits the containing native Preview Block without showing Blo
  assert(js.includes("document.documentElement.classList.contains('nv-live-layout-editing')"));
  assert(js.includes("event.target.closest('md-menu[data-nv-unified-key]')"));
  assert(js.includes("nativeMenu.hasAttribute('data-customize-preview')"));
- assert(js.includes("var key=nativeTile.getAttribute('data-nv-unified-key'),current=get(),where=M.locate(current,key)"));
+ assert(js.includes("key=nativeTile.getAttribute('data-nv-unified-key')"));
+ assert(js.includes("where=M.locate(get(),key)"));
+ assert(js.includes("showBlockContext(where,key,event.clientX,event.clientY)"));
  assert(js.includes("M.changeType(s,panel,index,type)"));
  assert(js.includes("data-v4-context-type"));
  assert(js.includes("closeBlockContext()"));
  assert(js.includes("document.removeEventListener('contextmenu',openBlockContext,true)"));
- assert(js.includes("Right-click a tile in the preview"));
+ assert(js.includes("document.addEventListener('contextmenu',openBlockContext,true)"));
+ assert(js.includes("data-v4-menu"));
  const css=fs.readFileSync(path.join(__dirname,'../osc/mods/main-menu-unified-native.css'),'utf8');
  assert(css.includes('.nv-unified-context'));
  assert(css.includes('.nv-unified-context button[aria-checked="true"]'));
@@ -162,4 +165,37 @@ test('context menu edits the containing native Preview Block without showing Blo
  const after=f.api.get();
  assert.equal(after.panels[where.panel][where.index].type,'slot');
  assert.equal(M.locate(after,'Settings').panel,where.panel);
+});
+
+test('compact editor puts searchable NVIDIA Controls above the three panels',()=>{
+ const css=fs.readFileSync(path.join(__dirname,'../osc/mods/main-menu-unified-native.css'),'utf8');
+ const controls=js.indexOf("'<div class=\"nv-unified-controls\"");
+ const panels=js.indexOf("'<div class=\"nv-unified-panel-row\"");
+ assert(controls>=0&&panels>controls,'the catalog must appear above the panel columns');
+ assert(js.includes('nv-unified-block-meta'));
+ assert(js.includes('data-v4-menu'));
+ assert(js.includes('nv-unified-block-options'));
+ assert(!js.includes("'<select aria-label=\"Block Type\""),'no per-block type dropdown');
+ assert(!js.includes("data-v4-shift=\""),'no per-block move buttons');
+ assert(!js.includes('Add selected to Block'),'no repeated action at the bottom of every Block');
+ assert(css.includes('.nv-unified-block-options'));
+ assert(css.includes('.nv-unified-guide-text'));
+ assert(css.includes('.nv-unified-palette'));
+ assert(css.includes('grid-template-columns:repeat(3,minmax(0,1fr))'));
+});
+test('same Block menu works from card options and native Preview without touching V2 keys',()=>{
+ assert(js.includes('showBlockContext({panel:index[0],index:Number(index[1])}'));
+ assert(js.includes("data-v4-context-panel"));
+ assert(js.includes("data-v4-context-remove"));
+ assert(js.includes("M.moveBlock(s,panel,index,destination,s.panels[destination].length)"));
+ assert(js.includes("removeKey!=='Settings'"));
+ assert(js.includes("M.remove(s,removeKey)"));
+ assert(js.includes("document.addEventListener('contextmenu',openBlockContext,true)"));
+ assert(js.includes("ribbon.addEventListener('wheel'"));
+ const f=fake(),v4=f.api;v4.setEnabled(true);
+ const first=v4.get();
+ const moved=M.moveBlock(first,'left',0,'right',first.panels.right.length);
+ const last=v4.set(moved);
+ assert(M.validate(last));
+ assert.equal(f.values.DulukaMainMenuLayoutV2,undefined);
 });

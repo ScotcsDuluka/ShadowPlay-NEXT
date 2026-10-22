@@ -101,3 +101,56 @@ html.nv-live-layout-editing:not(.nv-motion-active):not(.nv-motion-preparing) .ma
 .nv-unified-context button:hover,.nv-unified-context button:focus{background:#405235;outline:none}
 .nv-unified-context button[aria-checked="true"]{color:#b0e567}
 .nv-unified-context button strong{font-size:14px}
+
+/* Compact Layout Editor — controls first, three quiet editing columns.
+   Only V4 editor classes are affected; NVIDIA native Preview remains intact. */
+.nv-live-editor.nv-unified-editor-active{padding:12px 16px!important}
+.nv-live-editor.nv-unified-editor-active .nv-unified-editor{margin:5px 0 10px;font-family:Arial,"Segoe UI",sans-serif}
+.nv-live-editor.nv-unified-editor-active .nv-unified-guide{background:#202628;border-left:3px solid #76b900;padding:9px 12px;margin:0 0 9px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.nv-unified-guide-text{display:flex;flex-direction:column;gap:3px;min-width:0}
+.nv-unified-guide-text strong{font-size:14px;color:#fff;letter-spacing:.15px}
+.nv-unified-guide-text span{font-size:11px;line-height:1.4;color:#b5bfb8}
+.nv-unified-guide [data-v4-undo]{height:31px;padding:6px 12px;color:#e9f0e5;white-space:nowrap;border:1px solid #546653;background:#303a32}
+.nv-live-editor.nv-unified-editor-active .nv-unified-controls{margin:0 0 10px;padding:11px 12px 8px;background:#1a2022;border:1px solid #394440}
+.nv-live-editor.nv-unified-editor-active .nv-unified-controls>header{margin-bottom:7px!important;display:flex!important;flex-wrap:wrap;gap:6px 18px!important;align-items:baseline!important}
+.nv-unified-controls h3{color:#f6f9f5;font-size:13px!important;letter-spacing:.15px}
+.nv-live-editor .nv-unified-controls .nv-unified-selection{font-size:11px;color:#aebbb3;white-space:normal}
+.nv-live-editor.nv-unified-editor-active .nv-unified-search{height:30px;padding:5px 9px;font-size:12px;color:#f5f8f3;background:#101617;border:1px solid #47534f}
+.nv-live-editor.nv-unified-editor-active .nv-unified-search:focus{outline:1px solid #76b900;border-color:#76b900}
+.nv-live-editor.nv-unified-editor-active .nv-unified-palette{display:flex;gap:6px;min-height:45px;max-height:45px;margin:8px 0 0;overflow-x:auto;overflow-y:hidden;padding:0 0 5px;scrollbar-width:thin}
+.nv-live-editor.nv-unified-editor-active .nv-unified-palette button{flex:0 0 132px;height:35px;min-width:0;gap:5px;padding:3px 8px;background:#2a3235;border:1px solid #454e4b}
+.nv-unified-palette button span{font-size:11px!important}
+.nv-unified-palette button.selected{border-color:#76b900!important;background:#33412e!important;box-shadow:inset 0 0 0 1px #76b900}
+.nv-unified-palette button:hover{background:#3a4940!important}
+.nv-live-editor.nv-unified-editor-active .nv-unified-panel-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;align-items:stretch;margin:0}
+.nv-live-editor.nv-unified-editor-active .nv-unified-panel{display:flex;flex-direction:column;min-width:0;min-height:145px;padding:10px 10px 9px;background:#1c2224;border:1px solid #3c4743}
+.nv-live-editor.nv-unified-editor-active .nv-unified-panel>h3{margin:0 0 9px;padding:0 2px 8px;border-bottom:1px solid #384640;color:#fafcf8;font-size:12px;font-weight:700;letter-spacing:.65px;display:flex;justify-content:space-between;align-items:center}
+.nv-unified-count{color:#abb8b0!important;letter-spacing:0!important}
+.nv-live-editor.nv-unified-editor-active .nv-unified-block-list{min-height:64px;max-height:240px;overflow:auto;scrollbar-width:thin;padding-right:2px;flex:1}
+.nv-live-editor.nv-unified-editor-active .nv-unified-block{padding:0 0 7px;margin:0 0 7px;background:#293134;border:1px solid #3f4b47;transition:border-color .15s ease}
+.nv-unified-block:hover{border-color:#668d58!important}
+.nv-live-editor.nv-unified-editor-active .nv-unified-block-head{display:flex;align-items:center;gap:7px;height:38px;min-height:38px;padding:4px 7px;border-bottom:1px solid #3f4a46}
+.nv-live-editor.nv-unified-editor-active .nv-unified-grip{min-width:23px;width:23px;height:27px;font-size:16px;line-height:24px;border:0;background:transparent;color:#a4b7a7}
+.nv-unified-block-meta{display:flex;flex-direction:column;justify-content:center;flex:1;min-width:0;gap:2px;color:#f2f7ef}
+.nv-unified-block-meta strong{font-size:11px;font-weight:600;line-height:13px}
+.nv-unified-block-meta small{font-size:10px;color:#a0b6a4;line-height:12px}
+.nv-live-editor.nv-unified-editor-active .nv-unified-block-head .nv-unified-block-options{width:29px;height:27px;min-width:29px;flex:0 0 29px;padding:0;background:#303b36;border:1px solid #4b5a4c;color:#f1f7ee;font-size:19px;line-height:19px;cursor:pointer}
+.nv-unified-block-options:hover,.nv-unified-block-options:focus{background:#43593d!important;border-color:#76b900!important;outline:none}
+.nv-live-editor.nv-unified-editor-active .nv-unified-members{display:flex;gap:4px;flex-wrap:wrap;margin:7px 7px 0;align-items:center}
+.nv-live-editor.nv-unified-editor-active .nv-unified-member-cell .nv-unified-member{height:31px;background:#222b2d;border:1px solid #3d4744}
+.nv-live-editor.nv-unified-editor-active .nv-unified-block:not([data-v4-count="1"]) .nv-unified-members{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
+.nv-live-editor.nv-unified-editor-active .nv-unified-block:not([data-v4-count="1"]) .nv-unified-member-cell .nv-unified-member{height:35px}
+.nv-live-editor.nv-unified-editor-active .nv-unified-member-cell .nv-unified-remove{opacity:0;transition:opacity .12s}
+.nv-live-editor.nv-unified-editor-active .nv-unified-member-cell:hover .nv-unified-remove,
+.nv-live-editor.nv-unified-editor-active .nv-unified-remove:focus,
+.nv-live-editor.nv-unified-editor-active .nv-unified-member-cell:focus-within .nv-unified-remove{opacity:1}
+.nv-live-editor.nv-unified-editor-active .nv-unified-add-drop{flex:0 0 30px;margin:4px 0 0;height:30px;min-height:30px;border:1px dashed #586b57;background:#202c25;color:#c7dfbf;font-size:11px}
+.nv-live-editor.nv-unified-editor-active .nv-unified-add-drop:hover{background:#314334;border-color:#76b900}
+.nv-live-editor.nv-unified-editor-active .nv-unified-empty{margin:3px 0;padding:16px 8px;font-size:11px;color:#9baaa1;text-align:center}
+.nv-unified-context-label{font-size:10px;letter-spacing:.55px;color:#a2ba9e;text-transform:uppercase;margin:8px 4px 2px;padding:7px 6px 3px;border-top:1px solid #485349}
+.nv-unified-context-danger{color:#ffb0ac!important}
+.nv-unified-context-danger:hover{background:#603532!important}
+.nv-live-editor.nv-unified-editor-active .nv-unified-message{margin:7px 2px 0;min-height:14px;font-size:10px;color:#a9d97d}
+@media(max-width:1000px){.nv-live-editor.nv-unified-editor-active .nv-unified-panel-row{gap:6px}.nv-live-editor.nv-unified-editor-active .nv-unified-panel{padding:7px}.nv-live-editor.nv-unified-editor-active .nv-unified-palette button{flex-basis:119px}}
+@media(max-width:750px){.nv-live-editor.nv-unified-editor-active .nv-unified-panel-row{grid-template-columns:1fr}.nv-live-editor.nv-unified-editor-active .nv-unified-block-list{max-height:160px}}
+@media(prefers-reduced-motion:reduce){.nv-live-editor.nv-unified-editor-active .nv-unified-block,.nv-live-editor.nv-unified-editor-active .nv-unified-member-cell .nv-unified-remove{transition:none}}
