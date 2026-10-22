@@ -1,0 +1,79 @@
+
+/* NVIDIA Group Layout A — V5 editor only. The native Preview is never cloned. */
+.nv-live-editor.nv-group-layout-on .nv-unified-editor{display:none!important}
+.nv-group-layout-editor{color:#e9eee9;font-family:Arial,"Segoe UI",sans-serif;margin:0 0 16px;min-width:0}
+.nv-group-layout-editor button,.nv-group-layout-editor select{font-family:inherit;cursor:pointer}
+.nv-g-toolbar{display:flex;align-items:center;gap:9px;background:#202629;border-left:3px solid #76b900;padding:9px 12px;margin-bottom:10px}
+.nv-g-toolbar>div{flex:1;display:flex;flex-direction:column;gap:3px}
+.nv-g-toolbar strong{font-size:13px;color:#fff;letter-spacing:.45px}
+.nv-g-toolbar small{font-size:11px;color:#a9bca8}
+.nv-g-toolbar button,.nv-g-group-head select,.nv-g-group-head button{border:1px solid #546259;background:#2f3835;color:#e4eee2;padding:6px 9px;font-size:11px}
+.nv-g-toolbar button:hover,.nv-g-group-head button:hover{border-color:#76b900}
+.nv-g-library{background:#1b2022;border:1px solid #3d4943;padding:10px 12px 7px;margin-bottom:9px}
+.nv-g-library-head{display:flex;gap:15px;justify-content:space-between;align-items:baseline;margin-bottom:7px}
+.nv-g-library-head strong{font-size:13px}
+.nv-g-library-head span{font-size:10px;color:#a9bbaa}
+.nv-g-search{display:block;width:100%;height:30px;background:#111718;color:#f2f7f1;padding:5px 10px;border:1px solid #48544d;font-size:12px}
+.nv-g-search:focus{outline:1px solid #76b900}
+.nv-g-catalog{display:flex;gap:5px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;margin-top:7px;padding-bottom:4px}
+.nv-g-catalog button{flex:0 0 116px;height:35px;display:flex;align-items:center;gap:6px;background:#2a3134;color:#e2e9e1;border:1px solid #434e49;padding:4px 7px;font-size:11px;text-align:left}
+.nv-g-catalog button md-icon{font-size:16px;min-width:19px}
+.nv-g-catalog button span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.nv-g-catalog button.selected{border-color:#76b900;background:#33452f;box-shadow:inset 0 0 0 1px #76b900}
+.nv-g-catalog button:hover{background:#364b39}
+.nv-g-panels{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.nv-g-panel{min-width:0;background:#1b2123;border:1px solid #3c4843;padding:9px;display:flex;flex-direction:column;max-height:352px;min-height:285px}
+.nv-g-panel>header{display:flex;justify-content:space-between;align-items:center;padding:3px 2px 8px;border-bottom:1px solid #404b46;font-size:12px;color:#fff}
+.nv-g-panel>header span{font-size:10px;color:#afbeb3}
+.nv-g-group-list{flex:1;overflow-y:auto;overscroll-behavior:contain;min-height:0;scrollbar-width:thin;padding:9px 1px 0}
+.nv-g-add{flex:0 0 29px;margin-top:7px;border:1px dashed #66815b;background:#253329;color:#badba9;font-size:11px}
+.nv-g-add:hover{background:#334938;border-color:#76b900}
+.nv-g-group{min-height:226px;max-width:330px;border:1px solid #59645b;background:#252d2f;margin:0 0 10px;padding:6px}
+.nv-g-group-head{display:flex;gap:5px;align-items:center;min-height:30px;border-bottom:1px solid #48534e;padding-bottom:5px;margin-bottom:6px}
+.nv-g-group-head strong{white-space:nowrap;color:#f5f6f3;font-size:11px}
+.nv-g-group-head>span{white-space:nowrap;color:#a0b6a5;font-size:9px;flex:1}
+.nv-g-group-head select{max-width:89px;font-size:10px;min-width:0;padding:4px 2px;background:#192321}
+.nv-g-group-head button.nv-g-delete{padding:3px 7px}
+.nv-g-block{margin-bottom:5px}
+.nv-g-block-title{display:flex;align-items:center;gap:5px;margin-bottom:4px}
+.nv-g-block-title span{font-size:10px;color:#cadace;flex:1}
+.nv-g-block-title select{width:70%;min-width:0;height:25px;padding:3px 5px;background:#202b2a;border:1px solid #526456;color:#e0eddb;font-size:10px}
+.nv-g-line{display:flex;gap:3px;height:46px}
+.nv-g-line[data-g-kind="big"]{height:153px}
+.nv-g-cell{position:relative;min-width:0;height:100%}
+.nv-g-cell>button[data-g-slot]{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:100%;height:100%;min-width:0;background:#1d2628;color:#fff;border:1px solid #485851;padding:4px 1px}
+.nv-g-line[data-g-kind="side"] .nv-g-cell>button[data-g-slot]{flex-direction:row;justify-content:flex-start;gap:5px;padding:4px 7px}
+.nv-g-line[data-g-kind="big"] .nv-g-cell>button[data-g-slot]{font-size:12px}
+.nv-g-line[data-g-kind="big"] .nv-g-cell>button[data-g-slot] md-icon{font-size:45px;width:56px;height:58px}
+.nv-g-cell>button[data-g-slot] span{white-space:nowrap;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;font-size:10px}
+.nv-g-cell>button[data-g-slot].empty{border-style:dashed;color:#95b293}
+.nv-g-cell>button[data-g-slot]:hover,.nv-g-cell>button[data-g-slot]:focus{border-color:#76b900;background:#334b33;outline:none}
+.nv-g-cell .nv-g-clear{position:absolute;right:2px;top:2px;font-size:10px;line-height:15px;padding:0 3px;background:#26312d;color:#d9ece0;border:1px solid #52665a;opacity:0}
+.nv-g-cell:hover .nv-g-clear,.nv-g-cell .nv-g-clear:focus{opacity:1}
+.nv-g-expand{display:flex;gap:6px;margin-top:8px}
+.nv-g-expand button{flex:1;height:23px;background:#26362b;color:#c7dfbd;border:1px dashed #62755b;font-size:10px}
+.nv-g-expand button:hover{border-color:#76b900}
+.nv-g-empty{color:#97a9a1;text-align:center;font-size:11px;padding:40px 6px}
+.nv-g-message{margin-top:7px;min-height:15px;font-size:11px;color:#a7d57c}
+.nv-group-layout-on .nv-unified-controls,.nv-group-layout-on .nv-unified-panel-row{display:none!important}
+@media(max-width:930px){.nv-g-panels{gap:5px}.nv-g-panel{padding:6px}.nv-g-group-head>span{display:none}}
+@media(max-width:650px){.nv-g-panels{grid-template-columns:1fr}.nv-g-panel{max-height:235px;min-height:180px}}
+
+/* Opt-in action is part of the existing native-style V4 toolbar. */
+.nv-live-editor .nv-unified-guide button.nv-g-launch{
+  flex:0 0 auto;
+  min-width:105px;
+  min-height:31px;
+  padding:5px 11px;
+  background:#2c362e;
+  color:#d6eccd;
+  border:1px solid #617956;
+  font-size:11px;
+  cursor:pointer;
+}
+.nv-live-editor .nv-unified-guide button.nv-g-launch:hover,
+.nv-live-editor .nv-unified-guide button.nv-g-launch:focus{
+  background:#40543a;
+  border-color:#76b900;
+  outline:none;
+}
