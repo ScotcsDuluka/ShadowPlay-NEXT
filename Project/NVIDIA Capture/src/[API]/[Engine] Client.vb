@@ -256,7 +256,7 @@ Partial Public Class UI_Engine
                         DebugLog($"[CaptureRoute] REJECT mode={OverlayConfig.GetEngineMode()}, api={requested.CaptureMethod}, encoder={requested.Encoder}: {route.ErrorCode}")
                         SendResponse("engine_record_start", "error", route.ErrorCode, reqId)
                     ElseIf (_recordingTask IsNot Nothing AndAlso Not _recordingTask.IsCompleted) OrElse
-                           (_legacyCaptureEngine IsNot Nothing AndAlso _legacyCaptureEngine.IsRecordingLifecycleActive) OrElse
+                           (_legacyCaptureEngine IsNot Nothing AndAlso _legacyCaptureEngine.IsRecordingLifecycleBusy) OrElse
                            _nvRecording Then
                         SendResponse("engine_record_start", "error", "already_recording", reqId)
                     Else

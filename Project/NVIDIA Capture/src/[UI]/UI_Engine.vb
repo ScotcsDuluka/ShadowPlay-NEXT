@@ -293,7 +293,7 @@ Partial Public Class UI_Engine
                 Return
             End If
             If (_recordingTask IsNot Nothing AndAlso Not _recordingTask.IsCompleted) OrElse
-               (_legacyCaptureEngine IsNot Nothing AndAlso _legacyCaptureEngine.IsRecordingLifecycleActive) OrElse
+               (_legacyCaptureEngine IsNot Nothing AndAlso _legacyCaptureEngine.IsRecordingLifecycleBusy) OrElse
                _nvRecording Then
                 DebugLog("[REST] REJECT already_recording (cross-backend reservation)")
                 Return
@@ -708,7 +708,7 @@ Partial Public Class UI_Engine
             ' engine mid-mux: jobGuard.Dispose killed the mux ffmpeg and
             ' ForceStop raced the mux's temp-file fallback → recording lost.
             If _legacyCaptureEngine IsNot Nothing AndAlso
-               _legacyCaptureEngine.IsRecordingLifecycleActive Then
+               _legacyCaptureEngine.IsRecordingLifecycleBusy Then
                 DebugLog("[Engine] RECORD_START rejected: recording lifecycle active")
                 SendResponse("engine_record_start", "error", "already_recording", reqId)
                 Return
@@ -1165,7 +1165,7 @@ Partial Public Class UI_Engine
                 Throw New InvalidOperationException(selected.ErrorCode)
             End If
             If (_recordingTask IsNot Nothing AndAlso Not _recordingTask.IsCompleted) OrElse
-               (_legacyCaptureEngine IsNot Nothing AndAlso _legacyCaptureEngine.IsRecordingLifecycleActive) OrElse
+               (_legacyCaptureEngine IsNot Nothing AndAlso _legacyCaptureEngine.IsRecordingLifecycleBusy) OrElse
                _nvRecording Then
                 Throw New InvalidOperationException("already_recording")
             End If
@@ -1202,7 +1202,7 @@ Partial Public Class UI_Engine
             ' disposing during the stop flow's mux phase killed the mux
             ' ffmpeg (job close) and deleted the temp files it was reading.
             If _legacyCaptureEngine IsNot Nothing AndAlso
-               _legacyCaptureEngine.IsRecordingLifecycleActive Then
+               _legacyCaptureEngine.IsRecordingLifecycleBusy Then
                 DebugLog("[Engine] Record click rejected: recording lifecycle active")
                 engine.Dispose()
                 btnStop.Enabled = _legacyCaptureEngine.IsRecording

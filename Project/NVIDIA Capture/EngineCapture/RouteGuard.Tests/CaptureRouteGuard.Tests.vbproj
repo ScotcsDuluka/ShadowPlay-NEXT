@@ -9,5 +9,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../src/[API]/CaptureBackendRoute.vb" Link="CaptureBackendRoute.vb" />
+    <Compile Include="../../src/[API]/FFmpegRuntimeProbe.vb" Link="FFmpegRuntimeProbe.vb" />
+    <Compile Include="../../src/[API]/CaptureHttpRequestReader.vb" Link="CaptureHttpRequestReader.vb" />
   </ItemGroup>
 </Project>
