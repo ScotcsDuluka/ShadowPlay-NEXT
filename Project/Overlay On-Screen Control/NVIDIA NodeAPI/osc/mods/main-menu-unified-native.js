@@ -215,6 +215,7 @@
       ghost=null;drag=null;wrap.classList.remove('nv-unified-dragging');
     }
     function dragDown(event){
+      if(!wrap.contains(event.target))return;
       if(event.button!==0||event.target.closest('select,input,[data-v4-remove],[data-v4-undo],[data-v4-shift],[data-v4-add],[data-v4-join]'))return;
       var tile=event.target.closest('[data-v4-drag]'),grip=event.target.closest('.nv-unified-grip');
       if(!tile&&!grip)return;
@@ -269,7 +270,7 @@
     function preventNativeDrag(event){if(event.target.closest('[data-v4-drag]'))event.preventDefault();}
     function cancelOnKey(event){if(event.key==='Escape'&&drag){cancelDrag();event.preventDefault();}}
     function suppressAfterDrag(event){if(suppressClick){event.preventDefault();event.stopImmediatePropagation();}}
-    wrap.addEventListener('mousedown',dragDown,true);
+    document.addEventListener('mousedown',dragDown,true);
     document.addEventListener('mousemove',dragMove,true);
     document.addEventListener('mouseup',dragUp,true);
     document.addEventListener('keydown',cancelOnKey,true);
@@ -278,6 +279,7 @@
     var destroyTimer=window.setInterval(function(){
       if(wrap.isConnected)return;
       window.clearInterval(destroyTimer);cancelDrag();
+      document.removeEventListener('mousedown',dragDown,true);
       document.removeEventListener('mousemove',dragMove,true);
       document.removeEventListener('mouseup',dragUp,true);
       document.removeEventListener('keydown',cancelOnKey,true);
