@@ -284,14 +284,30 @@ html.nv-motion-closing body .nv-live-editor {
 html.nv-live-layout-editing nv-osc-top-bar .top-bar {visibility:hidden!important;pointer-events:none!important;}
 
 
+/* The V5 top viewing strip has a real dark backdrop. Keep it BEHIND the
+   existing native md-menu nodes (z-index 2), never above their click targets.
+   The editor shell is layered above this but has pointer-events:none in its
+   top band, so native buttons keep their original handlers. */
+html.nv-live-layout-editing {
+  --nv-top-preview-height:380px;
+}
+html.nv-live-layout-editing:not(.nv-motion-active):not(.nv-motion-preparing):not(.nv-motion-opening):not(.nv-motion-closing) body [nv-main-menu-live-editor]::before {
+  content:"";
+  position:fixed;
+  top:40px;
+  left:40px;
+  right:40px;
+  height:var(--nv-top-preview-height);
+  background:#101617;
+  pointer-events:none;
+  z-index:1;
+}
 /* Restore the REAL NVIDIA Main-menu during Customize:
    the Settings shell stays 40px from all viewport edges, but its upper band
-   is a transparent viewing window rather than a solid overlay. The original
-   md-menu tiles remain mounted, clickable, and driven by OSC Motion. */
+   is transparent so the native tiles and dark backdrop remain visible. */
 html body .nv-live-editor,
 html body .nv-live-editor.nv-unified-editor-active {
-  /* Share one top-view boundary with V5 native layout sizing. */
-  --nv-top-preview-height:380px;
+  /* Inherits the same upper band height as the native backdrop. */
   background:linear-gradient(to bottom,
     rgba(0,0,0,.08) 0,
     rgba(0,0,0,.08) var(--nv-top-preview-height),
@@ -315,9 +331,9 @@ html.nv-live-layout-editing body .main-menu-container md-menu {
 /* On shorter displays prioritize usable native panel; content scrolls there.
    The outer 40px border remains unchanged. */
 @media(max-height:760px) {
+  html.nv-live-layout-editing {--nv-top-preview-height:272px;}
   html body .nv-live-editor,
   html body .nv-live-editor.nv-unified-editor-active {
-    --nv-top-preview-height:272px;
     padding-top:calc(var(--nv-top-preview-height) + 18px) !important;
   }
 }

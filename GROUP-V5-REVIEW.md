@@ -40,3 +40,15 @@ Do not auto-deploy. Review against the other session's live V5 editor changes, t
 - Reloaded **CEF page only**, `Page.reload(ignoreCache=true)`. CDP confirmed route remained `#/base`, V5 enabled, updated renderer contains `--nv-top-preview-height`, and Side ratio is `[3,1]`.
 - Actual click-target hit testing on the Customize route is still outstanding: CEF was on `#/base` during verification. Do not claim that a live visual/click test has passed yet. Do not restart the game to verify.
 - The main worktree already contained unrelated changes; do not cherry-pick this review branch indiscriminately over those uncommitted changes.
+
+## V5 Top View backdrop / click-through (2026-10-22)
+
+- User screenshot showed the ChatGPT window behind translucent Customize Top View, making unrelated UI appear inside OSC.
+- Live CDP on actual `#/base/main-menu` measured 12 native tile centers and verified the native target or its descendants received all 12 hits. The previous viewing strip used `rgba(0,0,0,.08)` and had no opaque background behind its native tiles.
+- Tested an opaque NVIDIA-dark `#101617` noninteractive pseudo-element on the existing `[nv-main-menu-live-editor]` wrapper, behind native `md-menu-bar` z-index 2. The pseudo-element has `pointer-events:none` and z-index 1; the existing Settings shell passes top-band pointer events through.
+- Promoted `--nv-top-preview-height` to the editing root so the backdrop and shell have the same 380px/272px responsive boundary. Motion transition phases exclude the new backdrop.
+- Isolated regression 124/124 passed. Main project regression 118/118 passed.
+- Safely copied only the CSS and new regression test to real Source/Runtime, backed up old Source and Runtime CSS under `C:\My Project\NVIDIA-Shadowplay\build_test\NVIDIA GroupLayout Backdrop Fix 20261022`.
+- Live CEF confirmed new stylesheet has the backdrop rule, removed the temporary injection, and verified all 12 of 12 native tile centers remain hit-testable.
+- Visual evidence from REAL CEF after permanent stylesheet: `build_test/NVIDIA GroupLayout Backdrop Fix 20261022/live-after-backdrop.png`.
+- No game restart, no capture backend modifications. Button handlers were not deliberately clicked (some invoke game/capture actions), so hit-testing is not a substitute for functional end-to-end verification.
