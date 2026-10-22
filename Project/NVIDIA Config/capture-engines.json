@@ -4,6 +4,15 @@
   "selectionLocked": true,
   "activeCaptureId": "duluka:dxgi",
   "activeEncoderId": "nvidia:nvenc-h264",
+  "runtimeRouting": {
+    "sourceOfTruth": "Config/config.json Recording.engine_mode and api_capture",
+    "mode": "legacy-compatible-strict",
+    "ffmpegEventBus": true,
+    "nativeDuluka": true,
+    "directHttpOtherBackends": false,
+    "obsCapture": false,
+    "nvfbcCapture": false
+  },
   "providers": {
     "Duluka": {
       "configured": true,
@@ -11,7 +20,7 @@
     },
     "FFmpeg": {
       "configured": false,
-      "note": "Existing FFmpeg tools and source; route switch not wired to NvCapture."
+      "note": "Available via existing LegacyCaptureEngine when unified engine_mode=FFmpeg. Requires FFmpeg runtime/encoder validation; direct HTTP start is not wired."
     },
     "OBS": {
       "configured": false,

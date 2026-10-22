@@ -246,22 +246,45 @@ Partial Public Class UI_Engine
         Try
             Select Case cmd
                 Case "engine_record_start"
-                    If _useNewEngine AndAlso _recordingEngine IsNot Nothing Then
-                        Await HandleRecordingStart(value, reqId)
+                    ' Phase 2: choose the backend from effective engine_mode, NOT
+                    ' from whether a native runtime happened to initialize.
+                    ' A wrong API/codec must fail before spawning any recorder.
+                    Dim requested As CaptureSettings = CaptureSettings.Load(_configPath)
+                    Dim route = CaptureBackendRoute.Decide(
+                        OverlayConfig.GetEngineMode(), requested.CaptureMethod, requested.Encoder)
+                    If Not route.Allowed Then
+                        DebugLog($"[CaptureRoute] REJECT mode={OverlayConfig.GetEngineMode()}, api={requested.CaptureMethod}, encoder={requested.Encoder}: {route.ErrorCode}")
+                        SendResponse("engine_record_start", "error", route.ErrorCode, reqId)
+                    ElseIf (_recordingTask IsNot Nothing AndAlso Not _recordingTask.IsCompleted) OrElse
+                           (_legacyCaptureEngine IsNot Nothing AndAlso _legacyCaptureEngine.IsRecordingLifecycleActive) OrElse
+                           _nvRecording Then
+                        SendResponse("engine_record_start", "error", "already_recording", reqId)
                     Else
-                        ' ★ P13-AUDIO-TIMELINE: loud, greppable pipeline marker.
-                        ' Every legacy-pipeline recording MUST announce itself —
-                        ' the [speech][speech][apad-silence] owner evidence was
-                        ' produced by THIS branch while the live-mux fixes were
-                        ' invisible (fallback happened silently at startup).
-                        Dim reasonTxt As String = If(String.IsNullOrEmpty(_engineInitFailReason),
-                                                     "",
-                                                     " — init failed: " & _engineInitFailReason)
-                        DebugLog($"★★ PIPELINE = LEGACY LegacyCaptureEngine (live-mux NOT active{reasonTxt}) — audio = WAV + apad mux ★★")
-                        Await HandleEngineRecordStart(value, reqId)
+                        Select Case route.Kind
+                            Case "Duluka"
+                                If Not _useNewEngine OrElse Not _engineReady OrElse
+                                   _recordingEngine Is Nothing Then
+                                    SendResponse("engine_record_start", "error", "native_engine_not_ready", reqId)
+                                Else
+                                    DebugLog("[CaptureRoute] selected Duluka DXGI -> native NVENC_H264")
+                                    Await HandleRecordingStart(value, reqId)
+                                End If
+                            Case "FFmpeg"
+                                DebugLog($"[CaptureRoute] selected FFmpeg {route.CaptureApi} -> {route.Encoder}")
+                                Await HandleEngineRecordStart(value, reqId)
+                            Case "InstalledNvidia"
+                                DebugLog("[CaptureRoute] selected installed GeForce Experience recorder (not NvFBC)")
+                                Await HandleEngineRecordStart(value, reqId)
+                            Case Else
+                                SendResponse("engine_record_start", "error", "unsupported_capture_route", reqId)
+                        End Select
                     End If
                 Case "engine_record_stop"
-                    If _useNewEngine AndAlso _recordingEngine IsNot Nothing Then
+                    ' Stop whichever session actually owns the recording, even if
+                    ' the user has changed engine_mode while it was active.
+                    If _nvRecording Then
+                        HandleNvidiaRecordStop(reqId)
+                    ElseIf _recordingTask IsNot Nothing AndAlso Not _recordingTask.IsCompleted Then
                         Await HandleRecordingStop(reqId)
                     Else
                         Await HandleEngineRecordStop(reqId)
@@ -273,7 +296,15 @@ Partial Public Class UI_Engine
                 Case "engine_replay_save"
                     HandleEngineReplaySave(value, reqId)
                 Case "engine_get_status"
-                    If _useNewEngine AndAlso _recordingEngine IsNot Nothing Then
+                    ' The running session owner is authoritative, regardless
+                    ' of whether the native engine is also initialized.
+                    If _nvRecording OrElse
+                       (_legacyCaptureEngine IsNot Nothing AndAlso _legacyCaptureEngine.IsRecordingLifecycleActive) Then
+                        HandleEngineGetStatus(reqId)
+                    ElseIf _recordingTask IsNot Nothing AndAlso Not _recordingTask.IsCompleted Then
+                        HandleRecordingGetStatus(reqId)
+                    ElseIf _useNewEngine AndAlso _recordingEngine IsNot Nothing AndAlso
+                           OverlayConfig.GetEngineMode() = "ddagrab" Then
                         HandleRecordingGetStatus(reqId)
                     Else
                         HandleEngineGetStatus(reqId)

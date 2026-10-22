@@ -60,3 +60,26 @@ test('catalog rejects malformed JSON', async () => {
     assert.equal(response.code, 503);
   });
 });
+
+test('passes through worker actual route without claiming a new provider ready', async () => {
+  await withServer(res => {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      schemaVersion: 1, readOnly: true,
+      selected: { captureId: 'duluka:dxgi', policyOnly: true },
+      providers: [{ id: 'FFmpeg', routeWired: true, runtimeReady: false }],
+      workerRuntime: {
+        schemaVersion: 2, readOnly: true,
+        configured: { backend: 'FFmpeg', allowed: true, captureApi: 'gdigrab' },
+        actualSessionBackend: 'FFmpeg'
+      }
+    }));
+  }, async port => {
+    const result = await invoke(port);
+    assert.equal(result.code, 200);
+    assert.equal(result.data.selected.policyOnly, true);
+    assert.equal(result.data.workerRuntime.configured.backend, 'FFmpeg');
+    assert.equal(result.data.workerRuntime.actualSessionBackend, 'FFmpeg');
+    assert.equal(result.data.providers[0].runtimeReady, false);
+  });
+});

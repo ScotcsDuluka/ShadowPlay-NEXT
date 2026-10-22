@@ -141,6 +141,7 @@
        app's SDK recursive globs; each nested project owns its own compilation. -->
   <ItemGroup>
     <Compile Remove="EngineCapture\Duluka Capture\**\*.vb" />
+    <Compile Remove="EngineCapture\RouteGuard.Tests\**\*.vb" />
     <EmbeddedResource Remove="EngineCapture\Duluka Capture\**\*.resx" />
   </ItemGroup>
 </Project>

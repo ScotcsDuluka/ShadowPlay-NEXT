@@ -30,6 +30,21 @@ Partial Public Class UI_Engine
     Private _restLastFile As String = ""
     Private ReadOnly _restLock As New Object()
 
+    ' Route selection is evaluated from unified config on demand, not by
+    ' guessing from whether the DXGI encoder happened to initialize.
+    Private Function RestConfiguredRoute() As CaptureBackendRoute.Decision
+        Dim current As CaptureSettings = CaptureSettings.Load(_configPath)
+        Return CaptureBackendRoute.Decide(
+            OverlayConfig.GetEngineMode(), current.CaptureMethod, current.Encoder)
+    End Function
+
+    Private Function RestActiveRoute() As String
+        If _nvRecording Then Return "InstalledNvidia"
+        If _recordingTask IsNot Nothing AndAlso Not _recordingTask.IsCompleted Then Return "Duluka"
+        If _legacyCaptureEngine IsNot Nothing AndAlso _legacyCaptureEngine.IsRecordingLifecycleActive Then Return "FFmpeg"
+        Return ""
+    End Function
+
     Public Sub StartCaptureRestApi()
         If _restApiRunning Then Return
         _restApiRunning = True
@@ -132,38 +147,76 @@ Partial Public Class UI_Engine
                 Return $"{{""ok"":true,""engine"":""NvCapture"",""ready"":{_engineReady.ToString().ToLowerInvariant()},""recording"":{RestRecording().ToString().ToLowerInvariant()}}}"
             End If
 
-            ' Diagnostic catalog: the current NEW RecordingEngine initializes native
-            ' DXGI Desktop Duplication + NVENC. It does not implement engine switching.
+            ' Report both requested route and actual session owner. A codec
+            ' is never advertised as active just because a config selected it.
             If path = "/engines" AndAlso method = "GET" Then
-                Dim configuredCodec As String = ""
+                Dim requested = RestConfiguredRoute()
+                Dim nativeCodec As String = ""
                 If _engineReady AndAlso _recordingEngine IsNot Nothing AndAlso
                    _recordingEngine.StartupEcho IsNot Nothing Then
-                    configuredCodec = If(_recordingEngine.StartupEcho.CodecKey, "")
+                    nativeCodec = If(_recordingEngine.StartupEcho.CodecKey, "")
                 End If
                 Return JsonSerializer.Serialize(New With {
-                    .schemaVersion = 1,
+                    .schemaVersion = 2,
                     .readOnly = True,
-                    .ready = _engineReady,
+                    .configured = New With {
+                        .backend = requested.Kind,
+                        .captureApi = requested.CaptureApi,
+                        .encoder = requested.Encoder,
+                        .allowed = requested.Allowed,
+                        .error = requested.ErrorCode
+                    },
+                    .actualSessionBackend = RestActiveRoute(),
+                    .nativeRuntimeReady = _engineReady,
+                    .nativeRuntimeCodec = nativeCodec,
                     .recording = RestRecording(),
-                    .captureId = "duluka:dxgi",
-                    .encoderId = "nvidia:nvenc-h264",
-                    .actualEncoderCodec = configuredCodec,
-                    .runtimeWired = True,
-                    .otherProvidersWired = False,
-                    .failure = If(_engineReady, "", If(_engineInitFailReason, "engine_not_ready"))
+                    .otherProvidersReady = False
                 })
             End If
 
             If path = "/state" Then
-                SyncLock _restLock
-                End SyncLock
-                Dim elapsed = 0
-                If RestRecording() AndAlso _newEngineSessionClock.IsRunning Then elapsed = CInt(_newEngineSessionClock.Elapsed.TotalSeconds)
-                Dim outPath = If(_newEngineSessionOutputPath, "")
-                Return $"{{""ready"":{_engineReady.ToString().ToLowerInvariant()},""failReason"":{JStr(_engineInitFailReason)},""recording"":{RestRecording().ToString().ToLowerInvariant()},""enabled"":{RestRecording().ToString().ToLowerInvariant()},""elapsedSec"":{elapsed},""outputPath"":{JStr(outPath)},""lastFile"":{JStr(_restLastFile)}}}"
+                Dim owner As String = RestActiveRoute()
+                Dim elapsed As Integer = 0
+                Dim outPath As String = ""
+                If owner = "Duluka" Then
+                    If _newEngineSessionClock.IsRunning Then
+                        elapsed = CInt(_newEngineSessionClock.Elapsed.TotalSeconds)
+                    End If
+                    outPath = If(_newEngineSessionOutputPath, "")
+                ElseIf owner = "FFmpeg" AndAlso _legacyCaptureEngine IsNot Nothing Then
+                    elapsed = CInt(_legacyCaptureEngine.RecordingDuration.TotalSeconds)
+                    outPath = If(_legacyCaptureEngine.OutputFile, "")
+                ElseIf owner = "InstalledNvidia" Then
+                    elapsed = _nvRecorder.ElapsedSeconds
+                End If
+                Dim active As Boolean = owner.Length > 0
+                Return JsonSerializer.Serialize(New With {
+                    .ready = _engineReady,
+                    .nativeRuntimeReady = _engineReady,
+                    .failReason = If(_engineInitFailReason, ""),
+                    .recording = active,
+                    .enabled = active,
+                    .actualSessionBackend = owner,
+                    .elapsedSec = elapsed,
+                    .outputPath = outPath,
+                    .lastFile = _restLastFile
+                })
             End If
 
             If path = "/record/start" AndAlso method = "POST" Then
+                Dim requested = RestConfiguredRoute()
+                If Not requested.Allowed Then
+                    Return JsonSerializer.Serialize(New With {.started = False, .error = requested.ErrorCode})
+                End If
+                ' Direct REST start still uses the native handler. FFmpeg/installed
+                ' NVIDIA are dispatched by the established event-bus/REST poller.
+                ' Reject instead of starting an unselected native encoder.
+                If requested.Kind <> "Duluka" Then
+                    Return "{""started"":false,""error"":""direct_http_route_not_wired_use_capture_event_bus""}"
+                End If
+                If (_legacyCaptureEngine IsNot Nothing AndAlso _legacyCaptureEngine.IsRecordingLifecycleActive) OrElse _nvRecording Then
+                    Return "{""started"":false,""error"":""already_recording_other_backend""}"
+                End If
                 If Not _engineReady OrElse _recordingEngine Is Nothing Then
                     Return "{""started"":false,""error"":""engine_not_ready"",""failReason"":" & JStr(_engineInitFailReason) & "}"
                 End If
@@ -183,6 +236,9 @@ Partial Public Class UI_Engine
             End If
 
             If path = "/record/stop" AndAlso method = "POST" Then
+                If (_legacyCaptureEngine IsNot Nothing AndAlso _legacyCaptureEngine.IsRecordingLifecycleActive) OrElse _nvRecording Then
+                    Return "{""stopped"":false,""error"":""direct_http_route_not_wired_use_capture_event_bus""}"
+                End If
                 If _recordingTask Is Nothing OrElse _recordingTask.IsCompleted Then
                     Return "{""stopped"":false,""error"":""not_recording""}"
                 End If
@@ -221,9 +277,9 @@ Partial Public Class UI_Engine
         End Try
     End Function
 
-    ' ── truth: session active = host clock รัน + task ยังไม่จบ ──
+    ' ── truth: any real owner is active (not the configured selector). ──
     Private Function RestRecording() As Boolean
-        Return _engineReady AndAlso _recordingTask IsNot Nothing AndAlso Not _recordingTask.IsCompleted
+        Return RestActiveRoute().Length > 0
     End Function
 
     ' ── output path: videos จาก genuine /RecordPaths → fallback OutputDirectory/MyVideos ──

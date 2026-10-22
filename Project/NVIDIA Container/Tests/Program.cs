@@ -20,7 +20,8 @@ Check("Stable policy valid", data.GetProperty("policyValid").GetBoolean());
 Check("Readonly catalog", data.GetProperty("readOnly").GetBoolean());
 Check("Selected route DXGI", data.GetProperty("selected").GetProperty("captureId").GetString() == "duluka:dxgi");
 Check("Duluka wired", data.GetProperty("providers")[0].GetProperty("routeWired").GetBoolean());
-Check("FFmpeg not wired", !data.GetProperty("providers")[1].GetProperty("routeWired").GetBoolean());
+Check("FFmpeg routed via existing legacy recording lane", data.GetProperty("providers")[1].GetProperty("routeWired").GetBoolean());
+Check("FFmpeg readiness not inferred from source", !data.GetProperty("providers")[1].GetProperty("runtimeReady").GetBoolean());
 Check("OBS not wired", !data.GetProperty("providers")[2].GetProperty("routeWired").GetBoolean());
 Check("NvFBC not wired", !data.GetProperty("providers")[3].GetProperty("routeWired").GetBoolean());
 Check("Disabled runtime not ready", !Read(args[0], false, true).GetProperty("captureRuntimeReady").GetBoolean());
@@ -37,4 +38,12 @@ try
     Check("Unsafe selection policy invalid", !invalid.GetProperty("policyValid").GetBoolean());
 }
 finally { File.Delete(temporary); }
+using var fakeWorkerDocument = JsonDocument.Parse(
+    "{\"schemaVersion\":2,\"readOnly\":true,\"configured\":{\"backend\":\"FFmpeg\"},\"actualSessionBackend\":\"FFmpeg\"}");
+var withWorker = JsonSerializer.SerializeToElement(CaptureEngineCatalog.Snapshot(
+    args[0], true, true, fakeWorkerDocument.RootElement.Clone()));
+Check("Worker truth included alongside locked policy",
+    withWorker.GetProperty("workerRuntime").GetProperty("configured").GetProperty("backend").GetString() == "FFmpeg");
+Check("Policy remains baseline, not live selection",
+    withWorker.GetProperty("selected").GetProperty("policyOnly").GetBoolean());
 Console.WriteLine("PASS: " + passed + " capture catalog tests");

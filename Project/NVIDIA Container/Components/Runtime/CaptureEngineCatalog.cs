@@ -6,7 +6,8 @@ using System.Text.Json;
 // Never equate a provider's source folder or ffmpeg binary with a usable route.
 internal static class CaptureEngineCatalog
 {
-    internal static object Snapshot(string configPath, bool runtimeEnabled, bool runtimeReady)
+    internal static object Snapshot(string configPath, bool runtimeEnabled, bool runtimeReady,
+        JsonElement? workerRuntime = null)
     {
         bool configValid = false;
         bool locked = true;
@@ -42,7 +43,9 @@ internal static class CaptureEngineCatalog
             policyError = configurationError,
             captureRuntimeEnabled = runtimeEnabled,
             captureRuntimeReady = ready,
-            selected = new { captureId = "duluka:dxgi", encoderId = "nvidia:nvenc-h264" },
+            // Locked policy baseline, not necessarily the user's currently requested route.
+            selected = new { captureId = "duluka:dxgi", encoderId = "nvidia:nvenc-h264", policyOnly = true },
+            workerRuntime,
             providers = new object[]
             {
                 new { id = "Duluka", captureApis = new[] { "dxgi_desktop_duplication" },
@@ -51,8 +54,8 @@ internal static class CaptureEngineCatalog
                     note = "Actual NvCapture Ddagrab + native NVENC; may run only after runtime readiness." },
                 new { id = "FFmpeg", captureApis = new[] { "ddagrab", "gdigrab", "gfxcapture" },
                     encoders = new[] { "h264_nvenc", "libx264" },
-                    routeWired = false, runtimeReady = false,
-                    note = "Existing FFmpeg source/tooling, not selectable through NvCapture worker yet." },
+                    routeWired = true, runtimeReady = false,
+                    note = "Existing LegacyCaptureEngine is routed from TCP and record-state poller; require a real FFmpeg runtime probe before claiming ready. Direct HTTP start/stop is not wired." },
                 new { id = "OBS", captureApis = new[] { "obs_managed" },
                     encoders = new[] { "obs_managed" },
                     routeWired = false, runtimeReady = false,
