@@ -112,6 +112,17 @@
       var b=a.splice(index,1)[0];a.splice(Math.max(0,Math.min(a.length,Number(to)||0)),0,b);
     });
   }
+  function moveBlock(src,fromPanel,fromIndex,toPanel,toIndex){
+    if(PANELS.indexOf(fromPanel)<0||PANELS.indexOf(toPanel)<0)throw Error('Unknown panel');
+    return transaction(src,function(s){
+      var source=s.panels[fromPanel],destination=s.panels[toPanel];
+      if(fromIndex<0||fromIndex>=source.length)throw Error('Missing Block');
+      var b=source.splice(fromIndex,1)[0];
+      var index=Math.max(0,Math.min(destination.length,Number(toIndex)||0));
+      if(fromPanel===toPanel&&index>fromIndex)index--;
+      destination.splice(index,0,b);
+    });
+  }
   function blockHeight(b){
     if(b.controls.length===1)return b.type==='big'?240:80;
     if(b.type==='big')return 240;
@@ -167,5 +178,5 @@
       actualWidth:best.width*best.scale,actualHeight:best.height*best.scale,panels:panelInfo,cells:result};
   }
   return {version:4,PANELS:PANELS,TYPES:TYPES,CONTROLS:CONTROLS,initial:initial,normalize:normalize,validate:validate,clone:clone,locate:locate,
-    toBlock:toBlock,join:join,changeType:changeType,remove:remove,reorder:reorder,blockHeight:blockHeight,layout:layout};
+    toBlock:toBlock,join:join,changeType:changeType,remove:remove,reorder:reorder,moveBlock:moveBlock,blockHeight:blockHeight,layout:layout};
 });
