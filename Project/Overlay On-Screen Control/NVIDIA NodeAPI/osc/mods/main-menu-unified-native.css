@@ -154,3 +154,6 @@ html.nv-live-layout-editing:not(.nv-motion-active):not(.nv-motion-preparing) .ma
 @media(max-width:1000px){.nv-live-editor.nv-unified-editor-active .nv-unified-panel-row{gap:6px}.nv-live-editor.nv-unified-editor-active .nv-unified-panel{padding:7px}.nv-live-editor.nv-unified-editor-active .nv-unified-palette button{flex-basis:119px}}
 @media(max-width:750px){.nv-live-editor.nv-unified-editor-active .nv-unified-panel-row{grid-template-columns:1fr}.nv-live-editor.nv-unified-editor-active .nv-unified-block-list{max-height:160px}}
 @media(prefers-reduced-motion:reduce){.nv-live-editor.nv-unified-editor-active .nv-unified-block,.nv-live-editor.nv-unified-editor-active .nv-unified-member-cell .nv-unified-remove{transition:none}}
+
+/* Prevent the V2-sized flash while returning from native Settings to V4 Main-menu. */
+html.nv-v4-route-settling body nv-main-menu:not([data-customize-preview]) .main-menu-container{visibility:hidden!important;pointer-events:none!important}

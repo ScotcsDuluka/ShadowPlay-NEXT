@@ -71,6 +71,11 @@
       },240);
       return null;
     }
+    // ui-router may attach Main-menu before NVIDIA has laid out its host.
+    // A zero-sized rect means its origin is still transient (often x=0).
+    // Never persist a transform derived from that half-linked geometry.
+    var rootRect=root.getBoundingClientRect&&root.getBoundingClientRect();
+    if(rootRect&&(!rootRect.width||(typeof rootRect.height==='number'&&!rootRect.height)))return null;
     var bar=root.querySelector('md-menu-bar');if(!bar)return null;
     var screenW=window.innerWidth||1920,screenH=window.innerHeight||1080;
     var available=editor?Math.max(180,Math.min(screenH*.35,440)):Math.max(220,Math.min(screenH*.54,700));
@@ -86,6 +91,8 @@
     var railParent=bar.parentElement||bar.offsetParent;
     var stableX;
     if(railParent&&railParent.getBoundingClientRect){
+      var parentRect=railParent.getBoundingClientRect();
+      if(!preMotion&&(!parentRect.width||(typeof parentRect.height==='number'&&!parentRect.height)))return null;
       // The NVIDIA md-toolbar can be translated far outside the centered
       // .main-menu-container. Anchor relative to the actual toolbar, not
       // an assumed 1040px root (otherwise live edits drift off screen).
@@ -396,6 +403,14 @@
     var e=document.querySelector('.nv-live-editor');
     if(e&&(!editor||editor!==e||!e.querySelector('.nv-unified-editor')))getEditor();
     if(!e)editor=null;
+    // Router and native Performance initialization are independent.
+    // If they miss the first frame, heal an unfinished V4 menu without
+    // moving an already positioned menu or resetting persisted controls.
+    var root=document.querySelector('nv-main-menu:not([data-customize-preview]) .main-menu-container');
+    if(root&&root.querySelectorAll&&
+       root.querySelectorAll('md-menu.nv-unified-tile').length<M.CONTROLS.length){
+      nativeGeometry(root);
+    }
   }
   function enableTemporary(value){
     if(value){window.localStorage.setItem(FLAG,'1');state=null;}
@@ -414,4 +429,52 @@
     openEditor:getEditor,observeEditor:observeEditor,lastError:function(){return lastError;},model:M
   };
   if(window.setInterval)window.setInterval(observeEditor,320);
+  // ui-router can report main.main-menu before the directive has measured
+  // its toolbar. Sync in the first visible frames of each internal return
+  // (Preferences -> Main-menu), rather than only on the 500ms GPU poll.
+  if(window.angular&&window.angular.module){
+    window.angular.module('main').run(['$rootScope','$state',function($rootScope,$state){
+      var settleRaf=null,maskTimer=null;
+      function clearRouteMask(){
+        document.documentElement.classList.remove('nv-v4-route-settling');
+        if(maskTimer!==null){window.clearTimeout(maskTimer);maskTimer=null;}
+      }
+      function routeSettle(){
+        if(!window.requestAnimationFrame){clearRouteMask();return;}
+        if(settleRaf!==null&&window.cancelAnimationFrame)window.cancelAnimationFrame(settleRaf);
+        var remaining=16;
+        function frame(){
+          settleRaf=null;
+          if(!enabled()||!$state.current||$state.current.name!=='main.main-menu'){clearRouteMask();return;}
+          var root=document.querySelector('nv-main-menu:not([data-customize-preview]) .main-menu-container');
+          var result=root&&nativeGeometry(root);
+          if(result&&root.querySelectorAll('md-menu.nv-unified-tile').length===M.CONTROLS.length){
+            var bar=root.querySelector('md-menu-bar'),box=bar&&bar.getBoundingClientRect();
+            var correctX=(window.innerWidth-result.actualWidth)/2;
+            if(box&&Math.abs(box.left-correctX)<=3)clearRouteMask();
+          }
+          if(--remaining>0)settleRaf=window.requestAnimationFrame(frame);
+          else clearRouteMask();
+        }
+        settleRaf=window.requestAnimationFrame(frame);
+      }
+      $rootScope.$on('$stateChangeStart',function(e,to,params,from){
+        if(enabled()&&to&&to.name==='main.main-menu'&&from&&
+           /^main\.preferences(?:\.|$)/.test(from.name||'')){
+          document.documentElement.classList.add('nv-v4-route-settling');
+          if(maskTimer!==null)window.clearTimeout(maskTimer);
+          // Never leave the menu invisible if a route fails or OSC closes.
+          maskTimer=window.setTimeout(clearRouteMask,750);
+        }else if(!to||to.name!=='main.main-menu')clearRouteMask();
+      });
+      $rootScope.$on('$stateChangeSuccess',function(e,to){
+        if(to&&to.name==='main.main-menu')routeSettle();
+        else clearRouteMask();
+      });
+      $rootScope.$on('$viewContentLoaded',function(){
+        if($state.current&&$state.current.name==='main.main-menu')routeSettle();
+      });
+      $rootScope.$on('$stateChangeError',clearRouteMask);
+    }]);
+  }
 })(window,document);

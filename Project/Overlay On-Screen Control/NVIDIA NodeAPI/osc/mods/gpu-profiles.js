@@ -68,9 +68,28 @@
 
   // Reposition the original NVIDIA md-menu elements without replacing any
   // Angular controllers, click actions, or focus/keyboard behavior.
+  // Route transitions recreate the native root at 0x0 for a short time.
+  // Give the first V4 route render a few animation frames to settle, rather
+  // than depending on the next unrelated 500ms performance polling tick.
+  var v4RouteRoot=null,v4RouteRaf=null,v4RouteFrames=0;
   function syncNativeMainMenuSlots(root) {
     var unified=window.__dulukaUnifiedMainMenu;
-    if(unified&&unified.enabled()){unified.nativeGeometry(root);return;}
+    if(unified&&unified.enabled()){
+      if(v4RouteRoot!==root){
+        if(v4RouteRaf!==null&&window.cancelAnimationFrame)window.cancelAnimationFrame(v4RouteRaf);
+        v4RouteRoot=root;v4RouteRaf=null;v4RouteFrames=0;
+      }
+      unified.nativeGeometry(root);
+      if(v4RouteFrames<12&&v4RouteRaf===null&&window.requestAnimationFrame){
+        v4RouteRaf=window.requestAnimationFrame(function(){
+          v4RouteRaf=null;
+          if(root!==v4RouteRoot||root.isConnected===false)return;
+          v4RouteFrames++;
+          syncNativeMainMenuSlots(root);
+        });
+      }
+      return;
+    }
     var api=window.__dulukaMenuLayout;if(!api||!root)return;
     var map={};api.items.forEach(function(item){map[item.key]=item.name;});
     function setStyle(element,key,value){if(element.style.getPropertyValue(key)!==value||element.style.getPropertyPriority(key)!=='important')element.style.setProperty(key,value,'important');}

@@ -66,7 +66,8 @@ test('V4 geometry moves the SAME twelve native tiles using native styles',()=>{
 });
 test('legacy native renderer only delegates geometry when V4 opt-in is enabled',()=>{
  assert(gpu.includes('unified&&unified.enabled()'));
- assert(gpu.includes('unified.nativeGeometry(root);return;'));
+ assert(gpu.includes('unified.nativeGeometry(root);'));
+ assert(gpu.includes('v4RouteFrames<12'),'route stabilization must remain bounded');
  assert(gpu.includes('window.__nvUnifiedV4RequestNativeSync=updateMainMenuPerformance'));
  assert(orig.includes('if(v4&&v4.enabled())'));
  assert(orig.includes('window.__dulukaUnifiedMainMenu.openEditor()'));
@@ -198,4 +199,30 @@ test('same Block menu works from card options and native Preview without touchin
  const last=v4.set(moved);
  assert(M.validate(last));
  assert.equal(f.values.DulukaMainMenuLayoutV2,undefined);
+});
+
+test('V4 defers native geometry while a returned Main-menu has zero size',()=>{
+ const f=fake(),u=f.api;u.setEnabled(true);
+ const writes=[];
+ const bar={style:{getPropertyValue:()=>'',getPropertyPriority:()=>'',setProperty:(k,v)=>writes.push([k,v])}};
+ const root={getBoundingClientRect:()=>({width:0,height:0}),querySelector:selector=>selector==='md-menu-bar'?bar:null};
+ assert.equal(u.nativeGeometry(root),null,'must ignore zero-sized route placeholder');
+ assert.equal(writes.length,0,'do not write any incorrect transform during transient route');
+});
+test('V4 defers transform if toolbar parent is not laid out yet',()=>{
+ const f=fake(),u=f.api;u.setEnabled(true);
+ const values={};
+ const bar={offsetLeft:0,parentElement:{getBoundingClientRect:()=>({left:0,width:0,height:0})},
+ style:{getPropertyValue:k=>values[k]||'',getPropertyPriority:()=>'',setProperty:(k,v)=>{values[k]=v;}},
+ classList:{add(){}}};
+ const root={getBoundingClientRect:()=>({width:1040,height:340}),querySelector:q=>q==='md-menu-bar'?bar:null};
+ assert.equal(u.nativeGeometry(root),null);
+ assert.equal(values.transform,undefined,'never set translation against parent x=0 before layout');
+});
+test('first native V4 route revisits geometry on bounded animation frames',()=>{
+ assert(gpu.includes('v4RouteRoot!==root'));
+ assert(gpu.includes('v4RouteFrames<12'));
+ assert(gpu.includes('window.requestAnimationFrame'));
+ assert(gpu.includes('window.cancelAnimationFrame'));
+ assert(js.includes('A zero-sized rect means its origin is still transient'));
 });
