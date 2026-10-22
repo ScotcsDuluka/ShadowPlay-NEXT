@@ -280,8 +280,14 @@ html.nv-motion-closing body .nv-live-editor {
   }
 }
 
-/* Native GFE top bar belongs to the menu; hide it while fullscreen Settings is open. */
-html.nv-live-layout-editing nv-osc-top-bar .top-bar {visibility:hidden!important;pointer-events:none!important;}
+/* Preserve NVIDIA's real top bar (logo, title, X) above the Settings shell.
+   Native OSC Motion still controls the top bar's entrance/exit opacity. */
+html.nv-live-layout-editing nv-osc-top-bar .top-bar {
+  visibility:visible!important;
+  pointer-events:auto!important;
+  position:relative;
+  z-index:85;
+}
 
 
 /* The V5 top viewing strip has a real dark backdrop. Keep it BEHIND the

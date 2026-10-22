@@ -52,3 +52,14 @@ Do not auto-deploy. Review against the other session's live V5 editor changes, t
 - Live CEF confirmed new stylesheet has the backdrop rule, removed the temporary injection, and verified all 12 of 12 native tile centers remain hit-testable.
 - Visual evidence from REAL CEF after permanent stylesheet: `build_test/NVIDIA GroupLayout Backdrop Fix 20261022/live-after-backdrop.png`.
 - No game restart, no capture backend modifications. Button handlers were not deliberately clicked (some invoke game/capture actions), so hit-testing is not a substitute for functional end-to-end verification.
+
+## Genuine NVIDIA `nv-osc-top-bar` restored (2026-10-23)
+
+- User clarified they meant the genuine top bar (NVIDIA logo, `GeForce Experience` title, Close/X), not just the top preview strip.
+- Live CEF audit confirmed `.top-bar` was present at viewport x=0,y=0,size=1920x80 but had `visibility:hidden!important;pointer-events:none!important` under `html.nv-live-layout-editing`.
+- Surgical fix in `osc/mods/main-menu-live.css`: scope to editing mode, set `visibility:visible`, `pointer-events:auto`, `position:relative`, and `z-index:85` (above editor z-index 75). Keep OSC Motion opacity rules intact.
+- Live temporary CSS test verified logo and X rendered; X hit-tested to its own inner icon, before touching Source/Runtime.
+- Dedicated `mainMenuTopBarV5.test.js` first failed against the hiding rule, then passed with the patch. Review regression: 126/126; main Source regression: 120/120.
+- Deployed only this CSS to Source and runtime with backups at `C:\My Project\NVIDIA-Shadowplay\build_test\NVIDIA OSC TopBar Restore 20261023`.
+- Live CEF confirmed permanent stylesheet loaded and temporary override removed. Top bar visible/clickable, Close/X hit-target valid, 12/12 native menu centers hit their original tiles. No close or Capture action was triggered; no game restart.
+- Permanent live screenshot: `build_test\NVIDIA OSC TopBar Restore 20261023\live-after-native-topbar.png`.
