@@ -127,6 +127,20 @@ try {
     }
     $stopped = Invoke-RestMethod -Uri "$base/record/stop" -Method POST -ContentType 'application/json' -Body '{}' -TimeoutSec 45
     if (-not $stopped.stopped) { throw "Stop not confirmed: $($stopped.error)" }
+    if (-not $stopped.media -or -not $stopped.media.verified -or
+        $stopped.media.videoStreams -lt 1) {
+        throw "Final MP4 media evidence missing: $($stopped.media.reason)"
+    }
+    if ($stopped.media.audioStreams -ne 0) {
+        throw "Video-only smoke unexpectedly contained $($stopped.media.audioStreams) audio tracks"
+    }
+    if ($stopped.systemAudioRequestedAtStart -or $stopped.microphoneRequestedAtStart) {
+        throw 'Video-only test unexpectedly requested actual audio devices'
+    }
+    Write-Host "Media evidence: video=$($stopped.media.videoStreams) audio=$($stopped.media.audioStreams) duration=$($stopped.media.durationSec)s"
+    if ([double]$stopped.media.durationSec -lt ([double]$Seconds - 0.75)) {
+        throw "Finalized duration $($stopped.media.durationSec)s is too short for requested $($Seconds)s recording window"
+    }
     $target = [IO.Path]::GetFullPath([string]$stopped.file)
     $recordPrefix = [IO.Path]::GetFullPath($records).TrimEnd([char]92) + [char]92
     if (-not $target.StartsWith($recordPrefix, [StringComparison]::OrdinalIgnoreCase)) {

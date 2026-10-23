@@ -34,6 +34,8 @@ Partial Public Class UI_Engine
     Private _restLastFile As String = ""
     Private ReadOnly _restLock As New Object()
     Private ReadOnly _directRestCommandGate As New SemaphoreSlim(1, 1)
+    Private _directRestSystemAudioRequested As Boolean = False
+    Private _directRestMicrophoneRequested As Boolean = False
 
     ' Route selection is evaluated from unified config on demand, not by
     ' guessing from whether the DXGI encoder happened to initialize.
@@ -132,6 +134,10 @@ Partial Public Class UI_Engine
     Private Async Function StartRestOnUi(route As CaptureBackendRoute.Decision,
                                           outputPath As String) As Task(Of Boolean)
         If RestActiveRoute().Length > 0 Then Return False
+        ' Snapshot user intent when this session starts; device initiation can
+        ' still fail, and the finalized media inspector reports actual tracks.
+        _directRestSystemAudioRequested = _settings IsNot Nothing AndAlso _settings.SystemAudioCapture
+        _directRestMicrophoneRequested = _settings IsNot Nothing AndAlso _settings.MicCapture
         If Not NextRecordingConfig.IsSafeRecordingOutputPath(outputPath) Then
             Throw New ArgumentException("invalid_output_path")
         End If
@@ -141,7 +147,20 @@ Partial Public Class UI_Engine
                     Throw New InvalidOperationException("native_engine_not_ready")
                 End If
                 Await HandleRecordingStart(outputPath, "", LoadOscSnapshot())
-                Return _recordingTask IsNot Nothing AndAlso Not _recordingTask.IsCompleted
+                If _recordingTask Is Nothing Then Return False
+                ' The background Task can exist well BEFORE CaptureSession.Run
+                ' owns an actual DXGI/NVENC session (NVENC rebuild is expensive).
+                ' Returning started=true merely for a queued task caused a 2s
+                ' client-side record window to produce only 0.63s of video.
+                For attempt As Integer = 1 To 100
+                    If _recordingTask.IsCompleted Then Return False
+                    Dim truth = _recordingEngine.GetStatus()
+                    If Not String.IsNullOrWhiteSpace(truth.CurrentSessionId) Then
+                        Return True
+                    End If
+                    Await Task.Delay(100)
+                Next
+                Throw New TimeoutException("native_session_start_pending_check_state")
             Case "FFmpeg"
                 Await HandleEngineRecordStart(outputPath, "")
                 Return _legacyCaptureEngine IsNot Nothing AndAlso _legacyCaptureEngine.IsRecording
@@ -316,9 +335,25 @@ Partial Public Class UI_Engine
                 End If
                 Dim stopped As Boolean = work.GetAwaiter().GetResult()
                 If stopped Then _restLastFile = outputPath
+                Dim mediaEvidence As CaptureMediaInspector.Evidence = Nothing
+                If stopped Then
+                    Dim probePath = ""
+                    Try
+                        If _settings IsNot Nothing AndAlso
+                           Not String.IsNullOrWhiteSpace(_settings.FFmpegPath) Then
+                            probePath = IO.Path.Combine(IO.Path.GetDirectoryName(_settings.FFmpegPath), "ffprobe.exe")
+                        End If
+                    Catch
+                    End Try
+                    If Not File.Exists(probePath) Then probePath = AppLayout.P("FFmpeg", "ffprobe.exe")
+                    mediaEvidence = CaptureMediaInspector.Inspect(outputPath, probePath)
+                End If
                 Return JsonSerializer.Serialize(New With {
                     .stopped = stopped, .backend = owner,
                     .file = If(stopped, outputPath, ""),
+                    .systemAudioRequestedAtStart = _directRestSystemAudioRequested,
+                    .microphoneRequestedAtStart = _directRestMicrophoneRequested,
+                    .media = mediaEvidence,
                     .error = If(stopped, "", "stop_or_finalize_failed")
                 })
                 Finally
