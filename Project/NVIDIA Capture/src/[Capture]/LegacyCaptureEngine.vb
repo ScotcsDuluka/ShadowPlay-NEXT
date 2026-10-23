@@ -166,6 +166,21 @@ Partial Public Class LegacyCaptureEngine
         End Get
     End Property
 
+    ' A start reserves Detecting before FFmpeg has begun writing frames.
+    ' Other command surfaces must not dispose/re-enter while this is in flight.
+    ' Keep this distinct from IsRecordingLifecycleActive: diagnostics must not
+    ' report a recording that has not actually started.
+    Public ReadOnly Property IsRecordingLifecycleBusy As Boolean
+        Get
+            SyncLock _stateLock
+                Return _state = CaptureState.Detecting OrElse
+                       _state = CaptureState.Recording OrElse
+                       _state = CaptureState.Stopping OrElse
+                       _state = CaptureState.Muxing
+            End SyncLock
+        End Get
+    End Property
+
     Public ReadOnly Property OutputFile As String
         Get
             Return _outputFile

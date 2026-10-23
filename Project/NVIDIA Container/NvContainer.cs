@@ -130,6 +130,43 @@ static class NvContainer
         return ConfigBool("captureRuntime", "enabled", false);
     }
 
+    // Diagnostics only. Never starts a recorder or switches the production backend.
+    static object GetCaptureEngineCatalog()
+    {
+        var enabled = CaptureRuntimeEnabled();
+        var ready = enabled && NvCaptureReady();
+        // The policy is intentionally locked. Current configured/active route
+        // comes from the worker, not from guessing which provider the user selected.
+        var worker = enabled ? TryReadCaptureWorkerRoute() : null;
+        return CaptureEngineCatalog.Snapshot(
+            Path.Combine(BuildRoot, "NVIDIA Config", "capture-engines.json"),
+            enabled, ready, worker);
+    }
+
+    static JsonElement? TryReadCaptureWorkerRoute()
+    {
+        try
+        {
+            using var response = NvCaptureHealthHttp.GetAsync(
+                "http://127.0.0.1:" + CaptureRuntimeApiPort() + "/engines").GetAwaiter().GetResult();
+            if (!response.IsSuccessStatusCode) return null;
+            using var document = JsonDocument.Parse(
+                response.Content.ReadAsStringAsync().GetAwaiter().GetResult());
+            var root = document.RootElement;
+            if (!root.TryGetProperty("schemaVersion", out var version) ||
+                version.GetInt32() != 2 ||
+                !root.TryGetProperty("readOnly", out var readOnly) ||
+                readOnly.ValueKind != JsonValueKind.True ||
+                !root.TryGetProperty("configured", out _))
+                return null;
+            return root.Clone();
+        }
+        catch
+        {
+            return null; // Worker may be starting; never manufacture route truth.
+        }
+    }
+
     static int CaptureRuntimeApiPort()
     {
         return ConfigInt("captureRuntime", "apiPort", 59077, 1, 65535);
@@ -783,7 +820,8 @@ static class NvContainer
             GameWatcher.Start();
             TestApi = new ContainerTestApi(TestModeEnabled(), ControlApiPort(), Log,
                 PublishContainerEvents, ObsRuntime, MarkNvGraphicsReady, NvGraphicsStatus,
-                OpenNvGraphics, ApplicationOntologyClient, GameWatcher, OscAdapterLifecycle);
+                OpenNvGraphics, ApplicationOntologyClient, GameWatcher, OscAdapterLifecycle,
+                GetCaptureEngineCatalog);
             TestApi.Start();
             Log("[test-api] test mode " + (TestModeEnabled() ? "enabled: capture/filter actions are simulated" : "disabled"));
             HoldPairing();

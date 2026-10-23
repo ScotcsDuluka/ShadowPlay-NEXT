@@ -23,12 +23,32 @@ Imports System.Threading.Tasks
 
 Partial Public Class UI_Engine
 
-    Private Const RestApiPort As Integer = 59077
+    Private ReadOnly Property RestApiPort As Integer
+        Get
+            Return CaptureIsolation.ApiPort
+        End Get
+    End Property
     Private _restApiListener As TcpListener
     Private _restApiThread As Thread
     Private _restApiRunning As Boolean
     Private _restLastFile As String = ""
     Private ReadOnly _restLock As New Object()
+    Private ReadOnly _directRestCommandGate As New SemaphoreSlim(1, 1)
+
+    ' Route selection is evaluated from unified config on demand, not by
+    ' guessing from whether the DXGI encoder happened to initialize.
+    Private Function RestConfiguredRoute() As CaptureBackendRoute.Decision
+        Dim current As CaptureSettings = CaptureSettings.Load(_configPath)
+        Return CaptureBackendRoute.Decide(
+            OverlayConfig.GetEngineMode(), current.CaptureMethod, current.Encoder)
+    End Function
+
+    Private Function RestActiveRoute() As String
+        If _nvRecording Then Return "InstalledNvidia"
+        If _recordingTask IsNot Nothing AndAlso Not _recordingTask.IsCompleted Then Return "Duluka"
+        If _legacyCaptureEngine IsNot Nothing AndAlso _legacyCaptureEngine.IsRecordingLifecycleActive Then Return "FFmpeg"
+        Return ""
+    End Function
 
     Public Sub StartCaptureRestApi()
         If _restApiRunning Then Return
@@ -79,51 +99,86 @@ Partial Public Class UI_Engine
         End Try
     End Sub
 
-    ' อ่าน HTTP request จาก stream — return {method,path,body} หรือ Nothing
+    ' Shared bounded reader is regression-tested with fragmented TCP payloads.
     Private Function ReadHttpRequest(stream As NetworkStream) As Dictionary(Of String, String)
+        Return CaptureHttpRequestReader.Read(stream)
+    End Function
+
+    ' The HTTP listener runs on ThreadPool threads while existing recording
+    ' handlers own WinForms state. Marshal commands onto that same UI thread,
+    ' otherwise REST start/stop races the event bus and touches UI controls.
+    Private Function OnCaptureUiAsync(work As Func(Of Task(Of Boolean))) As Task(Of Boolean)
+        Dim result As New TaskCompletionSource(Of Boolean)(
+            TaskCreationOptions.RunContinuationsAsynchronously)
         Try
-            Dim buf(8191) As Byte
-            Dim sb As New StringBuilder()
-            Dim headerEnd As Integer = -1
-            Dim total As Integer = 0
-            ' อ่านจนจบ header
-            While headerEnd < 0 AndAlso total < buf.Length
-                Dim n = stream.Read(buf, 0, buf.Length)
-                If n <= 0 Then Exit While
-                sb.Append(Encoding.ASCII.GetString(buf, total, n))
-                total += n
-                headerEnd = sb.ToString().IndexOf(vbCr & vbLf & vbCr & vbLf, StringComparison.Ordinal)
-            End While
-            If headerEnd < 0 Then Return Nothing
-            Dim head = sb.ToString().Substring(0, headerEnd)
-            Dim lines = head.Split({vbCr & vbLf}, StringSplitOptions.None)
-            If lines.Length = 0 Then Return Nothing
-            Dim reqLine = lines(0).Split(" "c)
-            If reqLine.Length < 2 Then Return Nothing
-            Dim bodyLen = 0
-            For Each ln In lines
-                If ln.ToLowerInvariant().StartsWith("content-length:") Then
-                    Integer.TryParse(ln.Substring(15).Trim(), bodyLen)
-                End If
-            Next
-            Dim bodyStart = headerEnd + 4
-            Dim bodyBytes(bodyLen - 1) As Byte
-            Dim have = total - bodyStart
-            If have > 0 Then Array.Copy(buf, bodyStart, bodyBytes, 0, Math.Min(have, bodyLen))
-            ' อ่าน body ที่เหลือ
-            While have < bodyLen
-                Dim n = stream.Read(bodyBytes, have, bodyLen - have)
-                If n <= 0 Then Exit While
-                have += n
-            End While
-            Return New Dictionary(Of String, String) From {
-                {"method", reqLine(0)},
-                {"path", reqLine(1)},
-                {"body", Encoding.UTF8.GetString(bodyBytes)}
-            }
-        Catch
-            Return Nothing
+            If Me.IsDisposed OrElse Not Me.IsHandleCreated Then
+                result.SetException(New InvalidOperationException("capture_ui_unavailable"))
+            Else
+                Me.BeginInvoke(New Action(
+                    Async Sub()
+                        Try
+                            result.TrySetResult(Await work())
+                        Catch ex As Exception
+                            result.TrySetException(ex)
+                        End Try
+                    End Sub))
+            End If
+        Catch ex As Exception
+            result.TrySetException(ex)
         End Try
+        Return result.Task
+    End Function
+
+    Private Async Function StartRestOnUi(route As CaptureBackendRoute.Decision,
+                                          outputPath As String) As Task(Of Boolean)
+        If RestActiveRoute().Length > 0 Then Return False
+        If Not NextRecordingConfig.IsSafeRecordingOutputPath(outputPath) Then
+            Throw New ArgumentException("invalid_output_path")
+        End If
+        Select Case route.Kind
+            Case "Duluka"
+                If Not _engineReady OrElse _recordingEngine Is Nothing OrElse Not _useNewEngine Then
+                    Throw New InvalidOperationException("native_engine_not_ready")
+                End If
+                Await HandleRecordingStart(outputPath, "", LoadOscSnapshot())
+                Return _recordingTask IsNot Nothing AndAlso Not _recordingTask.IsCompleted
+            Case "FFmpeg"
+                Await HandleEngineRecordStart(outputPath, "")
+                Return _legacyCaptureEngine IsNot Nothing AndAlso _legacyCaptureEngine.IsRecording
+            Case Else
+                Throw New NotSupportedException("direct_http_backend_not_supported")
+        End Select
+    End Function
+
+    Private Async Function StopRestOnUi() As Task(Of Boolean)
+        Dim owner As String = RestActiveRoute()
+        Select Case owner
+            Case "Duluka"
+                ' HandleRecordingStop clears _recordingTask after awaiting it.
+                ' Retain this session's task locally so REST returns the
+                ' committed SessionResult instead of treating a cleared field
+                ' as failure after a successful MP4 finalize.
+                Dim ownerTask As Task(Of DulukaEngine.Recording.SessionResult) = _recordingTask
+                If ownerTask Is Nothing Then Return False
+                Await HandleRecordingStop("")
+                If Not ownerTask.IsCompletedSuccessfully Then Return False
+                Try
+                    Dim completed = Await ownerTask
+                    Return completed IsNot Nothing AndAlso completed.Pass AndAlso
+                           Not String.IsNullOrWhiteSpace(completed.OutputPath) AndAlso
+                           IO.File.Exists(completed.OutputPath)
+                Catch
+                    Return False
+                End Try
+            Case "FFmpeg"
+                If _legacyCaptureEngine Is Nothing OrElse Not _legacyCaptureEngine.IsRecording Then Return False
+                Await HandleEngineRecordStop("")
+                Return _legacyCaptureEngine IsNot Nothing AndAlso
+                       Not _legacyCaptureEngine.IsRecordingLifecycleActive AndAlso
+                       IO.File.Exists(_legacyCaptureEngine.OutputFile)
+            Case Else
+                Return False
+        End Select
     End Function
 
     Private Function HandleRestRequest(method As String, path As String, body As String) As String
@@ -132,54 +187,143 @@ Partial Public Class UI_Engine
                 Return $"{{""ok"":true,""engine"":""NvCapture"",""ready"":{_engineReady.ToString().ToLowerInvariant()},""recording"":{RestRecording().ToString().ToLowerInvariant()}}}"
             End If
 
+            ' Report both requested route and actual session owner. A codec
+            ' is never advertised as active just because a config selected it.
+            If path = "/engines" AndAlso method = "GET" Then
+                Dim requested = RestConfiguredRoute()
+                Dim ffmpegSettings As CaptureSettings = CaptureSettings.Load(_configPath)
+                Dim ffmpeg = FFmpegRuntimeProbe.CachedOrStart(ffmpegSettings.FFmpegPath)
+                Dim nativeCodec As String = ""
+                If _engineReady AndAlso _recordingEngine IsNot Nothing AndAlso
+                   _recordingEngine.StartupEcho IsNot Nothing Then
+                    nativeCodec = If(_recordingEngine.StartupEcho.CodecKey, "")
+                End If
+                Return JsonSerializer.Serialize(New With {
+                    .schemaVersion = 2,
+                    .readOnly = True,
+                    .configured = New With {
+                        .backend = requested.Kind,
+                        .captureApi = requested.CaptureApi,
+                        .encoder = requested.Encoder,
+                        .allowed = requested.Allowed,
+                        .error = requested.ErrorCode
+                    },
+                    .actualSessionBackend = RestActiveRoute(),
+                    .nativeRuntimeReady = _engineReady,
+                    .nativeRuntimeCodec = nativeCodec,
+                    .ffmpegBinary = New With {
+                        .binaryRunnable = ffmpeg.BinaryRunnable,
+                        .version = ffmpeg.Version,
+                        .captureApis = ffmpeg.CaptureApis,
+                        .encoders = ffmpeg.Encoders,
+                        .reason = ffmpeg.Reason,
+                        .hardwareEncoderVerified = False
+                    },
+                    .recording = RestRecording(),
+                    .otherProvidersReady = False
+                })
+            End If
+
             If path = "/state" Then
-                SyncLock _restLock
-                End SyncLock
-                Dim elapsed = 0
-                If RestRecording() AndAlso _newEngineSessionClock.IsRunning Then elapsed = CInt(_newEngineSessionClock.Elapsed.TotalSeconds)
-                Dim outPath = If(_newEngineSessionOutputPath, "")
-                Return $"{{""ready"":{_engineReady.ToString().ToLowerInvariant()},""failReason"":{JStr(_engineInitFailReason)},""recording"":{RestRecording().ToString().ToLowerInvariant()},""enabled"":{RestRecording().ToString().ToLowerInvariant()},""elapsedSec"":{elapsed},""outputPath"":{JStr(outPath)},""lastFile"":{JStr(_restLastFile)}}}"
+                Dim owner As String = RestActiveRoute()
+                Dim elapsed As Integer = 0
+                Dim outPath As String = ""
+                If owner = "Duluka" Then
+                    If _newEngineSessionClock.IsRunning Then
+                        elapsed = CInt(_newEngineSessionClock.Elapsed.TotalSeconds)
+                    End If
+                    outPath = If(_newEngineSessionOutputPath, "")
+                ElseIf owner = "FFmpeg" AndAlso _legacyCaptureEngine IsNot Nothing Then
+                    elapsed = CInt(_legacyCaptureEngine.RecordingDuration.TotalSeconds)
+                    outPath = If(_legacyCaptureEngine.OutputFile, "")
+                ElseIf owner = "InstalledNvidia" Then
+                    elapsed = _nvRecorder.ElapsedSeconds
+                End If
+                Dim active As Boolean = owner.Length > 0
+                Return JsonSerializer.Serialize(New With {
+                    .ready = _engineReady,
+                    .nativeRuntimeReady = _engineReady,
+                    .failReason = If(_engineInitFailReason, ""),
+                    .recording = active,
+                    .enabled = active,
+                    .actualSessionBackend = owner,
+                    .elapsedSec = elapsed,
+                    .outputPath = outPath,
+                    .lastFile = _restLastFile
+                })
             End If
 
             If path = "/record/start" AndAlso method = "POST" Then
-                If Not _engineReady OrElse _recordingEngine Is Nothing Then
-                    Return "{""started"":false,""error"":""engine_not_ready"",""failReason"":" & JStr(_engineInitFailReason) & "}"
+                If Not _directRestCommandGate.Wait(0) Then
+                    Return "{""started"":false,""error"":""direct_rest_command_busy""}"
                 End If
-                If _recordingTask IsNot Nothing AndAlso Not _recordingTask.IsCompleted Then
+                Try
+                Dim requested = RestConfiguredRoute()
+                If Not requested.Allowed Then
+                    Return JsonSerializer.Serialize(New With {.started = False, .error = requested.ErrorCode})
+                End If
+                If requested.Kind <> "Duluka" AndAlso requested.Kind <> "FFmpeg" Then
+                    Return "{""started"":false,""error"":""direct_http_backend_not_supported""}"
+                End If
+                If RestActiveRoute().Length > 0 Then
                     Return "{""started"":false,""error"":""already_recording""}"
                 End If
-                Dim outPath = ResolveRecordOutputPath()
-                HandleRecordingStart(outPath, "restapi", LoadOscSnapshot())   ' snapshot = settings จาก OSC plane (override config)
-                ' รอสั้น ๆ ให้ handler ตอบ (start เร็ว — ffmpeg spawn)
-                For i = 1 To 20
-                    Thread.Sleep(250)
-                    If _recordingTask IsNot Nothing Then Exit For
-                Next
-                Thread.Sleep(700)
-                Dim active = _recordingTask IsNot Nothing AndAlso Not _recordingTask.IsCompleted
-                Return $"{{""started"":{active.ToString().ToLowerInvariant()},""outputPath"":{JStr(_newEngineSessionOutputPath)}}}"
+                If requested.Kind = "FFmpeg" Then
+                    Dim effective As CaptureSettings = CaptureSettings.Load(_configPath)
+                    Dim capabilities As FFmpegRuntimeProbe.Result = FFmpegRuntimeProbe.Inspect(effective.FFmpegPath)
+                    If Not capabilities.Supports(requested) Then
+                        Return JsonSerializer.Serialize(New With {
+                            .started = False, .error = "ffmpeg_capability_unavailable",
+                            .probeReason = capabilities.Reason,
+                            .captureApi = requested.CaptureApi,
+                            .encoder = FFmpegRuntimeProbe.CanonicalEncoder(requested.Encoder)
+                        })
+                    End If
+                End If
+                Dim outPath As String = ResolveRecordOutputPath()
+                Dim work As Task(Of Boolean) = OnCaptureUiAsync(Function() StartRestOnUi(requested, outPath))
+                If Not work.Wait(TimeSpan.FromSeconds(15)) Then
+                    Return "{""started"":false,""error"":""start_status_pending_timeout""}"
+                End If
+                Dim started As Boolean = work.GetAwaiter().GetResult()
+                Return JsonSerializer.Serialize(New With {
+                    .started = started,
+                    .backend = If(started, RestActiveRoute(), ""),
+                    .outputPath = If(started, If(requested.Kind = "FFmpeg",
+                        If(_legacyCaptureEngine?.OutputFile, ""), _newEngineSessionOutputPath), ""),
+                    .error = If(started, "", "start_failed")
+                })
+                Finally
+                    _directRestCommandGate.Release()
+                End Try
             End If
 
             If path = "/record/stop" AndAlso method = "POST" Then
-                If _recordingTask Is Nothing OrElse _recordingTask.IsCompleted Then
-                    Return "{""stopped"":false,""error"":""not_recording""}"
+                If Not _directRestCommandGate.Wait(0) Then
+                    Return "{""stopped"":false,""error"":""direct_rest_command_busy""}"
                 End If
-                HandleRecordingStop("restapi")
-                ' รอ finalize (mux) — ไม่เกิน 20 วิ
-                For i = 1 To 80
-                    Thread.Sleep(250)
-                    If _recordingTask IsNot Nothing AndAlso _recordingTask.IsCompleted Then Exit For
-                Next
-                Dim file = ""
                 Try
-                    If _recordingTask IsNot Nothing AndAlso _recordingTask.IsCompleted AndAlso _recordingTask.Result IsNot Nothing Then
-                        file = _recordingTask.Result.OutputPath
-                    End If
-                Catch ex As Exception
-                    DebugLog($"[CaptureRestApi] stop result: {ex.Message}")
+                Dim owner As String = RestActiveRoute()
+                If owner = "" Then Return "{""stopped"":false,""error"":""not_recording""}"
+                If owner = "InstalledNvidia" Then
+                    Return "{""stopped"":false,""error"":""installed_nvidia_uses_event_bus""}"
+                End If
+                Dim outputPath As String = If(owner = "FFmpeg",
+                    If(_legacyCaptureEngine?.OutputFile, ""), _newEngineSessionOutputPath)
+                Dim work As Task(Of Boolean) = OnCaptureUiAsync(Function() StopRestOnUi())
+                If Not work.Wait(TimeSpan.FromSeconds(30)) Then
+                    Return "{""stopped"":false,""error"":""stop_status_pending_timeout""}"
+                End If
+                Dim stopped As Boolean = work.GetAwaiter().GetResult()
+                If stopped Then _restLastFile = outputPath
+                Return JsonSerializer.Serialize(New With {
+                    .stopped = stopped, .backend = owner,
+                    .file = If(stopped, outputPath, ""),
+                    .error = If(stopped, "", "stop_or_finalize_failed")
+                })
+                Finally
+                    _directRestCommandGate.Release()
                 End Try
-                If Not String.IsNullOrEmpty(file) Then _restLastFile = file
-                Return $"{{""stopped"":true,""file"":{JStr(file)}}}"
             End If
 
             If path = "/settings" AndAlso method = "GET" Then
@@ -199,13 +343,18 @@ Partial Public Class UI_Engine
         End Try
     End Function
 
-    ' ── truth: session active = host clock รัน + task ยังไม่จบ ──
+    ' ── truth: any real owner is active (not the configured selector). ──
     Private Function RestRecording() As Boolean
-        Return _engineReady AndAlso _recordingTask IsNot Nothing AndAlso Not _recordingTask.IsCompleted
+        Return RestActiveRoute().Length > 0
     End Function
 
     ' ── output path: videos จาก genuine /RecordPaths → fallback OutputDirectory/MyVideos ──
     Private Function ResolveRecordOutputPath() As String
+        If CaptureIsolation.Requested Then
+            Dim testDir = CaptureIsolation.RecordingDirectory(AppLayout.Dir)
+            Return Path.Combine(testDir, "NvCapture_sandbox_" &
+                DateTime.Now.ToString("yyyy-MM-dd_HHmmss_fff") & ".mp4")
+        End If
         Dim dir As String = ""
         Try
             Dim req = DirectCast(Net.WebRequest.Create("http://127.0.0.1:59001/ShadowPlay/v.1.0/RecordPaths"), Net.HttpWebRequest)

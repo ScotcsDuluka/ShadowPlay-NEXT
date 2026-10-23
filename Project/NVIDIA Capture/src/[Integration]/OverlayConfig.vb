@@ -452,6 +452,7 @@ Public NotInheritable Class OverlayConfig
                     ' documented regime table — rejecting it here makes the
                     ' Engine run legacy while the Overlay UI shows Duluka.
                     If mode = "duluka" OrElse mode = "ddagrab" OrElse mode = "native" Then Return "ddagrab"
+                    Return "unsupported"
                 End If
 
                 Dim cfg As AppConfig = LoadConfig()
@@ -461,6 +462,7 @@ Public NotInheritable Class OverlayConfig
                     If mode = "ffmpeg" OrElse mode = "legacy" Then Return "ffmpeg"
                     If mode = "nvidia" OrElse mode = "shadowplay" Then Return "nvidia"
                     If mode = "duluka" OrElse mode = "ddagrab" OrElse mode = "native" Then Return "ddagrab"
+                    Return "unsupported"
                 End If
 
                 Dim api As String = If(cfg?.Recording?.APICapture, "").Trim().ToLowerInvariant()

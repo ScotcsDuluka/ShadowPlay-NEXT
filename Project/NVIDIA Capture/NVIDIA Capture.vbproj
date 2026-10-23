@@ -54,6 +54,11 @@
     <PackageReference Include="NAudio.WinForms" Version="2.3.0" />
     <PackageReference Include="NAudio.WinMM" Version="2.3.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <!-- The prebuilt DulukaEngine.Encoder.Nvenc.dll references Vortice/SharpGen.
+         Plain <Reference> HintPaths do not propagate NuGet runtime assets into
+         NvCapture.deps.json or its output folder. Keep this exact package
+         version aligned with DulukaEngine.Encoder.Nvenc.vbproj. -->
+    <PackageReference Include="Vortice.Direct3D11" Version="3.6.2" />
   </ItemGroup>
   <ItemGroup>
     <None Update="API-Core\ffmpeg.exe">
@@ -141,6 +146,7 @@
        app's SDK recursive globs; each nested project owns its own compilation. -->
   <ItemGroup>
     <Compile Remove="EngineCapture\Duluka Capture\**\*.vb" />
+    <Compile Remove="EngineCapture\RouteGuard.Tests\**\*.vb" />
     <EmbeddedResource Remove="EngineCapture\Duluka Capture\**\*.resx" />
   </ItemGroup>
 </Project>

@@ -92,6 +92,11 @@ Partial Public Class UI_Engine
 
     Private Sub UI_Engine_Load(sender As Object, e As EventArgs) Handles Me.Load
         _configPath = AppLayout.P("Config", "engine.json")
+        ' Fail closed before initializing any worker or starting any listener.
+        CaptureIsolation.AssertReady(AppLayout.Dir)
+        If CaptureIsolation.Requested AndAlso Not _headless Then
+            Throw New InvalidOperationException("capture_sandbox_requires_rest_headless")
+        End If
 
         ' ✅ P2: locate Overlay's config.json + video.json first.
         ' lblConfigSource will show where they were found.
@@ -102,8 +107,16 @@ Partial Public Class UI_Engine
 
         LoadSettings()
         InitializeEngine()
-        InitializeRecordingEngine()  ' Phase 12b: initialize new RecordingEngine
-        DetectEncoders()
+        If Not CaptureIsolation.Requested OrElse OverlayConfig.GetEngineMode() = "ddagrab" Then
+            InitializeRecordingEngine()  ' DXGI/NVENC native runtime; avoid GPU ownership in FFmpeg sandbox
+        Else
+            DebugLog("[Sandbox] Skipping native DXGI/NVENC initialization for FFmpeg-only worker")
+        End If
+        If Not CaptureIsolation.Requested Then
+            DetectEncoders()
+        Else
+            DebugLog("[Sandbox] Background encoder discovery disabled (REST capability probe is available)")
+        End If
 
         ' เชื่อมกับ API Hub (headless: ข้าม TCP diagnostic — ต้นตอ busy-loop เดิม)
         If Not _headless Then StartHubClient()
@@ -112,7 +125,11 @@ Partial Public Class UI_Engine
         ' :59001 -- the same API surface the osc page drives. The old TCP
         ' :5001 engine path stays for the diagnostic window, but record
         ' commands now arrive through the poller (state machine edges).
-        StartRestChannel()
+        If Not CaptureIsolation.Requested Then
+            StartRestChannel()
+        Else
+            DebugLog("[Sandbox] NodeAPI event-bus poller disabled; REST-only isolated worker")
+        End If
 
         ' Phase 3 (§21.2): capture boundary REST — node JS boundary (NvShadowPlayAPI.js
         ' middleware) ยิงมาที่ 127.0.0.1:59077 — NvCapture = เจ้าของการอัดตามสถาปัตยกรรม §20
@@ -151,8 +168,10 @@ Partial Public Class UI_Engine
         Try
             Dim s As CaptureSettings = CaptureSettings.Load(_configPath)
             SyncWithOverlayConfig(s)
-            _audioForm = New AudioSettingsForm(s)
-            _audioForm.Show(Me)  ' Show() แค่เริ่ม form — Opacity=0 อยู่เพราะยังไม่มี Audio.UI
+            If Not CaptureIsolation.Requested Then
+                _audioForm = New AudioSettingsForm(s)
+                _audioForm.Show(Me)
+            End If
         Catch
         End Try
 
@@ -282,24 +301,51 @@ Partial Public Class UI_Engine
 
     Private Async Sub StartRestRecording(outPath As String, restSettings As RecordSettingsSnapshot)
         Try
-            ' Same regime dispatch as OnRecordClick: nvidia = installed
-            ' ShadowPlay external recorder; everything else = process-lifetime
-            ' RecordingEngine (Ddagrab + NVENC + ffmpeg mux).
-            If String.Equals(OverlayConfig.GetEngineMode(), "nvidia", StringComparison.OrdinalIgnoreCase) Then
-                HandleNvidiaRecordStart(outPath)
-                If Not _nvRecording Then
-                    DebugLog("[REST] record start rejected by NVIDIA lane; not confirming actual=Recording")
-                    Return
-                End If
-            Else
-                Await HandleRecordingStart(outPath, "", restSettings)
-                ' The handler can reject an unavailable engine or fail before
-                ' creating its session task. Never claim Recording in that case.
-                If _recordingTask Is Nothing OrElse _recordingTask.IsCompleted Then
-                    DebugLog("[REST] record start failed/no active capture task; not confirming actual=Recording")
-                    Return
-                End If
+            ' Phase 2: the headless /Duluka poller must honor the SAME route
+            ' as the TCP command path; never silently encode with native NVENC
+            ' when FFmpeg is selected in unified config.
+            Dim requested As CaptureSettings = CaptureSettings.Load(_configPath)
+            Dim route = CaptureBackendRoute.Decide(
+                OverlayConfig.GetEngineMode(), requested.CaptureMethod, requested.Encoder)
+            If Not route.Allowed Then
+                DebugLog($"[REST] REJECT capture route: {route.ErrorCode}")
+                Return
             End If
+            If (_recordingTask IsNot Nothing AndAlso Not _recordingTask.IsCompleted) OrElse
+               (_legacyCaptureEngine IsNot Nothing AndAlso _legacyCaptureEngine.IsRecordingLifecycleBusy) OrElse
+               _nvRecording Then
+                DebugLog("[REST] REJECT already_recording (cross-backend reservation)")
+                Return
+            End If
+
+            Select Case route.Kind
+                Case "InstalledNvidia"
+                    HandleNvidiaRecordStart(outPath)
+                    If Not _nvRecording Then
+                        DebugLog("[REST] installed NVIDIA lane did not start")
+                        Return
+                    End If
+                Case "FFmpeg"
+                    Await HandleEngineRecordStart(outPath, "", restSettings)
+                    If _legacyCaptureEngine Is Nothing OrElse Not _legacyCaptureEngine.IsRecording Then
+                        DebugLog("[REST] FFmpeg failed to start; no active recording confirmed")
+                        Return
+                    End If
+                Case "Duluka"
+                    If Not _useNewEngine OrElse Not _engineReady OrElse _recordingEngine Is Nothing Then
+                        DebugLog("[REST] native capture engine unavailable; no legacy fallback")
+                        Return
+                    End If
+                    Await HandleRecordingStart(outPath, "", restSettings)
+                    If _recordingTask Is Nothing OrElse _recordingTask.IsCompleted Then
+                        DebugLog("[REST] native recording did not start")
+                        Return
+                    End If
+                Case Else
+                    DebugLog("[REST] selected capture route not implemented")
+                    Return
+            End Select
+            DebugLog($"[REST] actual route started: {route.Kind}, capture={route.CaptureApi}, encoder={route.Encoder}")
             _rest.ConfirmRecordStarted()
             DebugLog("[REST] confirmed actual=Recording -- backend pushes to osc page")
         Catch ex As Exception
@@ -315,13 +361,14 @@ Partial Public Class UI_Engine
     Private Async Sub StopRestRecording()
         Try
             If _nvRecording Then
-                ' The installed NVIDIA lane has no Duluka session task.
-                ' Stopping only the task would leave the real hotkey recorder running.
                 HandleNvidiaRecordStop("")
             ElseIf _recordingTask IsNot Nothing AndAlso Not _recordingTask.IsCompleted Then
                 Await HandleRecordingStop("")
+            ElseIf _legacyCaptureEngine IsNot Nothing AndAlso
+                   _legacyCaptureEngine.IsRecordingLifecycleActive Then
+                Await HandleEngineRecordStop("")
             Else
-                DebugLog("[REST] no active session task -- confirming Idle")
+                DebugLog("[REST] no active capture session -- confirming Idle")
             End If
             _rest.ConfirmRecordStopped()
             DebugLog("[REST] confirmed actual=Idle -- backend pushes to osc page")
@@ -584,7 +631,7 @@ Partial Public Class UI_Engine
 
     ' ── Engine Command Handlers (TCP แค่ on/off) ──────────
 
-    Private Async Function HandleEngineRecordStart(value As String, reqId As String) As Task
+    Private Async Function HandleEngineRecordStart(value As String, reqId As String, Optional restSettings As RecordSettingsSnapshot = Nothing) As Task
         Try
             DebugLog($"[Engine] HandleEngineRecordStart: path={value}, reqId={If(String.IsNullOrEmpty(reqId), "(none)", reqId)}")
 
@@ -622,7 +669,30 @@ Partial Public Class UI_Engine
             Dim s As CaptureSettings = CaptureSettings.Load(_configPath)
             SyncWithOverlayConfig(s)
             _settings = s
-            DebugLog($"[Engine] config loaded (synced with Overlay): FFmpegPath={If(_settings.FFmpegPath, "(empty)")}, Encoder={If(_settings.Encoder, "(empty)")}, CaptureMethod={_settings.CaptureMethod}, FPS={_settings.FPS}, Bitrate={_settings.Bitrate}")
+            Dim selectedRoute = CaptureBackendRoute.Decide(OverlayConfig.GetEngineMode(), s.CaptureMethod, s.Encoder)
+            If Not selectedRoute.Allowed OrElse selectedRoute.Kind <> "FFmpeg" Then
+                SendResponse("engine_record_start", "error",
+                    If(selectedRoute.Allowed, "not_ffmpeg_route", selectedRoute.ErrorCode), reqId)
+                Return
+            End If
+            If _recordingTask IsNot Nothing AndAlso Not _recordingTask.IsCompleted Then
+                SendResponse("engine_record_start", "error", "already_recording", reqId)
+                Return
+            End If
+            ' REST quality overrides apply to this FFmpeg session only.
+            ' Do not write the transient request back into unified config.
+            If restSettings IsNot Nothing Then
+                If restSettings.Framerate > 0 Then s.FPS = restSettings.Framerate
+                If restSettings.BitrateBps > 0 Then s.Bitrate = restSettings.BitrateBps
+                If restSettings.NativeResolution Then
+                    s.UseNativeResolution = True
+                ElseIf restSettings.Width > 0 AndAlso restSettings.Height > 0 Then
+                    s.UseNativeResolution = False
+                    s.CustomWidth = restSettings.Width
+                    s.CustomHeight = restSettings.Height
+                End If
+            End If
+            DebugLog($"[CaptureRoute] FFmpeg selected, API={s.CaptureMethod}, encoder={s.Encoder}, fps={s.FPS}, bitrate={s.Bitrate}")
 
             ' ✅ P1.6: if FFmpegPath is empty or doesn't exist, respond with
             ' a clear error immediately. Old code let StartRecordingAsync run
@@ -657,7 +727,7 @@ Partial Public Class UI_Engine
             ' engine mid-mux: jobGuard.Dispose killed the mux ffmpeg and
             ' ForceStop raced the mux's temp-file fallback → recording lost.
             If _legacyCaptureEngine IsNot Nothing AndAlso
-               _legacyCaptureEngine.IsRecordingLifecycleActive Then
+               _legacyCaptureEngine.IsRecordingLifecycleBusy Then
                 DebugLog("[Engine] RECORD_START rejected: recording lifecycle active")
                 SendResponse("engine_record_start", "error", "already_recording", reqId)
                 Return
@@ -769,8 +839,9 @@ Partial Public Class UI_Engine
 
     Private Async Function HandleEngineRecordStop(reqId As String) As Task
         Try
-            ' NVIDIA Engine owns the active session in nvidia mode.
-            If OverlayConfig.GetEngineMode() = "nvidia" Then
+            ' The installed NVIDIA recorder owns its session regardless of
+            ' changes to configuration since record start.
+            If _nvRecording Then
                 HandleNvidiaRecordStop(reqId)
                 Return
             End If
@@ -819,8 +890,8 @@ Partial Public Class UI_Engine
     End Sub
 
     Private Sub HandleEngineGetStatus(reqId As String)
-        ' NVIDIA Engine: status = hotkey-driven session state.
-        If OverlayConfig.GetEngineMode() = "nvidia" Then
+        ' Installed NVIDIA session owner, even if config changes mid-record.
+        If _nvRecording OrElse OverlayConfig.GetEngineMode() = "nvidia" Then
             Dim nvState As String = If(_nvRecorder.IsRecording,
                 $"Recording|{_nvRecorder.ElapsedSeconds}", "Idle")
             SendResponse("engine_get_status", "ok", nvState, reqId)
@@ -1106,18 +1177,32 @@ Partial Public Class UI_Engine
             SyncWithOverlayConfig(s)
             _settings = s
 
-            ' Honor the same persisted engine regime as TCP-triggered recording.
-            ' Duluka uses the process-lifetime RecordingEngine; FFmpeg keeps the
-            ' existing Legacy LegacyCaptureEngine path untouched. NVIDIA drives the
-            ' installed ShadowPlay recorder.
-            If OverlayConfig.GetEngineMode() = "nvidia" Then
+            ' All command surfaces use one capability/ownership guard.
+            Dim selected = CaptureBackendRoute.Decide(
+                OverlayConfig.GetEngineMode(), s.CaptureMethod, s.Encoder)
+            If Not selected.Allowed Then
+                Throw New InvalidOperationException(selected.ErrorCode)
+            End If
+            If (_recordingTask IsNot Nothing AndAlso Not _recordingTask.IsCompleted) OrElse
+               (_legacyCaptureEngine IsNot Nothing AndAlso _legacyCaptureEngine.IsRecordingLifecycleBusy) OrElse
+               _nvRecording Then
+                Throw New InvalidOperationException("already_recording")
+            End If
+            If selected.Kind = "InstalledNvidia" Then
                 HandleNvidiaRecordStart("")
                 Return
             End If
-            If OverlayConfig.GetEngineMode() = "ddagrab" Then
+            If selected.Kind = "Duluka" Then
+                If Not _engineReady OrElse _recordingEngine Is Nothing OrElse Not _useNewEngine Then
+                    Throw New InvalidOperationException("native_engine_not_ready")
+                End If
                 Await HandleRecordingStart(s.GenerateOutputFilename(), "")
                 Return
             End If
+            If selected.Kind <> "FFmpeg" Then
+                Throw New InvalidOperationException("unsupported_capture_route")
+            End If
+            DebugLog($"[CaptureRoute] UI Record -> FFmpeg {selected.CaptureApi} / {selected.Encoder}")
 
             Dim engine As New LegacyCaptureEngine(_settings)
             AddHandler engine.StateChanged, AddressOf OnEngineStateChanged
@@ -1136,7 +1221,7 @@ Partial Public Class UI_Engine
             ' disposing during the stop flow's mux phase killed the mux
             ' ffmpeg (job close) and deleted the temp files it was reading.
             If _legacyCaptureEngine IsNot Nothing AndAlso
-               _legacyCaptureEngine.IsRecordingLifecycleActive Then
+               _legacyCaptureEngine.IsRecordingLifecycleBusy Then
                 DebugLog("[Engine] Record click rejected: recording lifecycle active")
                 engine.Dispose()
                 btnStop.Enabled = _legacyCaptureEngine.IsRecording
@@ -1159,13 +1244,19 @@ Partial Public Class UI_Engine
         btnStop.Enabled = False
 
         Try
-            If _recordingTask IsNot Nothing AndAlso Not _recordingTask.IsCompleted Then
+            If _nvRecording Then
+                HandleNvidiaRecordStop("")
+            ElseIf _recordingTask IsNot Nothing AndAlso Not _recordingTask.IsCompleted Then
                 Await HandleRecordingStop("")
-            Else
+            ElseIf _legacyCaptureEngine IsNot Nothing AndAlso
+                   _legacyCaptureEngine.IsRecordingLifecycleActive Then
                 Await _legacyCaptureEngine.StopRecordingAsync()
+            Else
+                DebugLog("[CaptureRoute] Stop click: no active recording")
             End If
             btnRecord.Enabled = True
-        Catch
+        Catch ex As Exception
+            DebugLog("[CaptureRoute] stop failed: " & ex.Message)
             btnRecord.Enabled = True
         End Try
     End Sub

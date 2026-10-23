@@ -19,6 +19,8 @@
     <!-- The helper is a separate nested project; its generated obj sources
          must not be globbed into NvContainer during a local build. -->
     <Compile Remove="NVIDIA ShadowPlay Helper/**/*.cs" />
+    <!-- Standalone catalog regression runner must not compile into NvContainer.exe. -->
+    <Compile Remove="Tests/**/*.cs" />
   </ItemGroup>
 
   <ItemGroup>

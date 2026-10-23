@@ -19,6 +19,7 @@ internal sealed class ContainerTestApi
     private readonly ApplicationOntologyClient _applicationOntologyClient;
     private readonly GameWatcher _gameWatcher;
     private readonly OscAdapterLifecycle _oscAdapterLifecycle;
+    private readonly Func<object> _getCaptureEngineCatalog;
     private readonly object _stateLock = new object();
     private bool _recordEnabled;
     private bool _irEnabled;
@@ -32,7 +33,8 @@ internal sealed class ContainerTestApi
         Action<JsonElement> publishEvents, ObsRuntime obsRuntime,
         Func<int, long, bool> markNvGraphicsReady, Func<object> getNvGraphicsStatus,
         Func<bool> openNvGraphics, ApplicationOntologyClient applicationOntologyClient,
-        GameWatcher gameWatcher, OscAdapterLifecycle oscAdapterLifecycle)
+        GameWatcher gameWatcher, OscAdapterLifecycle oscAdapterLifecycle,
+        Func<object> getCaptureEngineCatalog)
     {
         _enabled = enabled;
         _log = log;
@@ -44,6 +46,7 @@ internal sealed class ContainerTestApi
         _applicationOntologyClient = applicationOntologyClient;
         _gameWatcher = gameWatcher;
         _oscAdapterLifecycle = oscAdapterLifecycle;
+        _getCaptureEngineCatalog = getCaptureEngineCatalog;
         _listener = new TcpListener(IPAddress.Loopback, port);
     }
 
@@ -147,6 +150,12 @@ internal sealed class ContainerTestApi
                         obsEnabled = _obsRuntime?.Enabled ?? false,
                         obs
                     });
+                    return;
+                }
+
+                if (request.Method == "GET" && request.Path == "/v1/capture/engines")
+                {
+                    Write(stream, 200, _getCaptureEngineCatalog());
                     return;
                 }
 
