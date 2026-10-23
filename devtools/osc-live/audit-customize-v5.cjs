@@ -25,7 +25,13 @@
        hit=cr&&document.elementFromPoint(cr.left+cr.width/2,cr.top+cr.height/2);
      var tiles=Array.from(document.querySelectorAll('md-menu[data-nv-unified-key]'));
      var clickable=tiles.filter(function(t){var r=t.getBoundingClientRect(),h=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return h&&t.contains(h)}).length;
+     var ancestors=[],cur=shell;
+     while(cur&&ancestors.length<14){var st=getComputedStyle(cur),cr=cur.getBoundingClientRect();ancestors.push({tag:cur.tagName,
+       cls:String(cur.className||'').slice(0,110),y:+cr.y.toFixed(1),height:+cr.height.toFixed(1),
+       position:st.position,top:st.top,transform:st.transform,filter:st.filter,perspective:st.perspective,
+       contain:st.contain,willChange:st.willChange});cur=cur.parentElement;}
      return {route:location.hash,viewport:[innerWidth,innerHeight],editing:document.documentElement.classList.contains('nv-live-layout-editing'),
+       ancestors:ancestors,
        shell:info(shell),bar:info(bar),footer:info(footer),background:info(bg),groups:groups.map(info),
        nativeTiles:tiles.length,hitCenters:clickable,closeHit:!!(close&&hit&&close.contains(hit)),
        scrollTop:scrollY};
