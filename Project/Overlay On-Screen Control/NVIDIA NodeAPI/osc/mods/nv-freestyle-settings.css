@@ -49,10 +49,16 @@ html.nv-live-layout-editing body .nv-live-editor.nv-freestyle-settings {
 }
 .nv-live-editor.nv-freestyle-settings .nv-osc-bg-settings-grid {
  display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
- grid-row-gap:12px;margin:0 -8px!important;
+ grid-row-gap:12px;margin:0!important;
 }
 .nv-live-editor.nv-freestyle-settings .nv-osc-bg-field {
- flex-basis:200px!important;min-width:0!important;padding:0 8px!important;
+ flex-basis:200px!important;min-width:0!important;box-sizing:border-box;
+ /* Native endpoint thumbs extend 10px and the focused ring 17px. Keep
+    both inside the scroll column, including at 0% / 100% and host scaling. */
+ padding:0 18px!important;
+}
+.nv-live-editor.nv-freestyle-settings .nv-osc-bg-field md-slider {
+ box-sizing:border-box;width:100%;max-width:100%;min-width:0!important;margin:0!important;
 }
 .nv-live-editor.nv-freestyle-settings .nv-freestyle-background > footer {
  display:flex!important;flex:0 0 auto;flex-wrap:wrap;
