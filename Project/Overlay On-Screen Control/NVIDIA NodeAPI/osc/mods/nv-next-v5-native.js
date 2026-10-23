@@ -78,6 +78,10 @@
     return enabled();
   }
   legacy.CONTROLS.forEach(function (meta) { controls[meta.key] = meta; });
+  // Keep V4's original catalog intact. V5's additive Control uses a real
+  // Angular-owned native tile and remains unassigned until the user places it.
+  if (M.CONTROLS.indexOf('GameProfiles') >= 0)
+    controls.GameProfiles={key:'GameProfiles',name:'nv-game-profiles-tile',label:'Game Profiles',icon:'icon-edit_tune'};
 
   function read(name) {
     try { return window.localStorage.getItem(name); } catch (error) { return null; }
@@ -164,7 +168,8 @@
     var nativeKeys = M.CONTROLS, actual = nativeKeys.filter(function (key) {
       return !!namedTile(root, key);
     });
-    // Never partially reflow: all 12 original NVIDIA tiles must be linked.
+    // Never partially reflow: all 12 original NVIDIA tiles must be linked,
+    // plus every additional native Control supported by this V5 catalog.
     if (actual.length !== nativeKeys.length) return null;
 
     var width = g.width || 240;

@@ -11,7 +11,7 @@ const names = {
   Screenshot: 'screenshot-tile', Mods: 'mods-tile', ManualRecord: 'manual-record-tile',
   Stream: 'stream-tile', InstantReplay: 'instant-replay-tile', Ansel: 'ansel-tile',
   Broadcast: 'broadcast-tile', Performance: 'performance-tile', Mic: 'mic-tile',
-  Camera: 'camera-tile', Gallery: 'gallery-tile', Settings: 'nv-settings-menu-tile'
+  Camera: 'camera-tile', Gallery: 'gallery-tile', Settings: 'nv-settings-menu-tile', GameProfiles: 'nv-game-profiles-tile'
 };
 const plain = value => JSON.parse(JSON.stringify(value));
 
@@ -132,7 +132,7 @@ function gpuFixture() {
 
 test('V5 revives every Angular native tile despite persisted V2 hiding, and exclusively owns geometry', () => {
   const f = gpuFixture();
-  for (const key of M.CONTROLS.filter(key => key !== 'Settings'))
+  for (const key of M.CONTROLS.filter(key => key !== 'Settings' && key !== 'GameProfiles'))
     assert.equal(f.window.__dulukaMainMenuVisibility[key], false, key + ' starts hidden by saved V2');
   f.synchronize();
   assert.deepEqual(f.counts(), { v5: 1, v4: 0 });
@@ -154,9 +154,10 @@ test('disabling V5 returns native geometry and persisted visibility to the legac
   assert.deepEqual(f.counts(), { v5: 1, v4: 0 });
   assert.equal(f.bar.style.getPropertyValue('width'), '0px', 'legacy Settings-only geometry is restored');
   assert.ok(f.nativeWrites() > 0, 'disabled V5 falls through to executable V2 geometry');
-  for (const key of M.CONTROLS.filter(key => key !== 'Settings'))
+  for (const key of M.CONTROLS.filter(key => key !== 'Settings' && key !== 'GameProfiles'))
     assert.equal(f.tiles[key].visible, false, key + ' follows its original V2 saved visibility');
   assert.equal(f.tiles.Preferences.visible, true);
+  assert.equal(f.tiles.GameProfiles.visible, false, 'the catalog-only control is hidden after releasing V5');
   assert.deepEqual(Array.from(f.values), f.originalStorage);
 });
 
@@ -255,5 +256,26 @@ test('disabling a committed owner removes V5 additions while retaining preexisti
   assert.equal(f.tiles.Mic.classList.contains('nv-unified-big'), false);
   f.api.enable(false);
   assert.deepEqual(f.snapshot(), before);
+  assert.equal(f.storage.size, 0);
+});
+
+test('thirteen linked controls retain twelve default cells and Game Profiles receives geometry only after assignment', () => {
+  const f = adapterFixture(), before = f.snapshot(), tile = f.tiles.GameProfiles;
+  assert.equal(Object.keys(f.tiles).length, 13);
+  f.api.editOwnership(true); f.api.beginEdit();
+  const initial = f.api.sync(true);
+  assert.equal(initial.cells.length, 12); assert.equal(initial.boxes.length, 6);
+  assert.ok(M.available(f.api.get()).includes('GameProfiles'));
+  assert.equal(tile.style.getPropertyValue('display'), 'none'); assert.equal(tile.getAttribute('aria-hidden'), 'true');
+  f.api.edit(s => M.changeBlock(s, 'g2', 0, 'small', 'triple'));
+  f.api.edit(s => M.placeControl(s, 'GameProfiles', 'g2', 0, 1));
+  const assigned = f.api.sync(true);
+  assert.equal(assigned.cells.length, 13); assert.equal(assigned.cells.filter(cell => cell.control === 'GameProfiles').length, 1);
+  assert.equal(f.tiles.GameProfiles, tile, 'the real native node is positioned without replacement');
+  assert.equal(tile.style.getPropertyValue('display'), 'block'); assert.equal(tile.getAttribute('data-nv-next-control'), 'GameProfiles');
+  assert.equal(tile.getAttribute('aria-hidden'), null); assert.equal(M.findControl(f.api.get(), 'GameProfiles').groupId, 'g2');
+  assert.equal(f.storage.size, 0, 'assignment stays transient until Done');
+  f.api.cancel(); f.api.editOwnership(false);
+  assert.deepEqual(f.snapshot(), before, 'Cancel restores native attributes/classes/styles including the catalog tile');
   assert.equal(f.storage.size, 0);
 });

@@ -59,7 +59,7 @@
     Screenshot:'Screenshot',Ansel:'Photo mode',Mods:'Game filter',
     InstantReplay:'Instant Replay',ManualRecord:'Record',Stream:'Stream',
     Broadcast:'Broadcast LIVE',Performance:'Performance',Mic:'Microphone',
-    Camera:'Camera',Gallery:'Gallery',Settings:'Settings'
+    Camera:'Camera',Gallery:'Gallery',Settings:'Settings',GameProfiles:'Game Profiles'
   };
   function node(tag, cls, txt) {
     var el = document.createElement(tag);if(cls)el.className=cls;

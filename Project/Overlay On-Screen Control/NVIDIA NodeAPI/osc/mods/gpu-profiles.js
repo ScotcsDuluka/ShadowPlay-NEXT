@@ -61,6 +61,7 @@
       '.main-menu-container .nv-settings-menu-tile .osc-tile-icon{position:absolute;left:20px;top:21px;width:32px;height:32px;}' +
       '.main-menu-container .nv-settings-menu-tile .osc-tile-icon md-icon{width:32px;height:32px;font-size:32px;}' +
       '.main-menu-container .nv-settings-menu-tile .osc-tile-footer{display:none!important;}' +
+      '.main-menu-container md-menu.nv-game-profiles-tile:not([data-nv-next-control]){display:none!important;}' +
       '';
     if (style.textContent !== css) style.textContent = css;
     if (!style.parentNode) (document.head || document.documentElement).appendChild(style);
@@ -188,8 +189,22 @@
     var tiles = scope.mainMenu.tiles;
     var changed = false;
     if(!liveLayoutUnsubscribe&&window.__dulukaMenuLayout)liveLayoutUnsubscribe=window.__dulukaMenuLayout.subscribe(function(){updateMainMenuPerformance();});
-    if (tiles.GameProfiles) {
-      delete tiles.GameProfiles;
+    var nextOwner = window.__nvNextLayoutV5;
+    var profilesVisible = !!(nextOwner && nextOwner.enabled && nextOwner.enabled() &&
+      nextOwner.model && nextOwner.model.CONTROLS.indexOf('GameProfiles') >= 0);
+    if (!tiles.GameProfiles || !tiles.GameProfiles[mainMenuTileMarker]) {
+      tiles.GameProfiles = {
+        name:'nv-game-profiles-tile',extraclass:'nv-gpu-profiles-mainmenu-tile',
+        title:'Game Profiles',icon:'icon-edit_tune',initialFocus:'false',
+        visible:profilesVisible,enabled:true,currentState:'Ready',
+        state:{Ready:{icon:'icon-edit_tune',status:'',statusBrush:'',items:[]}},
+        click:openGameProfilesFromMainMenu
+      };
+      tiles.GameProfiles[mainMenuTileMarker] = true;
+      changed = true;
+    }
+    if (tiles.GameProfiles.visible !== profilesVisible) {
+      tiles.GameProfiles.visible = profilesVisible;
       changed = true;
     }
 
@@ -237,8 +252,6 @@
           click:function () { return injector.get('$state').go('main.preferences'); }},
         {id:'customize-main-menu',name:'Customize Main-menu',icon:'icon-share',visible:true,enabled:true,
           click:function () { if(window.__dulukaStartMainMenuEditor)return window.__dulukaStartMainMenuEditor(); }},
-        {id:'game-profiles',name:'คอลโทล',icon:'icon-edit_tune',visible:true,enabled:true,
-          click:openGameProfilesFromMainMenu},
         {id:'quiet-mode',name:'Whisper Mode',icon:'icon-volume_off',visible:false,enabled:false,
           click:function () {
             var current = scope.mainMenu.tiles.QuietMode2;
@@ -254,6 +267,14 @@
       changed = true;
     }
     if (settings && settings.__dulukaSettingsSubmenu) {
+      // Retire an already-linked submenu entry without replacing its array or
+      // changing the other native actions while Material has the menu open.
+      for (var profileIndex = settings.state.Menu.items.length - 1; profileIndex >= 0; profileIndex--) {
+        if (settings.state.Menu.items[profileIndex].id === 'game-profiles') {
+          settings.state.Menu.items.splice(profileIndex, 1);
+          changed = true;
+        }
+      }
       if (!settings.state.Menu.items.some(function (item) { return item.id === 'overlay-fps'; })) {
         settings.state.Menu.items.push({id:'overlay-fps',name:'Overlay FPS',icon:'icon-performance',visible:true,enabled:true,
           click:function () { return window.angular.element(document.documentElement).injector().get('$state').go('main.osc-fps'); }});
@@ -295,8 +316,8 @@
     });
     if (changed) scope.$applyAsync();
     syncNativeMainMenuSlots(root);
-    // The native preferences-style tile renders icon-only. Give it a tooltip
-    // and an accessible name without changing the OSC's menu template.
+    // Keep the native control's tooltip and accessible name localized by the
+    // existing phrase bridge, without changing the OSC's menu template.
     var button = root.querySelector('.nv-gpu-profiles-mainmenu-tile .menu-button');
     if (button) {
       button.title = 'Game Profiles';

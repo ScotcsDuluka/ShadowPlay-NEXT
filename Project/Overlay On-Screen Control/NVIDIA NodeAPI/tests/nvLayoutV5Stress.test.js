@@ -87,6 +87,13 @@ for (let seed = 1; seed <= 20; seed++) {
   test('V5 deterministic randomized state integrity, seed ' + seed, () => {
     const rand = random(seed * 7919);
     let state = M.defaultLayout(), accepted = 0, rejected = 0;
+    // Half the runs begin with the exact old catalog metadata. Reading that
+    // state must include newly optional Controls without migrating the input.
+    if (seed % 2 === 0) state.controlOrder = M.CONTROLS.filter(key => key !== 'GameProfiles');
+    const initial = JSON.stringify(state);
+    invariants(state, 1920);
+    assert.equal(JSON.stringify(state), initial, 'Legacy catalog reads must not mutate saved state');
+    assert.deepEqual(M.available(state), ['GameProfiles']);
     for (let step = 0; step < 550; step++) {
       const before = JSON.stringify(state);
       let next;

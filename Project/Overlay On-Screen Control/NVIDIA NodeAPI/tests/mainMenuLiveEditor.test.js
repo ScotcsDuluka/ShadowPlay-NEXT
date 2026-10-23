@@ -89,6 +89,30 @@ test('the editable catalog has seven real controls and the right panel stays loc
   assertLockedRight(f.window);
 });
 
+test('Game Profiles is a V5 palette Control without changing V2 defaults or saved catalog', () => {
+  const f = fixture(), before = plain(f.values), legacyItems = plain(f.api.items);
+  f.window.NvShadowPlayLayoutV5 = { CONTROLS: defaults.left.concat(defaults.center, ['Performance', 'Mic', 'Camera', 'Gallery', 'Settings', 'GameProfiles']) };
+  const { controller } = editorController(f);
+  const item = controller.items.find(item => item.key === 'GameProfiles');
+  assert.deepEqual(plain(item), { key: 'GameProfiles', name: 'nv-game-profiles-tile', label: 'Game Profiles', icon: 'icon-edit_tune' });
+  assert.equal(controller.label('GameProfiles'), 'Game Profiles');
+  assert.equal(controller.iconFor('GameProfiles'), 'icon-edit_tune');
+  assert.equal(controller.key({ name: 'nv-game-profiles-tile' }), 'GameProfiles');
+  assert.equal(controller.isMovable({ name: 'nv-game-profiles-tile' }), true);
+  assert.equal(controller.assigned('GameProfiles'), false, 'new Control remains unassigned');
+  assert.deepEqual(plain(f.api.items), legacyItems, 'V2 still owns its original seven-control schema');
+  assert.deepEqual(plain(f.api.get()), defaults);
+  assert.deepEqual(plain(f.values), before, 'creating the palette does not write or migrate saved layouts');
+});
+
+test('older model catalogs do not advertise an unsupported Game Profiles Control', () => {
+  const f = fixture();
+  f.window.NvShadowPlayLayoutV5 = { CONTROLS: defaults.left.concat(defaults.center, ['Performance', 'Mic', 'Camera', 'Gallery', 'Settings']) };
+  const { controller } = editorController(f);
+  assert.equal(controller.items.some(item => item.key === 'GameProfiles'), false);
+  assert.equal(controller.key({ name: 'nv-game-profiles-tile' }), '');
+});
+
 test('normalization compacts blanks, removes invalid controls and deduplicates across panels', () => {
   const f = fixture();
   const result = f.api.normalize({

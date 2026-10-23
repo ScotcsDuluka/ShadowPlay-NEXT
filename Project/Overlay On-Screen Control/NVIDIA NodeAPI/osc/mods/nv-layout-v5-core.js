@@ -13,7 +13,7 @@
 
   var PANEL_NAMES = ['left', 'center', 'right'];
   var CONTROLS = ['Screenshot', 'Mods', 'ManualRecord', 'Stream', 'InstantReplay',
-    'Ansel', 'Broadcast', 'Performance', 'Mic', 'Camera', 'Gallery', 'Settings'];
+    'Ansel', 'Broadcast', 'Performance', 'Mic', 'Camera', 'Gallery', 'Settings', 'GameProfiles'];
   var KNOWN = Object.create(null);
   CONTROLS.forEach(function (key) { KNOWN[key] = true; });
   var PRESETS = {
@@ -82,12 +82,20 @@
     });
     return order;
   }
+  function catalogOrder(s) {
+    var previous = s.controlOrder || CONTROLS;
+    // Older V5 data predates the optional Game Profiles Control. Append it in
+    // memory only; reading the palette must never migrate saved user data.
+    return previous.concat(CONTROLS.filter(function (key) {
+      return previous.indexOf(key) < 0;
+    }));
+  }
   function controlOrder(s) {
     // Keep a complete order, including palette Controls, so a second reduction
     // can return an earlier Slot before Controls displaced by the first one.
     // Older saved layouts have no metadata; derive their actual native order.
     var assigned = assignedOrder(s), at = 0;
-    var previous = s.controlOrder || assigned.concat(CONTROLS.filter(function (key) {
+    var previous = s.controlOrder ? catalogOrder(s) : assigned.concat(CONTROLS.filter(function (key) {
       return assigned.indexOf(key) < 0;
     }));
     return previous.map(function (key) {
@@ -128,13 +136,18 @@
     ensure(groups <= MAX_GROUPS, 'Only six Groups may exist across all Panels');
     ensure(keys.Settings === true, 'Settings cannot be removed');
     if (s.controlOrder !== undefined) {
-      ensure(Array.isArray(s.controlOrder) && s.controlOrder.length === CONTROLS.length,
+      ensure(Array.isArray(s.controlOrder) &&
+        (s.controlOrder.length === CONTROLS.length || s.controlOrder.length === CONTROLS.length - 1),
         'Invalid Control order');
       var ordered = Object.create(null);
       s.controlOrder.forEach(function (key) {
-        ensure(KNOWN[key] && !ordered[key], 'Invalid Control order');
+        ensure(typeof key === 'string' && KNOWN[key] && !ordered[key], 'Invalid Control order');
         ordered[key] = true;
       });
+      ensure(CONTROLS.every(function (key) {
+        return ordered[key] || (key === 'GameProfiles' && s.controlOrder.length === CONTROLS.length - 1);
+      }),
+        'Invalid Control order');
     }
     return true;
   }
@@ -164,7 +177,7 @@
   }
   function available(s) {
     validate(s);
-    return (s.controlOrder || CONTROLS).filter(function (key) { return !findControl(s, key); });
+    return catalogOrder(s).filter(function (key) { return !findControl(s, key); });
   }
   function change(s, fn) {
     validate(s);

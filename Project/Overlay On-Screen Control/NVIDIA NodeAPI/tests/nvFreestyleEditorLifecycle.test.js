@@ -188,6 +188,17 @@ test('native click, Enter and Space are captured during Angular shell startup be
   assert.equal(f.nativeActions, 1, 'native behavior resumes outside editing shell');
 });
 
+test('Game Profiles palette selection keeps its proper title and does not invoke a native action', () => {
+  const f = fixture(); f.scan();
+  const control = f.host.querySelector('[data-menu-key="GameProfiles"]');
+  assert.ok(control);
+  const event = f.emit('click', control);
+  assert.ok(event.prevented && event.stopped);
+  assert.equal(f.host.querySelector('.nv-f-selection').textContent, 'Selected: Game Profiles');
+  assert.equal(f.nativeActions, 0);
+  assert.equal(M.findControl(f.A.get(), 'GameProfiles'), null, 'selection leaves the saved default untouched');
+});
+
 test('Cancel closes original Angular shell directly and releases only the transient lease', () => {
   const f = fixture(); f.scan();
   assert.equal(f.editor.isEditing(), true); assert.equal(f.lease(), true); assert.equal(f.flag(), false);

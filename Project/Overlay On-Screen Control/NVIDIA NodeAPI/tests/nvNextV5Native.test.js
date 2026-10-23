@@ -4,7 +4,8 @@ const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const M=require('../osc/mods/nv-layout-v5-core.js');
 const nativeCode=fs.readFileSync(path.join(__dirname,'../osc/mods/nv-next-v5-native.js'),'utf8');
 
-function makeRuntime(flag, withClock=false) {
+function makeRuntime(flag, withClock=false, options={}) {
+  const model=options.model||M;
   const frames=new Map();let frameId=0, onInterval=null;
   const storage=new Map([
     ['DulukaMainMenuUnifiedV4Enabled','1'],
@@ -28,7 +29,10 @@ function makeRuntime(flag, withClock=false) {
       ['Settings','nv-settings-menu-tile']
     ].map(([key,name])=>({key,name}))
   };
-  v4.CONTROLS.forEach(c=>{tiles[c.key]={
+  const nativeMeta=v4.CONTROLS.slice();
+  if(options.gameProfiles!==false&&model.CONTROLS.includes('GameProfiles'))
+    nativeMeta.push({key:'GameProfiles',name:'nv-game-profiles-tile'});
+  nativeMeta.forEach(c=>{tiles[c.key]={
     key:c.key,style:style(),classList:classes(),
     querySelector(){return null},
     setAttribute(k,v){changes.set(c.key+'/'+k,v)},
@@ -38,7 +42,7 @@ function makeRuntime(flag, withClock=false) {
     getBoundingClientRect(){return {left:440,top:120,width:1040,height:350}},
     querySelector(name){
       if(name==='md-menu-bar')return bar;
-      const c=v4.CONTROLS.find(x=>name==='md-menu.'+x.name);
+      const c=nativeMeta.find(x=>name==='md-menu.'+x.name);
       return c?tiles[c.key]:null;
     }
   };
@@ -49,14 +53,14 @@ function makeRuntime(flag, withClock=false) {
   };
   if(editor)document.documentElement.classList.add('nv-live-layout-editing');
   const window={
-    NvShadowPlayLayoutV5:M,NvUnifiedLayoutV4:v4,innerWidth:1920,innerHeight:1200,
+    NvShadowPlayLayoutV5:model,NvUnifiedLayoutV4:v4,innerWidth:1920,innerHeight:1200,
     localStorage:{getItem(k){return storage.get(k)||null},setItem(k,v){storage.set(k,String(v))},removeItem(k){storage.delete(k)}},
     setInterval:withClock?fn=>{onInterval=fn}:null,
     requestAnimationFrame:withClock?fn=>{const id=++frameId;frames.set(id,fn);return id}:null,
     cancelAnimationFrame:withClock?id=>frames.delete(id):null
   };
   vm.runInNewContext(nativeCode,{window,document}, {filename:'nv-next-v5-native.js',timeout:2500});
-  return {window,document,root,bar,tiles,storage,changes,frames,
+  return {window,document,root,bar,tiles,storage,changes,frames,legacy:v4,
     tick(){if(onInterval)onInterval()},
     advance(){const first=frames.entries().next().value;if(!first)return false;
       frames.delete(first[0]);first[1]();return true}
@@ -82,7 +86,7 @@ test('disabled NEXT V5 does not alter any live native button or old user layout 
 });
 test('enabled adapter reuses all twelve original NVIDIA md-menu elements, no clones',()=>{
  const t=makeRuntime(true);
- const before=Object.values(t.tiles);
+ const before=t.legacy.CONTROLS.map(meta=>t.tiles[meta.key]);
  const api=t.window.__nvNextLayoutV5;
  const g=api.sync(true);
  assert.equal(g.cells.length,12);
@@ -113,6 +117,38 @@ test('native sync hides unassigned Controls without removing or changing their l
  s=M.placeControl(s,'Screenshot','g1',0,0);api.set(s);api.sync(true);
  assert.equal(t.tiles.Screenshot.style.getPropertyValue('display'),'block');
  assert.equal(t.changes.has('Screenshot/aria-hidden'),false);
+});
+test('Game Profiles reuses its native tile, stays unassigned by default and leaves V4 catalog intact',()=>{
+ const t=makeRuntime(true),api=t.window.__nvNextLayoutV5, native=t.tiles.GameProfiles;
+ assert.ok(native,'supported V5 catalog supplies the custom native Angular tile');
+ assert.equal(t.legacy.CONTROLS.length,12);
+ assert.equal(t.legacy.CONTROLS.some(meta=>meta.key==='GameProfiles'),false);
+ assert.equal(api.sync(true).cells.length,12,'the original six-Group default stays unchanged');
+ assert.equal(native.style.getPropertyValue('display'),'none');
+ assert.equal(t.storage.has(api.storageKey),false,'sync does not save a replacement default');
+ const next=M.placeControl(api.get(),'GameProfiles','g1',0,0);
+ api.set(next);api.sync(true);
+ assert.equal(t.tiles.GameProfiles,native,'assigning reuses the same node and native listeners');
+ assert.equal(native.style.getPropertyValue('display'),'block');
+ assert.equal(native.style.getPropertyValue('height'),'80px');
+ assert.equal(t.tiles.Screenshot.style.getPropertyValue('display'),'none');
+ assert.equal(t.changes.get('GameProfiles/data-nv-next-control'),'GameProfiles');
+});
+test('new catalog waits for Game Profiles and every original tile before changing geometry',()=>{
+ const t=makeRuntime(true,false,{gameProfiles:false});
+ assert.equal(t.window.__nvNextLayoutV5.sync(true),null);
+ assert.equal(t.bar.style.getPropertyValue('width'),'');
+ for(const tile of Object.values(t.tiles))assert.equal(tile.style.getPropertyValue('left'),'');
+ const original=makeRuntime(true);delete original.tiles.Mods;
+ assert.equal(original.window.__nvNextLayoutV5.sync(true),null,'custom Control never relaxes original twelve-tile readiness');
+ assert.equal(original.bar.style.getPropertyValue('width'),'');
+});
+test('adapter still accepts older twelve-Control V5 catalogs without adding to V4 metadata',()=>{
+ const older=Object.assign({},M,{CONTROLS:M.CONTROLS.filter(key=>key!=='GameProfiles')});
+ const t=makeRuntime(true,false,{model:older});
+ assert.ok(t.window.__nvNextLayoutV5.sync(true));
+ assert.equal(t.tiles.GameProfiles,undefined);
+ assert.equal(t.legacy.CONTROLS.length,12);
 });
 test('NEXT V5 edit state stays ephemeral until Done, supports Cancel and Undo',()=>{
  const t=makeRuntime(true),api=t.window.__nvNextLayoutV5;

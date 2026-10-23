@@ -1,6 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const mods=path.join(__dirname,'../osc/mods'),liveSource=fs.readFileSync(path.join(mods,'main-menu-live.js'),'utf8'),gpuSource=fs.readFileSync(path.join(mods,'gpu-profiles.js'),'utf8');
+const V5=require('../osc/mods/nv-layout-v5-core.js');
 const plain=value=>JSON.parse(JSON.stringify(value));
 function live(window={},document={}){
  const states={},decorators={},directives={},values={};
@@ -16,7 +17,7 @@ function styledNode(className){
  node.classList={contains:n=>classes.has(n),add(n){classes.add(n);node.classWrites++;},remove:n=>classes.delete(n)};
  node.setAttribute=(n,v)=>{node.attributes[n]=v;};return node;
 }
-function menu(visibility){
+function menu(visibility,{v5Owner=false}={}){
  const routes=[],quietCalls=[],nodes={},styles={},micAction=()=>{},cameraAction=()=>{},galleryAction=()=>{};
  const tiles={Performance:{name:'performance-tile',visible:true,enabled:true},Gallery:{name:'gallery-tile',visible:true,click:galleryAction},Mic:{name:'mic-tile',visible:true,state:{On:{items:[{click:micAction}]}}},Camera:{name:'camera-tile',visible:true,state:{Off:{items:[{click:cameraAction}]}}},QuietMode2:{name:'quietmode2-tile',visible:true,enabled:true,click:()=>quietCalls.push('toggle')},Preferences:{name:'preferences-tile',visible:true,enabled:true,click:()=>{throw Error('Settings must open its submenu');}}};
  const scope={mainMenu:{tiles},digests:0,$applyAsync(){this.digests++;}},root={querySelector:sel=>nodes[sel.replace('md-menu.','')]||null};
@@ -25,10 +26,13 @@ function menu(visibility){
  const window={angular:{element:el=>el===root?{scope:()=>scope}:{injector:()=>({get:()=>({go:route=>routes.push(route)})})}}},f=live(window,document);
  f.api.items.forEach(item=>{nodes[item.name]=styledNode(item.name);tiles[item.key]={name:item.name,visible:true,enabled:true,click(){},state:{}};});
  window.__dulukaStartMainMenuEditor=()=>{editStarts++;};if(visibility)window.__dulukaMainMenuVisibility=visibility;
- const context={window,document,mainMenuTileStyleId:'test-menu-style',mainMenuTileMarker:'test-marker',performanceSupportAvailable:null,liveLayoutUnsubscribe:null,openGameProfilesFromMainMenu:()=>routes.push('main.gpu-profiles')};
- vm.createContext(context);const start=gpuSource.indexOf('  function ensureMainMenuTileStyle()'),end=gpuSource.indexOf('  function registerPerformanceSupportListener()',start);vm.runInContext(gpuSource.slice(start,end),context);
+ let nextOwner=v5Owner,nextSyncs=0;
+ window.__nvNextLayoutV5={enabled:()=>nextOwner,model:V5,sync(){nextSyncs++;}};
+ const context={window,document,mainMenuTileStyleId:'test-menu-style',mainMenuTileMarker:'test-marker',performanceSupportAvailable:null,liveLayoutUnsubscribe:null,gameProfilesReturnState:'main.preferences'};
+ vm.createContext(context);const start=gpuSource.indexOf('  function openGameProfilesFromMainMenu()'),end=gpuSource.indexOf('  function registerPerformanceSupportListener()',start);vm.runInContext(gpuSource.slice(start,end),context);
  const synchronize=()=>vm.runInContext('updateMainMenuPerformance()',context);synchronize();
- return Object.assign(f,{routes,tiles,nodes,root,scope,quietCalls,context,synchronize,micAction,cameraAction,galleryAction,editStarts:()=>editStarts});
+ return Object.assign(f,{routes,tiles,nodes,root,scope,quietCalls,context,synchronize,micAction,cameraAction,galleryAction,editStarts:()=>editStarts,
+  owner(value){nextOwner=value;},nextSyncs:()=>nextSyncs});
 }
 function nativeTemplate(){
  const bundle=fs.readFileSync(path.join(__dirname,'../osc/app.js'),'utf8'),position=bundle.indexOf('main-menu-container" ng-cloak'),start=bundle.lastIndexOf('e.exports=',position)+'e.exports='.length,end=bundle.indexOf('},function',start);
@@ -38,13 +42,13 @@ function nativeTemplate(){
 test('Settings keeps native actions and starts customization directly on the real Main-menu',()=>{
  const f=menu(),settings=f.tiles.Preferences;
  assert.equal(settings.name,'nv-settings-menu');assert.equal(typeof settings.click,'undefined');
- assert.deepEqual(Array.from(settings.state.Menu.items,item=>item.name),['Settings','Customize Main-menu','Game Profiles','Whisper Mode','Overlay FPS','Renderer Mode']);
- settings.state.Menu.items[0].click();settings.state.Menu.items[1].click();settings.state.Menu.items[2].click();
- assert.deepEqual(f.routes,['main.preferences','main.gpu-profiles']);assert.equal(f.editStarts(),1);assert.equal(settings.state.Menu.items[1].icon,'icon-share');
+ assert.deepEqual(Array.from(settings.state.Menu.items,item=>item.name),['Settings','Customize Main-menu','Whisper Mode','Overlay FPS','Renderer Mode']);
+ settings.state.Menu.items.find(item=>item.id==='settings').click();settings.state.Menu.items.find(item=>item.id==='customize-main-menu').click();
+ assert.deepEqual(f.routes,['main.preferences']);assert.equal(f.editStarts(),1);assert.equal(settings.state.Menu.items.find(item=>item.id==='customize-main-menu').icon,'icon-share');
  assert.equal(f.tiles.Mic.state.On.items[0].click,f.micAction);assert.equal(f.tiles.Camera.state.Off.items[0].click,f.cameraAction);assert.equal(f.tiles.Gallery.click,f.galleryAction);
 });
 test('Whisper Mode stays in Settings and follows a replacement native control',()=>{
- const f=menu(),items=f.tiles.Preferences.state.Menu.items,quietItem=items[3];
+ const f=menu(),items=f.tiles.Preferences.state.Menu.items,quietItem=items.find(item=>item.id==='quiet-mode');
  assert.equal(f.tiles.QuietMode2.visible,false);assert.equal(quietItem.visible,true);quietItem.click();f.synchronize();
  assert.equal(f.tiles.Preferences.state.Menu.items,items,'Synchronizing must not rebuild an open submenu');
  f.tiles.QuietMode2={visible:true,enabled:true,click:()=>f.quietCalls.push('new toggle')};f.synchronize();quietItem.click();
@@ -65,13 +69,45 @@ test('Renderer Mode opens from Settings and remains unique after synchronization
  assert.equal(items.filter(x=>x.id==='renderer-mode').length,1);
 });
 test('missing Whisper Mode disables its submenu action',()=>{
- const f=menu();delete f.tiles.QuietMode2;f.synchronize();const item=f.tiles.Preferences.state.Menu.items[3];
+ const f=menu();delete f.tiles.QuietMode2;f.synchronize();const item=f.tiles.Preferences.state.Menu.items.find(item=>item.id==='quiet-mode');
  assert.equal(item.visible,false);assert.equal(item.enabled,false);assert.doesNotThrow(()=>item.click());
 });
 test('right controls may be hidden but Settings always remains visible',()=>{
  const f=menu({Performance:false,Gallery:false,Mic:false,Camera:false,Preferences:false});for(let i=0;i<3;i++)f.synchronize();
  for(const key of ['Performance','Gallery','Mic','Camera'])assert.equal(f.tiles[key].visible,false,key);assert.equal(f.tiles.Preferences.visible,true);
- assert.equal(f.tiles.GameProfiles,undefined);
+ assert.equal(f.tiles.GameProfiles.visible,false,'unassigned Game Profiles remains absent from legacy Main-menu');
+});
+test('Game Profiles is an actual native menu tile while V5 owns it and opens the existing route',()=>{
+ const f=menu(undefined,{v5Owner:true}),tile=f.tiles.GameProfiles;
+ assert.equal(tile.name,'nv-game-profiles-tile');assert.equal(tile.title,'Game Profiles');assert.equal(tile.icon,'icon-edit_tune');
+ assert.equal(tile.visible,true);assert.equal(tile.enabled,true);assert.equal(tile.initialFocus,'false');
+ assert.equal(tile.currentState,'Ready');assert.equal(tile.state.Ready.icon,'icon-edit_tune');assert.equal(tile.state.Ready.status,'');
+ assert.deepEqual(Array.from(tile.state.Ready.items),[],'direct native click has no submenu commands');
+ assert.equal(tile[f.context.mainMenuTileMarker],true);assert.equal(typeof tile.click,'function');
+ assert.equal(V5.findControl(V5.defaultLayout(),'GameProfiles'),null,'default original twelve slots are unchanged');
+ assert.ok(V5.available(V5.defaultLayout()).includes('GameProfiles'),'new control starts in the palette');
+ tile.click();assert.deepEqual(f.routes,['main.gpu-profiles']);assert.equal(f.context.gameProfilesReturnState,'main.main-menu');
+ assert.ok(f.nextSyncs()>0,'positioning remains delegated to the V5 owner');
+});
+test('Game Profiles native tile identity and click survive repeated synchronization and ownership changes',()=>{
+ const f=menu(undefined,{v5Owner:true}),tile=f.tiles.GameProfiles,click=tile.click,items=f.tiles.Preferences.state.Menu.items;
+ for(let i=0;i<4;i++)f.synchronize();
+ assert.equal(f.tiles.GameProfiles,tile);assert.equal(tile.click,click);assert.equal(f.tiles.Preferences.state.Menu.items,items);
+ assert.equal(items.some(item=>item.id==='game-profiles'),false);
+ f.owner(false);f.synchronize();assert.equal(tile.visible,false,'legacy owner does not introduce an extra tile');
+ f.owner(true);f.synchronize();assert.equal(tile.visible,true);assert.equal(f.tiles.GameProfiles,tile);assert.equal(tile.click,click);
+ tile.click();assert.deepEqual(f.routes,['main.gpu-profiles']);
+});
+test('stale Game Profiles Settings rows are removed in place without replacing native actions or open menu array',()=>{
+ const f=menu(undefined,{v5Owner:true}),settings=f.tiles.Preferences,items=settings.state.Menu.items,
+   existing=Array.from(items),actions=existing.map(item=>item.click);
+ const obsolete={id:'game-profiles',name:'Old Game Profiles',visible:true,enabled:true,click(){throw Error('retired submenu action');}};
+ items.splice(1,0,obsolete);items.push({...obsolete});
+ assert.equal(settings.__dulukaSettingsSubmenu,true);f.synchronize();f.synchronize();
+ assert.equal(settings.state.Menu.items,items,'Angular-owned open submenu array is retained');
+ assert.deepEqual(Array.from(items),existing,'every stale copy removed while other row objects keep their order');
+ for(let i=0;i<existing.length;i++)assert.equal(items[i].click,actions[i]);
+ assert.equal(f.tiles.GameProfiles.visible,true,'actual native Game Profiles control remains available');
 });
 test('native feature support controls Performance availability independently of visibility',()=>{
  const f=menu();f.context.performanceSupportAvailable=false;f.synchronize();assert.equal(f.tiles.Performance.enabled,false);assert.equal(f.tiles.Performance.visible,true);

@@ -15,6 +15,10 @@
   var sideStorageKey='DulukaMainMenuSideRowsV1';
   var nativeSideKeys=['Performance','Mic','Camera','Gallery','Settings'];
   var sideItems=[{key:'Performance',label:'Performance',icon:'icon-performance'},{key:'Mic',label:'Microphone',icon:'icon-mic_off'},{key:'Camera',label:'Camera',icon:'icon-camera'},{key:'Gallery',label:'Gallery',icon:'icon-gallery'},{key:'Settings',label:'Settings',icon:'icon-settings'}];
+  // V5 can configure application controls without extending V2's saved
+  // layout schema or silently assigning them to the native default layout.
+  var freestyleItems=[{key:'GameProfiles',name:'nv-game-profiles-tile',label:'Game Profiles',icon:'icon-edit_tune'}];
+  function freestyleCatalog(){var model=window.NvShadowPlayLayoutV5;return model&&Array.isArray(model.CONTROLS)?freestyleItems.filter(function(item){return model.CONTROLS.indexOf(item.key)>=0;}):[];}
   function copy(value){return JSON.parse(JSON.stringify(value));}
   function known(key){return items.some(function(item){return item.key===key;});}
   function normalize(raw){
@@ -180,9 +184,9 @@
     }]);
   }]).directive('nvMainMenuLiveEditor',['$window','$document',function($window,$document){
     return {restrict:'A',controller:['$scope',function($scope){
-      var self=this;self.editing=false;self.items=items.concat(sideItems);self.layout=api.get();self.sides=api.getSides();self.selected='';self.search='';self.error='';
+      var self=this;self.editing=false;self.items=items.concat(sideItems,freestyleCatalog());self.layout=api.get();self.sides=api.getSides();self.selected='';self.search='';self.error='';
       self.extraRows=function(){return Math.max(0,self.sides.right.length-3)*80;};
-      self.key=function(tile){var match=items.filter(function(item){return tile&&item.name===tile.name;})[0];return match?match.key:'';};
+      self.key=function(tile){var match=items.concat(freestyleCatalog()).filter(function(item){return tile&&item.name===tile.name;})[0];return match?match.key:'';};
       self.isMovable=function(tile){return !!self.key(tile);};self.item=function(key){return self.items.filter(function(item){return item.key===key;})[0]||{};};self.label=function(key){return self.item(key).label;};
       self.subtitle=function(key){var menu=$scope.mainMenu||{},tile=(menu.tiles||{})[key];if(key==='Screenshot')return menu.screenshotHotkey||'';if(key==='Ansel')return menu.anselHotkey||'';if(key==='Settings')return 'Preferences';if(key==='Gallery')return 'Saved captures';return tile?(tile.shortcut||(tile.state&&tile.state[tile.currentState]||{}).status||tile.currentState||''):'';};
       self.iconFor=function(key){var item=self.item(key),tile=($scope.mainMenu&&$scope.mainMenu.tiles||{})[key];return tile&&(tile.state&&tile.state[tile.currentState]||{}).icon||item.icon;};

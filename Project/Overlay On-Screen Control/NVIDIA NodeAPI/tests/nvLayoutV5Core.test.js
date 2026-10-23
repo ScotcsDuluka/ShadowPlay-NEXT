@@ -7,7 +7,7 @@ function defaultState() { return M.defaultLayout(); }
 function totalCells(s) {
   return M.geometry(s, 'normal', 1920).cells.length;
 }
-test('native default preserves all 12 Controls and six Groups in 1/4/1 split', () => {
+test('native default preserves its 12 occupied Controls and six Groups; Game Profiles starts in palette', () => {
   const s = defaultState();
   assert.equal(M.validate(s), true);
   assert.equal(M.count(s), 6);
@@ -15,8 +15,76 @@ test('native default preserves all 12 Controls and six Groups in 1/4/1 split', (
   assert.deepEqual(s.panels.center.map(x => x.id), ['g2','g3','g4','g5']);
   assert.deepEqual(s.panels.right.map(x => x.id), ['g6']);
   assert.equal(totalCells(s), 12);
-  assert.deepEqual(M.available(s), []);
+  assert.deepEqual(M.available(s), ['GameProfiles']);
+  assert.equal(M.CONTROLS.length, 13);
   assert.equal(M.findControl(s, 'Settings').groupId, 'g6');
+});
+
+test('legacy 12-key saved order loads and exposes Game Profiles without mutating saved data or Cancel', () => {
+  const saved=defaultState();
+  saved.panels.right[0].blocks[0].slots=['Performance',null,null];
+  saved.controlOrder=['Mic','Camera'].concat(M.CONTROLS.filter(key=>!['Mic','Camera','GameProfiles'].includes(key)));
+  const raw=JSON.stringify(saved),loaded=JSON.parse(raw);
+  assert.equal(loaded.controlOrder.length,12);
+  assert.equal(M.validate(loaded),true);
+  assert.deepEqual(M.available(loaded),['Mic','Camera','GameProfiles']);
+  M.geometry(loaded,'edit',1920);
+  assert.equal(JSON.stringify(loaded),raw,'validation, palette and geometry are read-only');
+  let writes=0;
+  const session=M.createEditSession(loaded,()=>writes++);
+  assert.equal(JSON.stringify(session.get()),raw);
+  session.apply(s=>M.placeControl(s,'GameProfiles','g6',0,1));
+  assert.equal(session.get().controlOrder.length,M.CONTROLS.length);
+  assert.equal(M.findControl(session.get(),'GameProfiles').slot,1);
+  assert.equal(JSON.stringify(session.cancel()),raw,'Cancel returns the exact pre-upgrade model');
+  assert.equal(JSON.stringify(loaded),raw);
+  assert.equal(writes,0);
+});
+
+test('Done can persist complete new order while a legacy layout retains displaced palette order', () => {
+  const saved=defaultState();
+  saved.panels.right[0].blocks[0].slots=['Performance',null,null];
+  saved.controlOrder=['Mic','Camera'].concat(M.CONTROLS.filter(key=>!['Mic','Camera','GameProfiles'].includes(key)));
+  const original=JSON.stringify(saved);let persisted=null;
+  const session=M.createEditSession(saved,s=>persisted=s);
+  session.apply(s=>M.autoFill(s,false));
+  assert.deepEqual(M.available(session.get()),['Mic','Camera','GameProfiles']);
+  assert.equal(persisted,null);
+  session.done();
+  assert.equal(persisted.controlOrder.length,M.CONTROLS.length);
+  assert.equal(persisted.controlOrder.at(-1),'GameProfiles');
+  assert.equal(M.validate(persisted),true);
+  assert.equal(JSON.stringify(saved),original);
+});
+
+test('Game Profiles supports empty Slots, occupied swaps, Settings protection and return to palette', () => {
+  let s=defaultState();
+  assert.throws(()=>M.placeControl(s,'GameProfiles','g6',2,0),/Move Settings/);
+  s=M.placeControl(s,'GameProfiles','g2',0,0);
+  assert.equal(M.findControl(s,'GameProfiles').groupId,'g2');
+  assert.deepEqual(M.available(s),['Stream']);
+  s=M.placeControl(s,'GameProfiles','g6',2,0);
+  assert.equal(M.findControl(s,'Settings').groupId,'g2','assigned Controls can swap with Settings');
+  s=M.takeControl(s,'GameProfiles');
+  assert.deepEqual(new Set(M.available(s)),new Set(['Stream','GameProfiles']));
+  s=M.placeControl(s,'GameProfiles','g6',2,0);
+  assert.equal(M.available(s).includes('GameProfiles'),false);
+  assert.equal(M.validate(s),true);
+  assert.equal(M.findControl(M.deleteGroup(s,'g6'),'GameProfiles'),null);
+});
+
+test('Control order accepts only complete new metadata or legacy metadata missing only Game Profiles', () => {
+  const legacy=M.CONTROLS.filter(key=>key!=='GameProfiles');
+  const state=order=>Object.assign(defaultState(),{controlOrder:order});
+  assert.equal(M.validate(state(legacy)),true);
+  assert.equal(M.validate(state(M.CONTROLS.slice())),true);
+  assert.throws(()=>M.validate(state(M.CONTROLS.filter(key=>key!=='Screenshot'))),/Invalid Control order/);
+  assert.throws(()=>M.validate(state(legacy.slice(1))),/Invalid Control order/);
+  assert.throws(()=>M.validate(state(legacy.slice(0,-1).concat('Screenshot'))),/Invalid Control order/);
+  assert.throws(()=>M.validate(state(legacy.slice(0,-1).concat('Unknown'))),/Invalid Control order/);
+  assert.throws(()=>M.validate(state(Array(M.CONTROLS.length))),/Invalid Control order/);
+  const sparse=legacy.slice();sparse.length=M.CONTROLS.length;
+  assert.throws(()=>M.validate(state(sparse)),/Invalid Control order/);
 });
 test('all three Panels are unrestricted individually, while global Group max stays six', () => {
   let s = defaultState();
@@ -27,7 +95,7 @@ test('all three Panels are unrestricted individually, while global Group max sta
   assert.throws(() => M.addGroup(s, 'left'), /Only six Groups/);
   s = M.deleteGroup(s, 'g2');
   assert.equal(M.count(s), 5);
-  assert.deepEqual(M.available(s), ['Stream']);
+  assert.deepEqual(M.available(s), ['Stream','GameProfiles']);
   s = M.addGroup(s, 'right');
   assert.equal(M.count(s), 6);
   assert.equal(s.panels.right[0].blocks.length, 0);
@@ -89,18 +157,18 @@ test('palette Control fills empty Slot or replaces occupied Slot and returns dis
   s = M.placeControl(s,'Screenshot','g2',0,0);
   assert.equal(M.findControl(s,'Screenshot').groupId,'g2');
   assert.equal(M.available(s).includes('Screenshot'),false);
-  assert.deepEqual(M.available(s),['Stream']);
+  assert.deepEqual(M.available(s),['Stream','GameProfiles']);
   s = M.placeControl(s,'Stream','g1',0,0);
-  assert.equal(M.available(s).length,0);
+  assert.deepEqual(M.available(s),['GameProfiles']);
   assert.equal(totalCells(s),12);
 });
 test('layout shrinking returns excess Controls to catalog in original order', () => {
   let s = defaultState();
   s = M.changeBlock(s,'g6',0,'small','wideLeft');
   assert.deepEqual(M.locate(s,'g6').group.blocks[0].slots,['Performance','Mic']);
-  assert.deepEqual(M.available(s),['Camera']);
+  assert.deepEqual(M.available(s),['Camera','GameProfiles']);
   s = M.changeBlock(s,'g6',0,'small','single');
-  assert.deepEqual(M.available(s),['Mic','Camera']);
+  assert.deepEqual(M.available(s),['Mic','Camera','GameProfiles']);
   assert.equal(M.locate(s,'g6').group.blocks[0].slots[0],'Performance');
 });
 
@@ -108,19 +176,19 @@ test('displaced palette order follows prior Slots after arbitrary swaps, across 
   let s = M.placeControl(defaultState(),'Camera','g6',0,0);
   assert.deepEqual(M.locate(s,'g6').group.blocks[0].slots,['Camera','Mic','Performance']);
   s = M.changeBlock(s,'g6',0,'small','wideLeft');
-  assert.deepEqual(M.available(s),['Performance']);
+  assert.deepEqual(M.available(s),['Performance','GameProfiles']);
   s = M.changeBlock(s,'g6',0,'small','single');
-  assert.deepEqual(M.available(s),['Mic','Performance']);
-  assert.deepEqual(M.available(M.clone(s)),['Mic','Performance']);
+  assert.deepEqual(M.available(s),['Mic','Performance','GameProfiles']);
+  assert.deepEqual(M.available(M.clone(s)),['Mic','Performance','GameProfiles']);
   const restored = JSON.parse(JSON.stringify(s));
-  assert.deepEqual(M.available(restored),['Mic','Performance']);
+  assert.deepEqual(M.available(restored),['Mic','Performance','GameProfiles']);
 });
 
 test('Group deletion and Big replacement return Controls in their previous native order', () => {
   let s = M.placeControl(defaultState(),'ManualRecord','g1',0,0);
-  assert.deepEqual(M.available(M.deleteGroup(s,'g1')),['ManualRecord','Mods','Screenshot']);
+  assert.deepEqual(M.available(M.deleteGroup(s,'g1')),['ManualRecord','Mods','Screenshot','GameProfiles']);
   s = M.changeBlock(s,'g1',1,'big','single');
-  assert.deepEqual(M.available(s),['ManualRecord','Screenshot']);
+  assert.deepEqual(M.available(s),['ManualRecord','Screenshot','GameProfiles']);
   assert.equal(M.findControl(s,'Mods').groupId,'g1');
 });
 test('changing Group to Big releases displaced controls and rejects loss of Settings', () => {
@@ -148,11 +216,11 @@ test('a palette replacement cannot eject Settings and rejected changes leave the
   assert.throws(()=>M.placeControl(s,'Screenshot','g6',2,0),/Move Settings/);
   assert.deepEqual(s,before);
   assert.equal(M.findControl(s,'Settings').groupId,'g6');
-  assert.deepEqual(M.available(s),['Screenshot']);
+  assert.deepEqual(M.available(s),['Screenshot','GameProfiles']);
 });
 test('deleting Group releases all normal Controls but not Settings',()=>{
   let s = M.deleteGroup(defaultState(),'g1');
-  assert.deepEqual(M.available(s),['Screenshot','Mods','ManualRecord']);
+  assert.deepEqual(M.available(s),['Screenshot','Mods','ManualRecord','GameProfiles']);
   assert.throws(()=>M.deleteGroup(s,'g6'),/Move Settings/);
 });
 test('Group -> Group swap preserves identities across Panels and no duplicate IDs',()=>{
