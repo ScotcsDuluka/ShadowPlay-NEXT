@@ -123,6 +123,13 @@
   }
   function redraw() {
     if(!editing||!host)return;
+    var motion=window.__dulukaOscMotion;
+    if((motion && motion.phase && motion.phase!=='idle') ||
+      document.documentElement.classList.contains('nv-motion-active')){
+      if(overlay)overlay.style.display='none';
+      return;
+    }
+    if(overlay)overlay.style.display='block';
     var g=A.sync(true)||M.geometry(A.get(),'edit',Math.max(320,window.innerWidth-80));
     var bar=bars();
     if(!bar)return;
@@ -389,10 +396,12 @@
     else if(editing&&(!editor||editor!==host)){
       A.cancel();var disabled=!originallyEnabled;cleanup();
       if(disabled){A.enable(false);window.location.reload()}
-    }else if(editing&&Math.abs(window.innerWidth-lastWidth)>0&&overlay){
-      // The bar is responsive to OSC Host scaling; use the actual DOM rect.
+    }else if(editing){
+      // Do not paint Edit outlines over the CEF entrance animation; then
+      // track the exact scaled native bar rect without a second layout owner.
       var rect=bars()&&bars().getBoundingClientRect();
-      if(rect && (Math.abs(rect.width-lastWidth)>1||Math.abs(rect.y-lastTop)>1))redraw();
+      if(!overlay || (overlay.style.display==='none') ||
+        (rect && (Math.abs(rect.width-lastWidth)>1||Math.abs(rect.y-lastTop)>1)))redraw();
     }
   }
   document.addEventListener('mousedown',down,true);

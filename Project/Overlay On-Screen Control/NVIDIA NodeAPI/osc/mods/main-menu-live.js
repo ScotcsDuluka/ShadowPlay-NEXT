@@ -186,7 +186,20 @@
       self.isMovable=function(tile){return !!self.key(tile);};self.item=function(key){return self.items.filter(function(item){return item.key===key;})[0]||{};};self.label=function(key){return self.item(key).label;};
       self.subtitle=function(key){var menu=$scope.mainMenu||{},tile=(menu.tiles||{})[key];if(key==='Screenshot')return menu.screenshotHotkey||'';if(key==='Ansel')return menu.anselHotkey||'';if(key==='Settings')return 'Preferences';if(key==='Gallery')return 'Saved captures';return tile?(tile.shortcut||(tile.state&&tile.state[tile.currentState]||{}).status||tile.currentState||''):'';};
       self.iconFor=function(key){var item=self.item(key),tile=($scope.mainMenu&&$scope.mainMenu.tiles||{})[key];return tile&&(tile.state&&tile.state[tile.currentState]||{}).icon||item.icon;};
-      self.variant=function(tile){var key=self.key(tile);var groups=self.sides;for(var g in groups){for(var i=0;i<groups[g].length;i++)if(groups[g][i].indexOf(key)>=0)return groups[g][i].length>1?'small':'row';}return 'big';};
+      self.variant=function(tile){
+        var key=self.key(tile),next=window.__nvNextLayoutV5;
+        if(next&&next.enabled&&next.enabled()&&key){
+          var model=next.model,state=next.get(),loc=model.findControl(state,key);
+          if(loc){var b=model.locate(state,loc.groupId).group.blocks[loc.block];
+            if(b.type==='big')return 'big';
+            if(b.type==='small')return 'small';
+            if(b.layout==='single'||(b.layout==='detailLeft'&&loc.slot===0)||
+              (b.layout==='detailRight'&&loc.slot===1))return 'row';
+            return 'small';
+          }
+        }
+        var groups=self.sides;for(var g in groups){for(var i=0;i<groups[g].length;i++)if(groups[g][i].indexOf(key)>=0)return groups[g][i].length>1?'small':'row';}return 'big';
+      };
       self.icon=function(tile){return tile.icon||(tile.state&&tile.state[tile.currentState]||{}).icon||self.item(self.key(tile)).icon;};
       self.detail=function(tile){var key=self.key(tile),menu=$scope.mainMenu||{};return key==='Screenshot'?menu.screenshotHotkey:key==='Ansel'?menu.anselHotkey:tile.shortcut||(tile.state&&tile.state[tile.currentState]||{}).status||'';};
       function update(){if(!$scope.$$destroyed)$scope.$evalAsync(function(){self.layout=api.get();self.sides=api.getSides();self.error=api.error;});}
