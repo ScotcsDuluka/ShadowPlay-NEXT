@@ -2,30 +2,17 @@ Option Strict On
 Option Explicit On
 Option Infer On
 
-' SessionResultContractTests.vb — M2-W2 video-only loss gate.
+' SessionResultContractTests.vb — Phase 6B session-outcome truth.
 '
-' THE GAP (proven 2026-09-12): RecordingDTOs.vb:310-313 gates MuxDroppedBytes
-' under AudioRequested —
-'   audioOk = If(AudioRequested,
-'               AudioStreamFound AndAlso MuxDroppedBytes = 0 AndAlso
-'               AudioDroppedBytes = 0,
-'               True)
-' A video-only session (AudioRequested=False) therefore reports Pass=True
-' even when the VIDEO pipe dropped AUs: the file exists, header-parses, has
-' frames — but is silently missing everything the pipe threw away.
+' M2-W2 evidence demonstrated that a video-only recording could report
+' Pass=True after its mux pipe dropped 11,517 video bytes: the old Pass
+' implementation checked MuxDroppedBytes only when AudioRequested was True.
+' Phase 6B fixes that known-fail: mux loss invalidates every recording.
+' An explicit session ErrorMessage also invalidates Pass. Mic-only requests
+' must be treated as audio requests, not misclassified as video-only.
 '
-' Live proof (real production code, evidence\w2-mux-gate V3-PIPE-DROP):
-'   real LiveMuxSession + real ffmpeg — 120 AUs fed, 60 in the MP4,
-'   DroppedBytes = 11,517 counted by the pipe, file complete and
-'   header-valid → the session shape below reports Pass=True today.
-' (Related audit gaps, NOT this test's scope: exit-code suppression in the
-'  salvage path (GAP-1) and header-only validity (GAP-2).)
-'
-' The KNOWN-FAIL test pins the TARGET contract (Pass=False on video-pipe
-' loss); it flips to "PASS — fix verified" the moment the Pass gate stops
-' conditioning MuxDroppedBytes on AudioRequested. The three controls pin
-' today's-correct behavior so the eventual fix cannot over-tighten.
-' Pure VB — no hardware, no ffmpeg, deterministic.
+' These deterministic contract tests are runnable without GPU, FFmpeg,
+' WASAPI, desktop capture, microphones, or interacting with the live worker.
 
 Imports System
 Imports DulukaEngine.Recording
@@ -65,11 +52,22 @@ Namespace DulukaEngine.Recording.Tests
                                AddressOf Test_AudioSessionDropsFail)
             TestRunner.RunTest("PASSGATE: video-only healthy session passes",
                                AddressOf Test_VideoOnlyHealthyPasses)
+            TestRunner.RunTest("PASSGATE: all system and mic audio intents mapped",
+                               AddressOf Test_AudioIntentCombinations)
             TestRunner.RunTest("PASSGATE: audio-enabled healthy session passes",
                                AddressOf Test_AudioHealthyPasses)
-            TestRunner.RunKnownFail("PASSGATE: video-only session with video-pipe drops must NOT pass",
-                                    AddressOf Test_VideoOnlyDropsMustFail,
-                                    "RecordingDTOs.vb:310-313 — MuxDroppedBytes=0 must hold unconditionally, not only when AudioRequested. Live evidence: evidence\w2-mux-gate (11,517B real pipe drop, complete MP4, Pass=True today).")
+            TestRunner.RunTest("PASSGATE: video-only session with video-pipe drops must NOT pass",
+                               AddressOf Test_VideoOnlyDropsMustFail)
+            TestRunner.RunTest("PASSGATE: session with explicit error must NOT pass",
+                               AddressOf Test_ErrorMessageMustFail)
+            TestRunner.RunTest("PASSGATE: audio requested but stream absent must NOT pass",
+                               AddressOf Test_AudioMissingMustFail)
+            TestRunner.RunTest("PASSGATE: encoder errors must NOT pass",
+                               AddressOf Test_EncoderErrorsMustFail)
+            TestRunner.RunTest("PASSGATE: incomplete or partial output must NOT pass",
+                               AddressOf Test_PartialOrMissingMustFail)
+            TestRunner.RunTest("PASSGATE: audio drop or mic drop must NOT pass",
+                               AddressOf Test_AudioOrMicDropsMustFail)
         End Sub
 
         ''' <summary>Existing contract (already correct): a mux-pipe drop fails
@@ -110,6 +108,69 @@ Namespace DulukaEngine.Recording.Tests
                               $"video-only session with MuxDroppedBytes={s.MuxDroppedBytes} (video AUs lost, file truncated) reports Pass={s.Pass} — false success")
         End Sub
 
+        Private Sub Test_ErrorMessageMustFail()
+            Dim s = MakeVideoOnlyLossSession()
+            s.MuxDroppedBytes = 0
+            s.ErrorMessage = "second-pass mux failed"
+            TestRunner.Assert(Not s.Pass,
+                              "ErrorMessage indicates failure even when MP4 looks valid")
+        End Sub
+
+        Private Sub Test_AudioMissingMustFail()
+            Dim s = MakeVideoOnlyLossSession()
+            s.MuxDroppedBytes = 0
+            s.AudioRequested = True
+            s.AudioStreamFound = False
+            TestRunner.Assert(Not s.Pass, "requested audio is missing")
+        End Sub
+
+        Private Sub Test_EncoderErrorsMustFail()
+            Dim s = MakeVideoOnlyLossSession()
+            s.MuxDroppedBytes = 0
+            s.NvencErrors = 1
+            TestRunner.Assert(Not s.Pass, "NVENC failures cannot be successes")
+        End Sub
+
+        Private Sub Test_PartialOrMissingMustFail()
+            Dim s = MakeVideoOnlyLossSession()
+            s.MuxDroppedBytes = 0
+            s.MuxPartialSalvaged = True
+            TestRunner.Assert(Not s.Pass, "salvaged fragments stay failed")
+            s.MuxPartialSalvaged = False
+            s.FileExists = False
+            TestRunner.Assert(Not s.Pass, "missing file stays failed")
+            s.FileExists = True
+            s.FileSize = 0
+            TestRunner.Assert(Not s.Pass, "empty file stays failed")
+            s.FileSize = 1500
+            s.FramesEncoded = 0
+            TestRunner.Assert(Not s.Pass, "no encoded frames stays failed")
+        End Sub
+
+        Private Sub Test_AudioIntentCombinations()
+            For Each systemOn As Boolean In New Boolean() {False, True}
+                For Each micOn As Boolean In New Boolean() {False, True}
+                    Dim cfg As New SessionConfig With {
+                        .AudioEnabled = systemOn,
+                        .MicEnabled = micOn
+                    }
+                    TestRunner.Assert(cfg.RequestsAnyAudio = (systemOn OrElse micOn),
+                        $"system={systemOn} mic={micOn} audio intent mapping incorrect")
+                Next
+            Next
+        End Sub
+
+        Private Sub Test_AudioOrMicDropsMustFail()
+            Dim s = MakeVideoOnlyLossSession()
+            s.MuxDroppedBytes = 0
+            s.AudioRequested = True
+            s.AudioStreamFound = True
+            s.AudioDroppedBytes = 64
+            TestRunner.Assert(Not s.Pass, "system audio packet drops invalidate pass")
+            s.AudioDroppedBytes = 0
+            s.MicDroppedBytes = 64
+            TestRunner.Assert(Not s.Pass, "mic packet drops invalidate pass")
+        End Sub
     End Module
 
 End Namespace

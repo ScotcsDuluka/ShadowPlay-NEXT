@@ -74,6 +74,14 @@ Namespace DulukaEngine.Recording.Tests
     Friend Module Program
 
         Function Main(args As String()) As Integer
+            ' Phase 6B isolated contract gate: no FFmpeg, WASAPI, desktop,
+            ' NVENC or recording session started. Fast and safe with music on.
+            If args IsNot Nothing AndAlso args.Length = 1 AndAlso
+               String.Equals(args(0), "--result-contract-only", StringComparison.Ordinal) Then
+                SessionResultContractTests.RunAll()
+                Console.WriteLine($"SESSION_RESULT_CONTRACT: {TestRunner._passed} passed, {TestRunner._failed} failed, {TestRunner._knownFails} known-fail")
+                Return If(TestRunner._failed > 0 OrElse TestRunner._knownFails > 0, 1, 0)
+            End If
             Console.WriteLine("==================================================")
             Console.WriteLine(" DulukaEngine.Recording.Tests — Phase 12b")
             Console.WriteLine(" (SyncMath + WavSidecar + real-ffmpeg sync)")
@@ -88,7 +96,7 @@ Namespace DulukaEngine.Recording.Tests
                 AudioTimelineRepairTests.RunAll()   ' ★ P13-AUDIO-TIMELINE: OBS gap-repair rules
                 AudioTimelineDeviceClockTests.RunAll()   ' ★ P13-A: OWNER-spec deterministic sample timeline (no hardware)
                 MuxSinkAccountingTests.RunAll()   ' ★ Audit fix: pending-cap drops are counted, never silent
-                SessionResultContractTests.RunAll()   ' ★ M2-W2: video-only loss gate — Pass contract (1 known-fail until the fix lands)
+                SessionResultContractTests.RunAll()   ' ★ Phase 6B: video-only mux loss and error outcome gates (known-fail fixed)
                 RuntimeSyncTests.RunAll()
                 DualTrackTests.RunAll()   ' ★ M1: system + mic second track
                 P3AStopHardeningTests.RunAll()   ' ★ W3 P3-A: stop/finalize hardening (budget-bounded)

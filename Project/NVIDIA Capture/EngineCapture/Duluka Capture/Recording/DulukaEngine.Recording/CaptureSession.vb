@@ -230,7 +230,7 @@ Namespace DulukaEngine.Recording
             Dim result As New SessionResult() With {
                 .OutputPath = _config.OutputPath,
                 .RequestedDurationSec = _config.DurationSeconds,
-                .AudioRequested = _config.AudioEnabled
+                .AudioRequested = _config.RequestsAnyAudio
             }
 
             ' ─── Temp file paths ─────────────────────────────────────────

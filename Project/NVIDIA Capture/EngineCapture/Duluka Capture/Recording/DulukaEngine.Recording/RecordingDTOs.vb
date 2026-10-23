@@ -108,6 +108,14 @@ Namespace DulukaEngine.Recording
         '    accounting/start-timestamp per track; NO merged queues) ──
         ''' <summary>Record the microphone into a second WAV sidecar.</summary>
         Public Property MicEnabled As Boolean = False
+        ''' <summary>System-only, mic-only and combined sessions all require
+        ''' actual audio evidence in the finalized output. This must not
+        ''' depend solely on the system loopback switch.</summary>
+        Public ReadOnly Property RequestsAnyAudio As Boolean
+            Get
+                Return AudioEnabled OrElse MicEnabled
+            End Get
+        End Property
         ''' <summary>Mic volume applied at mux (0..2, 1 = unchanged).</summary>
         Public Property MicVolume As Single = 1.0F
         ''' <summary>Preferred mic device id (NAudio MMDevice ID). Empty = default capture device.</summary>
@@ -352,18 +360,22 @@ Namespace DulukaEngine.Recording
                 ' video-only session has NO audio stream by design (its mux
                 ' args don't even include an audio input), so demanding
                 ' AudioStreamFound made every video-only run fail.
-                Dim audioOk As Boolean = If(AudioRequested,
-                                            AudioStreamFound AndAlso MuxDroppedBytes = 0 AndAlso
-                                            AudioDroppedBytes = 0,
-                                            True)
-                Dim micOk As Boolean = If(MicDroppedBytes = 0, True, False)
+                ' Any loss in the mux pipe is fatal, including video-only
+                ' recording: the pipe may drop video access units even when
+                ' there is no audio to capture. The old condition mistakenly
+                ' allowed those corrupted recordings to report Pass=True.
+                Dim audioOk As Boolean = Not AudioRequested OrElse
+                    (AudioStreamFound AndAlso AudioDroppedBytes = 0)
                 Return FramesEncoded > 0 AndAlso
                        NvencErrors = 0 AndAlso
+                       MuxDroppedBytes = 0 AndAlso
+                       MicDroppedBytes = 0 AndAlso
+                       String.IsNullOrWhiteSpace(ErrorMessage) AndAlso
                        Not MuxPartialSalvaged AndAlso
                        FileExists AndAlso
                        FileSize > 0 AndAlso
                        VideoStreamFound AndAlso
-                       audioOk AndAlso micOk
+                       audioOk
             End Get
         End Property
     End Class
