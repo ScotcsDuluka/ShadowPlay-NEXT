@@ -90,7 +90,7 @@ class Element {
 
 function fixture({ enabled = false, lingerOnClose = false } = {}) {
   const calls = [], docListeners = {}, winListeners = {}, timers = new Map(); let nextTimer = 0;
-  const f = { shellVisible: true, hit: null, motionTarget: 'open', motionPhase: 'idle', nativeActions: 0, shellCloses: 0, shellCloseObservations: [] };
+  const f = { shellVisible: true, hit: null, motionTarget: 'open', motionPhase: 'idle', nativeActions: 0, shellCloses: 0, shellCloseObservations: [], nativeCloseCalls: 0 };
   const html = new Element('html', 'nv-live-layout-editing'), body = new Element('body'); html.appendChild(body);
   const host = new Element('section', 'nv-live-editor nv-freestyle-settings'), head = new Element('header');
   const done = new Element('button', 'osc-button-green'); head.appendChild(done); host.appendChild(head);
@@ -135,17 +135,19 @@ function fixture({ enabled = false, lingerOnClose = false } = {}) {
     elementFromPoint: () => f.hit,
     addEventListener(type, listener) { (docListeners[type] ||= []).push(listener); }
   };
+  const display = {closeOSC() { f.nativeCloseCalls++; }};
   const window = {
     __nvNextLayoutV5: A, NvShadowPlayLayoutV5: M, innerWidth: 1920, innerHeight: 1200,
     __dulukaOscMotion: { get phase() { return f.motionPhase; }, getState: () => ({ target: f.motionTarget }) },
     location: { hash: '#/base/main-menu' },
-    angular: { element(el) { assert.equal(el, host); return { scope: () => scope }; } },
+    angular: { element(el) { assert.equal(el, host); return { scope: () => scope,
+      injector: () => ({get(name) {assert.equal(name,'oscDisplayService');return display;}}) }; } },
     setInterval() {}, setTimeout(fn, delay) { const id = ++nextTimer; timers.set(id, { fn, delay }); return id; },
     clearTimeout(id) { timers.delete(id); },
     addEventListener(type, listener) { (winListeners[type] ||= []).push(listener); }
   };
   vm.runInNewContext(source, { window, document }, { timeout: 2000 });
-  Object.assign(f, { A, calls, window, document, host, scope, nativeButton, done, timers, editor: window.__nvFreestyleEditor,
+  Object.assign(f, { A, calls, window, document, host, scope, display, nativeButton, done, timers, editor: window.__nvFreestyleEditor,
     flag: () => flag, lease: () => lease, preview: () => preview,
     scan: () => window.__nvFreestyleEditor.scan(),
     emit(type, target, more = {}) {
@@ -371,4 +373,26 @@ test('stale idle/closed Motion target cannot cancel an open Angular Settings pop
   assert.equal(f.shellCloses,0);
   f.motionPhase='closing';f.scan();
   assert.equal(f.editor.isEditing(),false,'Real closing phase releases the editor');
+});
+
+test('Angular keyboard Escape cannot close OSC while NVIDIA md-select consumes same event', () => {
+  const f=fixture();f.scan();
+  const popup=new Element('div','md-select-menu-container md-active');
+  const option=new Element('md-option');popup.appendChild(option);f.document.body.appendChild(popup);
+  const event=f.emit('keydown',option,{key:'Escape'});
+  assert.equal(event.prevented,undefined,'Material receives Escape unmodified');
+  f.display.closeOSC();
+  assert.equal(f.nativeCloseCalls,0,'OSC app keyboard shortcut is blocked for popup Escape');
+  assert.equal(f.editor.isEditing(),true);
+  f.fireTimer(0);
+  popup.remove();
+  f.display.closeOSC();
+  assert.equal(f.nativeCloseCalls,1,'Later genuine OSC close remains available');
+});
+test('Esc without native popup keeps previous Customize Cancel behavior', () => {
+  const f=fixture();f.scan();
+  const event=f.emit('keydown',f.host,{key:'Escape'});
+  assert.equal(event.prevented,true);
+  assert.equal(f.editor.isEditing(),false);
+  assert.equal(f.shellCloses,1);
 });

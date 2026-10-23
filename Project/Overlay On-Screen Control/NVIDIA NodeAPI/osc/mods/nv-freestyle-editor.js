@@ -11,6 +11,45 @@
   var editing = false, originallyEnabled = false, chosen = null;
   var dragging = null, message = '', pending = null, pendingTimer = null;
   var lastWidth = 0, lastTop = 0, lastLeft = 0, suppressClick = false, suppressTimer = null;
+  // app.js has a document-level Escape keyboardHandler that calls
+  // oscDisplayService.closeOSC even when Angular Material is dismissing its
+  // own md-select popup. Scope that one keyboard close to the popup event.
+  var materialEscapeClosePending = false, materialEscapeTimer = null;
+  function materialPopupEvent(ev) {
+    var element = ev && ev.target;
+    if (element && element.closest && (
+      element.closest('md-option') || element.closest('md-select-menu') ||
+      element.closest('md-select') || element.closest('.md-select-menu-container') ||
+      element.closest('.md-open-menu-container'))) return true;
+    return !!(document.querySelector('.md-select-menu-container.md-active') ||
+      document.querySelector('.md-open-menu-container.md-active'));
+  }
+  function markMaterialEscape(ev) {
+    if (!editing || ev.key !== 'Escape' || !materialPopupEvent(ev)) return;
+    materialEscapeClosePending = true;
+    if (materialEscapeTimer !== null) window.clearTimeout(materialEscapeTimer);
+    // Guard ONLY the current keyboard dispatch, not future Escape presses.
+    materialEscapeTimer = window.setTimeout(function () {
+      materialEscapeClosePending = false; materialEscapeTimer = null;
+    }, 0);
+  }
+  function guardOriginalOverlayClose() {
+    if (!host || !window.angular) return;
+    try {
+      var injector = window.angular.element(host).injector();
+      var display = injector && injector.get('oscDisplayService');
+      if (!display || typeof display.closeOSC !== 'function' ||
+          display.__nvFreestyleMaterialEscapeGuard) return;
+      var original = display.closeOSC;
+      display.closeOSC = function () {
+        if (editing && materialEscapeClosePending) return;
+        return original.apply(this, arguments);
+      };
+      display.__nvFreestyleMaterialEscapeGuard = true;
+    } catch (ignore) {
+      // A real CEF Angular injector will be available once Customize mounts.
+    }
+  }
   var LABELS = {
     Screenshot:'Screenshot',Ansel:'Photo mode',Mods:'Game filter',
     InstantReplay:'Instant Replay',ManualRecord:'Record',Stream:'Stream',
@@ -239,6 +278,7 @@
       host=null;alertText(error.message);return;
     }
     host.classList.add('nv-freestyle-v5-edit');
+    guardOriginalOverlayClose();
     createTools();redraw();
   }
   function hideShell() {
@@ -261,6 +301,8 @@
       if(legacy)legacy.style.display='';
     }
     editing=false;host=null;chosen=null;
+    materialEscapeClosePending=false;
+    if(materialEscapeTimer!==null){window.clearTimeout(materialEscapeTimer);materialEscapeTimer=null;}
   }
   function closeShell() {
     // Close the Angular shell directly. A synthetic Done click can be blocked
@@ -459,6 +501,7 @@
     if(ctl){stop(ev);setSelected(ctl.getAttribute('data-menu-key'));return}
   }
   function keyboard(ev) {
+    markMaterialEscape(ev);
     if(!editing){
       if(document.documentElement.classList.contains('nv-live-layout-editing')&&target(ev,'nv-main-menu md-menu')&&(ev.key==='Enter'||ev.key===' '))stop(ev);
       return;
@@ -520,6 +563,7 @@
   document.addEventListener('mouseup',up,true);
   document.addEventListener('contextmenu',contextual,true);
   document.addEventListener('click',click,true);
+  window.addEventListener('keydown',markMaterialEscape,true);
   document.addEventListener('keydown',keyboard,true);
   window.addEventListener('blur',function(){if(dragging){
     if(dragging.ghost)dragging.ghost.remove();dragging=null;markPending(null);
