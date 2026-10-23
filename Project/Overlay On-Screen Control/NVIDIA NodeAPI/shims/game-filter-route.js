@@ -126,10 +126,15 @@ function mount(app, io, options) {
       emit({ type: 'filters', filters: state.filters.map(f => ({ id: f.id, name: f.name })) });
       lastCatalog = catalog;
     }
-    if (!suppressCurrent) state.stack.forEach((_, index) => {
-      const before = last && currentFilter(last, index), after = currentFilter(state, index);
-      if (JSON.stringify(before) !== JSON.stringify(after)) emit(after);
-    });
+    if (!suppressCurrent) {
+      // Include slots removed directly in ReShade; otherwise OSC retains the
+      // previous filter pane when the native stack becomes shorter.
+      const length = Math.max(state.stack.length, last ? last.stack.length : 0);
+      for (let index = 0; index < length; index++) {
+        const before = last && currentFilter(last, index), after = currentFilter(state, index);
+        if (JSON.stringify(before) !== JSON.stringify(after)) emit(after);
+      }
+    }
     last = state;
   }
   function disconnected(error) {
@@ -254,7 +259,13 @@ function mount(app, io, options) {
           // Avoid two expensive catalog walks in the same opening sequence;
           // retain a fresh read for older editing sessions and explicit refresh.
           (route === '/Capture/Control' && body.capture === true && Date.now() - cachedAt > 5000) ||
-          (route === '/State' && req.query && req.query.refresh === '1'), version);
+          (route === '/State' && (
+            req.query && req.query.refresh === '1' ||
+            // An open editor must reflect changes made in ReShade itself.
+            // Keep idle menu/availability reads cheap; the editor heartbeat
+            // performs at most one complete catalog read every two seconds.
+            editingTarget && Date.now() - cachedAt >= 1800
+          )), version);
         requireBridge(version);
       }
       catch (error) {

@@ -54,15 +54,14 @@ struct ReShadeRuntime final : Runtime {
         std::string buffer(bytes, '\0');
         runtime->get_current_preset_path(buffer.data(), &bytes);
         buffer.resize(std::strlen(buffer.c_str()));
-        return std::filesystem::u8path(buffer);
+        return ansel::game_presets::resolve_preset_path(
+            std::filesystem::u8path(buffer), game_directory(), executable_directory());
     }
     Json preset_info() const override {
         const auto current = active_preset_file();
-        // Avoid filesystem probes for each shader snapshot; Windows compares
-        // preset path names case-insensitively.
-        std::error_code pathError;
-        const auto absolute = current.empty() ? current : std::filesystem::absolute(current, pathError);
-        const auto normalized = (pathError ? current : absolute).lexically_normal().wstring();
+        // active_preset_file resolves relative paths against the installation,
+        // not whatever working directory the game launcher happened to set.
+        const auto normalized = current.lexically_normal().wstring();
         Json items = Json::array();
         unsigned selected = 0;
         for (unsigned slot = 1; slot <= 3; ++slot) {
@@ -78,16 +77,24 @@ struct ReShadeRuntime final : Runtime {
     void select_preset(unsigned slot) override {
         const auto target = preset_file(slot);
         const auto source = active_preset_file();
-        if (source.empty())
-            throw Failure(409, "PRESET_UNAVAILABLE", "ReShade has no active preset to copy");
         std::error_code ec;
         const bool exists = std::filesystem::exists(target, ec);
-        if (exists && std::filesystem::equivalent(source, target, ec) && !ec) {
-            runtime->set_effects_state(true);
-            return;
-        }
         if (ec) throw Failure(403, "PRESET_IO_ERROR", "Cannot inspect the game's preset directory");
+        if (exists && !std::filesystem::is_regular_file(target, ec))
+            throw Failure(403, "PRESET_IO_ERROR", "Preset target is not a regular INI file");
+        if (ec) throw Failure(403, "PRESET_IO_ERROR", "Cannot inspect the preset target");
+        if (exists && !source.empty()) {
+            std::error_code sameError;
+            if (std::filesystem::equivalent(source, target, sameError) && !sameError) {
+                runtime->set_effects_state(true);
+                return;
+            }
+        }
+        // A user may already have created Preset 1/2/3 at Game Root before
+        // ReShade has selected any current preset. That file remains usable.
         if (!exists) {
+            if (source.empty())
+                throw Failure(409, "PRESET_UNAVAILABLE", "No ReShade preset exists to initialize this empty slot");
             // Preserve legacy presets stored next to a nested shipping EXE.
             // Never overwrite the corresponding INI already at Game Root,
             // and never remove the legacy original.
@@ -112,6 +119,9 @@ struct ReShadeRuntime final : Runtime {
     }
     void toggle_preset_effects(bool enabled) override {
         runtime->set_effects_state(enabled);
+    }
+    bool preset_effects_enabled() const override {
+        return runtime->get_effects_state();
     }
     void save_preset() override {
         const auto info = preset_info();

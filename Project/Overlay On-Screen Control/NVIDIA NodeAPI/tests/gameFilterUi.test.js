@@ -44,7 +44,7 @@ async function scenario(existing, coldStart) {
     }};
   const menu={tiles:{Mods:{visible:false,enabled:false},Ansel:{visible:false,enabled:false},Screenshot:{visible:false},Stream:{visible:false},QuietMode2:{visible:false}}}, menuElement={},preferencesElement={};
   const accordionItems=[{id:'a'},{id:'b'}],modsMenuElement={};
-  let accordionRerenders=0;
+  let modsMenuReady=true,accordionRerenders=0;
   const accordion={slot:{activeFilterStack:accordionItems},activeFilter:accordionItems[0],
     activateFilter:()=>{accordionRerenders++;},toggleSubMenuVisibility:()=>{accordionRerenders++;}};
   const preferences={tiles:[{visible:false,precondition:()=>false}]},entered=[],notifications=[];
@@ -63,7 +63,7 @@ async function scenario(existing, coldStart) {
     $q:{when:Promise.resolve.bind(Promise),defer:()=>{let resolve,reject;const promise=new Promise((r,j)=>{resolve=r;reject=j;});return{promise,resolve,reject};}}};
   const injector={get:key=>{assert(services[key],'unexpected service '+key);return services[key];}};
   const angular={element:element=>({injector:()=>injector,controller:()=>element===modsMenuElement?accordion:element===menuElement?menu:preferences})};
-  const context={window:{angular,addEventListener:(name,fn)=>{if(name==='click')windowClickListeners.push(fn);}},document:{addEventListener:(name,fn)=>{closeListener=fn;},querySelector:selector=>selector==='mods-menu'?modsMenuElement:selector==='nv-main-menu'?menuElement:preferencesElement},console};
+  const context={window:{angular,addEventListener:(name,fn)=>{if(name==='click')windowClickListeners.push(fn);}},document:{addEventListener:(name,fn)=>{closeListener=fn;},querySelector:selector=>selector==='mods-menu'?(modsMenuReady?modsMenuElement:null):selector==='nv-main-menu'?menuElement:preferencesElement},console};
   const emitWindowClick=event=>windowClickListeners.forEach(listener=>listener(event));
   function selectStyle(index){
     const buttons=[0,1,2,3].map(()=>({closest:selector=>selector==='mods-menu'?{querySelectorAll:()=>buttons}:null}));
@@ -125,11 +125,18 @@ async function scenario(existing, coldStart) {
   assert.strictEqual(entered.pop(),'main.main-menu','X must return to main menu');
   assert.strictEqual(camera.UIRunning,false,'X left the editor launch guard enabled');
   camera.UIRunning=true;
+  services.$state.current.name='mods';
+  modsMenuReady=false;
   listeners.$stateChangeSuccess({}, {name:'mods'});
   assert.strictEqual(camera.UIRunning,true,'active editor flag was cleared');
+  await new Promise(resolve=>setTimeout(resolve,12));
+  assert.notStrictEqual(accordion.__dulukaAccordionReady,true,
+    'accordion patch ran before the NVIDIA directive was attached');
+  modsMenuReady=true;
+  await new Promise(resolve=>setTimeout(resolve,125));
+  services.$state.current.name='main.main-menu';
   listeners.$stateChangeSuccess({}, {name:'main.main-menu'});
   assert.strictEqual(camera.UIRunning,false,'leaving editor did not clear launch guard');
-  await new Promise(resolve=>setTimeout(resolve,5));
   assert.strictEqual(accordion.__dulukaAccordionReady,true,
     'mods accordion patch did not reach the real NVIDIA controller');
   camera.modsHelper.activateFilter=(slot,filter)=>{
@@ -396,6 +403,36 @@ async function scenario(existing, coldStart) {
     'OSC slot did not mirror ReShade INI technique state');
   assert.strictEqual(camera.modsSlots[1].filters[0].savedConfigs['fx#Amount'][0],0.33,
     'OSC slot preferred an obsolete browser-side uniform over ReShade');
+  // While the editor is open, the heartbeat must explicitly refresh ReShade
+  // and mirror shader edits without reopening the browser-side preset.
+  const originalNativeGet=services.$http.get, heartbeatUrls=[];
+  services.$state.current.name='mods';
+  services.$http.get=url=>{
+    heartbeatUrls.push(url);
+    return url.indexOf('/GameFilter/State')>=0 ? Promise.resolve({data:nativeState}) : originalNativeGet(url);
+  };
+  nativeState.effectsEnabled=true;
+  nativeState.enabled=true;
+  nativeState.filters[0].controls[0].currentValue=[0.72];
+  checkGame();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert(heartbeatUrls.some(url=>url.indexOf('/GameFilter/State?refresh=1')>=0),
+    'open editor remained on cached native shader data');
+  assert.strictEqual(camera.modsSlots[1].filters[0].savedConfigs['fx#Amount'][0],0.72,
+    'external ReShade uniform changes were not mirrored to the OSC slot');
+  services.eventAggregator.trigger('native-filter-readback',{
+    type:'currentFilter',id:'fx',controls:[{id:'Amount',currentValue:[0.88]}]
+  });
+  assert.strictEqual(camera.modsSlots[1].filters[0].savedConfigs['fx#Amount'][0],0.88,
+    'native notifications replayed obsolete browser slider settings');
+  nativeState.stack=[];
+  nativeState.filters[0].enabled=false;
+  checkGame();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.strictEqual(camera.modsSlots[1].activeFilterStack.length,0,
+    'external ReShade technique removal left a stale OSC filter row');
+  services.$http.get=originalNativeGet;
+  services.$state.current.name='main.main-menu';
   selectStyle(3);
   camera.applySlot(undefined);
   assert.strictEqual(await camera.__dulukaPresetQueue,true);

@@ -37,6 +37,7 @@ struct Runtime {
     virtual void select_preset(unsigned) { throw Failure(501, "NOT_SUPPORTED", "ReShade preset switching is unavailable"); }
     virtual void save_preset() { throw Failure(501, "NOT_SUPPORTED", "ReShade preset saving is unavailable"); }
     virtual void toggle_preset_effects(bool) { throw Failure(501, "NOT_SUPPORTED", "ReShade global effects toggle is unavailable"); }
+    virtual bool preset_effects_enabled() const { return true; }
 };
 
 class FilterSession {
@@ -125,6 +126,9 @@ public:
         // owns the currently enabled technique list and its saved parameters.
         auto filters = runtime_.catalog();
         if (preset.value("supported", false)) {
+            // The external ReShade hotkey can toggle effects without notifying
+            // OSC. Read its real global flag; preserve technique state/stack.
+            enabled_ = runtime_.preset_effects_enabled();
             stack_.clear();
             for (const auto &filter : filters)
                 if (filter.at("enabled").get<bool>()) stack_.push_back(filter.at("id"));
@@ -225,7 +229,14 @@ public:
                 if (!body.contains("globalEnable") || !body["globalEnable"].is_boolean())
                     throw Failure(400, "INVALID_ARGUMENT", "globalEnable must be a boolean");
                 enabled_ = body["globalEnable"].get<bool>();
-                for (const auto &id : stack_) runtime_.enable(id, enabled_);
+                if (runtime_.preset_info().value("supported", false)) {
+                    // ReShade INI presets own their technique enabled flags.
+                    // Do not delete the preset stack when NVIDIA enables or
+                    // disables the overall Game Filter menu.
+                    runtime_.toggle_preset_effects(enabled_);
+                } else {
+                    for (const auto &id : stack_) runtime_.enable(id, enabled_);
+                }
             } else if (op == "reset") {
                 const auto slot = index(body);
                 if (slot >= stack_.size()) throw Failure(404, "FILTER_NOT_FOUND", "Stack slot is empty");

@@ -89,6 +89,7 @@
         camera.__dulukaModsPrepared = null;
         camera.__dulukaEntrySlot = null;
         camera.__dulukaEntryPrepared = false;
+        camera.__dulukaLiveFingerprint = null;
       }
       camera.__dulukaModsRuntime = identity;
       camera.__dulukaModsExecutable = identity && state.executable || '';
@@ -97,6 +98,15 @@
       camera.__dulukaNativePreset = camera.__dulukaNativePresets ? state.preset : null;
       camera.__dulukaNativeEffectsOn = camera.__dulukaNativePresets &&
         state.enabled !== false && state.effectsEnabled !== false;
+    }
+    function nativeFingerprint(state) {
+      return JSON.stringify([state.pid, state.session, state.generation,
+        state.preset && state.preset.activeSlot, state.enabled, state.effectsEnabled,
+        state.stack, (state.filters || []).map(function (filter) {
+          return [filter.id, filter.enabled, (filter.controls || []).map(function (control) {
+            return [control.id, control.currentValue];
+          })];
+        })]);
     }
     function syncNativeSlot(camera, state, selectedIndex) {
       if (!state || !Array.isArray(state.filters) || !Array.isArray(state.stack) ||
@@ -129,7 +139,58 @@
       camera.modsSlots = slots;
       camera.modsActiveSlot = slot;
       camera.lastSlot = camera.lastActiveSlot = selectedIndex;
+      camera.__dulukaLiveFingerprint = nativeFingerprint(state);
       return slot;
+    }
+    // Only the currently open editor is synchronized continuously. A native
+    // readback is authoritative; browser-local savedConfigs must not replay
+    // stale values on the next currentFilter notification.
+    function reconcileNativeSnapshot(camera, state) {
+      if (!camera.__dulukaNativePresets || !state || !Array.isArray(state.stack) ||
+          !Array.isArray(state.filters)) return;
+      var fingerprint = nativeFingerprint(state);
+      if (camera.__dulukaLiveFingerprint === fingerprint) return;
+      var active = state.preset && state.preset.activeSlot;
+      var enabled = state.enabled !== false && state.effectsEnabled !== false;
+      var element = document.querySelector && document.querySelector('mods-menu');
+      var control = element && angular.element(element).controller('modsMenu');
+      camera.__dulukaLiveFingerprint = fingerprint;
+      if (!enabled || !(active >= 1 && active <= 3)) {
+        camera.modsActiveSlot = undefined;
+        camera.lastActiveSlot = -1;
+        if (control) {
+          control.slot = undefined; control.activeFilterStack = [];
+          control.activeFilter = undefined; control.activeIndex = -1;
+        }
+        return;
+      }
+      var previous = camera.modsActiveSlot;
+      var oldStack = previous && previous.activeFilterStack || [];
+      var sameStack = previous && previous.id === active &&
+        JSON.stringify(oldStack.map(function (f) { return f.id; })) === JSON.stringify(state.stack);
+      var slot;
+      if (sameStack) {
+        slot = previous;
+        state.filters.forEach(function (filter) {
+          var model = slot.filters && slot.filters.filter(function (f) { return f.id === filter.id; })[0];
+          if (!model) return;
+          (filter.controls || []).forEach(function (attribute) {
+            if (Array.isArray(attribute.currentValue))
+              model.savedConfigs[filter.id + '#' + attribute.id] = attribute.currentValue.slice();
+          });
+        });
+      } else {
+        slot = syncNativeSlot(camera, state, active - 1);
+        if (control && slot) {
+          control.slot = slot; control.slots = camera.modsSlots;
+          control.filters = slot.filters; control.activeFilterStack = slot.activeFilterStack;
+          control.activeFilter = slot.activeFilter; control.activeIndex = slot.activeIndex;
+          control.selectedFilter = slot.selectedFilter;
+        }
+      }
+      if (slot && typeof camera.getCurrentFilterAttribute === 'function') {
+        state.stack.forEach(function (_, idx) { camera.getCurrentFilterAttribute(idx); });
+      }
     }
     function canReuseMods(camera) {
       var slot = camera.modsSlots && camera.modsSlots[camera.lastSlot];
@@ -308,6 +369,24 @@
         var camera = $injector.get('nvCameraService');
         var state = $injector.get('$state');
         var display = $injector.get('oscDisplayService');
+        var notification = arguments[1];
+        if (camera.__dulukaNativePresets && notification &&
+            notification.type === 'currentFilter' && Array.isArray(notification.controls) &&
+            camera.modsActiveSlot && Array.isArray(camera.modsActiveSlot.filters)) {
+          // The stock NVIDIA listener replays savedConfigs on currentFilter.
+          // Adopt the actual readback BEFORE invoking that listener so an
+          // external ReShade edit cannot be overwritten by stale browser data.
+          var model = camera.modsActiveSlot.filters.filter(function (f) {
+            return f.id === notification.id;
+          })[0];
+          if (model) {
+            model.savedConfigs = model.savedConfigs || {};
+            notification.controls.forEach(function (attribute) {
+              if (Array.isArray(attribute.currentValue))
+                model.savedConfigs[notification.id + '#' + attribute.id] = attribute.currentValue.slice();
+            });
+          }
+        }
         if (name === 'Hotkey_ModsShowUI' && canReuseMods(camera) && display.openOSC) {
           // Toggling a prepared editor is local UI work. Re-entering the
           // native initialization path reapplies every saved uniform.
@@ -352,7 +431,7 @@
       function reconcileEditorState(name) {
         if (name !== 'mods' && name !== 'nvcamera')
           $injector.get('nvCameraService').UIRunning = false;
-        if (name === 'mods') $injector.get('$timeout')(fixFilterAccordion, 0, false);
+        if (name === 'mods') scheduleFilterAccordion();
       }
       $injector.get('$rootScope').$on('$stateChangeSuccess', function (event, state) {
         if (state) reconcileEditorState(state.name);
@@ -505,8 +584,14 @@
       function checkSupportedGame() {
         if (checkingGame) return;
         checkingGame = true;
-        $injector.get('$http').get('/Duluka/v.1.0/GameFilter/State', {cache:false,timeout:1800}).then(function (response) {
-          rememberRuntime($injector.get('nvCameraService'), response.data);
+        var inEditor = $injector.get('$state').current.name === 'mods';
+        // Native-only refresh while editing. Main-menu checks continue using
+        // the cheap cached state instead of rescanning all shader uniforms.
+        var url = '/Duluka/v.1.0/GameFilter/State' + (inEditor ? '?refresh=1' : '');
+        $injector.get('$http').get(url, {cache:false,timeout:2500}).then(function (response) {
+          var camera = $injector.get('nvCameraService');
+          rememberRuntime(camera, response.data);
+          if (inEditor) reconcileNativeSnapshot(camera, response.data);
         }, function () {
           rememberRuntime($injector.get('nvCameraService'), null);
           var state = $injector.get('$state');
@@ -835,11 +920,12 @@
     // down, before the accordion receives click. Prevent that first-click
     // race: selecting a filter updates only the active reference.
     function fixFilterAccordion() {
-      if (!document.querySelector || !angular.element) return;
+      if (!document.querySelector || !angular.element) return false;
       var menu = document.querySelector('mods-menu');
-      if (!menu) return;
+      if (!menu) return false;
       var control = angular.element(menu).controller('modsMenu');
-      if (!control || control.__dulukaAccordionReady) return;
+      if (!control) return false;
+      if (control.__dulukaAccordionReady) return true;
       control.__dulukaAccordionReady = true;
       control.activateFilter = function (filter) {
         if (!this.slot || !filter) return;
@@ -848,9 +934,22 @@
         this.activeIndex = this.slot.activeIndex;
       };
       control.toggleSubMenuVisibility = function () {};
+      return true;
+    }
+    function scheduleFilterAccordion() {
+      // $stateChangeSuccess can run before the mods-menu directive/controller
+      // exists. Retry for one second rather than leaving the first click
+      // hooked to NVIDIA's destructive mouse-down rebuild.
+      var tries = 0;
+      function attempt() {
+        if ($injector.get('$state').current.name !== 'mods') return;
+        if (fixFilterAccordion()) return;
+        if (++tries < 12) $injector.get('$timeout')(attempt, 100, false);
+      }
+      $injector.get('$timeout')(attempt, 0, false);
     }
     if ($injector.get('$state').current.name === 'mods')
-      $injector.get('$timeout')(fixFilterAccordion, 0, false);
+      scheduleFilterAccordion();
   }
   var injector = angular.element(document).injector();
   if (injector) install(injector);

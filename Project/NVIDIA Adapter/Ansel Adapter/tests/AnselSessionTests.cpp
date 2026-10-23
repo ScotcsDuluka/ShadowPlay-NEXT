@@ -35,6 +35,7 @@ struct FakeRuntime final : ansel::Runtime {
         presetImages[activePreset] = filters; ++presetSaves;
     }
     void toggle_preset_effects(bool enabled) override { globalEffectsOn = enabled; }
+    bool preset_effects_enabled() const override { return globalEffectsOn; }
     ansel::Json catalog() override { ++catalogReads; return filters; }
     ansel::Json read_value(const std::string &id, const std::string &control) override {
         ++directReadbacks;
@@ -122,6 +123,24 @@ int main(int argc, char **argv) {
         touch(binExe);
         require(ansel::game_presets::resolve_root(binExe) == binGameRoot,
             "bin64 executable failed to resolve the adjacent ReShade config root");
+        const auto nativePreset = fs::path(L"NVIDIA-GameFilter-Preset1.ini");
+        const auto legacyPreset = fs::path(L"LegacyReShadePreset.ini");
+        const auto shippingDirectory = nestedExecutable.parent_path();
+        touch(launcherRoot / nativePreset);
+        touch(shippingDirectory / nativePreset);
+        touch(shippingDirectory / legacyPreset);
+        require(ansel::game_presets::resolve_preset_path(nativePreset, launcherRoot, shippingDirectory) ==
+            launcherRoot / nativePreset,
+            "relative active INI ignored an existing Game Root preset");
+        require(ansel::game_presets::resolve_preset_path(legacyPreset, launcherRoot, shippingDirectory) ==
+            shippingDirectory / legacyPreset,
+            "relative legacy INI was not resolved beside the game executable");
+        require(ansel::game_presets::resolve_preset_path(L"Missing.ini", launcherRoot, shippingDirectory) ==
+            launcherRoot / L"Missing.ini",
+            "missing relative preset fell back to the mutable process working directory");
+        require(ansel::game_presets::resolve_preset_path(launcherRoot / nativePreset, launcherRoot, shippingDirectory) ==
+            launcherRoot / nativePreset,
+            "absolute ReShade INI path was altered");
         // ReShade ui_items is NUL-delimited, including the final terminator.
         const char rawItems[] = "Off\0Low\0High\0";
         const auto parsed = reshade_ui::split_items(std::string(rawItems, sizeof(rawItems) - 1));
@@ -195,6 +214,19 @@ int main(int argc, char **argv) {
         require(session.snapshot()["stack"].size() == 1, "Off deleted the saved preset stack");
         require(session.dispatch(request("presetSelect",{{"slot",1}}))["ok"] && runtime.globalEffectsOn,
             "reselecting active preset failed to restore effects");
+        const auto beforeGlobalToggleWrites = runtime.writes;
+        require(session.dispatch(request("mods",{{"globalEnable",false}}))["ok"] && !runtime.globalEffectsOn,
+            "NVIDIA legacy Off did not toggle the ReShade global effects flag");
+        require(!session.snapshot()["enabled"].get<bool>() && session.snapshot()["stack"].size() == 1,
+            "legacy Off erased native enabled techniques instead of preserving INI stack");
+        require(runtime.writes == beforeGlobalToggleWrites,
+            "legacy Off wrote individual technique enabled flags in preset mode");
+        require(session.dispatch(request("mods",{{"globalEnable",true}}))["ok"] && runtime.globalEffectsOn,
+            "NVIDIA legacy On did not restore ReShade global effects");
+        runtime.globalEffectsOn = false;
+        require(session.snapshot()["enabled"] == false,
+            "external ReShade global Off did not appear in the native state readback");
+        runtime.globalEffectsOn = true;
         require(session.dispatch(request("presetSelect",{{"slot",4}}))["status"] == 400,
             "unsafe preset slot accepted");
         std::cout << "PASS: native catalog, uniforms, INI preset mirror/save/restore/off, range, expiry, order and reload guards\n";

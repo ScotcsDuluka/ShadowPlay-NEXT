@@ -93,6 +93,10 @@ layout and uses root-level game launchers, `ReShade.ini`, `Engine` and
 install markers to find the correct Game Root. For conventional games whose
 executable already sits at Game Root, it uses that directory. The resolved
 path is cached, and exposed in `GameFilter/State.preset.directory`.
+Relative ReShade preset paths are resolved against Game Root first, then the
+nested executable directory for legacy INIs; the mutable process working
+directory is never used. A slot INI already present at Game Root can be
+activated even if ReShade has not yet selected a current preset.
 
 Selecting a missing INI initializes it by asking ReShade to save the currently
 active preset and copying that file. If an older version of OSC stored
@@ -102,8 +106,12 @@ never overwritten by initialization or migration. ReShade's
 `set_current_preset_path` saves the outgoing
 preset and activates the target; `save_current_preset` persists OSC edits after
 750 ms without additional edits. OSC's Off toggles the ReShade global effects
-flag without deleting the saved technique stack. The Node bridge never writes
-Shader INI syntax itself. Saving requires write access to the game's folder;
+flag without deleting the saved technique stack. This also applies to the
+legacy NVIDIA `EnableMods` API: in preset mode it must toggle global effects,
+not disable every technique individually. Native snapshots read the real
+global ReShade effect flag, including when it is changed outside OSC.
+The Node bridge never writes Shader INI syntax itself. Saving requires write
+access to the game's folder;
 when this is denied the native command fails explicitly (403) and keeps the
 existing preset. No INI file is created until OSC activates a slot (including
 its initial default slot when the editor first opens).
@@ -128,6 +136,13 @@ Notifications include the original `available`, `captureControlChange`,
 session, generation, actual controls and stack. The legacy UI entry shim checks
 this live state before using its local/offline capability path, rather than
 assuming NVIDIA cloud allowlists or Container test replies establish support.
+An open OSC Game Filter editor refreshes the native catalog on its approximately
+two-second heartbeat (rather than replaying a stale Node cache). Removed native
+techniques emit an explicit empty stack-slot notification, and readback values
+replace browser savedConfigs before the stock NVIDIA notification handler runs.
+The closed editor/main menu retains inexpensive cached availability checks.
+The filter accordion patch retries until its real NVIDIA controller exists,
+avoiding a lost first click when route creation outruns Angular linking.
 
 ## Validation
 

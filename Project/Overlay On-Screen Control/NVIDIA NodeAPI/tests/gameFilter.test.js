@@ -158,8 +158,25 @@ async function main() {
     result = await call('POST', '/Duluka/v.1.0/GameFilter/Preset/Select', {slot:2});
     assert.strictEqual(result.status,200,'reselecting active INI preset failed');
     assert.strictEqual(result.body.state.enabled,true,'reselecting an INI preset did not restore effects');
+    result = await call('POST', base + '/EnableMods', {globalEnable:false});
+    assert.strictEqual(result.status,200,'legacy global toggle failed in ReShade preset mode');
+    assert.strictEqual(result.body.enabled,false,'legacy global toggle did not disable ReShade effects');
+    const offState = await call('GET', '/Duluka/v.1.0/GameFilter/State');
+    assert(offState.body.stack.length > 0,
+      'legacy enable/disable operation erased the INI preset technique stack');
+    result = await call('POST', base + '/EnableMods', {globalEnable:true});
+    assert.strictEqual(result.status,200,'legacy global toggle failed to restore ReShade effects');
     result = await call('POST', '/Duluka/v.1.0/GameFilter/Preset/Select', {slot:1});
     assert.strictEqual(result.status,200,'switching back to INI preset 1 failed');
+    // A direct ReShade/native edit bypasses the Node route. Refreshing the
+    // editor must read that external stack and clear every removed pane.
+    const externalTarget = await client.state();
+    await client.command(externalTarget, 'clear', {});
+    result = await call('GET', '/Duluka/v.1.0/GameFilter/State?refresh=1');
+    assert.strictEqual(result.status, 200, 'external ReShade edit failed to refresh');
+    assert.deepStrictEqual(result.body.stack, [], 'OSC still displays the old native filter stack');
+    assert(events.some(e => e.data.type === 'currentFilter' && e.data.stackIdx === 1 &&
+      e.data.id === 'None'), 'removing a native filter left its old OSC pane active');
     result = await call('POST', base + '/UnknownAction', {}); assert.strictEqual(result.status, 501);
     result = await call('GET', base + '/Filter'); assert.strictEqual(result.status, 405);
     result = await call('GET', base + '/GetFilters', undefined, {'x-ansel-game-pid':'invalid'}); assert.strictEqual(result.status, 400);

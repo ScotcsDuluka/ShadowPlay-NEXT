@@ -18,6 +18,18 @@ inline bool directory(const fs::path &path) {
     std::error_code ec;
     return fs::is_directory(path, ec) && !ec;
 }
+// ReShade may expose a relative INI filename. Resolve it against the actual
+// installation, never the launcher's mutable process working directory.
+inline fs::path resolve_preset_path(const fs::path &reported,
+                                    const fs::path &gameRoot,
+                                    const fs::path &executableDirectory) {
+    if (reported.empty() || reported.is_absolute()) return reported.lexically_normal();
+    const auto rootPath = (gameRoot / reported).lexically_normal();
+    if (regular_file(rootPath)) return rootPath;
+    const auto legacyPath = (executableDirectory / reported).lexically_normal();
+    if (regular_file(legacyPath)) return legacyPath;
+    return rootPath;
+}
 // Inspect only the installation's top-level entries, never recurse into a
 // library or game asset tree. Game launchers often live above UE binaries.
 inline bool installation_marker(const fs::path &candidate) {
