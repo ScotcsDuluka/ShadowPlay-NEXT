@@ -25,7 +25,10 @@
       document.querySelector('.md-open-menu-container.md-active'));
   }
   function markMaterialEscape(ev) {
-    if (!editing || ev.key !== 'Escape' || !materialPopupEvent(ev)) return;
+    // Both dismissing a Material menu and Canceling Freestyle are handled by
+    // this editor; the legacy document hotkey must NOT close the whole OSC
+    // during the SAME Escape keyboard event. Normal-mode Escape is unchanged.
+    if (!editing || ev.key !== 'Escape') return;
     materialEscapeClosePending = true;
     if (materialEscapeTimer !== null) window.clearTimeout(materialEscapeTimer);
     // Guard ONLY the current keyboard dispatch, not future Escape presses.
@@ -42,7 +45,9 @@
           display.__nvFreestyleMaterialEscapeGuard) return;
       var original = display.closeOSC;
       display.closeOSC = function () {
-        if (editing && materialEscapeClosePending) return;
+        // Cancel can flip editing=false before the old document hotkey runs.
+        // Keep the one-event guard alive until the next event-loop turn.
+        if (materialEscapeClosePending) return;
         return original.apply(this, arguments);
       };
       display.__nvFreestyleMaterialEscapeGuard = true;
@@ -301,8 +306,9 @@
       if(legacy)legacy.style.display='';
     }
     editing=false;host=null;chosen=null;
-    materialEscapeClosePending=false;
-    if(materialEscapeTimer!==null){window.clearTimeout(materialEscapeTimer);materialEscapeTimer=null;}
+    // Do not clear the Escape guard here: Angular's global keyboardHandler
+    // can run later in the same event after this editor closes its shell.
+    // The scheduled 0ms timer releases the guard after that dispatch.
   }
   function closeShell() {
     // Close the Angular shell directly. A synthetic Done click can be blocked

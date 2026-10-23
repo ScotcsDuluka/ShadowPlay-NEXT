@@ -396,3 +396,17 @@ test('Esc without native popup keeps previous Customize Cancel behavior', () => 
   assert.equal(f.editor.isEditing(),false);
   assert.equal(f.shellCloses,1);
 });
+
+test('Freestyle Escape Cancel does not leak into the global OSC close handler later in the same event', () => {
+  const f=fixture();f.scan();
+  const escape=f.emit('keydown',f.host,{key:'Escape'});
+  assert.equal(escape.prevented,true);
+  assert.equal(f.editor.isEditing(),false);
+  assert.equal(f.shellCloses,1);
+  // app.js document keyboardHandler runs AFTER V5 closed the Angular shell.
+  f.display.closeOSC();
+  assert.equal(f.nativeCloseCalls,0,'same key dispatch must not close Overlay');
+  f.fireTimer(0);
+  f.display.closeOSC();
+  assert.equal(f.nativeCloseCalls,1,'next genuine close is not suppressed');
+});
