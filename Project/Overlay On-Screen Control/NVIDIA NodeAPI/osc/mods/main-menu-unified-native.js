@@ -9,7 +9,9 @@
   var members={};
   M.CONTROLS.forEach(function(c){members[c.key]=c;});
   function stored(key){try{return window.localStorage.getItem(key);}catch(e){return null;}}
-  function enabled(){return stored(FLAG)==='1';}
+  // NEXT V5 owns native coordinates exclusively when explicitly enabled.
+  // Keep every legacy V4 key intact for instant rollback by page reload.
+  function enabled(){return stored(FLAG)==='1'&&stored('DulukaNextNativeLayoutV5Enabled')!=='1';}
   function backupLegacy(){
     var old=window.__dulukaMenuLayout;
     var result=M.initial(old&&old.get(),old&&old.getSides());

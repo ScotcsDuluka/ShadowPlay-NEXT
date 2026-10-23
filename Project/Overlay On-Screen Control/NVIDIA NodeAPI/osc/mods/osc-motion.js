@@ -87,10 +87,12 @@
       // captures screen rectangles for the opening animation. Otherwise
       // controls use their old V2 coordinates during opening and jump at idle.
       // This is a one-off preflight, never a reposition on animation frames.
-      var unified=window.__dulukaUnifiedMainMenu;
-      if(unified&&unified.enabled&&unified.enabled()&&unified.prepareForMotion){
-        var nativeRoot=document.querySelector('nv-main-menu:not([data-customize-preview]) .main-menu-container');
-        if(nativeRoot)unified.prepareForMotion(nativeRoot);
+      var nextV5=window.__nvNextLayoutV5,unified=window.__dulukaUnifiedMainMenu;
+      var nativeRoot=document.querySelector('nv-main-menu:not([data-customize-preview]) .main-menu-container');
+      if(nativeRoot&&nextV5&&nextV5.enabled&&nextV5.enabled()&&nextV5.prepareForMotion){
+        nextV5.prepareForMotion(nativeRoot);
+      }else if(nativeRoot&&unified&&unified.enabled&&unified.enabled()&&unified.prepareForMotion){
+        unified.prepareForMotion(nativeRoot);
       }
       if(!collect()){if(++linkAttempts<4){linkFrame=window.requestAnimationFrame(start);return;}prepared=false;releaseVisual();if(wanted==='closed')commitClose();return;}
       if(!makeController(false)){prepared=false;releaseVisual();if(wanted==='closed')commitClose();return;}

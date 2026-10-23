@@ -9,7 +9,7 @@
  }
  var keys={},present={};
  M.CONTROLS.forEach(function(c){keys[c.key]=c;});
- function enabled(){return window.localStorage.getItem(FLAG)==='1';}
+ function enabled(){return window.localStorage.getItem(FLAG)==='1'&&window.localStorage.getItem('DulukaNextNativeLayoutV5Enabled')!=='1';}
  function get(){
    if(!state){try{var raw=window.localStorage.getItem(KEY);if(raw){
      var s=JSON.parse(raw);G.validate(s);state=s;

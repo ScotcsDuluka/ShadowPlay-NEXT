@@ -1,0 +1,25 @@
+/* NEXT V5 only: native NVIDIA md-menu nodes, never clones.
+   No visible Group/Slot/edit adornments in Normal Mode. */
+html.nv-next-v5-on .main-menu-container md-menu-bar.nv-next-v5-bar {
+  overflow:visible!important;
+}
+html.nv-next-v5-on .main-menu-container md-menu.nv-next-v5-tile {
+  box-sizing:border-box!important;
+  overflow:hidden!important;
+}
+html.nv-next-v5-on .main-menu-container md-menu.nv-next-v5-tile > button.menu-button {
+  width:100%!important;
+  height:100%!important;
+  min-width:0!important;
+  min-height:0!important;
+}
+/* During Edit, the editor owns input; never let a drag trigger Record/etc. */
+html.nv-next-v5-on.nv-live-layout-editing .main-menu-container md-menu.nv-next-v5-tile > button.menu-button {
+  cursor:grab;
+}
+@media (prefers-reduced-motion:reduce) {
+  html.nv-next-v5-on .main-menu-container md-menu-bar.nv-next-v5-bar,
+  html.nv-next-v5-on .main-menu-container md-menu.nv-next-v5-tile {
+    transition:none!important;
+  }
+}
