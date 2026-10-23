@@ -149,6 +149,7 @@
     <Compile Remove="EngineCapture\RouteGuard.Tests\**\*.vb" />
     <Compile Remove="EngineCapture\MediaEvidence.Tests\**\*.vb" />
     <Compile Remove="EngineCapture\Mux.Tests\**\*.vb" />
+    <Compile Remove="EngineCapture\SessionRecovery.Tests\**\*.vb" />
     <EmbeddedResource Remove="EngineCapture\Duluka Capture\**\*.resx" />
   </ItemGroup>
 </Project>
