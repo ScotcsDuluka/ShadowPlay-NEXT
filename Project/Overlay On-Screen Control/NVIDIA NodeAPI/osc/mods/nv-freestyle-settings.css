@@ -1,5 +1,8 @@
 /* Original NVIDIA floating Settings. Angular owns the existing controls;
    the organizer only moves their nodes into Background 80% / Controls 20%. */
+html.nv-live-layout-editing body .nv-live-editor:not(.nv-freestyle-settings) {
+ visibility:hidden!important;
+}
 html.nv-live-layout-editing body .nv-live-editor.nv-freestyle-settings {
  position:fixed!important;box-sizing:border-box!important;
  display:flex!important;flex-direction:column;
@@ -9,6 +12,7 @@ html.nv-live-layout-editing body .nv-live-editor.nv-freestyle-settings {
  height:var(--nv-f-settings-height,42vh)!important;
  min-width:0!important;min-height:0!important;max-height:none!important;
  margin:0!important;padding:18px 22px!important;overflow:hidden!important;
+ animation:none!important;transition:none!important;
  z-index:70!important;background:rgba(36,41,44,.97)!important;
  border-top:4px solid #76b900!important;
  box-shadow:0 16px 44px rgba(0,0,0,.42)!important;

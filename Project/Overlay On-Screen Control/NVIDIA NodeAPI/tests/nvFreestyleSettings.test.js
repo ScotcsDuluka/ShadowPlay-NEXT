@@ -44,6 +44,8 @@ test('existing Angular-owned background, palette and md-select footer are moved,
  assert.equal(workspace.querySelector('.nv-live-panel'),side);
  assert.equal(editor.querySelector('header'),head);
  assert.equal(editor.querySelector('.nv-freestyle-legacy').tagName,'details');
+ assert.equal(editor.querySelector('.nv-freestyle-legacy').hidden,true,'V2 workspace is hidden before V5 starts');
+ assert.equal(editor.querySelector('.nv-freestyle-legacy').style.display,'none');
  assert.equal(window.__nvFreestyleSettings.scan(),undefined);
  assert.equal(editor.querySelector('.nv-freestyle-grid'),grid,'no duplicates after repeated scans');
  assert.equal(window.__nvFreestyleSettings.restore(),true);
@@ -65,6 +67,38 @@ test('80/20 visual contract remains scoped to original native Settings',()=>{
  assert.ok(index.includes('/mods/nv-freestyle-settings.css'));
  assert.ok(index.includes('/mods/launcher-language-sync.js'));
  assert.ok(index.includes('/mods/osc-motion.js'));
+});
+test('DOM insertions organize the native shell immediately, including delayed Background creation',()=>{
+ for(const readyState of ['complete','loading']){
+  const editor=new Node('section','nv-live-editor'),workspace=new Node('div','nv-live-workspace'),
+   library=new Node('div','nv-live-library'),footer=new Node('footer'),background=new Node('nv-osc-background-settings');
+  workspace.appendChild(library);editor.appendChild(workspace);editor.appendChild(footer);
+  let ready,callback,observed,intervalMs,instances=0;
+  const document={readyState,body:readyState==='complete'?new Node('body'):null,
+   querySelector:q=>q==='.nv-live-editor'?editor:null,createElement:tag=>new Node(tag),
+   createComment:()=>new Node('#comment'),addEventListener:(event,fn)=>{if(event==='DOMContentLoaded')ready=fn}};
+  const window={setInterval:(fn,ms)=>{intervalMs=ms},MutationObserver:function(fn){
+   instances++;callback=fn;this.observe=(target,options)=>{observed={target,options}};
+  }};
+  vm.runInNewContext(read('mods/nv-freestyle-settings.js'),{window,document},{timeout:2000});
+  if(readyState==='loading'){
+   assert.equal(instances,0,'waits for body at DOMContentLoaded');
+   document.body=new Node('body');ready();
+  }
+  assert.equal(instances,1);
+  assert.equal(observed.target,document.body);
+  assert.equal(observed.options.childList,true);assert.equal(observed.options.subtree,true);
+  assert.equal(intervalMs,300,'retains the fallback for older hosts');
+  assert.equal(editor.querySelector('.nv-freestyle-grid'),null,'waits for all Angular-owned nodes');
+  editor.appendChild(background);
+  callback([{type:'childList',target:editor,addedNodes:[background]}]);
+  const grid=editor.querySelector('.nv-freestyle-grid');
+  assert.ok(grid,'organizes in the DOM observer delivery, without waiting for a timer');
+  assert.equal(grid.querySelector('nv-osc-background-settings'),background);
+  assert.equal(grid.querySelector('.nv-freestyle-legacy').hidden,true);
+  callback([]);
+  assert.equal(editor.querySelector('.nv-freestyle-grid'),grid,'observer follow-up does not rebuild nodes');
+ }
 });
 function positioningFixture({width=1920,height=1080,scale=1,offsetX=0,offsetY=160,barBottom=400}={}){
  const editor=new Node('section','nv-live-editor'),workspace=new Node('div','nv-live-workspace'),

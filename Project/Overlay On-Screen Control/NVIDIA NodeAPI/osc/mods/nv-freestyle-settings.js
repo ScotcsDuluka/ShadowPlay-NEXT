@@ -5,7 +5,7 @@
 (function(window,document){
  'use strict';
  if(window.__nvFreestyleSettings)return;
- var mounted=null,original=[],helpText=null;
+ var mounted=null,original=[],helpText=null,observer=null;
  function node(tag,cls,label){
    var el=document.createElement(tag);if(cls)el.className=cls;
    if(label)el.textContent=label;return el;
@@ -77,6 +77,10 @@
    grid.setAttribute('aria-label','Freestyle Settings layout');
    left.setAttribute('aria-label','Background Settings');
    right.setAttribute('aria-label','Controls');
+   // The V2 workspace is retained for exact node restoration only. Hide it
+   // before insertion so it cannot paint while V5 acquires edit ownership.
+   detail.hidden=true;detail.open=false;detail.style.display='none';
+   detail.setAttribute('aria-hidden','true');
    detail.appendChild(summary);
    if(mounted&&mounted!==editor)restore();
    [workspace,library,background,footer].forEach(remember);
@@ -84,7 +88,7 @@
    if(help){helpText={node:help,text:help.textContent};help.textContent='Drag Controls onto the menu.';}
    editor.classList.add('nv-freestyle-settings');
    // Preserve every Angular-owned DOM node and scope by moving rather than
-   // rebuilding. The old three-panel V2 editor is still available on demand.
+   // rebuilding. V5 owns the visible editor; V2 nodes remain hidden.
    var anchor=workspace;
    editor.insertBefore(grid,anchor);
    grid.appendChild(left);grid.appendChild(right);
@@ -104,9 +108,19 @@
    if(editor!==mounted||!editor.querySelector('.nv-freestyle-grid'))organize(editor);
    position();
  }
+ function start(){
+   if(!observer&&window.MutationObserver&&document.body){
+     // Angular inserts the editor and Background companion in separate DOM
+     // changes. Observe both so organization completes before the next paint,
+     // rather than showing V2 until the 300ms fallback interval fires.
+     observer=new window.MutationObserver(scan);
+     observer.observe(document.body,{childList:true,subtree:true});
+   }
+   scan();
+ }
  window.__nvFreestyleSettings={scan:scan,organize:organize,restore:restore,position:position,bounds:bounds};
  if(window.setInterval)window.setInterval(scan,300);
  if(window.addEventListener)window.addEventListener('resize',position);
- if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',scan);
- else scan();
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);
+ else start();
 })(window,document);

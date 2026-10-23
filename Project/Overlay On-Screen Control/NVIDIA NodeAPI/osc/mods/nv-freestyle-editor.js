@@ -499,6 +499,13 @@
     dragState:function(){return {kind:dragging&&dragging.kind,target:dragging&&dragging.target,pending:pending}}
   };
   window.setInterval(scan,250);
-  if(document.readyState!=='loading')scan();
-  else document.addEventListener('DOMContentLoaded',scan);
+  function observeEditor() {
+    if(window.MutationObserver&&document.body){
+      var observer=new window.MutationObserver(scan);
+      observer.observe(document.body,{childList:true,subtree:true});
+    }
+    scan();
+  }
+  if(document.readyState!=='loading')observeEditor();
+  else document.addEventListener('DOMContentLoaded',observeEditor);
 })(window,document);

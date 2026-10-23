@@ -2,6 +2,9 @@
    No visible Group/Slot/edit adornments in Normal Mode. */
 html.nv-next-v5-on .main-menu-container md-menu-bar.nv-next-v5-bar {
   overflow:visible!important;
+  /* Recenter the coordinate rail atomically. Native tiles animate within it;
+     a tweened rail width gives drag guides a moving coordinate origin. */
+  transition:none!important;
 }
 html.nv-next-v5-on .main-menu-container md-menu.nv-next-v5-tile {
   box-sizing:border-box!important;
