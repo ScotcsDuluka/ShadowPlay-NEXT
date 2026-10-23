@@ -121,8 +121,12 @@ namespace DulukaEngine.Audio
             while (bytes > 0)
             {
                 int n = (int)Math.Min(bytes, zeros.Length);
+                // AudioWavSink.Write serializes the ENTIRE Data array, not
+                // AudioPacket.Frames. Passing the full 64 KiB zero buffer for
+                // a smaller tail chunk inflated the WAV and broke A/V sync.
+                byte[] chunk = n == zeros.Length ? zeros : new byte[n];
                 _writer.Write(new AudioPacket(AudioTrackKind.System, _expectedPts100ns,
-                    n / bytesPerFrame, zeros, true, 0, 0, 0, _sampleRate, _channels));
+                    n / bytesPerFrame, chunk, true, 0, 0, 0, _sampleRate, _channels));
                 _expectedPts100ns += (long)(n / bytesPerFrame) * 10000000L / _sampleRate;
                 bytes -= n;
             }
