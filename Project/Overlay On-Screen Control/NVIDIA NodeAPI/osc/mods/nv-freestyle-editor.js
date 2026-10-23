@@ -225,7 +225,9 @@
   function start() {
     if(editing)return;
     var el=document.querySelector('.nv-live-editor.nv-freestyle-settings');
-    if(!el)return;
+    if(!el||el.classList.contains('ng-leave'))return;
+    var shellScope=window.angular&&window.angular.element(el).scope();
+    if(shellScope&&(shellScope.$$destroyed||shellScope.flexMenu&&shellScope.flexMenu.editing===false))return;
     host=el;
     originallyEnabled=A.enabled();
     // Live edit is an in-memory owner lease, not a permanent feature flag.
@@ -239,7 +241,14 @@
     host.classList.add('nv-freestyle-v5-edit');
     createTools();redraw();
   }
+  function hideShell() {
+    if(host){
+      host.style.setProperty('visibility','hidden','important');
+      host.style.setProperty('pointer-events','none','important');
+    }
+  }
   function cleanup() {
+    hideShell();
     if(dragging&&dragging.ghost)dragging.ghost.remove();
     dragging=null;removePopup();
     if(pendingTimer){window.clearTimeout(pendingTimer);pendingTimer=null}
@@ -257,6 +266,7 @@
     // Close the Angular shell directly. A synthetic Done click can be blocked
     // by OSC Motion while closing, leaving a detached V5 lease reopened by scan.
     var scope=host&&window.angular&&window.angular.element(host).scope();
+    hideShell();
     if(scope&&scope.flexMenu&&scope.flexMenu.done)scope.flexMenu.done();
   }
   function finish() {
@@ -356,9 +366,8 @@
   }
   function move(ev) {
     if(!dragging||!editing)return;
-    // CEF Host can publish stationary hover moves while a captured drag is
-    // active. Only a left-button move may change the drag's destination.
-    if(ev.buttons===0)return;
+    // The native Host omits button modifiers on mousemove. The down/up pair
+    // owns this drag; DOM buttons=0 must not discard real captured movement.
     if(!dragging.active) {
       if(Math.abs(ev.clientX-dragging.x)+Math.abs(ev.clientY-dragging.y)<8)return;
       dragging.active=true;
@@ -466,6 +475,12 @@
   }
   function scan() {
     var editor=document.querySelector('.nv-live-editor.nv-freestyle-settings');
+    if(editor&&editor.classList.contains('ng-leave'))editor=null;
+    var shell=editor&&window.angular&&window.angular.element(editor).scope();
+    if(shell&&(shell.$$destroyed||shell.flexMenu&&shell.flexMenu.editing===false)){
+      if(editing){A.cancel();cleanup();A.editOwnership(false)}
+      return;
+    }
     var motion=window.__dulukaOscMotion,state=motion&&motion.getState&&motion.getState();
     if(state&&state.target==='closed'){
       if(editing)cancel(true);

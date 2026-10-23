@@ -1,5 +1,5 @@
 /* Freestyle V5 native edit ornaments. Never visible in Normal Mode. */
-html.nv-live-layout-editing .nv-live-editor:not(.nv-freestyle-v5-edit) {
+body .nv-live-editor:not(.nv-freestyle-v5-edit) {
  visibility:hidden!important;pointer-events:none!important;
 }
 .nv-f-overlay {position:fixed;left:0;top:0;right:0;bottom:0;z-index:85;pointer-events:none;user-select:none}

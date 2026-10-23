@@ -12,7 +12,14 @@ const source = fs.readFileSync(path.join(__dirname, '../osc/mods/nv-freestyle-ed
 class Element {
   constructor(tag, className = '') {
     this.tagName = tag; this.className = className; this.children = [];
-    this.parentNode = null; this.attributes = {}; this.style = {}; this.listeners = {};
+    this.parentNode = null; this.attributes = {}; this.listeners = {};
+    const values = {}, priorities = {};
+    this.style = {
+      setProperty(name, value, priority = '') { values[name] = String(value); priorities[name] = priority; this[name] = String(value); },
+      getPropertyValue(name) { return values[name] === undefined ? this[name] || '' : values[name]; },
+      getPropertyPriority(name) { return priorities[name] || ''; },
+      removeProperty(name) { const old = this.getPropertyValue(name); delete values[name]; delete priorities[name]; delete this[name]; return old; }
+    };
     this._text = '';
     this.classList = {
       contains: name => this.className.split(/\s+/).includes(name),
@@ -81,9 +88,9 @@ class Element {
   }
 }
 
-function fixture({ enabled = false } = {}) {
+function fixture({ enabled = false, lingerOnClose = false } = {}) {
   const calls = [], docListeners = {}, winListeners = {}, timers = new Map(); let nextTimer = 0;
-  const f = { shellVisible: true, hit: null, motionTarget: 'open', nativeActions: 0, shellCloses: 0 };
+  const f = { shellVisible: true, hit: null, motionTarget: 'open', nativeActions: 0, shellCloses: 0, shellCloseObservations: [] };
   const html = new Element('html', 'nv-live-layout-editing'), body = new Element('body'); html.appendChild(body);
   const host = new Element('section', 'nv-live-editor nv-freestyle-settings'), head = new Element('header');
   const done = new Element('button', 'osc-button-green'); head.appendChild(done); host.appendChild(head);
@@ -110,8 +117,12 @@ function fixture({ enabled = false } = {}) {
     preview(value) { calls.push(['preview', !!value]); preview = value; },
     undo() { calls.push(['undo']); }
   };
-  const scope = { $evalAsync(fn) { fn(); }, flexMenu: { done() {
-    calls.push(['shell.done']); f.shellCloses++; f.shellVisible = false; html.classList.remove('nv-live-layout-editing');
+  const scope = { $evalAsync(fn) { fn(); }, flexMenu: { editing: true, done() {
+    f.shellCloseObservations.push({ visibility: host.style.getPropertyValue('visibility'),
+      visibilityPriority: host.style.getPropertyPriority('visibility'), pointer: host.style.getPropertyValue('pointer-events'),
+      pointerPriority: host.style.getPropertyPriority('pointer-events'), wasAngularEditing: scope.flexMenu.editing });
+    calls.push(['shell.done']); f.shellCloses++; scope.flexMenu.editing = false;
+    f.shellVisible = lingerOnClose; html.classList.remove('nv-live-layout-editing');
   } } };
   const document = {
     readyState: 'loading', documentElement: html, body,
@@ -133,7 +144,7 @@ function fixture({ enabled = false } = {}) {
     addEventListener(type, listener) { (winListeners[type] ||= []).push(listener); }
   };
   vm.runInNewContext(source, { window, document }, { timeout: 2000 });
-  Object.assign(f, { A, calls, window, document, host, nativeButton, done, timers, editor: window.__nvFreestyleEditor,
+  Object.assign(f, { A, calls, window, document, host, scope, nativeButton, done, timers, editor: window.__nvFreestyleEditor,
     flag: () => flag, lease: () => lease, preview: () => preview,
     scan: () => window.__nvFreestyleEditor.scan(),
     emit(type, target, more = {}) {
@@ -215,24 +226,37 @@ test('blur clears actual drag ghost, delayed insertion preview and pending targe
   assert.equal(f.flag(), false);
 });
 
-test('Host hover with buttons zero cannot replace a held drag target or delayed insertion preview', () => {
-  const f = fixture(); f.scan(); startDrag(f); f.fireTimer(360);
-  const held = f.editor.dragState();
-  assert.equal(held.target.id, 'g2'); assert.equal(held.target.edge, 'before');
-  assert.equal(held.pending.groupId, 'g2'); assert.equal(held.pending.ready, true);
-  const before = JSON.stringify(held), previewBefore = JSON.stringify(f.preview());
-  const unrelated = f.document.querySelector('[data-f-group="g4"]');
-  const rect = unrelated.getBoundingClientRect(); f.hit = unrelated;
-  // The native Host sends these real-cursor hovers between injected held moves.
-  for (let i = 0; i < 3; i++) {
-    f.emit('mousemove', unrelated, { buttons: 0, clientX: rect.left + rect.width / 2, clientY: rect.top + 20 });
+test('real Host zero-button-mask mouse sequence starts, updates and completes Group swap while native actions remain guarded', () => {
+  const f = fixture(); f.scan();
+  const handle = f.document.querySelector('[data-f-drag-group="g1"]');
+  const destination = f.document.querySelector('[data-f-group="g2"]'), rect = destination.getBoundingClientRect();
+  f.hit = destination;
+  f.emit('mousedown', handle, { buttons: 0, clientX: 120, clientY: 100 });
+  f.emit('mousemove', destination, { buttons: 0, clientX: rect.left + rect.width / 2, clientY: rect.top + 40 });
+  assert.ok(f.document.querySelector('.nv-f-drag-ghost'), 'Host move with buttons zero starts real drag');
+  assert.equal(f.editor.dragState().target.id, 'g2');
+  f.emit('mouseup', destination, { buttons: 0, clientX: rect.left + rect.width / 2, clientY: rect.top + 40 });
+  assert.equal(f.A.get().panels.left[0].id, 'g2'); assert.equal(f.A.get().panels.center[0].id, 'g1');
+  assert.equal(f.editor.dragState().kind, null); assert.equal(f.document.querySelector('.nv-f-drag-ghost'), null);
+  for (const [type, more] of [['click', {}], ['keydown', { key: 'Enter' }], ['keydown', { key: ' ' }]]) {
+    const event = f.emit(type, f.nativeButton, more); assert.ok(event.prevented && event.stopped, 'native command remains guarded');
   }
-  assert.equal(JSON.stringify(f.editor.dragState()), before, 'hover leaves held target and pending insertion intact');
-  assert.equal(JSON.stringify(f.preview()), previewBefore, 'hover does not cancel or replace rendered preview');
-  assert.ok(f.document.querySelector('.nv-f-drag-ghost'), 'held drag remains active');
-  f.blur();
-  assert.equal(f.editor.dragState().kind, null); assert.equal(f.editor.dragState().pending, null);
-  assert.equal(f.preview(), null); assert.equal(f.document.querySelector('.nv-f-drag-ghost'), null);
+  assert.equal(f.nativeActions, 0); assert.equal(f.flag(), false, 'drag stays an unsaved edit');
+});
+
+test('real Host zero-button-mask drag accepts delayed Group insertion and clears its preview on drop', () => {
+  const f = fixture(); f.scan();
+  const handle = f.document.querySelector('[data-f-drag-group="g2"]');
+  const destination = f.document.querySelector('[data-f-group="g4"]'), rect = destination.getBoundingClientRect();
+  f.hit = destination;
+  f.emit('mousedown', handle, { buttons: 0, clientX: 350, clientY: 100 });
+  f.emit('mousemove', destination, { buttons: 0, clientX: rect.left + 1, clientY: rect.top + 40 });
+  assert.equal(f.editor.dragState().pending.groupId, 'g4');
+  f.fireTimer(360); assert.ok(f.preview()); assert.equal(f.editor.dragState().pending.ready, true);
+  f.emit('mouseup', destination, { buttons: 0, clientX: rect.left + 1, clientY: rect.top + 40 });
+  assert.deepEqual(f.A.get().panels.center.map(g => g.id), ['g3', 'g2', 'g4', 'g5']);
+  assert.equal(f.preview(), null); assert.equal(f.editor.dragState().pending, null);
+  assert.equal(f.document.querySelector('.nv-f-drag-ghost'), null); assert.equal(f.nativeActions, 0);
 });
 
 test('route exit cancels active drag and draft, removes guides, and releases temporary owner', () => {
@@ -252,4 +276,48 @@ test('Motion closed target prevents stale Angular editor from acquiring or resta
   assert.equal(f.editor.isEditing(), false); assert.equal(f.lease(), false); assert.equal(f.shellCloses, 1);
   assert.equal(f.calls.filter(x => x[0] === 'begin').length, 1, 'closed Motion never restarts stale shell');
   assert.equal(f.calls.some(x => x[0] === 'done' || x[0] === 'enable'), false);
+});
+
+test('ng-leave DOM never acquires a lease and cancels an editor already entering Angular leave', () => {
+  const f = fixture(); f.host.classList.add('ng-leave'); f.editor.begin(); f.scan();
+  assert.equal(f.editor.isEditing(), false); assert.deepEqual(f.calls, []);
+  f.host.classList.remove('ng-leave'); f.scan(); assert.equal(f.editor.isEditing(), true);
+  startDrag(f); f.host.classList.add('ng-leave'); f.scan(); f.editor.begin(); f.scan();
+  assert.equal(f.editor.isEditing(), false); assert.equal(f.lease(), false);
+  assert.equal(f.document.querySelector('.nv-f-drag-ghost'), null); assert.equal(f.timers.size, 0);
+  assert.equal(f.calls.filter(x => x[0] === 'begin').length, 1); assert.equal(f.shellCloses, 0);
+});
+
+test('Angular editing false or destroyed scope blocks both direct begin and scan while closing DOM remains', () => {
+  for (const closedState of ['editingFalse', 'destroyed']) {
+    const f = fixture();
+    if (closedState === 'editingFalse') f.scope.flexMenu.editing = false; else f.scope.$$destroyed = true;
+    f.editor.begin(); f.scan();
+    assert.equal(f.editor.isEditing(), false, closedState); assert.deepEqual(f.calls, [], closedState);
+    f.scope.flexMenu.editing = true; f.scope.$$destroyed = false; f.scan(); startDrag(f);
+    if (closedState === 'editingFalse') f.scope.flexMenu.editing = false; else f.scope.$$destroyed = true;
+    f.scan(); f.editor.begin(); f.scan();
+    assert.equal(f.editor.isEditing(), false); assert.equal(f.lease(), false); assert.equal(f.shellCloses, 0);
+    assert.equal(f.calls.filter(x => x[0] === 'begin').length, 1);
+    assert.equal(f.document.querySelector('.nv-f-drag-ghost'), null); assert.equal(f.timers.size, 0);
+  }
+});
+
+for (const action of ['Cancel', 'Done']) test(action + ' hides lingering native Settings before shell editing flag and V5 edit class disappear', () => {
+  const f = fixture({ lingerOnClose: true }); f.scan();
+  const removedClass = [], originalRemove = f.host.classList.remove;
+  f.host.classList.remove = name => {
+    if (name === 'nv-freestyle-v5-edit') removedClass.push({ visibility: f.host.style.getPropertyValue('visibility'),
+      pointer: f.host.style.getPropertyValue('pointer-events'), visibilityPriority: f.host.style.getPropertyPriority('visibility'),
+      pointerPriority: f.host.style.getPropertyPriority('pointer-events') });
+    originalRemove(name);
+  };
+  if (action === 'Cancel') f.editor.cancel(true); else f.editor.done();
+  assert.equal(f.scope.flexMenu.editing, false); assert.equal(f.shellCloses, 1);
+  assert.equal(f.document.querySelector('.nv-live-editor.nv-freestyle-settings'), f.host, 'Angular leave DOM deliberately lingers');
+  assert.deepEqual(f.shellCloseObservations, [{ visibility: 'hidden', visibilityPriority: 'important', pointer: 'none', pointerPriority: 'important', wasAngularEditing: true }], 'hidden before Angular shell removes its editing flag');
+  assert.deepEqual(removedClass, [{ visibility: 'hidden', pointer: 'none', visibilityPriority: 'important', pointerPriority: 'important' }], 'hidden before V5 edit class removal');
+  f.editor.begin(); f.scan(); f.scan();
+  assert.equal(f.editor.isEditing(), false); assert.equal(f.calls.filter(x => x[0] === 'begin').length, 1, 'closing DOM cannot reacquire owner');
+  assert.equal(f.lease(), false); assert.equal(f.flag(), action === 'Done');
 });
