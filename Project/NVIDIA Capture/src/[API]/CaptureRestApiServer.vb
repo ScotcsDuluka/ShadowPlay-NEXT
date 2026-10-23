@@ -134,10 +134,9 @@ Partial Public Class UI_Engine
     Private Async Function StartRestOnUi(route As CaptureBackendRoute.Decision,
                                           outputPath As String) As Task(Of Boolean)
         If RestActiveRoute().Length > 0 Then Return False
-        ' Snapshot user intent when this session starts; device initiation can
-        ' still fail, and the finalized media inspector reports actual tracks.
-        _directRestSystemAudioRequested = _settings IsNot Nothing AndAlso _settings.SystemAudioCapture
-        _directRestMicrophoneRequested = _settings IsNot Nothing AndAlso _settings.MicCapture
+        ' Handler reloads the effective CaptureSettings from config.json.
+        ' Snapshot audio intent AFTER that reload, not from a stale form
+        ' state left over from process startup.
         If Not NextRecordingConfig.IsSafeRecordingOutputPath(outputPath) Then
             Throw New ArgumentException("invalid_output_path")
         End If
@@ -148,6 +147,8 @@ Partial Public Class UI_Engine
                 End If
                 Await HandleRecordingStart(outputPath, "", LoadOscSnapshot())
                 If _recordingTask Is Nothing Then Return False
+                _directRestSystemAudioRequested = _settings IsNot Nothing AndAlso _settings.SystemAudioCapture
+                _directRestMicrophoneRequested = _settings IsNot Nothing AndAlso _settings.MicCapture
                 ' The background Task can exist well BEFORE CaptureSession.Run
                 ' owns an actual DXGI/NVENC session (NVENC rebuild is expensive).
                 ' Returning started=true merely for a queued task caused a 2s
@@ -163,7 +164,10 @@ Partial Public Class UI_Engine
                 Throw New TimeoutException("native_session_start_pending_check_state")
             Case "FFmpeg"
                 Await HandleEngineRecordStart(outputPath, "")
-                Return _legacyCaptureEngine IsNot Nothing AndAlso _legacyCaptureEngine.IsRecording
+                If _legacyCaptureEngine Is Nothing OrElse Not _legacyCaptureEngine.IsRecording Then Return False
+                _directRestSystemAudioRequested = _settings IsNot Nothing AndAlso _settings.SystemAudioCapture
+                _directRestMicrophoneRequested = _settings IsNot Nothing AndAlso _settings.MicCapture
+                Return True
             Case Else
                 Throw New NotSupportedException("direct_http_backend_not_supported")
         End Select
