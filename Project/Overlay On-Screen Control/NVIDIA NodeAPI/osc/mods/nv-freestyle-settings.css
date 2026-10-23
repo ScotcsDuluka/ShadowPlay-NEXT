@@ -81,7 +81,8 @@ html.nv-live-layout-editing body .nv-live-editor.nv-freestyle-settings {
 html.nv-live-layout-editing body .nv-live-editor.nv-freestyle-settings {
  position:fixed!important;
  left:10.4vw!important;right:10.4vw!important;
- top:44vh!important;bottom:auto!important;
+ /* Native .nv-osc content is anchored 160px below the browser viewport. */
+ top:calc(44vh - 160px)!important;bottom:auto!important;
  width:79.2vw!important;height:42vh!important;
  min-height:345px!important;
  max-height:calc(100vh - 44vh - 20px)!important;
@@ -120,7 +121,7 @@ html.nv-live-layout-editing body .nv-live-editor.nv-freestyle-settings .nv-live-
 }
 @media(max-height:720px){
  html.nv-live-layout-editing body .nv-live-editor.nv-freestyle-settings {
-  top:40vh!important;height:53vh!important;max-height:57vh!important;
+  top:calc(40vh - 160px)!important;height:53vh!important;max-height:57vh!important;
  }
 }
 

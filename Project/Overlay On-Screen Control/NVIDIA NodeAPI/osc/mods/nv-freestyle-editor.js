@@ -255,6 +255,10 @@
     if(!el)return null;
     var groupPriority=(kind==='group'||kind==='newGroup');
     var group=el.closest&&el.closest('[data-f-group]');
+    if(groupPriority&&!group&&overlay){
+      var hitSlot=el.closest&&el.closest('[data-f-slot]');
+      if(hitSlot)group=overlay.querySelector('[data-f-group="'+hitSlot.getAttribute('data-f-group-id')+'"]');
+    }
     if(groupPriority&&group){
       var box=group.getBoundingClientRect(),fraction=(ev.clientX-box.left)/Math.max(box.width,1);
       return {kind:'group',id:group.getAttribute('data-f-group'),

@@ -57,6 +57,6 @@ test('floating panel matches original NVIDIA screenshot proportions rather than 
  const s=read('nv-freestyle-settings.css');
  assert.match(s,/left:10\.4vw!important/);
  assert.match(s,/width:79\.2vw!important/);
- assert.match(s,/top:44vh!important/);
+ assert.match(s,/top:calc\(44vh - 160px\)!important/);
  assert.match(s,/grid-template-columns:minmax\(0,4fr\)/);
 });
