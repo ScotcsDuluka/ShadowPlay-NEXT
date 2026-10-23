@@ -84,7 +84,16 @@ function plan(options = {}) {
 function atomicJson(file, data) {
   const temp = file + '.writing-' + process.pid;
   fs.writeFileSync(temp, JSON.stringify(data, null, 2) + '\n');
-  fs.renameSync(temp, file);
+  // Windows security scanners may briefly hold the replaced manifest open.
+  // Retry the rename without ever deleting the prior verified manifest.
+  for (let retry = 0; retry < 15; retry++) {
+    try { fs.renameSync(temp, file); return; }
+    catch (error) {
+      if (!['EPERM', 'EBUSY', 'EACCES'].includes(error.code) || retry === 14) throw error;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0,
+        Math.min(300, 30 * (retry + 1)));
+    }
+  }
 }
 function lockRun(base, fn) {
   fs.mkdirSync(base, { recursive: true });
