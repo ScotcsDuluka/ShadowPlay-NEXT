@@ -465,6 +465,10 @@
     }
     if(ev.key==='Escape'){
       if(picker){removePopup();stop(ev);return}
+      // Native Angular Material owns Escape while an md-select/md-menu is
+      // expanded. Let the popup dismiss itself; do not cancel Freestyle.
+      if(document.querySelector('.md-select-menu-container.md-active') ||
+         document.querySelector('.md-open-menu-container.md-active'))return;
       cancel(true);stop(ev);
     }else if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='z'){
       try{A.undo();redraw()}catch(error){alertText(error.message)}

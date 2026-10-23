@@ -321,3 +321,19 @@ for (const action of ['Cancel', 'Done']) test(action + ' hides lingering native 
   assert.equal(f.editor.isEditing(), false); assert.equal(f.calls.filter(x => x[0] === 'begin').length, 1, 'closing DOM cannot reacquire owner');
   assert.equal(f.lease(), false); assert.equal(f.flag(), action === 'Done');
 });
+
+test('Escape inside native NVIDIA md-select closes only that popup, not Freestyle', () => {
+  const f = fixture(); f.scan();
+  const nativePopup = new Element('div', 'md-select-menu-container md-active');
+  f.document.body.appendChild(nativePopup);
+  const popEscape = f.emit('keydown', f.host, { key: 'Escape' });
+  assert.equal(popEscape.prevented, undefined, 'Angular Material receives Escape');
+  assert.equal(f.editor.isEditing(), true, 'Freestyle stays in Edit while native popup is open');
+  assert.equal(f.shellCloses, 0);
+  assert.equal(f.flag(), false, 'No premature Done/persistence');
+  nativePopup.remove();
+  const editorEscape = f.emit('keydown', f.host, { key: 'Escape' });
+  assert.equal(editorEscape.prevented, true, 'Escape cancels Edit only after popup closes');
+  assert.equal(f.editor.isEditing(), false);
+  assert.equal(f.shellCloses, 1);
+});
