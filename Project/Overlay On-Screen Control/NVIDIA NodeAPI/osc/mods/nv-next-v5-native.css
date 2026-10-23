@@ -13,6 +13,22 @@ html.nv-next-v5-on .main-menu-container md-menu.nv-next-v5-tile > button.menu-bu
   min-width:0!important;
   min-height:0!important;
 }
+/* Native icon boxes keep their size when Auto-Fill grows a row. */
+html.nv-next-v5-on .main-menu-container md-menu.nv-next-v5-tile .gallery-tile-align {
+  height:100%!important;min-height:0!important;align-items:center!important;
+}
+html.nv-next-v5-on .main-menu-container md-menu.nv-next-v5-tile .osc-tile-icon {
+  top:50%!important;transform:translateY(-50%);
+}
+html.nv-next-v5-on .main-menu-container md-menu.nv-next-v5-tile .nv-side-native-info {
+  top:50%;transform:translateY(-50%);
+}
+html.nv-next-v5-on .main-menu-container md-menu.nv-next-v5-tile.nv-unified-big .gallery-tile-align {
+  justify-content:center!important;padding:0!important;
+}
+html.nv-next-v5-on .main-menu-container md-menu.nv-next-v5-tile.nv-unified-big .nv-side-native-info {
+  top:auto;bottom:12px;left:8px;right:8px;transform:none;text-align:center;
+}
 /* During Edit, the editor owns input; never let a drag trigger Record/etc. */
 html.nv-next-v5-on.nv-live-layout-editing .main-menu-container md-menu.nv-next-v5-tile > button.menu-button {
   cursor:grab;

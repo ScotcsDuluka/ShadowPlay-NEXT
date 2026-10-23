@@ -73,6 +73,14 @@
   // than depending on the next unrelated 500ms performance polling tick.
   var v4RouteRoot=null,v4RouteRaf=null,v4RouteFrames=0;
   function syncNativeMainMenuSlots(root) {
+    var next=window.__nvNextLayoutV5;
+    if(next&&next.enabled&&next.enabled()){
+      // Geometry has one owner, including the transient edit lease.
+      if(v4RouteRaf!==null&&window.cancelAnimationFrame)window.cancelAnimationFrame(v4RouteRaf);
+      v4RouteRaf=null;v4RouteRoot=null;v4RouteFrames=0;
+      next.sync();
+      return;
+    }
     var unified=window.__dulukaUnifiedMainMenu;
     if(unified&&unified.enabled()){
       if(v4RouteRoot!==root){
@@ -274,7 +282,12 @@
     // positions and sometimes covered Instant Replay; never pin pixel offsets.
     var visibility = window.__dulukaMainMenuVisibility || {};
     var unified=window.__dulukaUnifiedMainMenu;
-    if(unified&&unified.enabled()){var present=unified.visible(),next={Preferences:!!present.Settings};unified.model.CONTROLS.forEach(function(c){next[c.key]=!!present[c.key];});visibility=next;}
+    var nextV5=window.__nvNextLayoutV5;
+    if(nextV5&&nextV5.enabled&&nextV5.enabled()){
+      // Stale V2 visibility must not unlink potential V5 drop targets.
+      visibility={Preferences:true};
+      nextV5.model.CONTROLS.forEach(function(key){visibility[key==='Settings'?'Preferences':key]=true;});
+    }else if(unified&&unified.enabled()){var present=unified.visible(),next={Preferences:!!present.Settings};unified.model.CONTROLS.forEach(function(c){next[c.key]=!!present[c.key];});visibility=next;}
     ['Performance','Mic','Camera','Gallery','Preferences'].forEach(function(name){var desired=name==='Preferences'||visibility[name]!==false;if(tiles[name]&&tiles[name].visible!==desired){tiles[name].visible=desired;changed=true;}});
     Object.keys(visibility).forEach(function (name) {
       if (['Performance','Mic','Camera','Gallery','Preferences'].indexOf(name)>=0 || typeof visibility[name] !== 'boolean' || !tiles[name]) return;

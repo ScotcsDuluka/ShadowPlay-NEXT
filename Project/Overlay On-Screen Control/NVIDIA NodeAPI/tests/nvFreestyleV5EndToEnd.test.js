@@ -53,10 +53,10 @@ test('V5 editor mounts in original shell and intercepts native click paths',()=>
  assert.ok(settings.includes('.nv-freestyle-grid'));
  assert.match(css,/pointer-events:auto/);
 });
-test('floating panel matches original NVIDIA screenshot proportions rather than filling viewport',()=>{
+test('floating panel keeps NVIDIA proportions and uses measured viewport placement',()=>{
  const s=read('nv-freestyle-settings.css');
- assert.match(s,/left:10\.4vw!important/);
- assert.match(s,/width:79\.2vw!important/);
- assert.match(s,/top:calc\(44vh - 160px\)!important/);
+ assert.match(s,/left:var\(--nv-f-settings-left,10\.4vw\)!important/);
+ assert.match(s,/width:var\(--nv-f-settings-width,79\.2vw\)!important/);
+ assert.match(s,/top:var\(--nv-f-settings-top,44vh\)!important/);
  assert.match(s,/grid-template-columns:minmax\(0,4fr\)/);
 });

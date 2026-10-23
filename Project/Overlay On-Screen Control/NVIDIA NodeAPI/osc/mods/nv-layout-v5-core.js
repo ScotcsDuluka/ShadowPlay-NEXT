@@ -14,7 +14,7 @@
   var PANEL_NAMES = ['left', 'center', 'right'];
   var CONTROLS = ['Screenshot', 'Mods', 'ManualRecord', 'Stream', 'InstantReplay',
     'Ansel', 'Broadcast', 'Performance', 'Mic', 'Camera', 'Gallery', 'Settings'];
-  var KNOWN = {};
+  var KNOWN = Object.create(null);
   CONTROLS.forEach(function (key) { KNOWN[key] = true; });
   var PRESETS = {
     small: { triple: [1, 1, 1], wideLeft: [2, 1], wideRight: [1, 2], single: [3] },
@@ -71,6 +71,29 @@
     // Empty GROUP means no Blocks, not merely unassigned Controls in its Slots.
     return g.blocks.length > 0;
   }
+  function assignedOrder(s) {
+    var order = [];
+    PANEL_NAMES.forEach(function (p) {
+      s.panels[p].forEach(function (g) {
+        g.blocks.forEach(function (b) {
+          b.slots.forEach(function (key) { if (key) order.push(key); });
+        });
+      });
+    });
+    return order;
+  }
+  function controlOrder(s) {
+    // Keep a complete order, including palette Controls, so a second reduction
+    // can return an earlier Slot before Controls displaced by the first one.
+    // Older saved layouts have no metadata; derive their actual native order.
+    var assigned = assignedOrder(s), at = 0;
+    var previous = s.controlOrder || assigned.concat(CONTROLS.filter(function (key) {
+      return assigned.indexOf(key) < 0;
+    }));
+    return previous.map(function (key) {
+      return findControl(s, key) ? assigned[at++] : key;
+    });
+  }
   function validate(s) {
     ensure(s && s.version === 5 && typeof s.autoFill === 'boolean' &&
       s.panels && typeof s.panels === 'object', 'Expected Layout V5 state');
@@ -104,6 +127,15 @@
     });
     ensure(groups <= MAX_GROUPS, 'Only six Groups may exist across all Panels');
     ensure(keys.Settings === true, 'Settings cannot be removed');
+    if (s.controlOrder !== undefined) {
+      ensure(Array.isArray(s.controlOrder) && s.controlOrder.length === CONTROLS.length,
+        'Invalid Control order');
+      var ordered = Object.create(null);
+      s.controlOrder.forEach(function (key) {
+        ensure(KNOWN[key] && !ordered[key], 'Invalid Control order');
+        ordered[key] = true;
+      });
+    }
     return true;
   }
   function locate(s, id) {
@@ -132,12 +164,14 @@
   }
   function available(s) {
     validate(s);
-    return CONTROLS.filter(function (key) { return !findControl(s, key); });
+    return (s.controlOrder || CONTROLS).filter(function (key) { return !findControl(s, key); });
   }
   function change(s, fn) {
     validate(s);
     var next = copy(s);
+    var order = controlOrder(s);
     fn(next);
+    next.controlOrder = order;
     validate(next);
     return next;
   }
@@ -233,8 +267,8 @@
       var slots = targetSlot(n, groupId, bi, si);
       var from = findControl(n, key), replaced = slots[si];
       if (replaced === key) return;
-      if (replaced && !from)
-        throw Error('Move a Control into an empty Slot before swapping');
+      if (replaced === 'Settings' && !from)
+        throw Error('Move Settings to another Slot before replacing it');
       if (from) targetSlot(n, from.groupId, from.block, from.slot)[from.slot] =
         replaced || null;
       slots[si] = key;

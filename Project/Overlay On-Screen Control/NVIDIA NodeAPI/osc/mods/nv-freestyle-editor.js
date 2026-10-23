@@ -10,7 +10,7 @@
   var host = null, overlay = null, tools = null, picker = null;
   var editing = false, originallyEnabled = false, chosen = null;
   var dragging = null, message = '', pending = null, pendingTimer = null;
-  var lastWidth = 0, lastTop = 0;
+  var lastWidth = 0, lastTop = 0, suppressClick = false, suppressTimer = null;
   var LABELS = {
     Screenshot:'Screenshot',Ansel:'Photo mode',Mods:'Game filter',
     InstantReplay:'Instant Replay',ManualRecord:'Record',Stream:'Stream',
@@ -139,7 +139,7 @@
     lastWidth=r.width;lastTop=y;
     if(!overlay){overlay=node('div','nv-f-overlay');document.body.appendChild(overlay)}
     overlay.textContent='';
-    var st=A.get();
+    var st=A.renderState?A.renderState():A.get();
     var fragment=document.createDocumentFragment();
     // Drag destinations for panels with zero Groups are always present.
     M.PANEL_NAMES.forEach(function(panel, i){
@@ -189,6 +189,21 @@
       fragment.appendChild(sl);
     });
     overlay.appendChild(fragment);
+    // The palette retains its Angular-owned buttons; only order/assignment
+    // follows the draft instead of V2's unrelated persisted layout.
+    var palette=host.querySelector('.nv-live-palette'),available=M.available(st);
+    if(palette) {
+      Array.prototype.slice.call(palette.querySelectorAll('[data-menu-key]'))
+        .sort(function(a,b){
+          var ai=available.indexOf(a.getAttribute('data-menu-key')),
+            bi=available.indexOf(b.getAttribute('data-menu-key'));
+          return (ai<0?100:ai)-(bi<0?100:bi);
+        }).forEach(function(item){
+          var key=item.getAttribute('data-menu-key');
+          item.classList.toggle('assigned',!!M.findControl(st,key));
+          item.classList.toggle('selected',key===chosen);palette.appendChild(item);
+        });
+    }
     if(tools) {
       var input=tools.querySelector('.nv-f-auto-input');
       if(input)input.checked=st.autoFill;
@@ -197,6 +212,10 @@
       var selection=tools.querySelector('.nv-f-selection');
       if(selection)selection.textContent=chosen?'Selected: '+LABELS[chosen]:'Select or drag a Control';
     }
+    // Native faces use Angular ng-class for Big/Side/Small. Draft mouse edits
+    // run outside Angular, so render their real icon/title layout this turn.
+    var angularScope=window.angular&&window.angular.element(host).scope();
+    if(angularScope&&!angularScope.$$destroyed)angularScope.$evalAsync(function(){});
   }
   function start() {
     if(editing)return;
@@ -204,13 +223,19 @@
     if(!el)return;
     host=el;
     originallyEnabled=A.enabled();
-    if(!originallyEnabled)A.enable(true);
+    // Live edit is an in-memory owner lease, not a permanent feature flag.
+    // Only Done commits a new owner; Cancel reverts the exact native styles.
+    if(!originallyEnabled)A.editOwnership(true);
     try {A.beginEdit();editing=true}
-    catch(error){alertText(error.message);return}
+    catch(error){
+      if(!originallyEnabled)A.editOwnership(false);
+      host=null;alertText(error.message);return;
+    }
     host.classList.add('nv-freestyle-v5-edit');
     createTools();redraw();
   }
   function cleanup() {
+    if(dragging&&dragging.ghost)dragging.ghost.remove();
     dragging=null;removePopup();
     if(pendingTimer){window.clearTimeout(pendingTimer);pendingTimer=null}
     pending=null;
@@ -223,27 +248,46 @@
     }
     editing=false;host=null;chosen=null;
   }
+  function closeShell() {
+    // Close the Angular shell directly. A synthetic Done click can be blocked
+    // by OSC Motion while closing, leaving a detached V5 lease reopened by scan.
+    var scope=host&&window.angular&&window.angular.element(host).scope();
+    if(scope&&scope.flexMenu&&scope.flexMenu.done)scope.flexMenu.done();
+  }
   function finish() {
     if(!editing)return;
-    try {A.done();cleanup()}
-    catch(error){alertText(error.message);throw error}
+    try {
+      A.done();
+      // Done makes V5 the sole persistent layout owner. No reload required:
+      // the current Edit Mode already uses this same native adapter.
+      if(!originallyEnabled)A.enable(true);
+      A.editOwnership(false);
+      closeShell();
+      cleanup();
+    }catch(error){alertText(error.message);throw error}
   }
   function cancel(triggerV2) {
     if(!editing)return;
     A.cancel();
-    var old=!originallyEnabled;
-    var header=host&&host.querySelector(':scope > header .osc-button-green');
+    if(triggerV2)closeShell();
     cleanup();
-    if(old)A.enable(false);
-    if(triggerV2&&header)header.click();
-    if(old)window.setTimeout(function(){window.location.reload()},80);
+    A.editOwnership(false); // Restores original native md-menu styles on Cancel.
   }
   function markPending(next) {
     if(pendingTimer){window.clearTimeout(pendingTimer);pendingTimer=null}
+    if(pending&&pending.ready){A.preview(null);if(editing)redraw()}
     pending=next;
     if(!next)return;
     pendingTimer=window.setTimeout(function(){
       if(!dragging||!pending)return;
+      var dest=M.locate(A.get(),pending.groupId);
+      if(!dest)return;
+      try {
+        var index=dest.index+(pending.edge==='after'?1:0);
+        pending.proposal=dragging.kind==='newGroup'?M.addGroup(A.get(),dest.panel,index):
+          M.insertionPreview(A.get(),dragging.id,dest.panel,index).layout;
+        pending.ready=true;A.preview(pending.proposal);redraw();
+      }catch(error){alertText(error.message);return}
       if(overlay) {
         var mark=overlay.querySelector('[data-f-group="'+pending.groupId+'"]');
         if(mark)mark.classList.add('nv-f-insert-preview');
@@ -255,6 +299,13 @@
     if(!el)return null;
     var groupPriority=(kind==='group'||kind==='newGroup');
     var group=el.closest&&el.closest('[data-f-group]');
+    // Slots and blank Group space share the same model hit test. Guide borders
+    // are pointer-transparent so native tiles cannot swallow an empty drop.
+    if(!group&&overlay)Array.prototype.some.call(overlay.querySelectorAll('[data-f-group]'),function(candidate){
+      var r=candidate.getBoundingClientRect();
+      if(ev.clientX>=r.left&&ev.clientX<=r.right&&ev.clientY>=r.top&&ev.clientY<=r.bottom){group=candidate;return true}
+      return false;
+    });
     if(groupPriority&&!group&&overlay){
       var hitSlot=el.closest&&el.closest('[data-f-slot]');
       if(hitSlot)group=overlay.querySelector('[data-f-group="'+hitSlot.getAttribute('data-f-group-id')+'"]');
@@ -312,7 +363,7 @@
     dragging.ghost.style.top=(ev.clientY+14)+'px';
     var t=hoverFromEvent(ev,dragging.kind);
     dragging.target=t;
-    if(dragging.kind==='group'&&t&&t.kind==='group'&&t.edge!=='swap') {
+    if((dragging.kind==='group'||dragging.kind==='newGroup')&&t&&t.kind==='group'&&t.edge!=='swap') {
       if(!pending || pending.groupId!==t.id || pending.edge!==t.edge)
         markPending({groupId:t.id,edge:t.edge,at:Date.now()});
     }else if(pending)markPending(null);
@@ -323,6 +374,9 @@
     var drag=dragging;dragging=null;
     if(drag.ghost)drag.ghost.remove();
     if(!drag.active)return;
+    suppressClick=true;
+    if(suppressTimer)window.clearTimeout(suppressTimer);
+    suppressTimer=window.setTimeout(function(){suppressClick=false;suppressTimer=null},0);
     var t=drag.target||hoverFromEvent(ev,drag.kind);
     if(!t){markPending(null);stop(ev);return}
     if(drag.kind==='control') {
@@ -338,15 +392,16 @@
       else if(t.kind==='group'&&t.id!==drag.id){
         var dest=M.locate(A.get(),t.id);
         var accepted=pending && pending.groupId===t.id &&
-          pending.edge===t.edge && t.edge!=='swap' &&
-          Date.now()-pending.at>=360;
-        if(accepted)apply(function(s){return M.moveGroup(s,drag.id,dest.panel,
-          dest.index+(t.edge==='after'?1:0))});
+          pending.edge===t.edge && t.edge!=='swap' && pending.ready;
+        if(accepted){var proposal=pending.proposal;A.preview(null);apply(function(){return proposal})}
         else apply(function(s){return M.swapGroups(s,drag.id,t.id)});
       }
     }else if(drag.kind==='newGroup'){
       if(t.kind==='panel')apply(function(s){return M.addGroup(s,t.panel)});
-      else if(t.kind==='group'){var loc=M.locate(A.get(),t.id);apply(function(s){return M.addGroup(s,loc.panel,loc.index+1)})}
+      else if(t.kind==='group'){
+        if(pending&&pending.ready){var added=pending.proposal;A.preview(null);apply(function(){return added})}
+        else{var loc=M.locate(A.get(),t.id);apply(function(s){return M.addGroup(s,loc.panel,loc.index+(t.edge==='before'?0:1))})}
+      }
     }
     markPending(null);stop(ev);
   }
@@ -354,6 +409,9 @@
     if(!editing)return;
     var slot=target(ev,'[data-f-slot]'),
       group=target(ev,'[data-f-group]');
+    if(!slot&&!group){var hit=hoverFromEvent(ev,'control');
+      if(hit&&hit.kind==='group'&&overlay)group=overlay.querySelector('[data-f-group="'+hit.id+'"]');
+    }
     if(slot) {
       stop(ev);choosePreset(ev.clientX,ev.clientY,slot.getAttribute('data-f-group-id'),
         +slot.getAttribute('data-f-block-index'),null);
@@ -362,15 +420,16 @@
     }
   }
   function click(ev) {
-    if(!editing)return;
     var native=target(ev,'nv-main-menu md-menu > button.menu-button');
-    if(native){stop(ev);return}
+    if(native&&(editing||document.documentElement.classList.contains('nv-live-layout-editing'))){stop(ev);return}
+    if(!editing)return;
+    if(suppressClick){suppressClick=false;stop(ev);return}
     var popup=target(ev,'.nv-f-context');
     if(picker&&!popup)removePopup();
     var restore=target(ev,'.nv-live-editor > header .osc-button-gray');
     if(restore){stop(ev);apply(function(){return M.defaultLayout()});return}
     var doneButton=target(ev,'.nv-live-editor > header .osc-button-green');
-    if(doneButton){try{finish()}catch(e){stop(ev)}return}
+    if(doneButton){stop(ev);try{finish()}catch(e){}return}
     var slot=target(ev,'[data-f-slot]');
     if(slot){
       stop(ev);
@@ -383,7 +442,10 @@
     if(ctl){stop(ev);setSelected(ctl.getAttribute('data-menu-key'));return}
   }
   function keyboard(ev) {
-    if(!editing)return;
+    if(!editing){
+      if(document.documentElement.classList.contains('nv-live-layout-editing')&&target(ev,'nv-main-menu md-menu')&&(ev.key==='Enter'||ev.key===' '))stop(ev);
+      return;
+    }
     if(ev.key==='Escape'){
       if(picker){removePopup();stop(ev);return}
       cancel(true);stop(ev);
@@ -396,10 +458,14 @@
   }
   function scan() {
     var editor=document.querySelector('.nv-live-editor.nv-freestyle-settings');
+    var motion=window.__dulukaOscMotion,state=motion&&motion.getState&&motion.getState();
+    if(state&&state.target==='closed'){
+      if(editing)cancel(true);
+      return;
+    }
     if(editor && !editing)start();
     else if(editing&&(!editor||editor!==host)){
-      A.cancel();var disabled=!originallyEnabled;cleanup();
-      if(disabled){A.enable(false);window.location.reload()}
+      A.cancel();cleanup();A.editOwnership(false);
     }else if(editing){
       // Do not paint Edit outlines over the CEF entrance animation; then
       // track the exact scaled native bar rect without a second layout owner.
@@ -421,7 +487,8 @@
     scan:scan,begin:start,render:redraw,done:finish,cancel:cancel,
     isEditing:function(){return editing},
     select:setSelected,apply:apply,
-    model:M
+    model:M,
+    dragState:function(){return {kind:dragging&&dragging.kind,target:dragging&&dragging.target,pending:pending}}
   };
   window.setInterval(scan,250);
   if(document.readyState!=='loading')scan();

@@ -1,5 +1,5 @@
 /* Freestyle V5 native edit ornaments. Never visible in Normal Mode. */
-.nv-f-overlay {position:fixed;inset:0;z-index:85;pointer-events:none;user-select:none}
+.nv-f-overlay {position:fixed;left:0;top:0;right:0;bottom:0;z-index:85;pointer-events:none;user-select:none}
 .nv-f-group {
  position:fixed;box-sizing:border-box;pointer-events:none;
  border:1px dashed rgba(118,185,0,.67);
@@ -31,7 +31,7 @@
  font-size:10px;cursor:pointer;pointer-events:auto;
 }
 .nv-f-group .nv-f-empty-target {
- position:absolute;inset:16px 8px;pointer-events:auto;
+ position:absolute;top:16px;bottom:16px;left:8px;right:8px;pointer-events:auto;
  background:transparent;color:#bac6c8;font-size:14px;
  border:1px dashed #7a8788;cursor:copy;
 }
@@ -48,6 +48,10 @@
  min-width:220px;max-height:380px;overflow-y:auto;box-sizing:border-box;
  border:1px solid #687476;background:#252b2e;color:#fff;
  box-shadow:0 10px 32px rgba(0,0,0,.7)}
+.nv-f-context .nv-f-context-content {
+ display:block;background:#252b2e!important;color:#fff!important;
+ padding:0;max-height:none;
+}
 .nv-f-context .nv-f-menu-head {
  padding:10px 14px;border-bottom:1px solid #515b5d;
  color:#76b900;font-size:13px;font-weight:600;

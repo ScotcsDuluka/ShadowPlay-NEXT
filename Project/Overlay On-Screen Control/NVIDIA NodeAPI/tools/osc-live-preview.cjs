@@ -17,13 +17,14 @@ const EXCLUDED = new Set(['config.js', 'user-config.js', 'mods/launcher-language
 function assert(ok, msg) { if (!ok) throw new Error(msg); }
 function hash(file) {
   if (!fs.existsSync(file)) return null;
-  const b = fs.readFileSync(file);
-  return crypto.createHash('sha256').update(b).digest('hex').toUpperCase();
+  return hashBytes(fs.readFileSync(file));
 }
+function hashBytes(bytes) { return crypto.createHash('sha256').update(bytes).digest('hex').toUpperCase(); }
 function safeRelative(file) {
   assert(typeof file === 'string' && file.length > 0, 'Empty relative path');
   assert(!path.isAbsolute(file) && !/^[a-z]:/i.test(file) &&
-    !file.includes('\\') && !file.split('/').some(x => !x || x === '.' || x === '..' || x.includes(':')),
+    !file.includes('\\') && !/[\x00-\x1f\x7f]/.test(file) &&
+    !file.split('/').some(x => !x || x === '.' || x === '..' || x.includes(':')),
     'Unsafe file path: ' + file);
   return file;
 }
@@ -42,10 +43,23 @@ function assertNoSymlinks(root, rel) {
     if (fs.existsSync(next)) assert(!fs.lstatSync(next).isSymbolicLink(), 'Refusing symlink: ' + next);
   }
 }
-function git(args) {
-  return cp.execFileSync('git', ['-C', REPO].concat(args), {
+function git(args, repo = REPO) {
+  return cp.execFileSync('git', ['-C', repo].concat(args), {
     encoding: 'utf8', maxBuffer: 8 * 1024 * 1024, windowsHide: true
   }).trim();
+}
+function allowedFrontend(file) {
+  safeRelative(file);
+  assert(FILE_PATTERN.test(file) && !EXCLUDED.has(file.toLowerCase()) &&
+    !/(?:^|\/)[^/]*\.bak(?:[-.]|$)/i.test(file) &&
+    !/(?:^|\/)[^/]*\.tmp$/i.test(file), 'Not an allowed OSC frontend file: ' + file);
+  return file;
+}
+function selectedFiles(files) {
+  assert(Array.isArray(files) && files.length > 0, 'Select at least one OSC frontend file');
+  files.forEach(allowedFrontend);
+  assert(new Set(files).size === files.length, 'Duplicate selected file');
+  return files.slice().sort();
 }
 function sources() {
   const raw = cp.execFileSync('git',
@@ -68,7 +82,7 @@ function sources() {
 function plan(options = {}) {
   const src = options.source || SOURCE, dest = options.runtime || RUNTIME;
   assert(fs.existsSync(src) && fs.existsSync(dest), 'Missing Source or Runtime OSC folder');
-  const files = options.files || sources();
+  const files = options.files === undefined ? sources() : selectedFiles(options.files);
   const changed = [], same = [];
   for (const file of files) {
     assertNoSymlinks(src, file);
@@ -79,7 +93,8 @@ function plan(options = {}) {
     const item = { file, sourceHash, beforeHash, existed: beforeHash !== null };
     (sourceHash === beforeHash ? same : changed).push(item);
   }
-  return { source: src, runtime: dest, changed, unchanged: same.length, tracked: files.length };
+  return { source: src, runtime: dest, changed, unchanged: same.length, tracked: files.length,
+    sourceHashes: Object.fromEntries(changed.concat(same).map(item => [item.file, item.sourceHash])) };
 }
 function atomicJson(file, data) {
   const temp = file + '.writing-' + process.pid;
@@ -109,11 +124,36 @@ function lockRun(base, fn) {
     fs.unlinkSync(lock);
   }
 }
-function projectPreflight() {
-  assert(git(['branch', '--show-current']) === 'Stable', 'Refusing non-Stable branch');
-  const dirty = git(['status', '--porcelain', '--', ROOT_PREFIX.slice(0, -1)]);
+function projectPreflight(files, options = {}) {
+  const repo = options.repo || REPO, src = options.source || SOURCE;
+  assert(path.resolve(src) === path.resolve(repo, ...ROOT_PREFIX.split('/')),
+    'Source must be the repository Project OSC folder');
+  assert(git(['branch', '--show-current'], repo) === 'Stable', 'Refusing non-Stable branch');
+  const selected = files === undefined ? undefined : selectedFiles(files);
+  const paths = selected ? selected.map(file => ':(literal)' + ROOT_PREFIX + file) : [ROOT_PREFIX.slice(0, -1)];
+  const dirty = git(['status', '--porcelain', '--untracked-files=all', '--'].concat(paths), repo);
   assert(!dirty, 'OSC sources changed but not committed:\n' + dirty);
-  return git(['rev-parse', 'HEAD']);
+  const commit = git(['rev-parse', 'HEAD'], repo);
+  if (selected) verifyCommittedSources(selected, commit, options);
+  return commit;
+}
+function verifyCommittedSources(files, commit, options = {}, planned) {
+  const repo = options.repo || REPO, src = options.source || SOURCE;
+  for (const file of selectedFiles(files)) {
+    assertNoSymlinks(src, file);
+    const absolute = subpath(src, file), tracked = ROOT_PREFIX + file;
+    assert(fs.existsSync(absolute) && fs.statSync(absolute).isFile(), 'Missing source: ' + file);
+    const before = hash(absolute);
+    if (planned) assert(before === planned.get(file), 'Source edited since planning: ' + file);
+    let committed;
+    try { committed = git(['rev-parse', '--verify', commit + ':' + tracked], repo); }
+    catch (_) { throw new Error('Selected file is not committed: ' + file); }
+    // --path applies the same Git clean filters/EOL normalization as git add.
+    // Raw deployment hashes remain byte-for-byte hashes of the working file.
+    const actual = git(['hash-object', '--path=' + tracked, '--', absolute], repo);
+    assert(actual === committed, 'Source does not match committed HEAD: ' + file);
+    assert(hash(absolute) === before, 'Source edited during verification: ' + file);
+  }
 }
 function sessionId() {
   const d = new Date().toISOString().replace(/[-:]/g, '').replace(/\..*$/, '').replace('T', '-');
@@ -122,9 +162,17 @@ function sessionId() {
 function deploy(options = {}) {
   const src = options.source || SOURCE, dest = options.runtime || RUNTIME;
   const base = options.base || SESSION_BASE;
-  const commit = options.skipGit ? 'TEST-FIXTURE' : projectPreflight();
+  if (options.skipGit) assert(path.resolve(src) !== path.resolve(SOURCE) && path.resolve(dest) !== path.resolve(RUNTIME),
+    'skipGit is permitted only for isolated test fixtures');
   return lockRun(base, () => {
+    const commit = options.skipGit ? 'TEST-FIXTURE' : projectPreflight(options.files, options);
     const p = plan({ source: src, runtime: dest, files: options.files });
+    if (!options.skipGit) {
+      // Also check unchanged selected files: an edit must not be hidden merely
+      // because its uncommitted bytes already happen to exist in Runtime.
+      const files = options.files === undefined ? sources() : selectedFiles(options.files);
+      verifyCommittedSources(files, commit, options, new Map(Object.entries(p.sourceHashes)));
+    }
     if (p.changed.length === 0) return { result: 'NO_CHANGES', commit, plan: p };
     const id = sessionId();
     const folder = path.join(base, 'sessions', id);
@@ -132,6 +180,7 @@ function deploy(options = {}) {
     fs.mkdirSync(path.join(folder, 'files'), { recursive: true });
     const manifest = {
       schema: 1, kind: 'osc-frontend-only', session: id,
+      selection: options.files === undefined ? 'all-tracked-frontend' : selectedFiles(options.files),
       createdAt: new Date().toISOString(), branch: 'Stable',
       commit, source: path.resolve(src), runtime: path.resolve(dest),
       status: 'preparing', files: p.changed.map(x => Object.assign({}, x, { phase: 'pending' }))
@@ -155,11 +204,12 @@ function deploy(options = {}) {
       for (const x of manifest.files) {
         assertNoSymlinks(src, x.file); assertNoSymlinks(dest, x.file);
         const from = subpath(src, x.file), to = subpath(dest, x.file);
-        assert(hash(from) === x.sourceHash, 'Source edited during deploy: ' + x.file);
+        const bytes = fs.readFileSync(from);
+        assert(hashBytes(bytes) === x.sourceHash, 'Source edited during deploy: ' + x.file);
         assert(hash(to) === x.beforeHash, 'Runtime edited during deploy: ' + x.file);
         x.phase = 'copying'; save();
         fs.mkdirSync(path.dirname(to), { recursive: true });
-        fs.copyFileSync(from, to);
+        fs.writeFileSync(to, bytes);
         assert(hash(to) === x.sourceHash, 'Deploy verification failed: ' + x.file);
         x.phase = 'applied'; save();
       }
@@ -227,19 +277,26 @@ function rollback(id, options = {}) {
   });
 }
 function runCLI(argv = process.argv.slice(2)) {
-  const usage = 'Usage: node osc-live-preview.cjs --plan | --apply | --status | --rollback SESSION_ID';
+  const usage = 'Usage: node osc-live-preview.cjs --plan|--apply [--files OSC_RELATIVE_FILE ... | --files-json FILE.json] | --status | --rollback SESSION_ID';
   assert(argv.length > 0, usage);
   const cmd = argv[0];
+  function selection() {
+    if (argv.length === 1) return undefined;
+    if (argv[1] === '--files') return selectedFiles(argv.slice(2));
+    if (argv[1] === '--files-json' && argv.length === 3)
+      return selectedFiles(JSON.parse(fs.readFileSync(argv[2], 'utf8')));
+    throw new Error(usage);
+  }
   if (cmd === '--plan') {
-    assert(argv.length === 1, usage);
-    const commit = projectPreflight(), p = plan();
+    const files = selection(), commit = projectPreflight(files), p = plan({ files });
+    if (files) verifyCommittedSources(files, commit, {}, new Map(Object.entries(p.sourceHashes)));
     console.log(JSON.stringify({ mode: 'PLAN', branch: 'Stable', commit, total: p.tracked,
+      selection: files || 'all-tracked-frontend',
       unchanged: p.unchanged, changed: p.changed.map(x => ({ file: x.file, existed: x.existed,
         beforeSHA256: x.beforeHash, sourceSHA256: x.sourceHash })),
       note: 'No changes made. Use --apply to backup and mirror these files.' }, null, 2));
   } else if (cmd === '--apply') {
-    assert(argv.length === 1, usage);
-    console.log(JSON.stringify(deploy(), null, 2));
+    console.log(JSON.stringify(deploy({ files: selection() }), null, 2));
   } else if (cmd === '--status') {
     assert(argv.length === 1, usage);
     console.log(JSON.stringify({ branch: git(['branch', '--show-current']),
@@ -253,5 +310,6 @@ function runCLI(argv = process.argv.slice(2)) {
 if (require.main === module) {
   try { runCLI(); } catch (error) { console.error('OSC_PREVIEW_ERROR: ' + error.message); process.exitCode = 1; }
 }
-module.exports = { hash, safeRelative, plan, deploy, rollback, listSessions, runCLI,
+module.exports = { hash, safeRelative, selectedFiles, projectPreflight, verifyCommittedSources,
+  plan, deploy, rollback, listSessions, runCLI,
   defaults: { REPO, SOURCE, RUNTIME, SESSION_BASE, ROOT_PREFIX } };

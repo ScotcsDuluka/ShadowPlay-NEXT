@@ -122,10 +122,10 @@ test('NEXT V5 edit state stays ephemeral until Done, supports Cancel and Undo',(
  api.beginEdit();api.edit(s=>M.autoFill(s,false));api.done();
  assert.equal(JSON.parse(t.storage.get(api.storageKey)).autoFill,false);
 });
-test('owner switch requests reload and does not erase V4/V5 experimental keys',()=>{
+test('owner switch takes effect without reload and preserves V4/V5 experimental keys',()=>{
  const t=makeRuntime(false),api=t.window.__nvNextLayoutV5;
  const r=api.enable(true);
- assert.equal(r.reloadRequired,true);
+ assert.equal(r.reloadRequired,false);
  assert.equal(t.storage.get(api.flagKey),'1');
  assert.equal(t.storage.get('DulukaMainMenuUnifiedV4Enabled'),'1');
  assert.equal(t.storage.get('DulukaMainMenuGroupLayoutAEnabled'),'1');
@@ -139,4 +139,40 @@ test('Motion preflight is supported; ordinary sync avoids closing and opening ph
  assert.ok(api.prepareForMotion(t.root));
  t.window.__dulukaOscMotion={phase:'idle',getState(){return {target:'closed'}}};
  assert.equal(api.sync(),null);
+});
+
+test('temporary V5 edit ownership never persists the enable flag before Done',()=>{
+ const t=makeRuntime(false), api=t.window.__nvNextLayoutV5;
+ assert.equal(t.storage.has(api.flagKey),false);
+ api.editOwnership(true);
+ assert.equal(api.enabled(),true);
+ assert.equal(t.storage.has(api.flagKey),false);
+ assert.ok(api.sync(true));
+ assert.equal(t.bar.style.getPropertyValue('position'),'relative');
+ api.beginEdit();api.edit(s=>M.autoFill(s,false));api.cancel();
+ api.editOwnership(false);
+ assert.equal(api.enabled(),false);
+ assert.equal(t.storage.has(api.flagKey),false);
+ assert.equal(t.storage.has(api.storageKey),false);
+ assert.equal(t.bar.style.getPropertyValue('transform'),'');
+ assert.equal(t.bar.style.getPropertyValue('width'),'');
+ assert.equal(t.document.documentElement.classList.contains('nv-next-v5-on'),false);
+ for(const tile of Object.values(t.tiles)){
+  assert.equal(tile.style.getPropertyValue('left'),'');
+  assert.equal(tile.style.getPropertyValue('display'),'');
+  assert.equal(tile.classList.contains('nv-next-v5-tile'),false);
+ }
+});
+test('committing V5 edit keeps its native owner without modifying legacy saved keys',()=>{
+ const t=makeRuntime(false),api=t.window.__nvNextLayoutV5;
+ api.editOwnership(true);
+ api.beginEdit();api.edit(s=>M.swapGroups(s,'g1','g6'));api.done();
+ api.enable(true);api.editOwnership(false);
+ assert.equal(api.enabled(),true);
+ assert.equal(t.storage.get(api.flagKey),'1');
+ assert.equal(t.storage.get('DulukaMainMenuUnifiedV4Enabled'),'1');
+ assert.equal(t.storage.get('DulukaMainMenuGroupLayoutAEnabled'),'1');
+ assert.equal(t.bar.style.getPropertyValue('width'),'');
+ api.sync(true);
+ assert.equal(t.bar.style.getPropertyValue('position'),'relative');
 });

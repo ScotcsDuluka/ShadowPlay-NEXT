@@ -1,54 +1,103 @@
-/* Freestyle Settings: reorganize existing NVIDIA V2 editor, not a replacement UI.
-   Background Settings 80% left / Controls 20% right. */
+/* Original NVIDIA floating Settings. Angular owns the existing controls;
+   the organizer only moves their nodes into Background 80% / Controls 20%. */
 html.nv-live-layout-editing body .nv-live-editor.nv-freestyle-settings {
- box-sizing:border-box!important;
- overflow-y:auto!important;
- padding:18px 24px!important;
+ position:fixed!important;box-sizing:border-box!important;
+ display:flex!important;flex-direction:column;
+ left:var(--nv-f-settings-left,10.4vw)!important;right:auto!important;
+ top:var(--nv-f-settings-top,44vh)!important;bottom:auto!important;
+ width:var(--nv-f-settings-width,79.2vw)!important;
+ height:var(--nv-f-settings-height,42vh)!important;
+ min-width:0!important;min-height:0!important;max-height:none!important;
+ margin:0!important;padding:18px 22px!important;overflow:hidden!important;
+ z-index:70!important;background:rgba(36,41,44,.97)!important;
+ border-top:4px solid #76b900!important;
+ box-shadow:0 16px 44px rgba(0,0,0,.42)!important;
 }
-.nv-live-editor.nv-freestyle-settings > header {margin-bottom:14px;}
+.nv-live-editor.nv-freestyle-settings > header {
+ flex:0 0 auto;min-height:0;
+ margin:0 0 14px!important;align-items:flex-start;
+}
+.nv-live-editor.nv-freestyle-settings > header h2 {
+ font-size:18px!important;line-height:24px!important;
+}
 .nv-live-editor.nv-freestyle-settings .nv-freestyle-grid {
- display:grid;grid-template-columns:minmax(0,4fr) minmax(240px,1fr);
- gap:18px;align-items:start;width:100%;min-width:0;
+ display:grid;grid-template-columns:minmax(0,4fr) minmax(0,1fr);
+ grid-template-rows:minmax(0,1fr);flex:1 1 0;
+ gap:14px;align-items:stretch;width:100%;min-width:0;min-height:0;
+ overflow:hidden;
+}
+.nv-live-editor.nv-freestyle-settings .nv-freestyle-background,
+.nv-live-editor.nv-freestyle-settings .nv-freestyle-controls {
+ min-width:0;min-height:0;height:100%;box-sizing:border-box;
 }
 .nv-live-editor.nv-freestyle-settings .nv-freestyle-background {
- min-width:0;box-sizing:border-box;
+ display:flex;flex-direction:column;overflow-x:hidden;overflow-y:auto;
 }
 .nv-live-editor.nv-freestyle-settings .nv-freestyle-controls {
- min-width:0;box-sizing:border-box;
- position:sticky;top:4px;
+ display:flex;flex-direction:column;overflow:hidden;
 }
 .nv-live-editor.nv-freestyle-settings .nv-freestyle-background > nv-osc-background-settings {
- display:block!important;margin:0!important;padding:0 0 16px!important;
+ display:block!important;flex:0 0 auto;margin:0!important;padding:0 0 16px!important;
  border-top:0!important;
 }
+.nv-live-editor.nv-freestyle-settings .nv-freestyle-background .nv-osc-background-settings {
+ margin-top:0!important;
+}
 .nv-live-editor.nv-freestyle-settings .nv-osc-bg-settings-grid {
- margin:0 -8px!important;
+ display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+ grid-row-gap:12px;margin:0 -8px!important;
 }
 .nv-live-editor.nv-freestyle-settings .nv-osc-bg-field {
- flex-basis:200px!important;min-width:180px!important;padding:0 8px!important;
+ flex-basis:200px!important;min-width:0!important;padding:0 8px!important;
 }
 .nv-live-editor.nv-freestyle-settings .nv-freestyle-background > footer {
- display:flex!important;margin:12px 0 4px!important;min-height:44px!important;
+ display:flex!important;flex:0 0 auto;flex-wrap:wrap;
+ margin:auto 0 0!important;padding-top:12px;min-height:44px!important;
 }
 .nv-live-editor.nv-freestyle-settings .nv-freestyle-background > footer md-select {
- min-width:180px;width:clamp(180px,35%,440px)!important;
+ min-width:160px!important;width:35%!important;max-width:100%;
+}
+.nv-live-editor.nv-freestyle-settings .nv-freestyle-background > footer label {
+ margin-right:12px;
 }
 .nv-live-editor.nv-freestyle-settings .nv-freestyle-controls .nv-live-library {
  min-width:0!important;width:100%!important;padding:14px!important;
- box-sizing:border-box;border:1px solid #42474a;
- background:#1b2022;
+ display:flex;flex-direction:column;flex:1 1 0;min-height:0;height:100%;
+ box-sizing:border-box;border:1px solid #42474a;background:#1b2022;
+ overflow:hidden;overflow-wrap:break-word;
+}
+.nv-live-editor.nv-freestyle-settings .nv-freestyle-controls .nv-live-library > .nv-f-tools,
+.nv-live-editor.nv-freestyle-settings .nv-freestyle-controls .nv-live-library > h3,
+.nv-live-editor.nv-freestyle-settings .nv-freestyle-controls .nv-live-library > input,
+.nv-live-editor.nv-freestyle-settings .nv-freestyle-controls .nv-live-library > p {
+ flex:0 0 auto;
 }
 .nv-live-editor.nv-freestyle-settings .nv-freestyle-controls .nv-live-library h3 {
- margin:0 0 10px!important;font-size:15px!important;
+ margin:0 0 10px!important;font-size:15px!important;flex-wrap:wrap;
 }
 .nv-live-editor.nv-freestyle-settings .nv-freestyle-controls .nv-live-palette {
  display:flex!important;flex-direction:column;flex-wrap:nowrap!important;
- overflow-y:auto!important;max-height:min(460px,53vh)!important;margin:0!important;
- align-content:unset!important;padding:0 4px 0 0!important;
+ flex:1 1 0;min-height:0;
+ overflow-y:auto!important;overflow-x:hidden!important;
+ height:auto!important;max-height:none!important;
+ margin:0!important;align-content:unset!important;padding:0 4px 0 0!important;
 }
 .nv-live-editor.nv-freestyle-settings .nv-freestyle-controls .nv-live-palette button {
- width:100%!important;flex:0 0 39px!important;margin:0 0 5px!important;
+ width:100%!important;min-width:0;flex:0 0 39px!important;
+ margin:0 0 5px!important;box-sizing:border-box;
 }
+.nv-live-editor.nv-freestyle-settings .nv-freestyle-controls .nv-live-palette button > span {
+ min-width:0;overflow:hidden;text-overflow:ellipsis;
+}
+.nv-live-editor.nv-freestyle-settings .nv-freestyle-controls .nv-live-search {
+ width:100%!important;min-width:0!important;box-sizing:border-box;
+}
+.nv-live-editor.nv-freestyle-settings .nv-freestyle-controls .nv-live-library > p {
+ margin:8px 0 0!important;font-size:11px;line-height:15px;
+}
+.nv-live-editor.nv-freestyle-settings .nv-freestyle-controls .nv-f-status:empty {display:none;}
+.nv-live-editor.nv-freestyle-settings .nv-freestyle-controls .nv-f-actions {flex-wrap:wrap;}
+.nv-live-editor.nv-freestyle-settings .nv-freestyle-controls .nv-f-actions > * {margin-bottom:5px;}
 .nv-live-editor.nv-freestyle-settings .nv-freestyle-legacy {
  margin-top:16px;border-top:1px solid #4a5356;color:#cad1d3;
 }
@@ -61,73 +110,46 @@ html.nv-live-layout-editing body .nv-live-editor.nv-freestyle-settings {
  padding:8px 0 14px!important;align-items:stretch;
 }
 .nv-live-editor.nv-freestyle-settings .nv-freestyle-legacy .nv-live-panel {
- min-width:180px!important;flex:1 1 210px!important;margin:0!important;
- padding:12px!important;
+ min-width:180px!important;flex:1 1 210px!important;margin:0!important;padding:12px!important;
 }
 .nv-live-editor.nv-freestyle-settings .nv-freestyle-legacy .nv-live-panel h3 {
  font-size:13px!important;margin-bottom:10px!important;
 }
-.nv-live-editor.nv-freestyle-settings .nv-freestyle-controls .nv-live-search {
- width:100%!important;
-}
 @media(max-width:1050px) {
- .nv-live-editor.nv-freestyle-settings .nv-freestyle-grid {
-   grid-template-columns:minmax(0,3fr) minmax(220px,1fr);gap:10px;
- }
+ .nv-live-editor.nv-freestyle-settings > header {flex-wrap:wrap;}
+ .nv-live-editor.nv-freestyle-settings > header > div {flex-basis:100%;margin-bottom:8px;}
+ .nv-live-editor.nv-freestyle-settings > header .osc-button {margin:0 8px 0 0;}
+ .nv-live-editor.nv-freestyle-settings .nv-freestyle-grid {gap:10px;}
  .nv-live-editor.nv-freestyle-settings .nv-freestyle-controls .nv-live-library {padding:9px!important;}
-}
-
-/* Original NVIDIA floating Settings shell; never stretch edge-to-edge. */
-html.nv-live-layout-editing body .nv-live-editor.nv-freestyle-settings {
- position:fixed!important;
- left:10.4vw!important;right:10.4vw!important;
- /* Native .nv-osc content is anchored 160px below the browser viewport. */
- top:calc(44vh - 160px)!important;bottom:auto!important;
- width:79.2vw!important;height:42vh!important;
- min-height:345px!important;
- max-height:calc(100vh - 44vh - 20px)!important;
- padding:18px 22px!important;
- z-index:70!important;
- background:rgba(36,41,44,.97)!important;
- border-top:4px solid #76b900!important;
- box-shadow:0 16px 44px rgba(0,0,0,.42)!important;
-}
-html.nv-live-layout-editing body .nv-live-editor.nv-freestyle-settings > header {
- margin:0 0 14px!important;align-items:flex-start;
-}
-html.nv-live-layout-editing body .nv-live-editor.nv-freestyle-settings > header h2 {
- font-size:18px!important;line-height:24px!important;
-}
-html.nv-live-layout-editing body .nv-live-editor.nv-freestyle-settings .nv-freestyle-grid {
- grid-template-columns:minmax(0,4fr) minmax(200px,1fr)!important;
- gap:14px!important;
-}
-html.nv-live-layout-editing body .nv-live-editor.nv-freestyle-settings .nv-freestyle-controls {
- position:relative;top:auto;
-}
-html.nv-live-layout-editing body .nv-live-editor.nv-freestyle-settings .nv-freestyle-background .nv-osc-background-settings {
- margin-top:0!important;
-}
-html.nv-live-layout-editing body .nv-live-editor.nv-freestyle-settings .nv-freestyle-background > footer {
- margin-top:16px!important;
-}
-html.nv-live-layout-editing body .nv-live-editor.nv-freestyle-settings .nv-live-library .nv-live-palette {
- max-height:220px!important;
 }
 @media(max-width:930px) {
  html.nv-live-layout-editing body .nv-live-editor.nv-freestyle-settings {
-  left:4vw!important;right:4vw!important;width:92vw!important;
+  left:var(--nv-f-settings-left,4vw)!important;
+  width:var(--nv-f-settings-width,92vw)!important;
  }
 }
-@media(max-height:720px){
- html.nv-live-layout-editing body .nv-live-editor.nv-freestyle-settings {
-  top:calc(40vh - 160px)!important;height:53vh!important;max-height:57vh!important;
- }
+@media(max-height:800px) {
+ html.nv-live-layout-editing body .nv-live-editor.nv-freestyle-settings {padding:12px 18px!important;}
+ .nv-live-editor.nv-freestyle-settings > header {margin-bottom:10px!important;}
+ .nv-live-editor.nv-freestyle-settings > header h2 {margin-bottom:0;}
+ .nv-live-editor.nv-freestyle-settings > header p {display:none;}
+ .nv-live-editor.nv-freestyle-settings > header .osc-button {height:38px;}
+ .nv-live-editor.nv-freestyle-settings .nv-freestyle-controls .nv-live-library {padding:8px!important;}
+ .nv-live-editor.nv-freestyle-settings .nv-freestyle-controls .nv-f-tools {margin-bottom:6px;padding-bottom:5px;}
+ .nv-live-editor.nv-freestyle-settings .nv-freestyle-controls .nv-f-actions {margin-bottom:4px;}
+ .nv-live-editor.nv-freestyle-settings .nv-freestyle-controls .nv-f-actions > * {margin-bottom:0;}
+ .nv-live-editor.nv-freestyle-settings .nv-freestyle-controls .nv-f-selection,
+ .nv-live-editor.nv-freestyle-settings .nv-freestyle-controls .nv-live-library > p,
+ .nv-live-editor.nv-freestyle-settings .nv-freestyle-controls .nv-live-library h3 span {display:none;}
+ .nv-live-editor.nv-freestyle-settings .nv-freestyle-controls .nv-live-library h3 {margin-bottom:6px!important;}
+ .nv-live-editor.nv-freestyle-settings .nv-freestyle-controls .nv-live-search {height:32px;margin-bottom:6px;}
+ .nv-live-editor.nv-freestyle-settings .nv-freestyle-controls .nv-live-palette button {height:32px;flex-basis:32px!important;}
 }
-
-@media(max-width:720px){
+@media(max-width:720px) {
  .nv-live-editor.nv-freestyle-settings .nv-freestyle-grid {
-   grid-template-columns:minmax(0,1fr);
+  display:flex;flex-direction:column;overflow-y:auto;
  }
- .nv-live-editor.nv-freestyle-settings .nv-freestyle-controls {position:static;}
+ .nv-live-editor.nv-freestyle-settings .nv-freestyle-background {height:auto;flex:0 0 auto;overflow:visible;}
+ .nv-live-editor.nv-freestyle-settings .nv-freestyle-controls {height:360px;flex:0 0 360px;margin-top:12px;}
+ .nv-live-editor.nv-freestyle-settings .nv-osc-bg-settings-grid {grid-template-columns:minmax(0,1fr);}
 }
