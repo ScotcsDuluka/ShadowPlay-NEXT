@@ -10,7 +10,7 @@
   var host = null, overlay = null, tools = null, picker = null;
   var editing = false, originallyEnabled = false, chosen = null;
   var dragging = null, message = '', pending = null, pendingTimer = null;
-  var lastWidth = 0, lastTop = 0, suppressClick = false, suppressTimer = null;
+  var lastWidth = 0, lastTop = 0, lastLeft = 0, suppressClick = false, suppressTimer = null;
   var LABELS = {
     Screenshot:'Screenshot',Ansel:'Photo mode',Mods:'Game filter',
     InstantReplay:'Instant Replay',ManualRecord:'Record',Stream:'Stream',
@@ -42,6 +42,22 @@
     if(key && M.CONTROLS.indexOf(key)<0)return;
     chosen=key;alertText(key ? 'Selected: '+LABELS[key]+'. Drop onto a Slot or Group.' : '');
     if(tools)tools.querySelector('.nv-f-selection').textContent=key?'Selected: '+LABELS[key]:'Select or drag a Control';
+    updatePalette(A.get());
+  }
+  function updatePalette(st) {
+    var scope=host&&window.angular&&window.angular.element(host).scope();
+    if(!scope||scope.$$destroyed||!scope.$evalAsync)return;
+    var available=M.available(st);
+    scope.$evalAsync(function(){
+      var shell=scope.flexMenu;
+      if(!shell)return;
+      shell.selected=chosen||'';
+      if(shell.items)shell.items.sort(function(a,b){
+        var ai=available.indexOf(a.key),bi=available.indexOf(b.key);
+        return (ai<0?100+M.CONTROLS.indexOf(a.key):ai)-
+          (bi<0?100+M.CONTROLS.indexOf(b.key):bi);
+      });
+    });
   }
   function removePopup() {
     if(picker){picker.remove();picker=null}
@@ -137,7 +153,7 @@
     var r=bar.getBoundingClientRect();
     if(!r.width||!r.height)return;
     var scale=r.width/Math.max(1,g.width), y=r.y;
-    lastWidth=r.width;lastTop=y;
+    lastWidth=r.width;lastTop=y;lastLeft=r.x;
     if(!overlay){overlay=node('div','nv-f-overlay');document.body.appendChild(overlay)}
     overlay.textContent='';
     var st=A.renderState?A.renderState():A.get();
@@ -190,21 +206,9 @@
       fragment.appendChild(sl);
     });
     overlay.appendChild(fragment);
-    // The palette retains its Angular-owned buttons; only order/assignment
-    // follows the draft instead of V2's unrelated persisted layout.
-    var palette=host.querySelector('.nv-live-palette'),available=M.available(st);
-    if(palette) {
-      Array.prototype.slice.call(palette.querySelectorAll('[data-menu-key]'))
-        .sort(function(a,b){
-          var ai=available.indexOf(a.getAttribute('data-menu-key')),
-            bi=available.indexOf(b.getAttribute('data-menu-key'));
-          return (ai<0?100:ai)-(bi<0?100:bi);
-        }).forEach(function(item){
-          var key=item.getAttribute('data-menu-key');
-          item.classList.toggle('assigned',!!M.findControl(st,key));
-          item.classList.toggle('selected',key===chosen);palette.appendChild(item);
-        });
-    }
+    // Let ng-repeat move whole native blocks (button + Angular anchors), so
+    // searching after a palette reorder cannot detach neighboring controls.
+    updatePalette(st);
     if(tools) {
       var input=tools.querySelector('.nv-f-auto-input');
       if(input)input.checked=st.autoFill;
@@ -475,7 +479,7 @@
       // track the exact scaled native bar rect without a second layout owner.
       var rect=bars()&&bars().getBoundingClientRect();
       if(!overlay || (overlay.style.display==='none') ||
-        (rect && (Math.abs(rect.width-lastWidth)>1||Math.abs(rect.y-lastTop)>1)))redraw();
+        (rect && (Math.abs(rect.width-lastWidth)>1||Math.abs(rect.y-lastTop)>1||Math.abs(rect.x-lastLeft)>1)))redraw();
     }
   }
   document.addEventListener('mousedown',down,true);

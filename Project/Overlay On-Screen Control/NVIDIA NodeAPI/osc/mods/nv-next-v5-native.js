@@ -212,7 +212,7 @@
       el.classList.toggle('nv-side-full-tile', v !== 'small');
       el.classList.toggle('nv-unified-big', v === 'big');
       var info = el.querySelector('.nv-side-native-info');
-      if (info) info.style.display = v === 'row' ? 'block' : 'none';
+      if (info) info.style.display = v === 'small' ? 'none' : 'block';
     });
     document.documentElement.classList.add('nv-next-v5-on');
     lastRoot = root;
