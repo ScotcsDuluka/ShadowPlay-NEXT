@@ -494,7 +494,13 @@
       return;
     }
     var motion=window.__dulukaOscMotion,state=motion&&motion.getState&&motion.getState();
-    if(state&&state.target==='closed'){
+    // The native Host can report a stale idle/closed Motion target while the
+    // real Main-menu and Settings editor are still alive (e.g. an md-select
+    // opens/closes). Only treat closed as an exit when route/closing state
+    // corroborates it; otherwise MutationObserver would cancel on any popup.
+    var routeClosed=window.location&&window.location.hash==='#/base';
+    var closing=motion&&motion.phase==='closing';
+    if(state&&state.target==='closed'&&(routeClosed||closing||!editor)){
       if(editing)cancel(true);
       return;
     }

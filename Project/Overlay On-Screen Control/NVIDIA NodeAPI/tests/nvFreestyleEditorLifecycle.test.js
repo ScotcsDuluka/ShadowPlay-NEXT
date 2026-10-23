@@ -90,7 +90,7 @@ class Element {
 
 function fixture({ enabled = false, lingerOnClose = false } = {}) {
   const calls = [], docListeners = {}, winListeners = {}, timers = new Map(); let nextTimer = 0;
-  const f = { shellVisible: true, hit: null, motionTarget: 'open', nativeActions: 0, shellCloses: 0, shellCloseObservations: [] };
+  const f = { shellVisible: true, hit: null, motionTarget: 'open', motionPhase: 'idle', nativeActions: 0, shellCloses: 0, shellCloseObservations: [] };
   const html = new Element('html', 'nv-live-layout-editing'), body = new Element('body'); html.appendChild(body);
   const host = new Element('section', 'nv-live-editor nv-freestyle-settings'), head = new Element('header');
   const done = new Element('button', 'osc-button-green'); head.appendChild(done); host.appendChild(head);
@@ -137,7 +137,8 @@ function fixture({ enabled = false, lingerOnClose = false } = {}) {
   };
   const window = {
     __nvNextLayoutV5: A, NvShadowPlayLayoutV5: M, innerWidth: 1920, innerHeight: 1200,
-    __dulukaOscMotion: { phase: 'idle', getState: () => ({ target: f.motionTarget }) },
+    __dulukaOscMotion: { get phase() { return f.motionPhase; }, getState: () => ({ target: f.motionTarget }) },
+    location: { hash: '#/base/main-menu' },
     angular: { element(el) { assert.equal(el, host); return { scope: () => scope }; } },
     setInterval() {}, setTimeout(fn, delay) { const id = ++nextTimer; timers.set(id, { fn, delay }); return id; },
     clearTimeout(id) { timers.delete(id); },
@@ -269,10 +270,10 @@ test('route exit cancels active drag and draft, removes guides, and releases tem
 });
 
 test('Motion closed target prevents stale Angular editor from acquiring or restarting a lease', () => {
-  const f = fixture(); f.motionTarget = 'closed'; f.scan(); f.scan();
+  const f = fixture(); f.motionTarget = 'closed'; f.window.location.hash='#/base'; f.scan(); f.scan();
   assert.equal(f.editor.isEditing(), false); assert.deepEqual(f.calls, []);
-  f.motionTarget = 'open'; f.scan(); assert.equal(f.editor.isEditing(), true);
-  f.motionTarget = 'closed'; f.scan(); f.scan();
+  f.motionTarget = 'open'; f.window.location.hash='#/base/main-menu'; f.scan(); assert.equal(f.editor.isEditing(), true);
+  f.motionTarget = 'closed'; f.motionPhase='closing'; f.scan(); f.scan();
   assert.equal(f.editor.isEditing(), false); assert.equal(f.lease(), false); assert.equal(f.shellCloses, 1);
   assert.equal(f.calls.filter(x => x[0] === 'begin').length, 1, 'closed Motion never restarts stale shell');
   assert.equal(f.calls.some(x => x[0] === 'done' || x[0] === 'enable'), false);
@@ -351,4 +352,23 @@ test('Material Escape race: md-option event stays owned after Angular removed ac
   popup.remove();
   f.emit('keydown', f.host, { key: 'Escape' });
   assert.equal(f.editor.isEditing(), false, 'Second Escape cancels Customize');
+});
+
+test('stale idle/closed Motion target cannot cancel an open Angular Settings popup', () => {
+  const f = fixture(); f.scan();
+  assert.equal(f.editor.isEditing(), true);
+  f.motionTarget = 'closed';f.motionPhase='idle';
+  const popup = new Element('div','md-select-menu-container md-active');
+  const option=new Element('md-option');popup.appendChild(option);
+  f.document.body.appendChild(popup);
+  f.scan();
+  assert.equal(f.editor.isEditing(), true);
+  assert.equal(f.shellCloses,0);
+  const key=f.emit('keydown',option,{key:'Escape'});
+  assert.equal(key.prevented,undefined);
+  popup.remove();f.scan();
+  assert.equal(f.editor.isEditing(),true,'Closed-but-idle stale target must not cancel editor');
+  assert.equal(f.shellCloses,0);
+  f.motionPhase='closing';f.scan();
+  assert.equal(f.editor.isEditing(),false,'Real closing phase releases the editor');
 });
