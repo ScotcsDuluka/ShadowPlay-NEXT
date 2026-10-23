@@ -1,0 +1,84 @@
+/* Freestyle Settings: reorganize existing NVIDIA V2 editor, not a replacement UI.
+   Background Settings 80% left / Controls 20% right. */
+html.nv-live-layout-editing body .nv-live-editor.nv-freestyle-settings {
+ box-sizing:border-box!important;
+ overflow-y:auto!important;
+ padding:18px 24px!important;
+}
+.nv-live-editor.nv-freestyle-settings > header {margin-bottom:14px;}
+.nv-live-editor.nv-freestyle-settings .nv-freestyle-grid {
+ display:grid;grid-template-columns:minmax(0,4fr) minmax(240px,1fr);
+ gap:18px;align-items:start;width:100%;min-width:0;
+}
+.nv-live-editor.nv-freestyle-settings .nv-freestyle-background {
+ min-width:0;box-sizing:border-box;
+}
+.nv-live-editor.nv-freestyle-settings .nv-freestyle-controls {
+ min-width:0;box-sizing:border-box;
+ position:sticky;top:4px;
+}
+.nv-live-editor.nv-freestyle-settings .nv-freestyle-background > nv-osc-background-settings {
+ display:block!important;margin:0!important;padding:0 0 16px!important;
+ border-top:0!important;
+}
+.nv-live-editor.nv-freestyle-settings .nv-osc-bg-settings-grid {
+ margin:0 -8px!important;
+}
+.nv-live-editor.nv-freestyle-settings .nv-osc-bg-field {
+ flex-basis:200px!important;min-width:180px!important;padding:0 8px!important;
+}
+.nv-live-editor.nv-freestyle-settings .nv-freestyle-background > footer {
+ display:flex!important;margin:12px 0 4px!important;min-height:44px!important;
+}
+.nv-live-editor.nv-freestyle-settings .nv-freestyle-background > footer md-select {
+ min-width:180px;width:clamp(180px,35%,440px)!important;
+}
+.nv-live-editor.nv-freestyle-settings .nv-freestyle-controls .nv-live-library {
+ min-width:0!important;width:100%!important;padding:14px!important;
+ box-sizing:border-box;border:1px solid #42474a;
+ background:#1b2022;
+}
+.nv-live-editor.nv-freestyle-settings .nv-freestyle-controls .nv-live-library h3 {
+ margin:0 0 10px!important;font-size:15px!important;
+}
+.nv-live-editor.nv-freestyle-settings .nv-freestyle-controls .nv-live-palette {
+ display:flex!important;flex-direction:column;flex-wrap:nowrap!important;
+ overflow-y:auto!important;max-height:min(460px,53vh)!important;margin:0!important;
+ align-content:unset!important;padding:0 4px 0 0!important;
+}
+.nv-live-editor.nv-freestyle-settings .nv-freestyle-controls .nv-live-palette button {
+ width:100%!important;flex:0 0 39px!important;margin:0 0 5px!important;
+}
+.nv-live-editor.nv-freestyle-settings .nv-freestyle-legacy {
+ margin-top:16px;border-top:1px solid #4a5356;color:#cad1d3;
+}
+.nv-live-editor.nv-freestyle-settings .nv-freestyle-legacy > summary {
+ cursor:pointer;display:list-item;padding:13px 6px;color:#b7c2c4;
+ font-size:13px;user-select:none;
+}
+.nv-live-editor.nv-freestyle-settings .nv-freestyle-legacy[open] .nv-live-workspace {
+ display:flex!important;gap:10px;max-width:100%;overflow-x:auto;
+ padding:8px 0 14px!important;align-items:stretch;
+}
+.nv-live-editor.nv-freestyle-settings .nv-freestyle-legacy .nv-live-panel {
+ min-width:180px!important;flex:1 1 210px!important;margin:0!important;
+ padding:12px!important;
+}
+.nv-live-editor.nv-freestyle-settings .nv-freestyle-legacy .nv-live-panel h3 {
+ font-size:13px!important;margin-bottom:10px!important;
+}
+.nv-live-editor.nv-freestyle-settings .nv-freestyle-controls .nv-live-search {
+ width:100%!important;
+}
+@media(max-width:1050px) {
+ .nv-live-editor.nv-freestyle-settings .nv-freestyle-grid {
+   grid-template-columns:minmax(0,3fr) minmax(220px,1fr);gap:10px;
+ }
+ .nv-live-editor.nv-freestyle-settings .nv-freestyle-controls .nv-live-library {padding:9px!important;}
+}
+@media(max-width:720px){
+ .nv-live-editor.nv-freestyle-settings .nv-freestyle-grid {
+   grid-template-columns:minmax(0,1fr);
+ }
+ .nv-live-editor.nv-freestyle-settings .nv-freestyle-controls {position:static;}
+}
