@@ -87,17 +87,59 @@
 
   if(!window.angular)return;
   var template=[
+    '<section class="nv-osc-motion-settings" aria-label="Animation">',
+    '<div class="nv-osc-bg-heading nv-osc-motion-heading"><div><h3 ng-bind="background.motionLabel(\'animation\')"></h3><p ng-bind="background.motionLabel(\'hint\')"></p></div><button class="osc-button osc-button-gray" hover-focus ng-click="background.resetMotion()" ng-disabled="!background.motionAvailable" ng-bind="background.motionLabel(\'reset\')"></button></div>',
+    '<div ng-if="background.motionAvailable">',
+    '<div class="nv-osc-motion-bar"><md-switch aria-label="Enable animation" ng-model="background.motionSettings.enabled" ng-change="background.saveMotion()"><span ng-bind="background.motionLabel(\'enabled\')"></span></md-switch><div class="nv-osc-motion-style" ng-if="background.motionSettings.enabled"><label ng-bind="background.motionLabel(\'style\')"></label><md-select class="nv-osc-settings-select" aria-label="Animation style" ng-model="background.motionSettings.mode" ng-change="background.saveMotion()"><md-option ng-value="\'osc\'">OSC Motion</md-option><md-option ng-value="\'default\'"><span ng-bind="background.motionLabel(\'default\')"></span></md-option></md-select></div></div>',
+    '<div class="nv-osc-motion-parts" ng-if="background.oscMotionActive()"><md-switch aria-label="BG fade" ng-model="background.motionSettings.backgroundFade" ng-change="background.saveMotion()"><span>BG fade</span></md-switch><md-switch aria-label="Top OSC" ng-model="background.motionSettings.topAnimation" ng-change="background.saveMotion()"><span>Top OSC</span></md-switch><md-switch aria-label="Main-menu" ng-model="background.motionSettings.mainMenuAnimation" ng-change="background.saveMotion()"><span>Main-menu</span></md-switch></div>',
+    '<div class="nv-osc-bg-settings-grid nv-osc-motion-timing" ng-if="background.motionTimingActive()">',
+    '<div class="nv-osc-bg-field"><label><span ng-bind="background.motionLabel(\'openDuration\')"></span><output>{{background.motionSettings.openDuration}} ms</output></label><md-slider aria-label="Open duration" min="50" max="2000" step="10" ng-model="background.motionSettings.openDuration" ng-change="background.saveMotion()" ng-disabled="!background.oscMotionActive()"></md-slider></div>',
+    '<div class="nv-osc-bg-field"><label><span ng-bind="background.motionLabel(\'closeDuration\')"></span><output>{{background.motionSettings.closeDuration}} ms</output></label><md-slider aria-label="Close duration" min="50" max="2000" step="10" ng-model="background.motionSettings.closeDuration" ng-change="background.saveMotion()" ng-disabled="!background.oscMotionActive()"></md-slider></div>',
+    '</div></div><p class="nv-osc-bg-error" role="alert" ng-if="!background.motionAvailable" ng-bind="background.motionLabel(\'unavailable\')"></p><p class="nv-osc-bg-error" role="alert" ng-if="background.motionError">{{background.motionError}}</p></section>',
     '<section class="nv-osc-background-settings" aria-label="Overlay background">',
-    '<div class="nv-osc-bg-heading"><div><h3 translate="l10n.oscBackgroundTitle">Overlay background</h3><p translate="l10n.oscBackgroundInfo">Website particles with the original translucent overlay.</p></div><button class="osc-button osc-button-gray" ng-click="background.reset()" translate="l10n.oscResetBackground">Reset background</button></div>',
+    '<div class="nv-osc-bg-heading"><div><h3 translate="l10n.oscBackgroundTitle">Overlay background</h3><p translate="l10n.oscBackgroundInfo">Website particles with the original translucent overlay.</p></div><button class="osc-button osc-button-gray" hover-focus ng-click="background.reset()" translate="l10n.oscResetBackground">Reset background</button></div>',
     '<div class="nv-osc-bg-settings-grid">',
-    '<div class="nv-osc-bg-field"><label translate="l10n.oscBackgroundStyle">Background style</label><md-select aria-label="Background style" ng-model="background.settings.mode" ng-change="background.save()"><md-option ng-value="\'website\'" translate="l10n.oscWebsiteParticles">Website — particles</md-option><md-option ng-value="\'classic\'" translate="l10n.oscNvidiaClassic">NVIDIA classic</md-option></md-select></div>',
+    '<div class="nv-osc-bg-field"><label translate="l10n.oscBackgroundStyle">Background style</label><md-select class="nv-osc-settings-select" aria-label="Background style" ng-model="background.settings.mode" ng-change="background.save()"><md-option ng-value="\'website\'" translate="l10n.oscWebsiteParticles">Website — particles</md-option><md-option ng-value="\'classic\'" translate="l10n.oscNvidiaClassic">NVIDIA classic</md-option></md-select></div>',
     '<div class="nv-osc-bg-field"><label><span translate="l10n.oscBackgroundOpacity">Background opacity</span> <output>{{background.settings.opacity | number:0}}%</output></label><md-slider aria-label="Background opacity" min="0" max="100" step="1" ng-model="background.settings.opacity" ng-change="background.save()"></md-slider></div>',
-    '<div class="nv-osc-bg-field"><label><span translate="l10n.oscParticles">Particles</span> <output>{{background.settings.particles}}</output></label><md-slider aria-label="Particle count" min="0" max="120" step="10" ng-model="background.settings.particles" ng-change="background.save()" ng-disabled="background.settings.mode===\'classic\'"></md-slider></div>',
-    '<div class="nv-osc-bg-field"><label><span translate="l10n.oscAnimationSpeed">Animation speed</span> <output>{{background.settings.speed | number:2}}×</output></label><md-slider aria-label="Animation speed" min="0.25" max="2" step="0.25" ng-model="background.settings.speed" ng-change="background.save()" ng-disabled="!background.settings.motion || background.settings.mode===\'classic\'"></md-slider></div>',
-    '</div><div class="nv-osc-bg-switches"><md-switch aria-label="Background animation" ng-model="background.settings.motion" ng-change="background.save()"><span translate="l10n.oscAnimation">Animation</span></md-switch><md-switch aria-label="Connecting lines" ng-model="background.settings.links" ng-change="background.save()"><span translate="l10n.oscConnectingLines">Connecting lines</span></md-switch><md-switch aria-label="React to pointer" ng-model="background.settings.react" ng-change="background.save()"><span translate="l10n.oscReactPointer">React to pointer</span></md-switch></div>',
+    '<div class="nv-osc-bg-field" ng-if="background.settings.mode!==\'classic\'"><label><span translate="l10n.oscParticles">Particles</span> <output>{{background.settings.particles}}</output></label><md-slider aria-label="Particle count" min="0" max="120" step="10" ng-model="background.settings.particles" ng-change="background.save()"></md-slider></div>',
+    '<div class="nv-osc-bg-field" ng-if="background.settings.motion && background.settings.mode!==\'classic\'"><label><span translate="l10n.oscAnimationSpeed">Animation speed</span> <output>{{background.settings.speed | number:2}}×</output></label><md-slider aria-label="Animation speed" min="0.25" max="2" step="0.25" ng-model="background.settings.speed" ng-change="background.save()"></md-slider></div>',
+    '</div><div class="nv-osc-bg-switches" ng-if="background.settings.mode!==\'classic\'"><md-switch aria-label="Background animation" ng-model="background.settings.motion" ng-change="background.save()"><span translate="l10n.oscAnimation">Animation</span></md-switch><md-switch aria-label="Connecting lines" ng-model="background.settings.links" ng-change="background.save()"><span translate="l10n.oscConnectingLines">Connecting lines</span></md-switch><md-switch aria-label="React to pointer" ng-model="background.settings.react" ng-change="background.save()"><span translate="l10n.oscReactPointer">React to pointer</span></md-switch></div>',
     '<p class="nv-osc-bg-error" role="alert" ng-if="background.error">{{background.error}}</p></section>'
   ].join('');
-  window.angular.module('main').directive('nvOscBackgroundSettings',[function(){return {restrict:'E',scope:true,template:template,controller:['$scope',function($scope){var self=this;self.settings=api.get();self.error='';self.save=function(){if(!api.set(self.settings)){self.settings=api.get();self.error=api.error;}else self.error='';};self.reset=function(){self.error=api.reset()?'':api.error;};$scope.background=self;var unsubscribe=api.subscribe(function(settings){if(!$scope.$$destroyed)$scope.$evalAsync(function(){self.settings=settings;});});$scope.$on('$destroy',unsubscribe);} ]};}]);
+  window.angular.module('main').directive('nvOscBackgroundSettings',[function(){return {restrict:'E',scope:true,template:template,controller:['$scope','$injector',function($scope,$injector){
+    var self=this,translate=null,motionApi=window.__dulukaOscMotionSettings,motionUnsubscribe=null;
+    self.settings=api.get();self.error='';
+    self.save=function(){if(!api.set(self.settings)){self.settings=api.get();self.error=api.error;}else self.error='';};
+    self.reset=function(){self.error=api.reset()?'':api.error;};
+    try{if($injector&&$injector.get)translate=$injector.get('$translate');}catch(ignore){}
+    var motionCopy={
+      animation:['Animation','แอนิเมชัน'],enabled:['Enable animation','เปิดแอนิเมชัน'],
+      style:['Style','รูปแบบ'],default:['Default','Default'],
+      openDuration:['Open duration','เวลาเปิด'],closeDuration:['Close duration','เวลาปิด'],
+      reset:['Reset animation','รีเซ็ตแอนิเมชัน'],
+      hint:['Controls and timing apply to OSC Motion.','ปรับเอฟเฟกต์และเวลาเมื่อใช้ OSC Motion'],
+      unavailable:['Animation settings are unavailable.','ยังไม่สามารถปรับแอนิเมชันได้'],
+      saveError:['Could not save animation settings.','บันทึกการตั้งค่าแอนิเมชันไม่สำเร็จ']
+    };
+    self.motionLabel=function(key){var locale=translate&&translate.use&&translate.use()||'en',entry=motionCopy[key]||[key,key];return entry[/^th(?:[-_]|$)/i.test(locale)?1:0];};
+    self.motionAvailable=!!(motionApi&&motionApi.get&&motionApi.set&&motionApi.reset);
+    self.motionSettings=self.motionAvailable?motionApi.get():{};self.motionError='';
+    self.oscMotionActive=function(){return self.motionAvailable&&self.motionSettings.enabled&&self.motionSettings.mode==='osc';};
+    self.motionTimingActive=function(){return self.oscMotionActive()&&!!(self.motionSettings.backgroundFade||self.motionSettings.topAnimation||self.motionSettings.mainMenuAnimation);};
+    function motionResult(ok){
+      self.motionSettings=motionApi.get();
+      self.motionError=ok?'':motionApi.error||self.motionLabel('saveError');
+      return ok;
+    }
+    self.saveMotion=function(){return self.motionAvailable?motionResult(motionApi.set(self.motionSettings)):false;};
+    self.resetMotion=function(){return self.motionAvailable?motionResult(motionApi.reset()):false;};
+    if(self.motionAvailable&&motionApi.subscribe)motionUnsubscribe=motionApi.subscribe(function(settings){
+      if(!$scope.$$destroyed)$scope.$evalAsync(function(){if(!$scope.$$destroyed)self.motionSettings=settings;});
+    });
+    $scope.background=self;
+    var unsubscribe=api.subscribe(function(settings){if(!$scope.$$destroyed)$scope.$evalAsync(function(){if(!$scope.$$destroyed)self.settings=settings;});});
+    $scope.$on('$destroy',function(){unsubscribe();if(motionUnsubscribe)motionUnsubscribe();});
+  } ]};}]);
   // Additive companion directive: never modifies the other chat's editor controller.
   window.angular.module('main').directive('nvMainMenuLiveEditor',['$compile','$timeout',function($compile,$timeout){return {restrict:'A',require:'nvMainMenuLiveEditor',link:function(scope,element){
     var child=null,node=null,pending=null;

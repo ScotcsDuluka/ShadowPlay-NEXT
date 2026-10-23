@@ -32,6 +32,15 @@ function fixture(options = {}) {
       throw Error('Unbounded timer scheduling');
     },
     advance(ms) { while (ms > 0) { const step = Math.min(16, ms); clock.frame(step); ms -= step; } },
+    timersOnly(ms) {
+      now += ms;
+      for (let limit = 0; limit < 100; limit++) {
+        const due = [...timers].filter(([, t]) => t.due <= now).sort((a, b) => a[1].due - b[1].due)[0];
+        if (!due) return;
+        timers.delete(due[0]); due[1].fn();
+      }
+      throw Error('Unbounded timer-only scheduling');
+    },
     settle(limit = 240) { while ((frames.size || timers.size) && limit-- > 0) clock.frame(); assert(limit > 0, 'animation must release all scheduled frames'); },
   };
   const nodes = [];
@@ -122,13 +131,16 @@ function fixture(options = {}) {
     getComputedStyle(node) { return { display: 'block', visibility: 'visible', opacity: '1', transform: node.styles.transform || 'none', getPropertyValue: key => node.style.getPropertyValue(key) }; },
     addEventListener(type, fn) { (windowEvents[type] ||= []).push(fn); },
   };
+  const stored = new Map(options.motionSettings ? [['DulukaOscMotionSettings', JSON.stringify(options.motionSettings)]] : []);
+  window.localStorage = { getItem: key => stored.get(key) || null,
+    setItem(key, value) { if(options.failStorage)throw Error('Storage full');stored.set(key,value); } };
   const context = { window, document, console, performance: window.performance, setTimeout: clock.setTimeout, clearTimeout: clock.clearTimeout };
-  for (const file of ['osc-motion-engine.js', 'osc-motion.js']) vm.runInNewContext(fs.readFileSync(path.join(modPath, file), 'utf8'), context);
+  for (const file of ['osc-motion-engine.js', 'osc-motion-timing.js', 'osc-motion.js']) vm.runInNewContext(fs.readFileSync(path.join(modPath, file), 'utf8'), context);
   runBlocks.forEach(definition => invoke(definition));
   const api = window.__dulukaOscMotion; assert(api, 'native adapter API must initialize');
   function emit(collection, type, ...args) { (collection[type] || []).slice().forEach(fn => fn(...args)); }
   return {
-    api, window, document, html, body, overlay, topbar, group, bar, tiles, content, nodes, media, frames, timers, clock, rootScope, asyncQueue,
+    api, window, document, html, body, overlay, topbar, group, bar, tiles, content, nodes, media, frames, timers, clock, rootScope, asyncQueue,stored,
     emitDocument: (type, ...args) => emit(documentEvents, type, ...args), emitWindow: (type, ...args) => emit(windowEvents, type, ...args),
     emitRoute: (type, ...args) => emit(lifecycle, type, ...args), decorate: delegate => invoke(decorators.oscDisplayService, { $delegate: delegate }),
     flushAsync() { while (asyncQueue.length) asyncQueue.shift()(); }, clones: () => clones, paintCount: () => paintCount,
@@ -174,8 +186,11 @@ test('edge geometry is cached rather than read again every animation frame', () 
   const state = f.api.getState(); assert(state.pose.x > -1 && state.pose.x < 0); assert(state.pose.scale > .24 && state.pose.scale < 1);
   // Visible union ends at x=1505; the zero-size hidden node at x=9000 is excluded.
   assert(Math.abs(parseFloat(f.group.styles['--nv-motion-x']) - state.pose.x * 1507) < .00001);
-  f.clock.settle(); f.api.close(() => {}); f.clock.settle();
-  assert.equal(parseFloat(f.group.styles['--nv-motion-x']), 1507); assertStopped(f);
+  f.clock.settle(); f.api.close(() => {}); f.clock.advance(120);
+  assert(Math.abs(parseFloat(f.group.styles['--nv-motion-x'])-f.api.getState().pose.x*1507)<.00001);
+  f.clock.settle();
+  assert.equal(f.group.style.getPropertyValue('--nv-motion-x'),'','a completed close cannot leave offscreen transforms over the UI');
+  assertStopped(f);assertNativeClean(f);
 });
 test('animation restores existing owned attributes and custom variables instead of deleting prior values', () => {
   const f = fixture(), block = f.tiles[0];
@@ -342,4 +357,157 @@ test('V2 animation remains unchanged without V4 feature flag',()=>{
   f.window.__dulukaUnifiedMainMenu={enabled:()=>false,prepareForMotion(){count++}};
   open(f);assert.equal(count,0);
   f.api.cancel();f.clock.settle();assertNativeClean(f);
+});
+
+test('Default delegates original NVIDIA open/close without OSC transforms or synthetic animation delays',()=>{
+  const f=fixture({motionSettings:{mode:'default'},unified:true}),calls=[];
+  let preflights=0;
+  f.window.__nvNextLayoutV5={enabled:()=>true,prepareForMotion(){preflights++;}};
+  const native=f.decorate({openOSC(route){calls.push(['open',route]);return 'native-open';},closeOSC(reason){calls.push(['close',reason]);}});
+  assert.equal(native.openOSC('main.main-menu'),'native-open');
+  f.api.prepareOpen();assert.equal(f.api.phase,'idle');assert.equal(f.html.classList.contains('nv-motion-preparing'),false);
+  f.api.playOpen();f.clock.settle();
+  assert.equal(preflights,1,'native positioning still precedes the settled view');
+  assert.equal(f.api.getState().target,'open');assertNativeClean(f);
+  native.closeOSC('original');
+  assert.deepEqual(calls,[['open','main.main-menu'],['close','original']]);
+  assert.equal(f.api.phase,'idle');assertStopped(f);
+  assert.equal(f.group.styleWrites.length,0);assert.equal(f.topbar.styleWrites.length,0);
+  assert.equal(f.html.classList.contains('nv-motion-default'),true);
+});
+
+test('Animation off and all OSC components off keep nodes visible and commit close instantly',()=>{
+  for(const motionSettings of [{enabled:false},{backgroundFade:false,topAnimation:false,mainMenuAnimation:false}]){
+    const f=fixture({motionSettings});f.api.prepareOpen();
+    assert.equal(f.html.classList.contains('nv-motion-preparing'),false);
+    f.api.playOpen();f.clock.settle();assertNativeClean(f);
+    let closed=0;f.api.close(()=>closed++);
+    assert.equal(closed,1);assertStopped(f);
+    assert.equal(f.api.getState().target,'closed');
+  }
+});
+
+test('OSC background, top and main-menu switches independently omit only their own animation',()=>{
+  for(const name of ['backgroundFade','topAnimation','mainMenuAnimation']){
+    const f=fixture({motionSettings:{[name]:false}});f.api.prepareOpen();
+    assert.equal(f.html.classList.contains('nv-motion-'+name),false);
+    if(name==='backgroundFade')assert.equal(f.html.style.getPropertyValue('--nv-motion-bg-alpha'),'');
+    f.api.playOpen();f.clock.frame();f.clock.frame();f.clock.advance(96);
+    assert.equal(f.group.hasAttribute('data-nv-motion-group'),name!=='mainMenuAnimation');
+    assert.equal(f.topbar.hasAttribute('data-nv-motion-top'),name!=='topAnimation');
+    assert.equal(!!f.html.style.getPropertyValue('--nv-motion-bg-alpha'),name!=='backgroundFade');
+    if(name==='mainMenuAnimation')assert(f.tiles.every(tile=>!tile.hasAttribute('data-nv-motion-block')));
+    f.clock.settle();assertNativeClean(f);assertStopped(f);
+  }
+  const css=fs.readFileSync(path.join(modPath,'osc-motion.css'),'utf8');
+  assert.match(css,/nv-motion-preparing\.nv-motion-mainMenuAnimation/);
+  assert.match(css,/nv-motion-preparing\.nv-motion-topAnimation/);
+  assert.match(css,/nv-motion-preparing\.nv-motion-backgroundFade/);
+});
+
+test('configured full-range durations are honored exactly and Reset restores approved curves',()=>{
+  const f=fixture({motionSettings:{openDuration:50,closeDuration:2000}});
+  f.api.prepareOpen();f.api.playOpen();f.clock.frame();f.clock.frame();
+  f.clock.advance(49);assert.equal(f.api.phase,'opening');
+  f.clock.advance(1);assert.equal(f.api.phase,'idle');assertStopped(f);
+  let closes=0;f.api.close(()=>closes++);f.clock.advance(1999);
+  assert.equal(f.api.phase,'closing');assert.equal(closes,0);
+  f.clock.advance(1);assert.equal(closes,1);assertStopped(f);
+  assert.equal(f.window.__dulukaOscMotionSettings.reset(),true);
+  assert.equal(f.api.timing.open.duration,500);assert.equal(f.api.timing.closed.duration,240);
+  assert.deepEqual(json(f.api.timing.open.bezier),TIMING.open.bezier);
+  assert.deepEqual(json(f.api.timing.closed.bezier),TIMING.closed.bezier);
+});
+
+test('shared engine constructor accepts the same50..2000ms range as persisted timing',()=>{
+  const f=fixture();
+  for(const duration of [50,2000]){
+    const controller=f.window.createMotionController({duration,
+      requestFrame:f.clock.requestAnimationFrame,cancelFrame:f.clock.cancelAnimationFrame,
+      now:()=>f.window.performance.now()});
+    assert.equal(controller.getTiming().open.duration,duration);
+    controller.open();f.clock.advance(duration-1);assert.equal(controller.getState().phase,'opening');
+    f.clock.advance(1);assert.equal(controller.getState().phase,'idle');
+    controller.cancel();assertStopped(f);
+  }
+});
+
+test('configuration changes settle an active transition and do not leave stale native close callbacks',()=>{
+  const f=fixture();open(f);let closes=0;f.api.close(()=>closes++);f.clock.advance(48);
+  assert.equal(f.api.phase,'closing');
+  f.window.__dulukaOscMotionSettings.set({enabled:false});
+  assert.equal(closes,1);assert.equal(f.api.phase,'idle');f.clock.settle();assertStopped(f);assertNativeClean(f);
+  f.window.__dulukaOscMotionSettings.set({enabled:true,mode:'osc'});open(f);
+  f.api.close(()=>closes++);f.clock.advance(48);f.api.open();
+  f.window.__dulukaOscMotionSettings.set({mode:'default'});f.clock.settle();
+  assert.equal(closes,1,'reopening discards the obsolete close even across engine change');
+  assert.equal(f.api.getState().target,'open');assertStopped(f);assertNativeClean(f);
+});
+
+test('input guard runs only during an actual OSC transition, never Default, disabled or preparation',()=>{
+  for(const motionSettings of [{},{mode:'default'},{enabled:false}]){
+    const f=fixture({motionSettings});
+    function activate(){const ev={target:{closest:()=>f.tiles[0]},preventDefault(){this.prevented=true;},stopImmediatePropagation(){this.stopped=true;}};f.emitDocument('click',ev);return !!ev.prevented;}
+    f.api.prepareOpen();assert.equal(activate(),false);
+    f.api.playOpen();f.clock.frame();f.clock.frame();f.clock.advance(48);
+    assert.equal(activate(),motionSettings.mode!=='default'&&motionSettings.enabled!==false);
+    f.clock.settle();assert.equal(activate(),false);
+  }
+});
+
+test('OSC restores a previously owned background alpha value and priority on release',()=>{
+  const f=fixture();f.html.style.setProperty('--nv-motion-bg-alpha','.37','important');
+  open(f);assert.equal(f.html.style.getPropertyValue('--nv-motion-bg-alpha'),'.37');
+  assert.equal(f.html.style.getPropertyPriority('--nv-motion-bg-alpha'),'important');
+  f.api.close(()=>{});f.clock.advance(48);f.api.cancel();
+  assert.equal(f.html.style.getPropertyValue('--nv-motion-bg-alpha'),'.37');
+  assert.equal(f.html.style.getPropertyPriority('--nv-motion-bg-alpha'),'important');
+  assertStopped(f);assertNativeClean(f);
+});
+
+test('stalled OSR animation frames cannot leave opening input guards or queued native close stuck',()=>{
+  const f=fixture();
+  f.api.prepareOpen();f.api.playOpen();f.clock.frame();f.clock.frame();
+  assert.equal(f.api.phase,'opening');assert.ok(f.frames.size);
+  f.clock.timersOnly(749);assert.equal(f.api.phase,'opening');
+  f.clock.timersOnly(1);
+  assert.equal(f.api.phase,'idle');assert.equal(f.api.getState().target,'open');
+  assertStopped(f);assertNativeClean(f);
+  let closed=0;f.api.close(()=>closed++);assert.equal(f.api.phase,'closing');
+  f.clock.timersOnly(490);
+  assert.equal(closed,1);assert.equal(f.api.phase,'idle');
+  assertStopped(f);assertNativeClean(f);
+  assert.equal(f.html.classList.contains('nv-motion-active'),false);
+  const event={target:{closest:()=>f.tiles[0]},preventDefault(){this.prevented=true;},stopImmediatePropagation(){}};
+  f.emitDocument('click',event);assert.equal(event.prevented,undefined);
+  f.api.open();f.clock.settle();assert.equal(f.api.getState().target,'open');
+  assertStopped(f);assertNativeClean(f);
+});
+
+test('native close failure still removes Motion transforms and allows the next open',()=>{
+  const f=fixture();open(f);
+  f.api.close(()=>{throw Error('native close failed');});
+  assert.throws(()=>f.clock.advance(240),/native close failed/);
+  assertStopped(f);assertNativeClean(f);
+  assert.equal(f.html.classList.contains('nv-motion-active'),false);
+  f.api.open();f.clock.settle();
+  assert.equal(f.api.phase,'idle');assert.equal(f.api.getState().target,'open');
+});
+
+test('missing preparation frames cannot hide the overlay or retain an Alt-Z close callback forever',()=>{
+  for(const missing of [false,true]){
+    const f=fixture({missing});let closed=0;
+    f.api.prepareOpen();f.api.playOpen();
+    if(missing){f.clock.frame();f.clock.frame();}
+    f.api.close(()=>closed++);
+    assert.equal(f.api.phase,'preparing');
+    f.clock.timersOnly(750);
+    assert.equal(closed,1);assert.equal(f.api.phase,'idle');
+    assert.equal(f.html.classList.contains('nv-motion-preparing'),false);
+    assertStopped(f);assertNativeClean(f);
+  }
+  const f=fixture();f.api.prepareOpen();f.api.playOpen();
+  f.clock.timersOnly(750);
+  assert.equal(f.api.phase,'idle');assert.equal(f.api.getState().target,'open');
+  assertStopped(f);assertNativeClean(f);
 });

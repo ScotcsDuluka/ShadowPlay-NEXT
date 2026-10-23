@@ -5,7 +5,21 @@
   var controller=null,prepared=false,wanted='closed',pendingClose=null,intent=0,linkFrame=null,linkAttempts=0,commitQueued=false;
   var records=[],group=null,blocks=[],header=null,geometry={enter:1,exit:1},paintCanvas=null,paintContext=null,paintTick=0;
   var suppressRender=false,forceInstant=false,dispatch=function(callback){callback();};
+  var transitionTimer=null,transitionTarget=null;
+  var backgroundSaved=null;
   var timing=window.__dulukaOscMotionTiming||{open:{duration:500,bezier:[0,.9524242401123044,.28,1]},closed:{duration:240,bezier:[.6681970923837989,.04272720336914062,.005,1]}};
+  var settingsApi=window.__dulukaOscMotionSettings;
+  var settings=settingsApi?settingsApi.get():{enabled:true,mode:'osc',backgroundFade:true,topAnimation:true,mainMenuAnimation:true,openDuration:500,closeDuration:240};
+  function customMotion(){return settings.enabled&&settings.mode==='osc'&&(settings.backgroundFade||settings.topAnimation||settings.mainMenuAnimation);}
+  function settingClasses(){
+    root.classList.toggle('nv-motion-disabled',!settings.enabled);
+    root.classList.toggle('nv-motion-osc',settings.enabled&&settings.mode==='osc');
+    root.classList.toggle('nv-motion-default',settings.enabled&&settings.mode==='default');
+    ['backgroundFade','topAnimation','mainMenuAnimation'].forEach(function(name){
+      root.classList.toggle('nv-motion-'+name,settings.enabled&&settings.mode==='osc'&&settings[name]);
+    });
+  }
+  settingClasses();
   function reduced(){return forceInstant||!!document.hidden||!!(media&&media.matches);}
   function stopPaint(){if(paintCanvas&&paintCanvas.parentNode)paintCanvas.parentNode.removeChild(paintCanvas);paintCanvas=paintContext=null;}
   function touchPaint(){
@@ -14,9 +28,46 @@
     if(paintContext){paintContext.fillStyle=paintTick++%2?'#fff':'#000';paintContext.fillRect(0,0,1,1);}
   }
   function clearClasses(){['nv-motion-preparing','nv-motion-active','nv-motion-opening','nv-motion-closing'].forEach(function(name){root.classList.remove(name);});}
+  function clearTransitionTimer(){
+    if(transitionTimer!==null)window.clearTimeout(transitionTimer);
+    transitionTimer=null;transitionTarget=null;
+  }
+  function boundTransition(current){
+    if(current.phase==='idle'||!customMotion()||reduced()){clearTransitionTimer();return;}
+    if(transitionTimer!==null&&transitionTarget===current.target)return;
+    clearTransitionTimer();transitionTarget=current.target;
+    var selected=timing[current.target==='open'?'open':'closed'];
+    // OSR can stop delivering RAF while the Host is hidden. A queued close
+    // must not wait forever or leave native input covered by Motion CSS.
+    transitionTimer=window.setTimeout(function(){
+      transitionTimer=null;transitionTarget=null;
+      if(controller&&controller.getState().phase!=='idle')settle();
+    },Math.max(50,selected.duration)+250);
+  }
+  function boundPreparation(){
+    clearTransitionTimer();transitionTarget='preparing';
+    transitionTimer=window.setTimeout(function(){
+      transitionTimer=null;transitionTarget=null;
+      if(!prepared)return;
+      clearLinkFrame();prepared=false;releaseVisual();
+      if(wanted==='closed')commitClose();
+    },Math.max(750,timing.open.duration+250));
+  }
+  function writeBackground(value){
+    if(!backgroundSaved)backgroundSaved={value:root.style.getPropertyValue('--nv-motion-bg-alpha'),
+      priority:root.style.getPropertyPriority?root.style.getPropertyPriority('--nv-motion-bg-alpha'):''};
+    root.style.setProperty('--nv-motion-bg-alpha',String(value));
+  }
   function releaseVisual(){
+    clearTransitionTimer();
     records.forEach(function(record){Object.keys(record.saved).forEach(function(key){var old=record.saved[key];if(old.value)record.node.style.setProperty(key,old.value,old.priority);else record.node.style.removeProperty(key);});if(record.had)record.node.setAttribute(record.attribute,record.value);else record.node.removeAttribute(record.attribute);});records=[];
-    clearClasses();root.style.removeProperty('--nv-motion-bg-alpha');stopPaint();
+    clearClasses();
+    if(backgroundSaved){
+      if(backgroundSaved.value)root.style.setProperty('--nv-motion-bg-alpha',backgroundSaved.value,backgroundSaved.priority);
+      else root.style.removeProperty('--nv-motion-bg-alpha');
+      backgroundSaved=null;
+    }
+    stopPaint();
   }
   function mark(node,type){
     if(!node)return null;var attribute='data-nv-motion-'+type;
@@ -42,11 +93,14 @@
     var box=group?group.getBoundingClientRect():null,scale=group&&group.offsetWidth&&box.width?box.width/group.offsetWidth:1;
     if(!isFinite(scale)||scale<=0)scale=1;
     geometry={enter:Math.max(1,(right+2)/scale),exit:Math.max(1,((window.innerWidth||root.clientWidth||1)-left+2)/scale)};
-    groupRecord=mark(group,'group');blockRecords=blocks.map(function(node){return mark(node,'block');});headerRecord=mark(header,'top');return true;
+    groupRecord=settings.mainMenuAnimation?mark(group,'group'):null;
+    blockRecords=settings.mainMenuAnimation?blocks.map(function(node){return mark(node,'block');}):[];
+    headerRecord=settings.topAnimation?mark(header,'top'):null;return true;
   }
   function backgroundOpacity(){try{var settings=window.__dulukaOscBackground&&window.__dulukaOscBackground.get();if(settings&&typeof settings.opacity==='number'&&isFinite(settings.opacity))return Math.max(0,Math.min(1,settings.opacity/100));}catch(ignore){}return .5;}
   function render(pose,state){
     if(suppressRender)return;
+    boundTransition(state);
     prepared=false;root.classList.remove('nv-motion-preparing');
     if(state.phase==='idle'&&state.target==='open'&&state.requestedTarget==='open'){releaseVisual();return;}
     root.classList.add('nv-motion-active');root.classList.toggle('nv-motion-opening',state.phase==='opening');root.classList.toggle('nv-motion-closing',state.phase==='closing');
@@ -55,13 +109,13 @@
     write(groupRecord,'--nv-motion-x',(pose.x*(pose.x<0?geometry.enter:geometry.exit))+'px');
     blockRecords.forEach(function(record){write(record,'--nv-motion-scale',pose.scale);});
     write(headerRecord,'--nv-motion-y',pose.barY+'px');
-    root.style.setProperty('--nv-motion-bg-alpha',String(backgroundOpacity()*pose.bgProgress));
+    if(settings.backgroundFade)writeBackground(backgroundOpacity()*pose.bgProgress);
     if(state.phase==='idle')stopPaint();else touchPaint();
   }
-  function state(){return controller?controller.getState():{phase:prepared?'preparing':'idle',target:wanted,requestedTarget:wanted};}
+  function state(){return controller?controller.getState():{phase:prepared&&customMotion()?'preparing':'idle',target:wanted,requestedTarget:wanted};}
   function commitClose(){
     if(commitQueued||!pendingClose||wanted!=='closed')return;commitQueued=true;var token=intent;
-    dispatch(function(){commitQueued=false;if(token!==intent||wanted!=='closed'||!pendingClose)return;var current=controller&&controller.getState();if(current&&(current.phase!=='idle'||current.requestedTarget!=='closed'))return;var finish=pendingClose;pendingClose=null;finish();});
+    dispatch(function(){commitQueued=false;if(token!==intent||wanted!=='closed'||!pendingClose)return;var current=controller&&controller.getState();if(current&&(current.phase!=='idle'||current.requestedTarget!=='closed'))return;var finish=pendingClose;pendingClose=null;try{finish();}finally{releaseVisual();}});
   }
   function makeController(initiallyOpen){
     if(typeof window.createMotionController!=='function')return false;
@@ -75,8 +129,9 @@
   function cancel(){intent++;pendingClose=null;commitQueued=false;clearLinkFrame();prepared=false;wanted='closed';suppressRender=true;if(controller)controller.cancel();controller=null;suppressRender=false;releaseVisual();group=null;blocks=[];header=null;}
   function prepareOpen(){
     if(prepared)return;intent++;pendingClose=null;wanted='open';
+    if(!customMotion()){prepared=true;return;}
     if(controller&&controller.getState().phase!=='idle'){controller.open();return;}
-    prepared=true;root.classList.add('nv-motion-preparing');root.style.setProperty('--nv-motion-bg-alpha','0');
+    prepared=true;root.classList.add('nv-motion-preparing');if(settings.backgroundFade)writeBackground(0);boundPreparation();
   }
   function playOpen(){
     if(controller&&!prepared){open();return;}if(linkFrame!==null)return;if(!prepared)prepareOpen();linkAttempts=0;
@@ -94,7 +149,10 @@
       }else if(nativeRoot&&unified&&unified.enabled&&unified.enabled()&&unified.prepareForMotion){
         unified.prepareForMotion(nativeRoot);
       }
-      if(!collect()){if(++linkAttempts<4){linkFrame=window.requestAnimationFrame(start);return;}prepared=false;releaseVisual();if(wanted==='closed')commitClose();return;}
+      // Default delegates the existing NVIDIA lifecycle/animations. Disabled
+      // mode also skips OSC transforms; its scoped CSS removes transitions.
+      if(!customMotion()){prepared=false;releaseVisual();if(wanted==='closed')commitClose();return;}
+      if(!collect()){if(++linkAttempts<4){boundPreparation();linkFrame=window.requestAnimationFrame(start);return;}prepared=false;releaseVisual();if(wanted==='closed')commitClose();return;}
       if(!makeController(false)){prepared=false;releaseVisual();if(wanted==='closed')commitClose();return;}
       var requested=wanted;controller.open();if(requested==='closed')controller.close();
     }
@@ -103,11 +161,19 @@
   }
   function open(){
     intent++;pendingClose=null;wanted='open';
+    // A completed close released its native snapshots. Re-link the current
+    // nodes instead of rendering through records from the previous cycle.
+    if(controller&&controller.getState().phase==='idle'&&controller.getState().target==='closed')controller=null;
     if(controller){controller.open();return;}
     if(!prepared)prepareOpen();playOpen();
   }
   function close(callback){
     if(pendingClose&&wanted==='closed')return;intent++;wanted='closed';pendingClose=callback;
+    if(!customMotion()){
+      clearLinkFrame();prepared=false;
+      suppressRender=true;if(controller)controller.cancel();controller=null;suppressRender=false;
+      releaseVisual();commitClose();return;
+    }
     if(prepared&&!controller){playOpen();return;}
     if(!controller){if(!collect()||!makeController(true)){releaseVisual();commitClose();return;}}
     else if(controller.getState().phase==='idle'&&controller.getState().target==='open')collect();
@@ -117,10 +183,21 @@
     if(!controller){if(prepared){prepared=false;clearLinkFrame();releaseVisual();if(wanted==='closed')commitClose();}return;}
     var requested=controller.getState().requestedTarget;suppressRender=true;controller.cancel();suppressRender=false;forceInstant=true;
     if(requested==='open')controller.open();else controller.close();forceInstant=false;
+    if(requested==='closed')releaseVisual();
   }
   var api=window.__dulukaOscMotion={prepareOpen:prepareOpen,playOpen:playOpen,open:open,close:close,cancel:cancel,getState:state,timing:timing};
-  Object.defineProperty(api,'phase',{get:function(){return prepared?'preparing':(controller?controller.getState().phase:'idle');}});
-  function guardActivation(event){if(api.phase==='idle'||(event.type==='keydown'&&event.key!=='Enter'&&event.key!==' '&&event.keyCode!==13&&event.keyCode!==32))return;var target=event.target;if(target&&target.closest&&(target.closest('.nv-osc md-menu,.nv-osc .osc-button')||target.closest('md-menu-content'))){event.preventDefault();event.stopImmediatePropagation();}}
+  Object.defineProperty(api,'phase',{get:function(){return prepared&&customMotion()?'preparing':(controller?controller.getState().phase:'idle');}});
+  if(settingsApi)settingsApi.subscribe(function(next){
+    var requested=controller?controller.getState().requestedTarget:wanted,linking=prepared;
+    clearLinkFrame();prepared=false;suppressRender=true;if(controller)controller.cancel();controller=null;suppressRender=false;
+    releaseVisual();settings=next;settingClasses();wanted=requested;
+    // Settle an interrupted transition at its current requested endpoint.
+    // Changing preferences never replays entry or leaves stale close work.
+    if(wanted==='closed'){commitClose();return;}
+    if(linking){prepared=true;playOpen();}
+    else if(customMotion())makeController(true);
+  });
+  function guardActivation(event){var phase=api.phase;if(!customMotion()||reduced()||(phase!=='opening'&&phase!=='closing')||(event.type==='keydown'&&event.key!=='Enter'&&event.key!==' '&&event.keyCode!==13&&event.keyCode!==32))return;var target=event.target;if(target&&target.closest&&(target.closest('.nv-osc md-menu,.nv-osc .osc-button')||target.closest('md-menu-content'))){event.preventDefault();event.stopImmediatePropagation();}}
   document.addEventListener('click',guardActivation,true);document.addEventListener('keydown',guardActivation,true);document.addEventListener('visibilitychange',function(){if(document.hidden)settle();});window.addEventListener('pagehide',cancel);
   if(media&&media.addListener)media.addListener(function(){if(media.matches)settle();});
   if(!window.angular)return;

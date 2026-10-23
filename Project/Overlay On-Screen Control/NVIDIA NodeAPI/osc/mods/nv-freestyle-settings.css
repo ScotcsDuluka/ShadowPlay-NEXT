@@ -24,6 +24,47 @@ html.nv-live-layout-editing body .nv-live-editor.nv-freestyle-settings {
 .nv-live-editor.nv-freestyle-settings > header h2 {
  font-size:18px!important;line-height:24px!important;
 }
+/* Native OSC adds a 3px focus border. Reserve it in every state so pointer
+   focus, keyboard focus and translated labels never resize these actions. */
+.nv-live-editor.nv-freestyle-settings > header > .osc-button {
+ --nv-f-header-button-width:240px;
+ display:inline-flex!important;align-items:center;justify-content:center;
+ box-sizing:border-box!important;flex:0 0 var(--nv-f-header-button-width)!important;
+ width:var(--nv-f-header-button-width)!important;
+ min-width:var(--nv-f-header-button-width)!important;
+ max-width:var(--nv-f-header-button-width)!important;
+ height:var(--nv-f-header-button-height,50px)!important;
+ min-height:var(--nv-f-header-button-height,50px)!important;
+ max-height:var(--nv-f-header-button-height,50px)!important;
+ margin:0 0 0 16px!important;padding:0 16px!important;
+ border:3px solid transparent!important;border-radius:0!important;
+ outline:none!important;box-shadow:none!important;transform:none!important;
+ font-size:16px!important;line-height:20px!important;
+ white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;
+ color:#fff!important;cursor:pointer;
+ transition:none!important;
+}
+.nv-live-editor.nv-freestyle-settings > header > .osc-button-gray {
+ background:#32363b!important;font-weight:400!important;
+}
+.nv-live-editor.nv-freestyle-settings > header > .osc-button-green {
+ --nv-f-header-button-width:120px;
+ background:#76b900!important;font-weight:700!important;
+}
+.nv-live-editor.nv-freestyle-settings > header > .osc-button-gray:not([disabled]):not(.osc-button-disabled):hover,
+.nv-live-editor.nv-freestyle-settings > header > .osc-button-gray:not([disabled]):not(.osc-button-disabled):focus,
+.nv-live-editor.nv-freestyle-settings > header > .osc-button-gray:not([disabled]):not(.osc-button-disabled):active {
+ border-color:#76b900!important;
+}
+.nv-live-editor.nv-freestyle-settings > header > .osc-button-green:not([disabled]):not(.osc-button-disabled):hover,
+.nv-live-editor.nv-freestyle-settings > header > .osc-button-green:not([disabled]):not(.osc-button-disabled):focus,
+.nv-live-editor.nv-freestyle-settings > header > .osc-button-green:not([disabled]):not(.osc-button-disabled):active {
+ border-color:#fff!important;
+}
+.nv-live-editor.nv-freestyle-settings > header > .osc-button[disabled],
+.nv-live-editor.nv-freestyle-settings > header > .osc-button.osc-button-disabled {
+ color:#888!important;border-color:transparent!important;cursor:default!important;
+}
 .nv-live-editor.nv-freestyle-settings .nv-freestyle-grid {
  display:grid;grid-template-columns:minmax(0,4fr) minmax(0,1fr);
  grid-template-rows:minmax(0,1fr);flex:1 1 0;
@@ -59,6 +100,27 @@ html.nv-live-layout-editing body .nv-live-editor.nv-freestyle-settings {
 }
 .nv-live-editor.nv-freestyle-settings .nv-osc-bg-field md-slider {
  box-sizing:border-box;width:100%;max-width:100%;min-width:0!important;margin:0!important;
+}
+/* The original NVIDIA boxed selector, with a reserved focus border. */
+.nv-live-editor.nv-freestyle-settings .nv-freestyle-background md-select {
+ box-sizing:border-box;display:flex;align-items:stretch;
+ height:44px!important;min-height:44px!important;max-height:44px!important;
+ min-width:0;max-width:100%;padding:0 10px!important;margin:6px 0 0!important;
+ border:3px solid transparent!important;border-radius:0!important;
+ background:#1b2022!important;outline:none!important;transition:none!important;
+}
+.nv-live-editor.nv-freestyle-settings .nv-freestyle-background md-select:not([disabled]):hover,
+.nv-live-editor.nv-freestyle-settings .nv-freestyle-background md-select:not([disabled]):focus,
+.nv-live-editor.nv-freestyle-settings .nv-freestyle-background md-select[aria-expanded="true"] {
+ border-color:#76b900!important;
+}
+.nv-live-editor.nv-freestyle-settings .nv-freestyle-background md-select .md-select-value {
+ display:flex;align-items:center;box-sizing:border-box;
+ width:100%;min-width:0;min-height:0!important;padding:0!important;
+ border:0!important;color:#fff;font-size:14px;line-height:20px;
+}
+.nv-live-editor.nv-freestyle-settings .nv-freestyle-background md-select .md-select-value>span:not(.md-select-icon) {
+ min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
 .nv-live-editor.nv-freestyle-settings .nv-freestyle-background > footer {
  display:flex!important;flex:0 0 auto;flex-wrap:wrap;
@@ -128,7 +190,7 @@ html.nv-live-layout-editing body .nv-live-editor.nv-freestyle-settings {
 @media(max-width:1050px) {
  .nv-live-editor.nv-freestyle-settings > header {flex-wrap:wrap;}
  .nv-live-editor.nv-freestyle-settings > header > div {flex-basis:100%;margin-bottom:8px;}
- .nv-live-editor.nv-freestyle-settings > header .osc-button {margin:0 8px 0 0;}
+ .nv-live-editor.nv-freestyle-settings > header > .osc-button {margin:0 8px 0 0!important;}
  .nv-live-editor.nv-freestyle-settings .nv-freestyle-grid {gap:10px;}
  .nv-live-editor.nv-freestyle-settings .nv-freestyle-controls .nv-live-library {padding:9px!important;}
 }
@@ -143,7 +205,7 @@ html.nv-live-layout-editing body .nv-live-editor.nv-freestyle-settings {
  .nv-live-editor.nv-freestyle-settings > header {margin-bottom:10px!important;}
  .nv-live-editor.nv-freestyle-settings > header h2 {margin-bottom:0;}
  .nv-live-editor.nv-freestyle-settings > header p {display:none;}
- .nv-live-editor.nv-freestyle-settings > header .osc-button {height:38px;}
+ .nv-live-editor.nv-freestyle-settings > header {--nv-f-header-button-height:38px;}
  .nv-live-editor.nv-freestyle-settings .nv-freestyle-controls .nv-live-library {padding:8px!important;}
  .nv-live-editor.nv-freestyle-settings .nv-freestyle-controls .nv-f-tools {margin-bottom:6px;padding-bottom:5px;}
  .nv-live-editor.nv-freestyle-settings .nv-freestyle-controls .nv-f-actions {margin-bottom:4px;}

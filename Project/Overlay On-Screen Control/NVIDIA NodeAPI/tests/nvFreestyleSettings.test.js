@@ -68,6 +68,34 @@ test('80/20 visual contract remains scoped to original native Settings',()=>{
  assert.ok(index.includes('/mods/launcher-language-sync.js'));
  assert.ok(index.includes('/mods/osc-motion.js'));
 });
+test('header actions reserve native focus borders and fixed dimensions while interaction states only change paint',()=>{
+ const css=read('mods/nv-freestyle-settings.css');
+ const rules=Array.from(css.matchAll(/([^{}]+)\{([^{}]*)\}/g),m=>({selector:m[1].trim(),body:m[2]}));
+ const base=rules.find(rule=>rule.selector.endsWith('.nv-live-editor.nv-freestyle-settings > header > .osc-button'));
+ assert.ok(base,'header actions have an independently scoped box');
+ for(const property of ['width','min-width','max-width'])
+  assert.ok(base.body.includes(property+':var(--nv-f-header-button-width)!important;'),property+' cannot depend on translated text');
+ for(const property of ['height','min-height','max-height'])
+  assert.ok(base.body.includes(property+':var(--nv-f-header-button-height,50px)!important;'),property+' shares the responsive fixed height');
+ assert.match(base.body,/box-sizing:border-box!important/);
+ assert.match(base.body,/border:3px solid transparent!important/,'reserve native focus ring before focus');
+ assert.match(base.body,/flex:0 0 var\(--nv-f-header-button-width\)!important/,'flex cannot shrink header actions');
+ assert.match(base.body,/white-space:nowrap!important/);assert.match(base.body,/text-overflow:ellipsis!important/);
+ const states=rules.filter(rule=>rule.selector.includes('> header > .osc-button')&&/:(hover|focus|active)|\[disabled\]|\.osc-button-disabled/.test(rule.selector));
+ assert.equal(states.length,3,'gray, green and disabled header paint states');
+ for(const rule of states) {
+  assert.doesNotMatch(rule.body,/(?:^|;)\s*(?:(?:min-|max-)?(?:width|height)|margin(?:-[a-z]+)?|padding(?:-[a-z]+)?|border-(?:width|style)|flex(?:-[a-z]+)?|font-(?:size|weight)|line-height|transform)\s*:/,
+   'interaction states must not alter box metrics: '+rule.selector);
+ }
+ const gray=states.find(rule=>rule.selector.includes('.osc-button-gray'));
+ const green=states.find(rule=>rule.selector.includes('.osc-button-green'));
+ for(const rule of [gray,green])for(const state of ['hover','focus','active'])assert.ok(rule.selector.includes(':'+state));
+ assert.match(gray.body,/border-color:#76b900!important/);assert.match(green.body,/border-color:#fff!important/);
+ assert.ok(css.includes('--nv-f-header-button-height:38px'),'short viewports change every height bound together');
+ const source=read('mods/main-menu-live.js'),header=source.match(/<header>[\s\S]*?<\/header>/);
+ assert.ok(header);const buttons=header[0].match(/<button\b[^>]*class="osc-button[^>]*>/g)||[];
+ assert.equal(buttons.length,2);for(const button of buttons)assert.match(button,/\bhover-focus\b/,'pointer entry uses the shipped NVIDIA focus directive');
+});
 test('DOM insertions organize the native shell immediately, including delayed Background creation',()=>{
  for(const readyState of ['complete','loading']){
   const editor=new Node('section','nv-live-editor'),workspace=new Node('div','nv-live-workspace'),

@@ -158,7 +158,7 @@
   }
   var toolbar=[
     '<section class="nv-live-editor" ng-if="flexMenu.editing" ng-style="{\'margin-top\':flexMenu.extraRows()+\'px\',\'max-height\':\'calc(100vh - \'+(490+flexMenu.extraRows())+\'px)\'}" aria-label="Customize Main-menu">',
-    '<header><div><h2>Customize Main-menu</h2><p>Drag controls across three panels. Add 2–3 icons into a Side Slot. Settings cannot be removed.</p></div><button class="osc-button osc-button-gray" ng-click="flexMenu.reset()">Restore NVIDIA layout</button><button class="osc-button osc-button-green" ng-click="flexMenu.done()">Done</button></header>',
+    '<header><div><h2>Customize Main-menu</h2><p>Drag controls across three panels. Add 2–3 icons into a Side Slot. Settings cannot be removed.</p></div><button class="osc-button osc-button-gray" hover-focus ng-click="flexMenu.reset()">Restore NVIDIA layout</button><button class="osc-button osc-button-green" hover-focus ng-click="flexMenu.done()">Done</button></header>',
     '<div class="nv-live-workspace">',
     sidePanelMarkup('left'),
     '<div class="nv-live-panel nv-live-drop" data-menu-group="center"><h3>Center panel <span>{{flexMenu.layout.center.length}} / 4 Big</span></h3>',

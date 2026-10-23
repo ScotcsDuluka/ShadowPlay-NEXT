@@ -405,6 +405,117 @@ test('a successful Reset background clears a previous save error in the settings
   assert.deepEqual(plain(controller.settings), defaults);
 });
 
+const motionDefaults = Object.freeze({ enabled: true, mode: 'osc', backgroundFade: true,
+  topAnimation: true, mainMenuAnimation: true, openDuration: 500, closeDuration: 240 });
+function animationController() {
+  let settings = { ...motionDefaults }, locale = 'en-US', fail = false;
+  const listeners = new Set(), saves = [], lifecycle = {};
+  const motion = {
+    get: () => ({ ...settings }),
+    set(patch) {
+      if (fail) return false;
+      settings = { ...settings, ...patch }; saves.push({ ...settings });
+      for (const listener of listeners) listener({ ...settings });
+      return true;
+    },
+    reset() { return this.set(motionDefaults); },
+    subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
+    get error() { return fail ? 'Motion storage unavailable' : ''; }
+  };
+  const f = load({ window: { __dulukaOscMotionSettings: motion } });
+  const definition = f.directives.nvOscBackgroundSettings.at(-1)();
+  const scope = { $$destroyed: false, $evalAsync(callback) { callback(); }, $on(name, callback) { lifecycle[name] = callback; } };
+  const controller = {};
+  definition.controller.at(-1).call(controller, scope, { get(name) {
+    assert.equal(name, '$translate'); return { use: () => locale };
+  } });
+  return { ...f, controller, scope, motion, saves, listeners, definition,
+    language(value) { locale = value; }, fail(value) { fail = value; },
+    destroy() { scope.$$destroyed = true; lifecycle.$destroy(); } };
+}
+
+test('Animation uses native Material controls without translating over switch internals', () => {
+  const f = animationController(), template = f.definition.template;
+  assert.ok(template.indexOf('nv-osc-motion-settings') < template.indexOf('nv-osc-background-settings'));
+  for (const property of ['enabled', 'mode', 'backgroundFade', 'topAnimation', 'mainMenuAnimation', 'openDuration', 'closeDuration'])
+    assert.ok(template.includes('ng-model="background.motionSettings.' + property + '"'), property);
+  for (const label of ['Open duration', 'Close duration'])
+    assert.ok(template.includes('aria-label="' + label + '" min="50" max="2000" step="10"'));
+  assert.match(template, /<button[^>]*hover-focus[^>]*ng-click="background\.resetMotion\(\)"/);
+  assert.match(template, /<button[^>]*hover-focus[^>]*ng-click="background\.reset\(\)"/);
+  assert.doesNotMatch(template, /<md-switch\b[^>]*\btranslate=/,
+    'a translation on the switch root destroys Angular Material toggle children');
+  for (const key of ['oscAnimation', 'oscConnectingLines', 'oscReactPointer'])
+    assert.ok(template.includes('<span translate="l10n.' + key + '">'), 'preserves existing background toggle labels');
+  assert.equal(f.state.writes, 0); assert.equal(f.saves.length, 0, 'opening Settings must not persist defaults');
+});
+
+test('Animation changes and reset go only through the Motion API and leave Background settings intact', () => {
+  const f = animationController(), ui = f.controller;
+  assert.equal(ui.motionAvailable, true); assert.equal(ui.oscMotionActive(), true);
+  ui.motionSettings.openDuration = 820; ui.motionSettings.backgroundFade = false;
+  assert.equal(ui.saveMotion(), true);
+  assert.equal(f.motion.get().openDuration, 820); assert.equal(f.motion.get().backgroundFade, false);
+  ui.motionSettings.mode = 'default'; ui.saveMotion();
+  assert.equal(ui.oscMotionActive(), false, 'OSC component controls are disabled for Default');
+  ui.motionSettings.mode = 'osc'; ui.motionSettings.enabled = false; ui.saveMotion();
+  assert.equal(ui.oscMotionActive(), false, 'disabled animation disables component and timing controls');
+  assert.equal(ui.resetMotion(), true); assert.deepEqual(plain(ui.motionSettings), motionDefaults);
+  assert.equal(ui.oscMotionActive(), true);
+  assert.deepEqual(plain(f.api.get()), defaults); assert.equal(f.state.writes, 0);
+});
+
+test('Animation failed saves restore committed values and successful reset clears the error', () => {
+  const f = animationController(), ui = f.controller;
+  ui.motionSettings.closeDuration = 400; ui.saveMotion();
+  f.fail(true); ui.motionSettings.closeDuration = 1900;
+  assert.equal(ui.saveMotion(), false); assert.equal(ui.motionSettings.closeDuration, 400);
+  assert.equal(ui.motionError, 'Motion storage unavailable');
+  assert.equal(ui.resetMotion(), false); assert.equal(ui.motionSettings.closeDuration, 400);
+  f.fail(false); assert.equal(ui.resetMotion(), true);
+  assert.equal(ui.motionError, ''); assert.deepEqual(plain(ui.motionSettings), motionDefaults);
+});
+
+test('Animation hides inapplicable options while retaining switches and saved choices for re-enabling', () => {
+  const f = animationController(), ui = f.controller;
+  assert.equal(ui.motionTimingActive(), true);
+  for (const name of ['backgroundFade', 'topAnimation', 'mainMenuAnimation']) ui.motionSettings[name] = false;
+  ui.saveMotion();
+  assert.equal(ui.oscMotionActive(), true, 'component switches remain available to turn effects back on');
+  assert.equal(ui.motionTimingActive(), false, 'no timing controls when every effect is off');
+  ui.motionSettings.topAnimation = true; ui.saveMotion();
+  assert.equal(ui.motionTimingActive(), true);
+  ui.motionSettings.mode = 'default'; ui.saveMotion();
+  assert.equal(ui.oscMotionActive(), false); assert.equal(ui.motionTimingActive(), false);
+  ui.motionSettings.mode = 'osc'; ui.saveMotion();
+  assert.equal(ui.motionSettings.backgroundFade, false); assert.equal(ui.motionSettings.topAnimation, true);
+  ui.motionSettings.enabled = false; ui.saveMotion();
+  assert.equal(ui.oscMotionActive(), false); assert.equal(ui.motionTimingActive(), false);
+  ui.motionSettings.enabled = true; ui.saveMotion();
+  assert.equal(ui.motionTimingActive(), true);
+  assert.equal(f.state.writes, 0, 'visibility never changes Background preferences');
+});
+
+test('Animation labels follow the native translator language and subscriptions stop with the companion scope', () => {
+  const f = animationController(), ui = f.controller;
+  assert.equal(ui.motionLabel('animation'), 'Animation');
+  f.language('th-TH'); assert.equal(ui.motionLabel('animation'), 'แอนิเมชัน');
+  assert.equal(ui.motionLabel('openDuration'), 'เวลาเปิด'); assert.equal(ui.motionLabel('closeDuration'), 'เวลาปิด');
+  f.language('en-US'); assert.equal(ui.motionLabel('openDuration'), 'Open duration');
+  f.motion.set({ topAnimation: false }); assert.equal(ui.motionSettings.topAnimation, false);
+  assert.equal(f.listeners.size, 1); f.destroy(); assert.equal(f.listeners.size, 0);
+  f.motion.set({ topAnimation: true }); assert.equal(ui.motionSettings.topAnimation, false, 'destroyed controls cannot receive live updates');
+});
+
+test('missing Motion API disables Animation settings without creating another preference store', () => {
+  const f = load(), definition = f.directives.nvOscBackgroundSettings.at(-1)(), controller = {};
+  definition.controller.at(-1).call(controller, { $evalAsync(fn) { fn(); }, $on() {} });
+  assert.equal(controller.motionAvailable, false); assert.equal(controller.oscMotionActive(), false);
+  assert.equal(controller.saveMotion(), false); assert.equal(controller.resetMotion(), false);
+  assert.equal(controller.motionLabel('unavailable'), 'Animation settings are unavailable.');
+  assert.equal(f.state.writes, 0); assert.deepEqual(plain(f.api.get()), defaults);
+});
+
 test('classic and website backgrounds use the same fixed full-screen canvas', () => {
   const f = renderer({ hash: '#/base/main-menu' });
   const css = fs.readFileSync(path.join(__dirname, '../osc/mods/osc-background.css'), 'utf8');
@@ -412,7 +523,7 @@ test('classic and website backgrounds use the same fixed full-screen canvas', ()
   assert.match(css, /#nv-osc-background\s*\{[^}]*position:fixed[^}]*top:0;right:0;bottom:0;left:0/);
   assert.match(css, /html\.nv-osc-bg-classic\s+#nv-osc-background\s*\{[^}]*background:#000!important/);
   assert.match(css, /html\.nv-osc-bg-classic\s+\.nv-osc\s*\{background:transparent!important\}/);
-  assert.match(motion, /nv-motion-active:not\(\.nv-osc-bg-website\) \.nv-osc\{background:transparent!important\}/);
+  assert.match(motion, /nv-motion-active\.nv-motion-backgroundFade:not\(\.nv-osc-bg-website\) \.nv-osc\{background:transparent!important\}/);
   f.api.set({ ...defaults, mode:'classic', opacity:80 });
   assert.equal(f.root.style.display,'block');
   assert.equal(f.root.style.opacity,'0.8');
