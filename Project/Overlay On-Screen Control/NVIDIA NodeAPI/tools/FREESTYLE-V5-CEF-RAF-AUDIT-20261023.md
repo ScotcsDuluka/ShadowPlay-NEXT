@@ -1,12 +1,12 @@
 # ShadowPlay NEXT Freestyle V5 — Live CEF RAF/Motion audit (2026-10-23)
 
-**Status: Partial CEF verification; deployment of commit 764809dca8 is blocked by native activation, not approved.**
+**Status: Partial CEF verification; native activation still blocks release sign-off. Current Project/Build SHA equality was verified after this audit, but deployment provenance is unknown.**
 
 ## Scope and protection
 
 - Git branch Stable, previously verified HEAD 764809dca8.
 - Source-only optimization in osc/mods/nv-next-v5-native.js suppresses RAF scheduling while native OSC Motion is blocked and retries when open/idle. Selected offline suite: 135/135 passed.
-- Source and Build native adapter differ intentionally. **Do not claim they were synced.**
+- Current post-audit source/Build adapter SHA-256 are identical (E0B32ADA4CA8A70E01211D992191DCA1A65E45A5A42C09A1A1F42407C6FC8A97). An older checkpoint showed a mismatch. **This audit did not deploy any files**; the time/actor/mechanism of the apparent external sync are unverified. Do not infer that the backed-up deploy tool was used.
 - All live audit scripts stored only under build_test/OSC-Live-Preview/v5-session-20261023/.
 - Fresh full CEF/localStorage backup before testing: pre-raf-cef-audit-20261023-2033.json.
 - Actual CEF Chromium target: http://localhost:59011/index.html#/base; viewport 1920x1200, DPR 0.875, V5 enabled, Edit false.
@@ -48,9 +48,7 @@
 - When Native Host activation is reliably available again, re-run the source
   preview using original Host sequencing and verify the genuine idle/open
   CEF geometry, 12 controls, transitions, and absence of RAF churn.
-- Do **not** deploy commit 764809dca8 into Build on the basis of offline/closed
-  results alone. If validated, use targeted backed-up sync through
-  tools/osc-live-preview.cjs with --files mods/nv-next-v5-native.js and verify SHA.
+- Do **not** repeat an unnecessary Build sync: Source and Build now have matching SHA. Determine and document deployment provenance separately; SHA equality does not replace real open/close testing. For future changes, use targeted backed-up sync via tools/osc-live-preview.cjs --files mods/nv-next-v5-native.js and verify SHA.
 - Check Native Host activation failure with the Host owner. The OSC Host and
   renderer files are already dirty under another workstream — do not edit,
   stage or overwrite them here. No full Build replacement, git reset or
@@ -59,4 +57,4 @@
   That previous pass must not be represented as validation of the new source
   RAF optimization.
 
-**Overall decision: hold source-only patch on Stable; Build remains untouched.**
+**Overall decision: the current Build has source-equivalent adapter bytes, but the native open/close CEF audit did not pass and release remains on hold. This testing session itself did not write Build.**
