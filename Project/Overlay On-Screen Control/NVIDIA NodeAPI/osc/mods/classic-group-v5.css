@@ -1,0 +1,131 @@
+/* Classic NVIDIA OSC Group V5 — isolated Settings editor.
+   No legacy V2/V4 selectors altered, no blanket changes to md-menu. */
+html.nvc5-editing .nvc5-shell {
+  position:fixed!important;top:40px!important;left:40px!important;
+  right:40px!important;bottom:40px!important;
+  width:calc(100vw - 80px)!important;height:calc(100vh - 80px)!important;
+  z-index:74!important;box-sizing:border-box;
+  background:linear-gradient(to bottom,transparent 0,transparent 304px,#212326 304px,#212326 100%);
+  border:1px solid #3d4344;box-shadow:0 12px 45px rgba(0,0,0,.53);
+  color:#f3f5f3;pointer-events:none;font-family:Arial,"Segoe UI",sans-serif;
+}
+.nvc5-shell *{box-sizing:border-box}
+.nvc5-editor{
+  margin:318px 24px 18px;height:calc(100% - 336px);
+  min-height:0;display:flex;flex-direction:column;gap:10px;
+  pointer-events:auto;background:#212326;
+}
+.nvc5-title{display:flex;align-items:center;flex:0 0 auto;gap:10px;
+  padding:0 0 10px;border-bottom:1px solid #3e4743;min-height:51px}
+.nvc5-title>div{flex:1;min-width:0}
+.nvc5-title h2{margin:0 0 4px;font-size:20px;line-height:23px;color:#fff}
+.nvc5-title h2 small{font-size:10px;color:#76b900;letter-spacing:1px}
+.nvc5-title p{margin:0;color:#aeb8b1;font-size:11px;line-height:15px}
+.nvc5-title button,.nvc5-group-head button,.nvc5-block-toolbar button,
+.nvc5-group-actions button,.nvc5-addgroup{
+  border:1px solid #48524c;border-radius:0;cursor:pointer;
+  background:#30383b;color:#fff;font:inherit;font-size:12px;min-height:28px;
+}
+.nvc5-title button{padding:0 13px;min-height:34px}
+.nvc5-title button:disabled{opacity:.4;cursor:default}
+.nvc5-title button:hover:not(:disabled),.nvc5-group-actions button:hover,
+.nvc5-addgroup:hover,.nvc5-group-head button:hover{border-color:#76b900}
+.nvc5-title .nvc5-done{background:#76b900;border-color:#76b900;color:#121912;font-weight:bold}
+.nvc5-catalog{flex:0 0 auto;background:#171c1e;border:1px solid #3e4743;padding:8px 10px}
+.nvc5-catalog-header{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+.nvc5-catalog-header strong{font-size:11px;letter-spacing:.7px}
+.nvc5-catalog-header span{font-size:11px;color:#9ab18d;margin-left:auto}
+.nvc5-search{width:200px;max-width:36%;height:26px;padding:2px 9px;
+  border:1px solid #4d5b52;background:#111718;color:#fff;font-size:12px}
+.nvc5-catalog-items{display:flex;gap:5px;overflow-x:auto;white-space:nowrap;padding-bottom:3px}
+.nvc5-catalog-items button{
+  display:flex;align-items:center;gap:5px;flex:0 0 auto;height:33px;
+  background:#30383b;color:#ddd;border:1px solid #44504a;padding:0 8px;
+  font-size:11px;cursor:pointer;
+}
+.nvc5-catalog-items button.selected{border:2px solid #76b900;color:#fff}
+.nvc5-catalog-items button.assigned:not(.selected){color:#abb6af}
+.nvc5-catalog-items button small{color:#76b900;font-size:9px}
+.nvc5-catalog-items md-icon,.nvc5-slot md-icon{
+  margin:0;width:20px;height:20px;font-size:20px;flex:0 0 20px;color:inherit
+}
+.nvc5-panels{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.nvc5-panel{display:flex;flex-direction:column;min-height:0;min-width:0;
+  background:#181d1f;border:1px solid #3c4841;padding:10px}
+.nvc5-panel>header{display:flex;justify-content:space-between;align-items:center;
+  border-bottom:1px solid #344037;padding:0 3px 8px;margin-bottom:8px}
+.nvc5-panel h3{font-size:13px;letter-spacing:.7px;margin:0;color:#e8efeb}
+.nvc5-panel>header span{font-size:11px;color:#9da9a1}
+.nvc5-panel-scroll{flex:1 1 auto;min-height:0;overflow:auto;
+  overscroll-behavior:contain;scrollbar-width:thin;padding:0 0 10px;
+  display:flex;flex-direction:column;align-items:center;gap:16px}
+.nvc5-group{flex:0 0 auto;width:252px;max-width:100%;padding:5px;
+  border:1px solid #3d4842;background:#232a2b}
+.nvc5-group-head{display:flex;align-items:center;gap:4px;min-height:26px}
+.nvc5-group-head strong{font-size:10px;letter-spacing:1px;color:#fff}
+.nvc5-group-head span{font-size:10px;color:#91a39a;margin-left:auto;margin-right:6px}
+.nvc5-group-head button{min-height:20px;min-width:20px;padding:0;font-size:13px}
+.nvc5-group-body{
+  width:240px;max-width:100%;height:240px;display:flex;flex-direction:column;
+  overflow:hidden;position:relative;background:#0f1516;border:0;outline:1px solid #435045;
+}
+.nvc5-group-empty{width:100%;display:flex;align-items:center;justify-content:center;
+  background:repeating-linear-gradient(45deg,#172022,#172022 6px,#1c2525 6px,#1c2525 12px);
+  color:#66766b;font-size:11px;flex:0 0 auto}
+.nvc5-block{position:relative;width:100%;flex:0 0 auto;overflow:hidden;border-bottom:1px solid #354139}
+.nvc5-block.nvc5-small,.nvc5-block.nvc5-side{height:80px}
+.nvc5-block.nvc5-big{height:240px}
+.nvc5-block-tiles{display:flex;width:240px;max-width:100%;height:100%;overflow:hidden}
+.nvc5-slot{
+  display:flex;flex:0 0 auto;align-items:center;justify-content:center;
+  height:100%;min-width:0;overflow:hidden;padding:4px;background:#222a2c;
+  border:1px solid #33453c;border-radius:0;color:#f2f5f2;cursor:pointer;
+}
+.nvc5-slot:nth-child(odd){background:#252e2f}
+.nvc5-slot:hover,.nvc5-slot.selected{outline:2px solid #76b900;outline-offset:-2px}
+.nvc5-slot>md-icon{font-size:34px;width:34px;height:34px;flex-basis:34px}
+.nvc5-slot .nvc5-plus{font-size:22px;color:#728778}
+.nvc5-slot-info{display:flex;flex-direction:column;align-items:flex-start;
+  overflow:hidden;text-align:left;max-width:100%;margin-left:6px}
+.nvc5-slot-info strong,.nvc5-slot-info small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.nvc5-slot-info strong{font-size:12px}.nvc5-slot-info small{font-size:10px;color:#9aaba1}
+.nvc5-big .nvc5-slot.nvc5-detail{flex-direction:column;gap:14px}
+.nvc5-big .nvc5-slot>md-icon{font-size:100px;width:100px;height:100px;flex-basis:100px}
+.nvc5-big .nvc5-slot-info{margin:0;text-align:center;align-items:center}
+.nvc5-big .nvc5-slot-info strong{font-size:16px}.nvc5-big .nvc5-slot-info small{font-size:12px}
+.nvc5-block-toolbar{position:absolute;right:2px;top:1px;z-index:2;display:flex;
+  align-items:center;gap:3px;background:rgba(16,23,24,.92);padding:1px;opacity:.8}
+.nvc5-block:hover .nvc5-block-toolbar,.nvc5-block:focus-within .nvc5-block-toolbar{opacity:1}
+.nvc5-block-toolbar span{display:none}
+.nvc5-block-toolbar select{font-size:10px;background:#1f2a27;color:#fff;
+  border:1px solid #536153;max-width:92px;height:22px}
+.nvc5-block-toolbar button{min-height:22px;min-width:20px;padding:0}
+.nvc5-group-actions{display:flex;gap:5px;margin-top:5px;min-height:24px;align-items:center}
+.nvc5-group-actions button{flex:1;min-height:24px;font-size:10px}
+.nvc5-group-actions span{font-size:10px;color:#7c8b7c}
+.nvc5-addgroup{flex:0 0 30px;margin-top:8px;border-style:dashed}
+.nvc5-footer{display:flex;justify-content:space-between;gap:12px;padding-top:7px;
+  border-top:1px solid #39433f;font-size:11px;color:#a2afa7;flex:0 0 auto}
+.nvc5-footer strong{color:#ffd28b}
+html.nvc5-editing nv-osc-top-bar .top-bar{visibility:visible!important;pointer-events:auto!important;position:relative;z-index:85}
+@media(max-height:920px){
+  .nvc5-shell{overflow-y:auto!important}
+  .nvc5-editor{margin-top:318px;height:auto;min-height:680px;padding-bottom:12px}
+  .nvc5-panel-scroll{min-height:300px}
+}
+@media(max-height:740px){
+  .nvc5-editor{margin-top:318px}
+}
+@media(max-width:1100px){
+  .nvc5-panels{gap:6px}
+  .nvc5-panel{padding:5px}
+  .nvc5-group{width:252px;padding:5px}
+  .nvc5-title h2{font-size:15px}
+}
+@media(max-width:1050px){
+  .nvc5-shell{overflow:auto!important}
+  .nvc5-editor{height:auto;min-height:850px;margin:318px 12px 12px}
+  .nvc5-panels{grid-template-columns:1fr}
+  .nvc5-panel{min-height:340px}
+  .nvc5-panel-scroll{min-height:250px;max-height:320px}
+}
