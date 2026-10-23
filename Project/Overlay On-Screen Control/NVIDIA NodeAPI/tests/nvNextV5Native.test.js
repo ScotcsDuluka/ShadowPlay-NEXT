@@ -4,7 +4,8 @@ const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const M=require('../osc/mods/nv-layout-v5-core.js');
 const nativeCode=fs.readFileSync(path.join(__dirname,'../osc/mods/nv-next-v5-native.js'),'utf8');
 
-function makeRuntime(flag) {
+function makeRuntime(flag, withClock=false) {
+  const frames=new Map();let frameId=0, onInterval=null;
   const storage=new Map([
     ['DulukaMainMenuUnifiedV4Enabled','1'],
     ['DulukaMainMenuGroupLayoutAEnabled','1']
@@ -50,10 +51,16 @@ function makeRuntime(flag) {
   const window={
     NvShadowPlayLayoutV5:M,NvUnifiedLayoutV4:v4,innerWidth:1920,innerHeight:1200,
     localStorage:{getItem(k){return storage.get(k)||null},setItem(k,v){storage.set(k,String(v))},removeItem(k){storage.delete(k)}},
-    setInterval:null,requestAnimationFrame:null
+    setInterval:withClock?fn=>{onInterval=fn}:null,
+    requestAnimationFrame:withClock?fn=>{const id=++frameId;frames.set(id,fn);return id}:null,
+    cancelAnimationFrame:withClock?id=>frames.delete(id):null
   };
   vm.runInNewContext(nativeCode,{window,document}, {filename:'nv-next-v5-native.js',timeout:2500});
-  return {window,document,root,bar,tiles,storage,changes};
+  return {window,document,root,bar,tiles,storage,changes,frames,
+    tick(){if(onInterval)onInterval()},
+    advance(){const first=frames.entries().next().value;if(!first)return false;
+      frames.delete(first[0]);first[1]();return true}
+  };
 }
 function classes(){
  const set=new Set();
@@ -175,4 +182,50 @@ test('committing V5 edit keeps its native owner without modifying legacy saved k
  assert.equal(t.bar.style.getPropertyValue('width'),'');
  api.sync(true);
  assert.equal(t.bar.style.getPropertyValue('position'),'relative');
+});
+
+test('closed or animating Native Host does not keep scheduling V5 RAF geometry work',()=>{
+ const t=makeRuntime(true,true), api=t.window.__nvNextLayoutV5;
+ const motion={phase:'idle',target:'closed',getState(){return {target:this.target}}};
+ t.window.__dulukaOscMotion=motion;
+ for(let i=0;i<40;i++)t.tick();
+ assert.equal(t.frames.size,0,'closed OSC cannot enqueue repeated RAF loops');
+ assert.equal(t.bar.style.getPropertyValue('width'),'','closed OSC stays untouched');
+ motion.phase='opening';motion.target='open';
+ for(let i=0;i<15;i++)t.tick();
+ assert.equal(t.frames.size,0,'entrance Motion may not reflow native tile geometry');
+ assert.ok(api.prepareForMotion(t.root),'preflight geometry remains allowed before animation');
+ assert.equal(t.frames.size,0);
+ motion.phase='idle';t.tick();
+ assert.equal(t.frames.size,1,'when native open settles, interval requests one geometry pass');
+ assert.equal(t.advance(),true);
+ assert.equal(t.bar.style.getPropertyValue('width'),'1496px');
+ assert.equal(t.frames.size,1);
+ // Native Close may arrive while a new RAF is queued: it must stop the
+ // in-flight cascade rather than scheduling another 30 frames.
+ motion.phase='closing';motion.target='closed';
+ assert.equal(t.advance(),true);
+ assert.equal(t.frames.size,0);
+ for(let i=0;i<40;i++)t.tick();
+ assert.equal(t.frames.size,0,'closing / closed must remain quiescent');
+ motion.phase='idle';motion.target='open';t.tick();
+ assert.equal(t.frames.size,1,'subsequent reopen resumes V5 geometry once ready');
+});
+
+test('temporary edit owner never spins RAF while closed and resumes without persisting a flag',()=>{
+ const t=makeRuntime(false,true), api=t.window.__nvNextLayoutV5;
+ const motion={phase:'idle',target:'closed',getState(){return {target:this.target}}};
+ t.window.__dulukaOscMotion=motion;
+ api.editOwnership(true);
+ assert.equal(api.enabled(),true);
+ for(let i=0;i<40;i++)t.tick();
+ assert.equal(t.frames.size,0);
+ assert.equal(t.storage.get(api.flagKey),undefined,'Edit must not persist enable flag');
+ motion.target='open';
+ t.tick();
+ assert.equal(t.frames.size,1);
+ api.editOwnership(false);
+ assert.equal(t.frames.size,0,'owner release cancels queued RAF');
+ assert.equal(api.enabled(),false);
+ assert.equal(t.storage.get(api.flagKey),undefined);
 });

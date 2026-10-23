@@ -71,3 +71,27 @@ This is historical evidence, not a new CEF run for the current audit.
 - The Stable worktree has unrelated concurrent dirty files in
   Capture/Container/Hook, osc/index.html, locales, and osc-renderer.
   Never run git add ., reset/clean, or stage those files from this QA task.
+
+## 2026-10-23 — V5 hidden-Host RAF guard
+
+An enabled NEXT native owner could schedule a 30-frame geometry settle
+repeatedly from its 360ms poll while the native Main-menu root existed but
+OSC Motion was closing/closed. Geometry correctly refused the writes, but
+the frames were needless.
+
+osc/mods/nv-next-v5-native.js now suppresses starting or continuing RAF
+during blocked Motion, then resumes on a blocked -> idle/open transition.
+prepareForMotion remains exempt to pre-position native NVIDIA tiles.
+
+tests/nvNextV5Native.test.js adds deterministic queued-RAF/timer coverage:
+- Closed Host: zero RAF requests after 40 ticks, no native style writes.
+- Opening/closing: no RAF reflows; preflight still allowed.
+- Idle/open: geometry resumes; subsequent Close ends a queued RAF loop.
+- Temporary edit owner: no RAF churn and no persistent feature flag.
+
+Combined offline suite: 135/135 pass. Test log:
+build_test/OSC-Live-Preview/freestyle-v5-motion-idle-gate-20261023.log
+
+Release gate unchanged. Source-only logic optimization; no direct CPU/GPU
+profiling or new real CEF verification. Do not auto-deploy during parallel
+OSC index/renderer/host work.

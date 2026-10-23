@@ -22,6 +22,7 @@
   var rootSelector = 'nv-main-menu:not([data-customize-preview]) .main-menu-container';
   var controls = {}, lastRoot = null, saved = null, session = null, raf = null, previewState = null;
   var settleRemaining = 0, lastGeometry = null, lastError = '';
+  var wasMotionBlocked = false;
   // Editing ownership is transient until Done. The legacy editor keeps its
   // persisted flag and NVIDIA node identities untouched during Cancel.
   var temporaryOwner = false, snapshots = [], createdInfo = [];
@@ -223,11 +224,13 @@
     return geometry(getNativeRoot(), !!preMotion);
   }
   function startSettle() {
-    if (!enabled() || raf !== null || !window.requestAnimationFrame) return;
+    // Do not run idle RAF loops while the native Host is hidden or in Motion.
+    // The interval below observes blocked -> idle/open and retries once ready.
+    if (!enabled() || motionBlocked() || raf !== null || !window.requestAnimationFrame) return;
     settleRemaining = 30;
     function frame() {
       raf = null;
-      if (!enabled()) return;
+      if (!enabled() || motionBlocked()) return;
       var root = getNativeRoot();
       var result = geometry(root, false);
       if (--settleRemaining <= 0) return;
@@ -312,7 +315,13 @@
   }
   if (window.setInterval) {
     window.setInterval(function () {
-      if (!enabled()) return;
+      if (!enabled()) { wasMotionBlocked = false; return; }
+      if (motionBlocked()) { wasMotionBlocked = true; return; }
+      if (wasMotionBlocked) {
+        wasMotionBlocked = false;
+        startSettle();
+        return;
+      }
       var root = getNativeRoot();
       if (root && root !== lastRoot) startSettle();
       // Edit view toggle changes which empty Groups may be rendered.
