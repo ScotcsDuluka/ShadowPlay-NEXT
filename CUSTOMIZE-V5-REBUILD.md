@@ -39,3 +39,14 @@
 - [ ] Only after visual acceptance, package a deliberate Source/Runtime deployment with rollback backup.
 
 _No changes to Stable, Capture Engine, or active game/runtime are part of this sandbox setup._
+
+## Crash-recovery checkpoint — 2026-10-23
+
+- The Clean Rebuild changeset from the user's ChatGPT package has been applied **only** to this sparse worktree; the original `Stable` tree and the running/build OSC have not been modified.
+- The source uses `main-menu-customize-shell.css` as the scoped owner of Customize geometry. It retains original NVIDIA menu and `nv-osc-top-bar`, V5 model, editor, Footer and Motion compatibility.
+- Native Windows checkout uses CRLF; initial patch application required `git apply --ignore-space-change` because the diff carried LF context.
+- CEF temporary CSS test **before this recovery** showed at viewport 1920×1200 the Settings shell started at y=448 instead of y=40; at 1366×768 the shell scrolled but Footer/Background sat outside its viewport (scroll-accessible). No functional native clicks were dispatched; 11/11 tile centers and X hit target were valid.
+- Geometry issue is NOT proven fixed in live CEF yet. The patch now avoids CSS `inset` shorthand and multiplication inside `calc()`, but an ancestor transform/containing block is another plausible cause. Do not assert success without running the read-only CEF geometry audit.
+- Run `node devtools/osc-live/audit-customize-v5.cjs` while **Customize Main-menu is visibly open**. Audit inspects geometry and hit tests without editing styles or clicking controls. At rest shell must be [40,40,viewport width−80,viewport height−80], with reachable Footer & Background.
+- Offline Main-menu regression: **103/103 passed** after change. This is NOT visual validation.
+- Next gate: inspect the failing live CEF ancestor chain if shell still y=448 (particularly ancestors with transform/filter/perspective), repair in sandbox, rerun regressions and native visual test. Only deploy after the native check passes and the user agrees.

@@ -83,8 +83,12 @@
    q=q.toLowerCase();
    G.PANELS.forEach(function(p){
      var list=editor.querySelector('[data-g-panel="'+p+'"] .nv-g-group-list');
+     // Repainting the Group DOM must not jump the user's scroll position.
+     // This also covers selecting a Control from the catalog and Undo/Redo.
+     var previousScroll=list.scrollTop;
      list.innerHTML=s.panels[p].map(function(g,i){return group(g,p,i);}).join('')||
        '<div class="nv-g-empty">No Groups · Add one below</div>';
+     list.scrollTop=previousScroll;
      editor.querySelector('[data-g-panel="'+p+'"] .nv-g-panel-count').textContent=s.panels[p].length+' Groups';
    });
    var bar=editor.querySelector('.nv-g-catalog');
@@ -113,7 +117,12 @@
    var del=btn.getAttribute('data-g-delete');
    if(del){var d=part(del);change(function(s){return G.removeGroup(s,d[0],+d[1]);},'Empty Group removed');return;}
    if(btn.hasAttribute('data-g-undo')){
-     if(undo.length){save(undo.pop(),'Undone');}return;
+     if(undo.length){
+       // Keep the Undo snapshot until persistence succeeds. A full disk or
+       // denied localStorage write must never silently consume history.
+       try{save(undo[undo.length-1],'Undone');undo.pop();}
+       catch(e){message=e.message;render();}
+     }return;
    }
    if(btn.hasAttribute('data-g-reset')){reset();return;}
  }

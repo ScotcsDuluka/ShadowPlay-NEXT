@@ -2,7 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const M=require('../osc/mods/main-menu-unified-model'),G=require('../osc/mods/main-menu-group-model');
 const native=fs.readFileSync(path.join(__dirname,'../osc/mods/main-menu-unified-native.js'),'utf8');
-const css=fs.readFileSync(path.join(__dirname,'../osc/mods/main-menu-live.css'),'utf8');
+const css=fs.readFileSync(path.join(__dirname,'../osc/mods/main-menu-customize-shell.css'),'utf8');
 
 function fixture(editing){
  let s=G.fromV4(M.initial());
@@ -26,9 +26,9 @@ function fixture(editing){
  const window={innerWidth:1920,innerHeight:1200,NvUnifiedLayoutV4:M,
    __dulukaGroupLayoutA:{enabled:()=>true,get:()=>s,model:G},
    localStorage:{getItem:k=>storage[k]||null,setItem:(k,v)=>{storage[k]=v},removeItem:k=>delete storage[k]},
-   getComputedStyle:()=>({getPropertyValue:k=>k==='--nv-top-preview-height'?'380px':'',paddingTop:'402px'})};
+   getComputedStyle:()=>({getPropertyValue:k=>k==='--nv-top-preview-height'?'300px':'',paddingTop:'316px'})};
  vm.runInNewContext(native,{window,document,JSON,Math},'main-menu-unified-native.js');
- return {api:window.__dulukaUnifiedMainMenu,root,window,state:s,menuOriginY:160,shellStartY:420};
+ return {api:window.__dulukaUnifiedMainMenu,root,window,state:s,menuOriginY:160,shellStartY:340};
 }
 
 test('when editing V5, native 2-row group preview fits fully above the opaque Settings shell',()=>{
@@ -45,7 +45,7 @@ test('outside Customize, V5 native geometry may use regular fullscreen height',(
 });
 
 test('Customize native viewing strip is a shared dimension in CSS and JavaScript',()=>{
- assert.match(css,/--nv-top-preview-height\s*:\s*380px/);
+ assert.match(css,/--nv-top-preview-height\s*:\s*300px/);
  assert.match(css,/background\s*:\s*linear-gradient\([\s\S]*?var\(--nv-top-preview-height\)/);
  assert.match(native,/--nv-top-preview-height/);
 });

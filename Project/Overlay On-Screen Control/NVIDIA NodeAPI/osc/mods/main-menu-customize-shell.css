@@ -1,0 +1,213 @@
+/* NVIDIA OSC Customize Shell — one scoped owner for screen geometry.
+   The real md-menu controls and nv-osc-top-bar are NEVER replaced.
+   No rules in this file apply while Customize is closed. */
+html.nv-live-layout-editing {
+  --nv-top-preview-height: 300px;
+  --nv-customize-inset: 40px;
+  --nv-customize-gutter: 32px;
+  --nv-customize-background-height: 108px;
+}
+
+/* Topbar stays native, keyboard/mouse enabled.  Motion handles its opacity. */
+html.nv-live-layout-editing nv-osc-top-bar .top-bar {
+  visibility: visible !important;
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 85;
+}
+
+/* Native preview backdrop is a noninteractive layer UNDER the existing
+   NVIDIA md-menu tiles. Do not duplicate menu buttons or bind events here. */
+html.nv-live-layout-editing:not(.nv-motion-active):not(.nv-motion-preparing):not(.nv-motion-opening):not(.nv-motion-closing) body [nv-main-menu-live-editor]::before {
+  content: "";
+  position: fixed;
+  top: var(--nv-customize-inset);
+  left: var(--nv-customize-inset);
+  right: var(--nv-customize-inset);
+  height: var(--nv-top-preview-height);
+  background: #101617;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* One Settings shell: the 40px border belongs to NVIDIA, not the grid.
+   Its transparent top band allows the REAL native preview to remain visible. */
+html.nv-live-layout-editing body .nv-live-editor,
+html.nv-live-layout-editing body .nv-live-editor.nv-unified-editor-active {
+  position: fixed !important;
+  box-sizing: border-box !important;
+  /* Explicit edges: older OSC CEF builds do not reliably parse the inset
+     shorthand or calc() multiplication, leaving the legacy top:390px active. */
+  top: 40px !important;
+  right: 40px !important;
+  bottom: 40px !important;
+  left: 40px !important;
+  width: calc(100vw - 80px) !important;
+  height: calc(100vh - 80px) !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-width: none !important;
+  max-height: none !important;
+  margin: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  padding: calc(var(--nv-top-preview-height) + 16px) var(--nv-customize-gutter) 24px !important;
+  overflow-x: hidden !important;
+  overflow-y: hidden !important;
+  overscroll-behavior: contain;
+  background: linear-gradient(to bottom,
+    transparent 0,
+    transparent var(--nv-top-preview-height),
+    #212326 var(--nv-top-preview-height),
+    #212326 100%) !important;
+  border: 1px solid #3c4043 !important;
+  border-radius: 0 !important;
+  box-shadow: 0 12px 44px rgba(0,0,0,.55) !important;
+  color: #fff !important;
+  transform: none !important;
+  animation: none !important;
+  z-index: 75 !important;
+  pointer-events: none !important;
+}
+/* Native preview remains clickable THROUGH the transparent shell band. */
+html.nv-live-layout-editing body .nv-live-editor > * {pointer-events: auto !important;}
+html.nv-live-layout-editing body .main-menu-container md-menu {visibility: visible !important;}
+html.nv-live-layout-editing body .nv-live-editor > header {
+  flex: 0 0 auto;
+  margin: 0 0 12px !important;
+  padding: 0 0 12px !important;
+  border-bottom: 1px solid #3a3f41;
+}
+html.nv-live-layout-editing body .nv-live-editor > header h2 {
+  font-size: 20px !important;
+  line-height: 26px;
+  color: #fff;
+}
+html.nv-live-layout-editing body .nv-live-editor > header .osc-button {border-radius: 0 !important;}
+html.nv-live-layout-editing body .nv-live-editor .nv-unified-controls,
+html.nv-live-layout-editing body .nv-live-editor .nv-unified-panel {
+  background: #1c2023 !important;
+  border-color: #373d40 !important;
+  border-radius: 0 !important;
+}
+
+/* V5 is a bounded, self-contained editor with an ACTUAL minmax grid track.
+   Each Group list scrolls independently; New Group stays accessible. */
+html.nv-live-layout-editing body .nv-live-editor.nv-group-layout-on > .nv-group-layout-editor {
+  display: flex !important;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+  margin: 0 0 8px;
+}
+html.nv-live-layout-editing body .nv-live-editor.nv-group-layout-on .nv-g-toolbar,
+html.nv-live-layout-editing body .nv-live-editor.nv-group-layout-on .nv-g-library,
+html.nv-live-layout-editing body .nv-live-editor.nv-group-layout-on .nv-g-message {
+  flex: 0 0 auto;
+}
+html.nv-live-layout-editing body .nv-live-editor.nv-group-layout-on .nv-g-toolbar {
+  padding: 7px 10px;
+  margin-bottom: 8px;
+}
+html.nv-live-layout-editing body .nv-live-editor.nv-group-layout-on .nv-g-library {
+  padding: 8px 10px 4px;
+  margin-bottom: 8px;
+}
+html.nv-live-layout-editing body .nv-live-editor.nv-group-layout-on .nv-g-library-head {margin-bottom: 5px;}
+html.nv-live-layout-editing body .nv-live-editor.nv-group-layout-on .nv-g-panels {
+  flex: 1 1 auto;
+  min-height: 0;
+  grid-template-rows: minmax(0,1fr);
+  overflow: hidden;
+  align-items: stretch;
+}
+html.nv-live-layout-editing body .nv-live-editor.nv-group-layout-on .nv-g-panel {
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 0;
+  max-height: none;
+  overflow: hidden;
+}
+html.nv-live-layout-editing body .nv-live-editor.nv-group-layout-on .nv-g-group-list {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  overscroll-behavior: contain;
+}
+html.nv-live-layout-editing body .nv-live-editor.nv-group-layout-on .nv-g-add {flex: 0 0 29px;}
+html.nv-live-layout-editing body .nv-live-editor.nv-group-layout-on > footer {
+  flex: 0 0 auto;
+  margin: 6px 0 8px !important;
+  min-height: 30px;
+}
+html.nv-live-layout-editing body .nv-live-editor.nv-group-layout-on > nv-osc-background-settings {
+  display: block !important;
+  box-sizing: border-box;
+  flex: 0 0 var(--nv-customize-background-height);
+  min-height: 0;
+  max-height: var(--nv-customize-background-height);
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+}
+/* Avoid horizontal scroll from the 100%-wide search field's own borders. */
+.nv-group-layout-editor .nv-g-search {box-sizing: border-box;}
+
+/* On shorter screens, prioritise reachability over an impossibly tiny grid.
+   The shell itself scrolls, and each Group still maintains its own scrollbar. */
+@media (max-height: 1000px) {
+  html.nv-live-layout-editing {--nv-top-preview-height: 255px;}
+  html.nv-live-layout-editing body .nv-live-editor,
+  html.nv-live-layout-editing body .nv-live-editor.nv-unified-editor-active {
+    display: block !important;
+    overflow-y: auto !important;
+    padding-bottom: 24px !important;
+  }
+  html.nv-live-layout-editing body .nv-live-editor.nv-group-layout-on > .nv-group-layout-editor {
+    display: block !important;
+    overflow: visible !important;
+  }
+  html.nv-live-layout-editing body .nv-live-editor.nv-group-layout-on .nv-g-panels {
+    grid-template-rows: auto;
+    overflow: visible;
+  }
+  html.nv-live-layout-editing body .nv-live-editor.nv-group-layout-on .nv-g-panel {
+    height: 300px;
+    max-height: 300px;
+  }
+  html.nv-live-layout-editing body .nv-live-editor.nv-group-layout-on > nv-osc-background-settings {
+    height: auto;
+    max-height: none;
+    overflow-y: visible !important;
+  }
+}
+@media (max-height: 780px) {
+  html.nv-live-layout-editing {--nv-top-preview-height: 215px;}
+}
+@media (max-width: 930px) {
+  html.nv-live-layout-editing {--nv-customize-gutter: 16px;}
+  html.nv-live-layout-editing body .nv-live-editor.nv-group-layout-on .nv-g-panels {
+    grid-template-columns: 1fr;
+    grid-template-rows: repeat(3,300px);
+    overflow: visible;
+  }
+  html.nv-live-layout-editing body .nv-live-editor,
+  html.nv-live-layout-editing body .nv-live-editor.nv-unified-editor-active {
+    display: block !important;
+    overflow-y: auto !important;
+  }
+  html.nv-live-layout-editing body .nv-live-editor.nv-group-layout-on > .nv-group-layout-editor {
+    display: block !important;
+    overflow: visible !important;
+  }
+  html.nv-live-layout-editing body .nv-live-editor.nv-group-layout-on .nv-g-panel {height: 300px;max-height: 300px;}
+}
+html.nv-motion-preparing body .nv-live-editor,
+html.nv-motion-opening body .nv-live-editor,
+html.nv-motion-closing body .nv-live-editor {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}

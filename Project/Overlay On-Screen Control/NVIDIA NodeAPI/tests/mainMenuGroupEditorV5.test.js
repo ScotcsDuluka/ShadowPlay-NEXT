@@ -47,7 +47,7 @@ function fake(){
   return {api:window.__dulukaGroupLayoutA,window,document,storage,
     open(){host=node();return host;},
     remove(){if(host&&host.querySelector('.nv-group-layout-editor'))host.querySelector('.nv-group-layout-editor').isConnected=false;host=null;},
-    listeners:k=>(events[k]||[]).length,fail:()=>{failSave=true;},failNativeSync:()=>{failSync=true;},
+    listeners:k=>(events[k]||[]).length,fail:()=>{failSave=true;},restoreWrites:()=>{failSave=false;},failNativeSync:()=>{failSync=true;},
     button:(key,value)=>({
       closest(){return this;}, getAttribute:k=>k===key?value:null, hasAttribute:k=>k===key
     })
@@ -95,4 +95,29 @@ test('a native Sync error after saving cannot erase Undo history',()=>{
   assert.equal(f.api.get().panels.left.length,old.panels.left.length+1,'the model was saved');
   editor.fire('click',f.button('data-g-undo',''));
   assert.deepEqual(f.api.get(),old,'Undo should still work after external Sync failure');
+});
+
+
+test('failed Undo persistence retains history so retry works after storage recovers',()=>{
+  const f=fake(),host=f.open();f.api.enable(true);
+  const before=f.api.get(),editor=host.querySelector('.nv-group-layout-editor');
+  editor.fire('click',f.button('data-g-add','left'));
+  assert.equal(f.api.get().panels.left.length,before.panels.left.length+1);
+  f.fail();
+  editor.fire('click',f.button('data-g-undo',''));
+  assert.equal(f.api.get().panels.left.length,before.panels.left.length+1);
+  f.restoreWrites();
+  editor.fire('click',f.button('data-g-undo',''));
+  assert.deepEqual(f.api.get(),before);
+});
+
+test('V5 rerenders preserve each Group column scroll position',()=>{
+  const f=fake(),host=f.open();f.api.enable(true);
+  const editor=host.querySelector('.nv-group-layout-editor');
+  const list=editor.querySelector('[data-g-panel="center"] .nv-g-group-list');
+  let value=list.innerHTML;
+  Object.defineProperty(list,'innerHTML',{get(){return value;},set(v){value=v;this.scrollTop=0;}});
+  list.scrollTop=84;
+  f.api.render();
+  assert.equal(list.scrollTop,84);
 });

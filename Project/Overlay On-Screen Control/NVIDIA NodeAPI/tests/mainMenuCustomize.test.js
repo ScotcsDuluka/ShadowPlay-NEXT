@@ -216,7 +216,9 @@ test('compact Controls tray is a single horizontal row with NVIDIA E909 collapse
  assert.match(css,/\.nv-live-library \.nv-live-palette\s*\{[^}]*overflow-x:auto/);
  assert.match(css,/\.nv-live-library \.nv-live-palette button\s*\{[^}]*flex:0 0 160px/);
  assert(output.includes("key!=='Settings'"),'protected Settings remains in the template');
- assert.match(css,/html \.nv-live-editor\s*\{[^}]*left:calc\(50% - 760px\)!important/,'Customize overrides the BG extension only for centered editor geometry');
+ const shell=fs.readFileSync(path.join(mods,'main-menu-customize-shell.css'),'utf8');
+ assert.match(shell,/--nv-customize-inset:\s*40px/,'V5 uses the native 40px inset instead of the old floating editor');
+ assert.match(shell,/overflow-y:\s*hidden\s*!important/,'tall Customize layout stays within the Settings shell');
 });
 
 test('Customize control labels use OSC locale keys without changing NVIDIA glyphs',()=>{
