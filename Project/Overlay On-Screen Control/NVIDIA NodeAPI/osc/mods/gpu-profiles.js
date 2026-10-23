@@ -237,7 +237,7 @@
           click:function () { return injector.get('$state').go('main.preferences'); }},
         {id:'customize-main-menu',name:'Customize Main-menu',icon:'icon-share',visible:true,enabled:true,
           click:function () { if(window.__dulukaStartMainMenuEditor)return window.__dulukaStartMainMenuEditor(); }},
-        {id:'game-profiles',name:'Game Profiles',icon:'icon-edit_tune',visible:true,enabled:true,
+        {id:'game-profiles',name:'คอลโทล',icon:'icon-edit_tune',visible:true,enabled:true,
           click:openGameProfilesFromMainMenu},
         {id:'quiet-mode',name:'Whisper Mode',icon:'icon-volume_off',visible:false,enabled:false,
           click:function () {
