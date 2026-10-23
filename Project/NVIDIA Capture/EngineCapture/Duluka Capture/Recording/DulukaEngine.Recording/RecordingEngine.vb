@@ -371,12 +371,6 @@ Namespace DulukaEngine.Recording
                 End SyncLock
                 If startStop Then session?.[Stop]()
                 result = session.Run()
-                SyncLock _sync
-                    If Object.ReferenceEquals(_currentSession, session) Then
-                        _currentSession = Nothing
-                    End If
-                    _lastSessionResult = result
-                End SyncLock
             Catch ex As Exception
                 _logger.Error($"RecordingEngine: session failed: {ex.Message}", ex)
                 result = New SessionResult() With {
@@ -386,6 +380,12 @@ Namespace DulukaEngine.Recording
                 }
             Finally
                 SyncLock _sync
+                    ' Publish the result for BOTH success and failure, and
+                    ' never expose a phantom active session after an exception.
+                    ' Previous success-only assignment left GetStatus().LastSessionResult
+                    ' stale when initialization or the session itself failed.
+                    _currentSession = Nothing
+                    _lastSessionResult = result
                     ' A timed-out Dispose leaves disposal pending while the
                     ' session unwinds. Do not publish Idle: StartSession rejects
                     ' that state through _disposeRequested, so Idle would lie
@@ -394,8 +394,11 @@ Namespace DulukaEngine.Recording
                     _state = If(_disposeRequested,
                                 RecordingEngineState.Stopping,
                                 RecordingEngineState.Idle)
+                    ' Set completion atomically with the Idle publication:
+                    ' a new StartSession cannot Reset the event before an old
+                    ' session signals completion.
+                    _sessionFinished.Set()
                 End SyncLock
-                _sessionFinished.Set()
             End Try
 
             Return result
