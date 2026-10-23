@@ -5,6 +5,7 @@ html.nv-live-layout-editing .nv-live-editor:not(.nv-freestyle-v5-edit) {
 .nv-f-overlay {position:fixed;left:0;top:0;right:0;bottom:0;z-index:85;pointer-events:none;user-select:none}
 .nv-f-group {
  position:fixed;box-sizing:border-box;pointer-events:none;
+ z-index:1;
  border:1px dashed rgba(118,185,0,.67);
  background:rgba(118,185,0,.025);
  transition:left .17s ease,top .17s ease,width .17s ease;
@@ -40,6 +41,7 @@ html.nv-live-layout-editing .nv-live-editor:not(.nv-freestyle-v5-edit) {
 }
 .nv-f-slot {
  position:fixed;box-sizing:border-box;pointer-events:auto;
+ z-index:0;
  border:1px dashed rgba(170,182,184,.32);
  color:#ccd8d6;text-align:center;display:flex;
  align-items:center;justify-content:center;
