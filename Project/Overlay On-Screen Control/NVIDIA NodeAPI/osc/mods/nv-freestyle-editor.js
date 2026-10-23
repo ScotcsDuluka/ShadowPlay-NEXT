@@ -467,6 +467,14 @@
       if(picker){removePopup();stop(ev);return}
       // Native Angular Material owns Escape while an md-select/md-menu is
       // expanded. Let the popup dismiss itself; do not cancel Freestyle.
+      // Angular Material may close its popup on an earlier capture listener,
+      // *before* this listener runs. The key's original target still identifies
+      // the native select/option that handled Escape, even after md-active goes.
+      var source=ev.target;
+      if(source&&source.closest&&(source.closest('md-option') ||
+         source.closest('md-select-menu') || source.closest('md-select') ||
+         source.closest('.md-select-menu-container') ||
+         source.closest('.md-open-menu-container')))return;
       if(document.querySelector('.md-select-menu-container.md-active') ||
          document.querySelector('.md-open-menu-container.md-active'))return;
       cancel(true);stop(ev);

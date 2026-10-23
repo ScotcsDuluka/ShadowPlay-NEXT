@@ -337,3 +337,18 @@ test('Escape inside native NVIDIA md-select closes only that popup, not Freestyl
   assert.equal(f.editor.isEditing(), false);
   assert.equal(f.shellCloses, 1);
 });
+
+test('Material Escape race: md-option event stays owned after Angular removed active class', () => {
+  const f = fixture(); f.scan();
+  const popup = new Element('div', 'md-select-menu-container');
+  const option = new Element('md-option');
+  popup.appendChild(option); f.document.body.appendChild(popup);
+  // Simulate the earlier Material capture listener already closing the popup.
+  const event = f.emit('keydown', option, { key: 'Escape' });
+  assert.equal(event.prevented, undefined, 'Freestyle does not swallow Material Escape');
+  assert.equal(f.editor.isEditing(), true);
+  assert.equal(f.shellCloses, 0);
+  popup.remove();
+  f.emit('keydown', f.host, { key: 'Escape' });
+  assert.equal(f.editor.isEditing(), false, 'Second Escape cancels Customize');
+});
