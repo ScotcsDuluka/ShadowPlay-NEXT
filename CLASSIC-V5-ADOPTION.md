@@ -27,7 +27,7 @@ A Group can contain Small/Side Blocks with a total of **up to three rows**, or o
 ## Implemented
 
 - `working/NVIDIA NodeAPI/osc/mods/classic-group-v5-model.js`: pure, testable V5 data model. Immutable edits, geometry, Block types/layouts, moving Groups/Controls, Settings protection, V2 data migration, separate safe persistence key `DulukaClassicGroupV5Layout`.
-- `.../classic-group-v5-editor.js`: interactive Customize UI for creating/reordering/removing Groups, adding/removing Blocks, switching Block Type/Layout, choosing Controls then clicking Slots, Undo, reset and saved state. When editing, native capture clicks are blocked.
+- `.../classic-group-v5-editor.js`: interactive Customize UI for creating/reordering/removing Groups, adding/removing Blocks, switching Block Type/Layout, choosing Controls then clicking Slots, Undo, reset and saved state. When editing, native capture clicks are blocked. Legacy `main.customize-main-menu` Angular route is intercepted so the old Customize page is not opened underneath V5.
 - `.../classic-group-v5.css`: single, scoped Stylesheet for native-style dark panel, fixed 40px shell inset, full 240×240 group geometry, independently scrolling panel lists and whole-shell scrolling on shorter screens. It does not modify V2 CSS rules.
 - `working/NVIDIA NodeAPI/osc/index.html`: loads model and editor after the old `main-menu-live.js` while preserving OSC Motion scripts. Original `__dulukaStartMainMenuEditor` entry point is intercepted **only inside this isolated working tree**.
 

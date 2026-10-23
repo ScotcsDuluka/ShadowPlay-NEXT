@@ -202,6 +202,19 @@
    if(inj){try{inj.get('$state').go('main.main-menu');}catch(ignore){}}
    var attempts=0,timer=win.setInterval(function(){if(doc.querySelector('nv-main-menu')||attempts++>24){win.clearInterval(timer);mount();}},60);
  }
+ // Legacy Settings links use an Angular UI-Router state, not the global opener.
+ // Intercept that route ONLY in the extracted classic working copy so the
+ // old V2 panel doesn't appear underneath the V5 editor.
+ if(win.angular&&typeof win.angular.module==='function'){
+   try{win.angular.module('main').run(['$rootScope',function($rootScope){
+     $rootScope.$on('$stateChangeStart',function(event,toState){
+       if(toState&&toState.name==='main.customize-main-menu'){
+         event.preventDefault();
+         win.setTimeout(start,0);
+       }
+     });
+   }]);}catch(ignore){}
+ }
  win.__dulukaOpenClassicGroupV5=start;
  win.__dulukaCloseClassicGroupV5=closeEditor;
  // Only this isolated classic sandbox opts in; the user's active V2 remains untouched.
