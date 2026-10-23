@@ -1,0 +1,87 @@
+/* Freestyle V5 native edit ornaments. Never visible in Normal Mode. */
+.nv-f-overlay {position:fixed;inset:0;z-index:85;pointer-events:none;user-select:none}
+.nv-f-group {
+ position:fixed;box-sizing:border-box;pointer-events:none;
+ border:1px dashed rgba(118,185,0,.67);
+ background:rgba(118,185,0,.025);
+ transition:left .17s ease,top .17s ease,width .17s ease;
+}
+.nv-f-group.nv-f-empty {border-color:rgba(172,182,184,.8);background:rgba(80,85,88,.14)}
+.nv-f-group.nv-f-insert-preview {border:3px solid #76b900;box-shadow:0 0 12px rgba(118,185,0,.5)}
+.nv-f-group-head {
+ position:absolute;left:0;top:-22px;height:20px;min-width:76px;padding:0 7px;
+ line-height:20px;font-size:11px;text-align:center;letter-spacing:.3px;
+ color:#dce5e9;background:#273034;border:1px solid #718082;
+ box-sizing:border-box;pointer-events:auto;cursor:grab;
+}
+.nv-f-panel-target {
+ position:fixed;box-sizing:border-box;min-width:93px;padding:3px 8px;
+ background:rgba(35,42,44,.94);border:1px solid #677477;
+ text-align:center;font-size:10px;color:#c3cdd1;
+ pointer-events:auto;cursor:crosshair;z-index:2;
+}
+.nv-f-group .nv-f-delete {
+ position:absolute;right:0;top:-22px;width:20px;height:20px;
+ padding:0;line-height:18px;font-size:16px;border:1px solid #606b6c;
+ background:#292f32;color:#dedede;cursor:pointer;pointer-events:auto;
+}
+.nv-f-group .nv-f-add-block {
+ position:absolute;right:4px;bottom:3px;z-index:4;padding:2px 6px;
+ background:#24292c;border:1px dashed #719337;color:#dce5e9;
+ font-size:10px;cursor:pointer;pointer-events:auto;
+}
+.nv-f-group .nv-f-empty-target {
+ position:absolute;inset:16px 8px;pointer-events:auto;
+ background:transparent;color:#bac6c8;font-size:14px;
+ border:1px dashed #7a8788;cursor:copy;
+}
+.nv-f-slot {
+ position:fixed;box-sizing:border-box;pointer-events:auto;
+ border:1px dashed rgba(170,182,184,.32);
+ color:#ccd8d6;text-align:center;display:flex;
+ align-items:center;justify-content:center;
+ font-size:20px;cursor:grab;
+}
+.nv-f-slot.nv-f-vacant {border-color:rgba(118,185,0,.8);background:rgba(118,185,0,.075)}
+.nv-f-slot:hover,.nv-f-group-head:hover {outline:2px solid #76b900;outline-offset:-2px}
+.nv-f-context {position:fixed;display:block;z-index:600!important;
+ min-width:220px;max-height:380px;overflow-y:auto;box-sizing:border-box;
+ border:1px solid #687476;background:#252b2e;color:#fff;
+ box-shadow:0 10px 32px rgba(0,0,0,.7)}
+.nv-f-context .nv-f-menu-head {
+ padding:10px 14px;border-bottom:1px solid #515b5d;
+ color:#76b900;font-size:13px;font-weight:600;
+}
+.nv-f-context md-menu-item {display:block;height:auto;min-height:31px}
+.nv-f-context md-menu-item button.md-button {box-sizing:border-box;width:100%;
+ min-height:32px;margin:0;border:0;background:transparent;
+ color:#e9eeee;text-align:left;padding:5px 13px;cursor:pointer;font-size:12px}
+.nv-f-context md-menu-item button.md-button:hover {background:#374b29}
+.nv-f-drag-ghost {position:fixed;z-index:650;pointer-events:none;
+ padding:9px 13px;border:2px solid #76b900;background:rgba(29,36,28,.95);
+ color:#fff;box-shadow:0 5px 20px rgba(0,0,0,.5)}
+.nv-f-tools {margin:0 0 10px;border-bottom:1px solid #444c4f;padding:0 0 9px}
+.nv-f-actions {display:flex;align-items:center;gap:5px;margin:2px 0 7px}
+.nv-f-autofill {display:flex;align-items:center;gap:6px;font-size:12px;
+ white-space:nowrap;margin-right:auto;color:#e0e4e4}
+.nv-f-auto-input {accent-color:#76b900}
+.nv-f-tool {background:#373f42;color:#f1f5f3;border:1px solid #566266;
+ min-height:29px;padding:4px 8px;font-size:11px;cursor:pointer}
+.nv-f-tool:hover {background:#46544b}
+.nv-f-tool:disabled {opacity:.4;cursor:not-allowed}
+.nv-f-add {border-color:#76b900;color:#c9ee9b}
+.nv-f-status {min-height:14px;color:#f8d28a;font-size:11px;line-height:16px}
+.nv-f-selection {color:#b7c1c3;font-size:11px;min-height:17px;line-height:17px}
+html.nv-freestyle-v5-editing .main-menu-container md-menu > button.menu-button {
+ cursor:grab!important;
+}
+/* Existing native NVIDIA animations only. Avoid animation while OSC opens/closes. */
+html.nv-live-layout-editing:not(.nv-motion-active):not(.nv-motion-preparing)
+ .main-menu-container md-menu.nv-next-v5-tile {
+ transition:left .16s ease,top .16s ease,width .16s ease,height .16s ease;
+}
+@media(prefers-reduced-motion:reduce){
+ .nv-f-group,html.nv-live-layout-editing .main-menu-container md-menu.nv-next-v5-tile {
+ transition:none!important
+ }
+}

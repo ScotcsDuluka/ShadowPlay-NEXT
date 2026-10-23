@@ -68,7 +68,8 @@
     return g.blocks.some(function (b) { return b.slots.indexOf(key) >= 0; });
   }
   function filled(g) {
-    return g.blocks.some(function (b) { return b.slots.some(Boolean); });
+    // Empty GROUP means no Blocks, not merely unassigned Controls in its Slots.
+    return g.blocks.length > 0;
   }
   function validate(s) {
     ensure(s && s.version === 5 && typeof s.autoFill === 'boolean' &&
@@ -274,7 +275,7 @@
   function geometry(s, mode, width) {
     validate(s);
     ensure(mode === 'normal' || mode === 'edit', 'Invalid Mode');
-    var showEmpty = mode === 'edit', gap = 28, x = 0, boxes = [], cells = [];
+    var showEmpty = mode === 'edit', gap = 28, x = 0, boxes = [], cells = [], slots = [];
     PANEL_NAMES.forEach(function (p) {
       var groups = s.panels[p].filter(function (g) { return showEmpty || filled(g); });
       groups.forEach(function (g) {
@@ -287,6 +288,9 @@
           var spans = PRESETS[b.type][b.layout], total = spans.reduce(function (n, v) { return n + v; }, 0), sx = 0;
           b.slots.forEach(function (key, si) {
             var w = GROUP_SIZE * spans[si] / total;
+            slots.push({ control: key, panel: p, groupId: g.id,
+              block: bi, slot: si, type: b.type, layout: b.layout,
+              x: x + sx, y: dy, width: w, height: h });
             if (key) cells.push({
               control: key, panel: p, groupId: g.id,
               block: bi, slot: si, type: b.type,
@@ -306,7 +310,8 @@
     var targetWidth = Number(width) || 1920;
     var scale = Math.min(1, Math.max(.01, targetWidth / Math.max(1, x)));
     return { width: x, height: GROUP_SIZE, scale: scale,
-      boxes: boxes, cells: cells, hiddenGroupIds: PANEL_NAMES.reduce(function (a, p) {
+      boxes: boxes, cells: cells, slots: slots,
+      hiddenGroupIds: PANEL_NAMES.reduce(function (a, p) {
         s.panels[p].forEach(function (g) {
           if (!showEmpty && !filled(g)) a.push(g.id);
         }); return a;

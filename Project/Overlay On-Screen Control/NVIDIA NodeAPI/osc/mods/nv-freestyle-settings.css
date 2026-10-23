@@ -76,6 +76,54 @@ html.nv-live-layout-editing body .nv-live-editor.nv-freestyle-settings {
  }
  .nv-live-editor.nv-freestyle-settings .nv-freestyle-controls .nv-live-library {padding:9px!important;}
 }
+
+/* Original NVIDIA floating Settings shell; never stretch edge-to-edge. */
+html.nv-live-layout-editing body .nv-live-editor.nv-freestyle-settings {
+ position:fixed!important;
+ left:10.4vw!important;right:10.4vw!important;
+ top:44vh!important;bottom:auto!important;
+ width:79.2vw!important;height:42vh!important;
+ min-height:345px!important;
+ max-height:calc(100vh - 44vh - 20px)!important;
+ padding:18px 22px!important;
+ z-index:70!important;
+ background:rgba(36,41,44,.97)!important;
+ border-top:4px solid #76b900!important;
+ box-shadow:0 16px 44px rgba(0,0,0,.42)!important;
+}
+html.nv-live-layout-editing body .nv-live-editor.nv-freestyle-settings > header {
+ margin:0 0 14px!important;align-items:flex-start;
+}
+html.nv-live-layout-editing body .nv-live-editor.nv-freestyle-settings > header h2 {
+ font-size:18px!important;line-height:24px!important;
+}
+html.nv-live-layout-editing body .nv-live-editor.nv-freestyle-settings .nv-freestyle-grid {
+ grid-template-columns:minmax(0,4fr) minmax(200px,1fr)!important;
+ gap:14px!important;
+}
+html.nv-live-layout-editing body .nv-live-editor.nv-freestyle-settings .nv-freestyle-controls {
+ position:relative;top:auto;
+}
+html.nv-live-layout-editing body .nv-live-editor.nv-freestyle-settings .nv-freestyle-background .nv-osc-background-settings {
+ margin-top:0!important;
+}
+html.nv-live-layout-editing body .nv-live-editor.nv-freestyle-settings .nv-freestyle-background > footer {
+ margin-top:16px!important;
+}
+html.nv-live-layout-editing body .nv-live-editor.nv-freestyle-settings .nv-live-library .nv-live-palette {
+ max-height:220px!important;
+}
+@media(max-width:930px) {
+ html.nv-live-layout-editing body .nv-live-editor.nv-freestyle-settings {
+  left:4vw!important;right:4vw!important;width:92vw!important;
+ }
+}
+@media(max-height:720px){
+ html.nv-live-layout-editing body .nv-live-editor.nv-freestyle-settings {
+  top:40vh!important;height:53vh!important;max-height:57vh!important;
+ }
+}
+
 @media(max-width:720px){
  .nv-live-editor.nv-freestyle-settings .nv-freestyle-grid {
    grid-template-columns:minmax(0,1fr);
