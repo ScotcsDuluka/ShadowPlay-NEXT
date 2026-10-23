@@ -14,7 +14,7 @@
 2. **Actual OSC/CEF:** Usually `http://localhost:59011/index.html`. In `NVIDIA NodeAPI/index.js` the Express static root is `path.join(__dirname,'osc')`. If the executable/server runs from **Build**, this serves **Build** files, *not* Project files.
 3. **Sandbox/browser mockup:** `_ShadowPlay-Classic-V5-Sandbox/preview.html` is only a simulated frontend QA page. Passing these checks does not prove integration with real OSC/CEF.
 
-No automatic Project -> Build sync was found or established during the audit. Editing Project alone does not update the live Build frontend. A Chrome refresh does not change the source directory selected by the serving process.
+No automatic Project -> Build sync exists. Editing Project alone does not update the live Build frontend. An explicit, backed-up OSC-only preview command is now available in tools/osc-live-preview.cjs (see README-OSC-LIVE-PREVIEW.md). A Chrome refresh does not change the source directory selected by the serving process.
 
 ## Required development flow
 
