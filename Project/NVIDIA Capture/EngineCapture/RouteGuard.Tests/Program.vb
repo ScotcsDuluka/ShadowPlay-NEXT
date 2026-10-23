@@ -91,7 +91,31 @@ Module Program
             Check("HTTP GET without content length", message IsNot Nothing AndAlso
                   message("method") = "GET" AndAlso message("body") = "")
         End Using
-        Console.WriteLine("PASS: " & _passed & " route/capability/HTTP guards")
+        ' Isolated mode preflight is pure and refuses accidental Stable roots.
+        Dim testRoot = Path.Combine(Path.GetTempPath(), "capture-guard-" & Guid.NewGuid().ToString("N"))
+        Directory.CreateDirectory(Path.Combine(testRoot, "Config"))
+        Try
+            Check("Sandbox requires marker",
+                  CaptureIsolation.Validate(testRoot, testRoot, 59477) = "isolated_marker_missing")
+            File.WriteAllText(Path.Combine(testRoot, ".shadowplay-capture-isolated"),
+                              "shadowplay-next-isolated-capture-v1")
+            Check("Sandbox requires dedicated config files",
+                  CaptureIsolation.Validate(testRoot, testRoot, 59477) = "isolated_config_missing")
+            File.WriteAllText(Path.Combine(testRoot, "Config", "config.json"), "{}")
+            File.WriteAllText(Path.Combine(testRoot, "Config", "engine.json"), "{}")
+            Check("Sandbox accepts isolated root and reserved port range",
+                  CaptureIsolation.Validate(testRoot, testRoot, 59477) = "")
+            Check("Sandbox refuses production REST port",
+                  CaptureIsolation.Validate(testRoot, testRoot, 59077) = "isolated_port_invalid")
+            Check("Sandbox refuses node API/control ports",
+                  CaptureIsolation.Validate(testRoot, testRoot, 59012) = "isolated_port_invalid")
+            Check("Sandbox rejects root mismatch",
+                  CaptureIsolation.Validate(testRoot, Path.GetTempPath(), 59477) =
+                  "isolated_layout_root_mismatch")
+        Finally
+            Directory.Delete(testRoot, True)
+        End Try
+        Console.WriteLine("PASS: " & _passed & " route/capability/HTTP/sandbox guards")
     End Sub
     Private NotInheritable Class TinyChunkStream
         Inherits MemoryStream

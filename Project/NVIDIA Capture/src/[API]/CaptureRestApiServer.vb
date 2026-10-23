@@ -23,7 +23,11 @@ Imports System.Threading.Tasks
 
 Partial Public Class UI_Engine
 
-    Private Const RestApiPort As Integer = 59077
+    Private ReadOnly Property RestApiPort As Integer
+        Get
+            Return CaptureIsolation.ApiPort
+        End Get
+    End Property
     Private _restApiListener As TcpListener
     Private _restApiThread As Thread
     Private _restApiRunning As Boolean
@@ -150,10 +154,19 @@ Partial Public Class UI_Engine
         Dim owner As String = RestActiveRoute()
         Select Case owner
             Case "Duluka"
+                ' HandleRecordingStop clears _recordingTask after awaiting it.
+                ' Retain this session's task locally so REST returns the
+                ' committed SessionResult instead of treating a cleared field
+                ' as failure after a successful MP4 finalize.
+                Dim ownerTask As Task(Of DulukaEngine.Recording.SessionResult) = _recordingTask
+                If ownerTask Is Nothing Then Return False
                 Await HandleRecordingStop("")
-                If _recordingTask Is Nothing OrElse Not _recordingTask.IsCompleted Then Return False
+                If Not ownerTask.IsCompletedSuccessfully Then Return False
                 Try
-                    Return _recordingTask.Result IsNot Nothing AndAlso _recordingTask.Result.Pass
+                    Dim completed = Await ownerTask
+                    Return completed IsNot Nothing AndAlso completed.Pass AndAlso
+                           Not String.IsNullOrWhiteSpace(completed.OutputPath) AndAlso
+                           IO.File.Exists(completed.OutputPath)
                 Catch
                     Return False
                 End Try
@@ -337,6 +350,11 @@ Partial Public Class UI_Engine
 
     ' ── output path: videos จาก genuine /RecordPaths → fallback OutputDirectory/MyVideos ──
     Private Function ResolveRecordOutputPath() As String
+        If CaptureIsolation.Requested Then
+            Dim testDir = CaptureIsolation.RecordingDirectory(AppLayout.Dir)
+            Return Path.Combine(testDir, "NvCapture_sandbox_" &
+                DateTime.Now.ToString("yyyy-MM-dd_HHmmss_fff") & ".mp4")
+        End If
         Dim dir As String = ""
         Try
             Dim req = DirectCast(Net.WebRequest.Create("http://127.0.0.1:59001/ShadowPlay/v.1.0/RecordPaths"), Net.HttpWebRequest)

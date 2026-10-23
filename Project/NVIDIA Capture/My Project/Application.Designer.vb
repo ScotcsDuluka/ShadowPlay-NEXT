@@ -24,7 +24,9 @@ Namespace My
         <Global.System.Diagnostics.DebuggerStepThroughAttribute()>  _
         Public Sub New()
             MyBase.New(Global.Microsoft.VisualBasic.ApplicationServices.AuthenticationMode.Windows)
-            Me.IsSingleInstance = true
+            ' Sandbox worker must not forward its command line to an already-running
+            ' Stable NvCapture. Normal deployment retains single-instance behavior.
+            Me.IsSingleInstance = Not Global.NVIDIA_Capture.CaptureIsolation.Requested
             Me.EnableVisualStyles = true
             Me.SaveMySettingsOnExit = true
             Me.ShutDownStyle = Global.Microsoft.VisualBasic.ApplicationServices.ShutdownMode.AfterMainFormCloses

@@ -92,6 +92,11 @@ Partial Public Class UI_Engine
 
     Private Sub UI_Engine_Load(sender As Object, e As EventArgs) Handles Me.Load
         _configPath = AppLayout.P("Config", "engine.json")
+        ' Fail closed before initializing any worker or starting any listener.
+        CaptureIsolation.AssertReady(AppLayout.Dir)
+        If CaptureIsolation.Requested AndAlso Not _headless Then
+            Throw New InvalidOperationException("capture_sandbox_requires_rest_headless")
+        End If
 
         ' ✅ P2: locate Overlay's config.json + video.json first.
         ' lblConfigSource will show where they were found.
@@ -102,8 +107,16 @@ Partial Public Class UI_Engine
 
         LoadSettings()
         InitializeEngine()
-        InitializeRecordingEngine()  ' Phase 12b: initialize new RecordingEngine
-        DetectEncoders()
+        If Not CaptureIsolation.Requested OrElse OverlayConfig.GetEngineMode() = "ddagrab" Then
+            InitializeRecordingEngine()  ' DXGI/NVENC native runtime; avoid GPU ownership in FFmpeg sandbox
+        Else
+            DebugLog("[Sandbox] Skipping native DXGI/NVENC initialization for FFmpeg-only worker")
+        End If
+        If Not CaptureIsolation.Requested Then
+            DetectEncoders()
+        Else
+            DebugLog("[Sandbox] Background encoder discovery disabled (REST capability probe is available)")
+        End If
 
         ' เชื่อมกับ API Hub (headless: ข้าม TCP diagnostic — ต้นตอ busy-loop เดิม)
         If Not _headless Then StartHubClient()
@@ -112,7 +125,11 @@ Partial Public Class UI_Engine
         ' :59001 -- the same API surface the osc page drives. The old TCP
         ' :5001 engine path stays for the diagnostic window, but record
         ' commands now arrive through the poller (state machine edges).
-        StartRestChannel()
+        If Not CaptureIsolation.Requested Then
+            StartRestChannel()
+        Else
+            DebugLog("[Sandbox] NodeAPI event-bus poller disabled; REST-only isolated worker")
+        End If
 
         ' Phase 3 (§21.2): capture boundary REST — node JS boundary (NvShadowPlayAPI.js
         ' middleware) ยิงมาที่ 127.0.0.1:59077 — NvCapture = เจ้าของการอัดตามสถาปัตยกรรม §20
@@ -151,8 +168,10 @@ Partial Public Class UI_Engine
         Try
             Dim s As CaptureSettings = CaptureSettings.Load(_configPath)
             SyncWithOverlayConfig(s)
-            _audioForm = New AudioSettingsForm(s)
-            _audioForm.Show(Me)  ' Show() แค่เริ่ม form — Opacity=0 อยู่เพราะยังไม่มี Audio.UI
+            If Not CaptureIsolation.Requested Then
+                _audioForm = New AudioSettingsForm(s)
+                _audioForm.Show(Me)
+            End If
         Catch
         End Try
 
