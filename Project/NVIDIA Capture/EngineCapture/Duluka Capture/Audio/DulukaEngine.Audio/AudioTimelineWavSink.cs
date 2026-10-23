@@ -19,11 +19,20 @@ namespace DulukaEngine.Audio
         private long _expectedPts100ns;
         private bool _aligned;
         private long _pendingBytes;
+        private long _pendingDroppedBytes;
+        private bool _completed;
         private const long MaxPendingBytes = 16L * 1024 * 1024;
 
         public AudioTimelineWavSink(string path) => _path = path ?? throw new ArgumentNullException(nameof(path));
         public long BytesWritten => _writer?.BytesWritten ?? 0;
-        public long BytesDropped => _writer?.BytesDropped ?? 0;
+        public long BytesDropped
+        {
+            get
+            {
+                lock (_sync)
+                    return _pendingDroppedBytes + (_writer?.BytesDropped ?? 0);
+            }
+        }
         public string FilePath => _path;
 
         public void SetVideoStart(long videoStartQpc100ns)
@@ -31,6 +40,10 @@ namespace DulukaEngine.Audio
             if (videoStartQpc100ns <= 0) return;
             lock (_sync)
             {
+                // The video's clock origin is immutable once established.
+                // A duplicate T0 publish must not rewind the sample cursor:
+                // doing so duplicates silence already committed to WAV.
+                if (_aligned || _completed) return;
                 _expectedPts100ns = videoStartQpc100ns;
                 _aligned = true;
                 FlushPendingLocked();
@@ -42,6 +55,7 @@ namespace DulukaEngine.Audio
             if (packet.Data == null || packet.Data.Length == 0) return;
             lock (_sync)
             {
+                if (_completed) return;
                 EnsureWriterLocked(packet);
                 if (!_aligned)
                 {
@@ -49,6 +63,12 @@ namespace DulukaEngine.Audio
                     {
                         _pending.Add(packet);
                         _pendingBytes += packet.Data.Length;
+                    }
+                    else
+                    {
+                        // A saturated pre-alignment buffer drops this
+                        // packet. Keep the loss visible in accounting.
+                        _pendingDroppedBytes += packet.Data.Length;
                     }
                     return;
                 }
@@ -91,23 +111,32 @@ namespace DulukaEngine.Audio
                 skipFrames = Math.Min(packet.Frames,
                     (int)(((_expectedPts100ns - packet.Pts100ns) * _sampleRate + 9999999L) / 10000000L));
 
+            // Packet.Frames can be larger than the supplied PCM buffer
+            // (truncated device packet / conversion failure). Copy only
+            // complete PCM frames and turn the missing tail into silence.
+            // Never advance the timeline over samples that were not written.
             int remainingFrames = packet.Frames - skipFrames;
-            if (remainingFrames > 0)
+            int availableFrames = packet.Data.Length / bytesPerFrame;
+            int copiedFrames = Math.Max(0, Math.Min(remainingFrames, availableFrames - skipFrames));
+            if (copiedFrames > 0)
             {
                 int offset = skipFrames * bytesPerFrame;
-                int count = Math.Min(packet.Data.Length - offset, remainingFrames * bytesPerFrame);
-                if (count > 0)
-                {
-                    var data = new byte[count];
-                    Buffer.BlockCopy(packet.Data, offset, data, 0, count);
-                    _writer.Write(new AudioPacket(packet.Track, _expectedPts100ns,
-                        count / bytesPerFrame, data, packet.IsSilence,
-                        packet.QpcPosition100ns, packet.DevicePositionFrames, packet.Flags,
-                        _sampleRate, _channels));
-                    _expectedPts100ns += (long)(count / bytesPerFrame) * 10000000L / _sampleRate;
-                }
+                int count = copiedFrames * bytesPerFrame;
+                var data = new byte[count];
+                Buffer.BlockCopy(packet.Data, offset, data, 0, count);
+                _writer.Write(new AudioPacket(packet.Track, _expectedPts100ns,
+                    copiedFrames, data, packet.IsSilence,
+                    packet.QpcPosition100ns, packet.DevicePositionFrames, packet.Flags,
+                    _sampleRate, _channels));
+                _expectedPts100ns += (long)copiedFrames * 10000000L / _sampleRate;
             }
-            if (_expectedPts100ns < packetEnd) _expectedPts100ns = packetEnd;
+            if (_expectedPts100ns < packetEnd)
+            {
+                WriteSilenceLocked(packetEnd - _expectedPts100ns);
+                // Preserve the sub-frame timestamp remainder as a clock
+                // cursor only; PCM is always written in whole frames.
+                if (_expectedPts100ns < packetEnd) _expectedPts100ns = packetEnd;
+            }
         }
 
         private void WriteSilenceLocked(long duration100ns)
@@ -136,17 +165,33 @@ namespace DulukaEngine.Audio
         {
             lock (_sync)
             {
+                if (_completed) return;
                 FlushPendingLocked();
+                if (!_aligned && _pendingBytes > 0)
+                {
+                    // No video T0 was ever published, so queued packets
+                    // cannot be aligned; account for all discarded data.
+                    _pendingDroppedBytes += _pendingBytes;
+                    _pendingBytes = 0;
+                    _pending.Clear();
+                }
                 if (_writer != null && _aligned && sessionEndQpc100ns > _expectedPts100ns)
                     WriteSilenceLocked(sessionEndQpc100ns - _expectedPts100ns);
                 _writer?.Complete(5000);
+                _completed = true;
             }
         }
 
         public void Dispose()
         {
-            lock (_sync) _writer?.Dispose();
-            _writer = null;
+            lock (_sync)
+            {
+                _completed = true;
+                _pending.Clear();
+                _pendingBytes = 0;
+                _writer?.Dispose();
+                _writer = null;
+            }
         }
     }
 }

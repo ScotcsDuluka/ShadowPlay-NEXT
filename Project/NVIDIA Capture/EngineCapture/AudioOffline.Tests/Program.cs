@@ -91,6 +91,64 @@ internal static class Program {
             Check("missing track does not fabricate PCM",s.BytesWritten==0&&!File.Exists(p4));
         }
 
+        // A malformed/short PCM packet must not collapse the WAV timeline.
+        // It claims 0.100s of frames, but supplies just 0.050s of PCM.
+        // Unprovided samples must become silence, never a shortened WAV.
+        string shortPath=Path.Combine(root,"short-pcm-packet.wav");
+        using (var s=new AudioTimelineWavSink(shortPath)) {
+            s.SetVideoStart(T0);
+            var shortPcm = new byte[2400*2];
+            for(int i=0;i<shortPcm.Length;i+=2) { shortPcm[i]=0x34; shortPcm[i+1]=0x12; }
+            s.Write(new AudioPacket(AudioTrackKind.System,T0,4800,shortPcm,
+                false,0,0,0,SampleRate,1));
+            s.Complete(T0+1_000_000L);
+        }
+        var w5=GetWav(shortPath,1,0.1);
+        Check("short PCM packet retains available samples",NonzeroAt(w5,1,0.03));
+        Check("short PCM packet fills missing tail with silence",SilenceAt(w5,1,0.08));
+
+        // A second Video T0 publication must not rewind the WAV sample
+        // cursor or duplicate already-serialized audio/silence.
+        string repeatPath=Path.Combine(root,"repeated-video-anchor.wav");
+        using (var s=new AudioTimelineWavSink(repeatPath)) {
+            s.SetVideoStart(T0);
+            s.Write(Packet(AudioTrackKind.System,T0+1_000_000L,4800,1));
+            s.SetVideoStart(T0);
+            s.Write(Packet(AudioTrackKind.System,T0+2_000_000L,4800,1));
+            s.Complete(T0+3_000_000L);
+        }
+        var w6=GetWav(repeatPath,1,0.3);
+        Check("repeated video anchor retains first packet",NonzeroAt(w6,1,0.12));
+        Check("repeated video anchor retains second packet",NonzeroAt(w6,1,0.23));
+
+        // An incomplete sample must never become a half PCM frame.
+        string oddPath=Path.Combine(root,"odd-pcm-buffer.wav");
+        using (var s=new AudioTimelineWavSink(oddPath)) {
+            s.SetVideoStart(T0);
+            s.Write(new AudioPacket(AudioTrackKind.System,T0,480,
+                new byte[]{0x34},false,0,0,0,SampleRate,1));
+            s.Complete(T0+100_000L);
+        }
+        var oddWav=GetWav(oddPath,1,0.01);
+        Check("odd PCM byte replaced with complete silence",SilenceAt(oddWav,1,0.003));
+
+        // The pre-video 16 MiB buffer limit may drop data but MUST account
+        // those discarded bytes rather than claim clean audio delivery.
+        string overflowPath=Path.Combine(root,"pending-overflow.wav");
+        using (var s=new AudioTimelineWavSink(overflowPath)) {
+            var full=new byte[16*1024*1024];
+            s.Write(new AudioPacket(AudioTrackKind.System,T0,
+                full.Length/2,full,false,0,0,0,SampleRate,1));
+            s.Write(Packet(AudioTrackKind.System,T0+1_000_000L,1,1));
+            Check("pending overflow is reflected in dropped-byte accounting",
+                  s.BytesDropped==2);
+            s.Complete(T0+2_000_000L);
+            Check("unanchored pending audio counted as discarded",
+                  s.BytesDropped>=full.Length+2);
+        }
+        Check("no video anchor prevents false PCM WAV",
+              File.Exists(overflowPath) && new FileInfo(overflowPath).Length==44);
+
         Console.WriteLine("AUDIO_OFFLINE_SMOKE_PASS checks="+passed+
              " : no WASAPI device, no microphone, no sound playback");
     }
