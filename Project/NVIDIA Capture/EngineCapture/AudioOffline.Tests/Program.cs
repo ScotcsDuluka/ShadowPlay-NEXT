@@ -151,5 +151,6 @@ internal static class Program {
 
         Console.WriteLine("AUDIO_OFFLINE_SMOKE_PASS checks="+passed+
              " : no WASAPI device, no microphone, no sound playback");
+        AudioStressTests.RunAll();
     }
 }
