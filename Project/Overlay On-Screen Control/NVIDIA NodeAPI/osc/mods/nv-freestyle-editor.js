@@ -69,6 +69,7 @@
             return key?M.placeControl(added,key,groupId,M.locate(added,groupId).group.blocks.length-1,0):added;
           });
         });
+        b.setAttribute('data-f-preset',type+':'+layout);
         b.setAttribute('role','menuitem');content.appendChild(row);
       });
     });
@@ -351,6 +352,9 @@
   }
   function move(ev) {
     if(!dragging||!editing)return;
+    // CEF Host can publish stationary hover moves while a captured drag is
+    // active. Only a left-button move may change the drag's destination.
+    if(ev.buttons===0)return;
     if(!dragging.active) {
       if(Math.abs(ev.clientX-dragging.x)+Math.abs(ev.clientY-dragging.y)<8)return;
       dragging.active=true;

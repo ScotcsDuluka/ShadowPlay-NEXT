@@ -155,8 +155,8 @@ function startDrag(f) {
   const destination = f.document.querySelector('[data-f-group="g2"]');
   const rect = destination.getBoundingClientRect();
   f.hit = destination;
-  f.emit('mousedown', handle, { clientX: 120, clientY: 100 });
-  f.emit('mousemove', destination, { clientX: rect.left + 1, clientY: rect.top + 10 });
+  f.emit('mousedown', handle, { buttons: 1, clientX: 120, clientY: 100 });
+  f.emit('mousemove', destination, { buttons: 1, clientX: rect.left + 1, clientY: rect.top + 10 });
   assert.ok(f.document.querySelector('.nv-f-drag-ghost'), 'real editor created drag ghost');
 }
 
@@ -213,6 +213,26 @@ test('blur clears actual drag ghost, delayed insertion preview and pending targe
   assert.equal(f.editor.dragState().kind, null); assert.equal(f.editor.dragState().pending, null);
   assert.equal(f.timers.size, 0); assert.equal(f.editor.isEditing(), true, 'blur ends drag without saving or closing editor');
   assert.equal(f.flag(), false);
+});
+
+test('Host hover with buttons zero cannot replace a held drag target or delayed insertion preview', () => {
+  const f = fixture(); f.scan(); startDrag(f); f.fireTimer(360);
+  const held = f.editor.dragState();
+  assert.equal(held.target.id, 'g2'); assert.equal(held.target.edge, 'before');
+  assert.equal(held.pending.groupId, 'g2'); assert.equal(held.pending.ready, true);
+  const before = JSON.stringify(held), previewBefore = JSON.stringify(f.preview());
+  const unrelated = f.document.querySelector('[data-f-group="g4"]');
+  const rect = unrelated.getBoundingClientRect(); f.hit = unrelated;
+  // The native Host sends these real-cursor hovers between injected held moves.
+  for (let i = 0; i < 3; i++) {
+    f.emit('mousemove', unrelated, { buttons: 0, clientX: rect.left + rect.width / 2, clientY: rect.top + 20 });
+  }
+  assert.equal(JSON.stringify(f.editor.dragState()), before, 'hover leaves held target and pending insertion intact');
+  assert.equal(JSON.stringify(f.preview()), previewBefore, 'hover does not cancel or replace rendered preview');
+  assert.ok(f.document.querySelector('.nv-f-drag-ghost'), 'held drag remains active');
+  f.blur();
+  assert.equal(f.editor.dragState().kind, null); assert.equal(f.editor.dragState().pending, null);
+  assert.equal(f.preview(), null); assert.equal(f.document.querySelector('.nv-f-drag-ghost'), null);
 });
 
 test('route exit cancels active drag and draft, removes guides, and releases temporary owner', () => {
