@@ -144,6 +144,21 @@ The closed editor/main menu retains inexpensive cached availability checks.
 The filter accordion patch retries until its real NVIDIA controller exists,
 avoiding a lost first click when route creation outruns Angular linking.
 
+The original NVIDIA `osc/app.js` `enableModsMode` waits on its internal
+`applySlot` deferred. In native preset mirror mode our slot handler deliberately
+bypasses that browser-side apply; the minified NVIDIA bundle contains a single
+guard that allows the already-completed slot path without dereferencing an
+undefined deferred. This prevents a `Cannot read property 'promise' of
+undefined` exception when opening the editor.
+
+When a native `currentFilter`/attribute readback arrives, the browser temporarily
+removes only those uniform cache keys while dispatching the stock NVIDIA handler,
+then restores the authoritative ReShade values. NVIDIA therefore builds its
+controls from live native values without feeding them back to the same native
+shader as a write. This prevents readback -> attribute POST loops and high-rate
+503 storms after a runtime disconnect. User-initiated slider changes still go
+through the regular guarded write path.
+
 ## Validation
 
 - `tests/AnselSessionTests.cpp`: range/dimension validation, deadlines, batches,

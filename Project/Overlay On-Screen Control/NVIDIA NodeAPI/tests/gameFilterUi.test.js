@@ -4,6 +4,20 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const source = fs.readFileSync(path.join(__dirname,'../osc/mods/ansel-game-filter.js'),'utf8');
+const nvidiaBundle = fs.readFileSync(path.join(__dirname,'../osc/app.js'),'utf8');
+const guardedNvidiaPromise = 'return rn.promise.then(function(){return nn?nn.promise.then(function(){return nn=void 0,!0}):e.when(!0)})';
+assert(nvidiaBundle.includes(guardedNvidiaPromise),
+  'stock NVIDIA enableModsMode still throws when native ReShade preset bypasses the internal applySlot deferred');
+async function verifyNvidiaDeferredGuard() {
+  // Exercise exactly the expression extracted from the bundled NVIDIA code:
+  // native presets do not create the legacy slot deferred, other modes do.
+  const evaluate = new Function('rn', 'nn', 'e', guardedNvidiaPromise);
+  const angularQ = {when:value => Promise.resolve(value)};
+  assert.strictEqual(await evaluate({promise:Promise.resolve()}, undefined, angularQ), true,
+    'native preset editor still dereferences an undefined applySlot deferred');
+  assert.strictEqual(await evaluate({promise:Promise.resolve()}, {promise:Promise.resolve(true)}, angularQ), true,
+    'legacy NVIDIA applySlot deferred stopped resolving');
+}
 
 async function scenario(existing, coldStart) {
   const data = {OtherGame:[{id:1,activeFilterStack:[{id:'keep-other-game'}]}]};
@@ -12,7 +26,7 @@ async function scenario(existing, coldStart) {
   const store = {ModsSlotStorage:JSON.stringify(data),ModsDataStorage:JSON.stringify({OtherGame:otherGameData}),DulukaModsSelectionStorage:JSON.stringify({OtherGame:2})};
   const state = {connected:true,pid:42,session:'42:test:1',generation:1,executable:'Game',stack:['fx'],filters:[{id:'fx',name:'Filter',controls:[{id:'Amount',currentValue:[0.5]}]}]};
   const applied=[],writes=[],osc={onlineState:{online:true},setOnline(){throw new Error('Local entry must not reinitialize cloud capabilities');}};
-  const filterEvents=[],shutdownCalls=[],storageWrites=[];
+  const filterEvents=[],shutdownCalls=[],storageWrites=[],stockReadbackWrites=[];
   let nativeEntries=0,httpReads=0,catalogReads=0,enableGate=null;
   const camera = {persistSlots:{},NUM_MODS_SLOTS:3,modsSlots:[1,2,3,4].map(id=>({id,filters:[],activeFilterStack:[]})),modsSupported:true,lastActiveSlot:-1,lastSlot:-1,UIRunning:true,
     checkReshadeSupport:()=>Promise.resolve(),
@@ -52,7 +66,19 @@ async function scenario(existing, coldStart) {
   const windowClickListeners=[];
   const listeners = {};
   const policy={fullInterface:true,navigationEnabled:true,preferencesEnabled:true,menus:Object.keys(menu.tiles),editorRoutes:{Ansel:'nvcamera',Mods:'mods'}};
-  const services = {$http:{get:url=>{httpReads++;return Promise.resolve({data:url.indexOf('/OSC/Interface')>=0?policy:state});}},nvCameraService:camera,eventAggregator:{trigger:()=>{}},
+  const nativeStockReadback=(name,notification)=>{
+    if (!notification || notification.type !== 'currentFilter' ||
+        !camera.modsActiveSlot || !Array.isArray(camera.modsActiveSlot.filters)) return;
+    const model=camera.modsActiveSlot.filters.find(f=>f.id===notification.id);
+    if (!model) return;
+    for(const attribute of notification.controls||[]){
+      const key=notification.id+'#'+attribute.id;
+      if (Object.prototype.hasOwnProperty.call(model.savedConfigs||{},key))
+        stockReadbackWrites.push(key); // Stock NVIDIA would re-POST stale values.
+      else model.savedConfigs[key]=attribute.currentValue.slice();
+    }
+  };
+  const services = {$http:{get:url=>{httpReads++;return Promise.resolve({data:url.indexOf('/OSC/Interface')>=0?policy:state});}},nvCameraService:camera,eventAggregator:{trigger:nativeStockReadback},
     $window:{localStorage:{getItem:key=>store[key]}},oscDisplayService:{closeOSC:()=>{},setLocalStorage:(key,value)=>{storageWrites.push(key);store[key]=value;}},
     cefService:{query:()=>Promise.resolve()},
     oscNotificationService:{show:message=>notifications.push(message)},
@@ -420,11 +446,19 @@ async function scenario(existing, coldStart) {
     'open editor remained on cached native shader data');
   assert.strictEqual(camera.modsSlots[1].filters[0].savedConfigs['fx#Amount'][0],0.72,
     'external ReShade uniform changes were not mirrored to the OSC slot');
+  const beforeStockWrites=stockReadbackWrites.length;
   services.eventAggregator.trigger('native-filter-readback',{
     type:'currentFilter',id:'fx',controls:[{id:'Amount',currentValue:[0.88]}]
   });
+  assert.strictEqual(stockReadbackWrites.length,beforeStockWrites,
+    'read-only ReShade currentFilter notification would write a uniform back into the game');
   assert.strictEqual(camera.modsSlots[1].filters[0].savedConfigs['fx#Amount'][0],0.88,
     'native notifications replayed obsolete browser slider settings');
+  services.eventAggregator.trigger('native-filter-readback',{
+    type:'currentFilter',id:'fx',controls:[{id:'Amount',currentValue:[0.88]}]
+  });
+  assert.strictEqual(stockReadbackWrites.length,beforeStockWrites,
+    'identical native readbacks still cause NVIDIA to POST an attribute feedback loop');
   nativeState.stack=[];
   nativeState.filters[0].enabled=false;
   checkGame();
@@ -456,5 +490,5 @@ async function scenario(existing, coldStart) {
   assert(prevented && stopped,'editor close must suppress the legacy reopen handler');
   assert.strictEqual(entered.pop(),'base','editor close must leave the interactive page');
 }
-(async()=>{await scenario(false);await scenario(true);await scenario(false,true);await scenario(false,'fail');console.log('PASS: cold direct route after deferred and failed native initialization, live UI entry, catalog listener re-arm, empty/stale/disabled/session readiness guards, fast reopen, explicit Off persistence, native-save race, runtime stack import, preset preservation and hot-load idempotency');})()
+(async()=>{await verifyNvidiaDeferredGuard();await scenario(false);await scenario(true);await scenario(false,true);await scenario(false,'fail');console.log('PASS: NVIDIA deferred guard, native readback without Shader POST feedback, cold direct route after deferred and failed native initialization, live UI entry, catalog listener re-arm, empty/stale/disabled/session readiness guards, fast reopen, explicit Off persistence, native-save race, runtime stack import, preset preservation and hot-load idempotency');})()
   .catch(error=>{console.error(error);process.exitCode=1;});

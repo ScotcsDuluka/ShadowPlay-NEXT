@@ -371,20 +371,33 @@
         var display = $injector.get('oscDisplayService');
         var notification = arguments[1];
         if (camera.__dulukaNativePresets && notification &&
-            notification.type === 'currentFilter' && Array.isArray(notification.controls) &&
+            (notification.type === 'currentFilter' || notification.type === 'filterAndAttributes') &&
+            Array.isArray(notification.controls) &&
             camera.modsActiveSlot && Array.isArray(camera.modsActiveSlot.filters)) {
-          // The stock NVIDIA listener replays savedConfigs on currentFilter.
-          // Adopt the actual readback BEFORE invoking that listener so an
-          // external ReShade edit cannot be overwritten by stale browser data.
+          // NVIDIA's original currentFilter handler writes every existing
+          // savedConfigs value back into ReShade, even on read-only refreshes.
+          // That produces a native notification -> write -> notification loop.
+          // Hide just the returned keys during dispatch, so NVIDIA initializes
+          // its controls from the actual native values without a write.
           var model = camera.modsActiveSlot.filters.filter(function (f) {
             return f.id === notification.id;
           })[0];
           if (model) {
             model.savedConfigs = model.savedConfigs || {};
-            notification.controls.forEach(function (attribute) {
-              if (Array.isArray(attribute.currentValue))
-                model.savedConfigs[notification.id + '#' + attribute.id] = attribute.currentValue.slice();
+            var nativeValues = (notification.controls || []).filter(function (attribute) {
+              return Array.isArray(attribute.currentValue);
+            }).map(function (attribute) {
+              return {key:notification.id + '#' + attribute.id, values:attribute.currentValue.slice()};
             });
+            nativeValues.forEach(function (item) { delete model.savedConfigs[item.key]; });
+            var dispatched;
+            try { dispatched = previousTrigger.apply(this, arguments); }
+            finally {
+              nativeValues.forEach(function (item) {
+                model.savedConfigs[item.key] = item.values;
+              });
+            }
+            return dispatched;
           }
         }
         if (name === 'Hotkey_ModsShowUI' && canReuseMods(camera) && display.openOSC) {
