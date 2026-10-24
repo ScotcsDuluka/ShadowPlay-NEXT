@@ -70,15 +70,15 @@ The old UI is part of the project's history. The live NEXT interface and integra
 | Milestone | Who gets access? | What it means | Status |
 |---|---|---|---|
 | **NVIDIA ShadowPlay OBT3** | Public | Existing legacy flagship release | **Available** |
-| **ShadowPlay NEXT CBT1** | Selected testers, once recruitment launches | First focused external verification of the rebuilt platform | **In preparation; applications not yet live** |
+| **ShadowPlay NEXT CBT1** | Existing Duluka Account users with a private invitation | Invitation-only application and manual operator approval; not a public beta download | **Invite-only workflow implemented; general applications closed** |
 | **ShadowPlay NEXT OBT1** | Intended public testing | The first open test of the NEXT generation | **Target: 2027-01-01** |
 | **ShadowPlay NEXT 1.0** | Public when ready | Release after compatibility, safety and reliability gates | **No date promised** |
 
 **The point of CBT1 is evidence, not hype.** We want repeatable results for overlay lifecycle, input routing, capture integrity, GPU/adapter compatibility, and game-specific behavior **before** expanding access.
 
-There is **no CBT1 registration form linked here yet**. An application page will be linked only when it is explicitly opened for testers.
+**CBT1 invitation and general registration are different states.** An invite-only workflow is documented for **existing Duluka Account users** via [the CBT1 website](https://nv-cbt.pages.dev/), with single-use expiring codes issued privately from the local operator dashboard and manual approval. **General CBT1 applications remain disabled** (`Cbt1:Enabled=false`); the invite path is separately gated. This does not mean a public CBT1 installer is released. See [Server invite rollout](Server/README.md).
 
-**Account login is separate from CBT1 recruitment.** The Launcher source now includes an **Account** button that opens the Duluka Account Portal in an external browser, not inside the CEF Launcher. The current shared-account Portal uses existing accounts; **new public account registration and CBT1 applications are disabled**. Portal availability or a successful HTTP response is not proof that external sign-in or tester recruitment is fully accepted. See [Server implementation and deployment boundaries](Server/README.md) and [Launcher source status](Project/Launcher.Cef/README.md).
+**Account login is separate from CBT1 recruitment.** The Launcher source now includes an **Account** button that opens the Duluka Account Portal in an external browser, not inside the CEF Launcher. The current shared-account Portal uses existing accounts; **new public account registration and general CBT1 applications remain disabled**, while the separately gated **invite-only CBT1 application** flow exists for existing account holders. Portal availability or a successful HTTP response is not proof that external sign-in or tester recruitment is fully accepted. See [Server implementation and deployment boundaries](Server/README.md) and [Launcher source status](Project/Launcher.Cef/README.md).
 
 ---
 
@@ -92,15 +92,17 @@ There is **no CBT1 registration form linked here yet**. An application page will
 | **Freestyle V5** | Drag-and-drop Main-menu Groups and Controls, Small / Side / Big layouts, Auto-Fill, Undo / Done / Cancel, native `md-menu` and `md-select` | **Implemented / testing** |
 | **OSC Motion** | Original-style transitions, preflight layout positioning, native lifecycle integration | **Implemented; open/close QA ongoing** |
 | **Game Profiles / GPU preferences** | Per-application executable profiles, names, GPU adapter selection and Windows Graphics preference controls via the NVIDIA Graphics backend; optional Freestyle V5 native Control | **Developer-reported end-to-end laptop test passed: distinct GPUs detected, selection applied, game rendered on the chosen GPU, and preference persisted after restart** |
-| **ApplicationOntology game catalog** | Separate Cloudflare Pages catalog and local game-identity cache via `C:\\My Project\\nv-ontology-pages`: executable matching, render-API hints and update notifications | **Local catalog v1.2.8 / 8 entries verified 2026-10-24; public deployment not independently verified; filename matches are not authenticated identities** |
-| **Game Filter** | ReShade effects/preset integration and OSC control surface | **Experimental integration** |
+| **ApplicationOntology game catalog** | Separate Cloudflare Pages catalog and local game-identity cache via `C:\\My Project\\nv-ontology-pages`: executable matching, render-API hints and update notifications | **Local catalog v1.2.9 / 23 entries verified 2026-10-24; public deployment not independently verified; filename matches are not authenticated identities** |
+| **Game Filter / ReShade Manager** | OSC Settings includes a guided ReShade Manager: local game-folder inspection, graphics-API hints, evidence-based installation status and official-Setup handoff | **Guided Info/Inspect APIs and guarded JS deployed in a dated 24 October test; no native installation/uninstall writes. Real CEF click-through and in-game ReShade effect still unverified** |
 | **DirectX Adapter / Hook** | Native D3D9/D3D9Ex and DXGI/D3D11 code; isolated DX9Ex Host-to-Hook GPU shared-texture IPC, including x86/x64 paths | **Experimental; production Auto-Hook, in-game frame rate and compatibility still require live validation** |
 | **NVIDIA Capture** | Capture and encoder work, DXGI monitor enumeration/selection, screenshot engine and Container relay endpoints | **Implemented components and scoped tests; complete live recording/replay and UI integration are not certified** |
 | **Encoding & audio** | Native NVENC and FFmpeg engine regimes; WASAPI, timing, mux and integrity validation | **Implementation varies by regime** |
 | **NVIDIA Container / Config** | Process lifecycle, game catalog watcher, Capture relay, request security checks and module orchestration | **Active integration; source, staged builds and deployed processes may differ** |
 | **Launcher / Modules** | Simplified ShadowPlay ON/OFF and read-only Core Modules catalog (11 built-in components) with local runtime telemetry; Add-ons is presently empty | **Active development: Core cannot be independently edited, disabled or removed. A future Server-owned metadata API is proposed, not connected; legacy appearance tooling is not loaded by the visible quick Core UI** |
 | **Gallery / Media** | NodeAPI recent media, safe file copy, metadata and MSE/seek bridge | **Backend regressions passed; actual CEF playback and seeking remain to be tested; delete returns 501** |
-| **Duluka Account / tester portal** | Independent account Server with username/password, session/device management and a browser Portal; Launcher has an external Account entry | **Account Portal implemented/tested in isolated cases; current shared Portal uses existing accounts, public registration and CBT1 applications remain disabled. External account login not yet certified** |
+| **Duluka Account / tester portal** | Independent account Server with username/password, session/device management and a browser Portal; Launcher has an external Account entry | **Account Portal implemented/tested in isolated cases; shared Portal keeps public account registration and general CBT1 applications closed; private single-use invitation flow can accept an existing-account tester's application. Full external login remains a separate acceptance gate** |
+
+**Current transport and Capture UI (source, 24 October):** D3D9 supports an opt-in **Windowed DWM/DirectComposition GPU preview** and CPU fallback; **D3D9Ex GPU is not currently selectable** through the production Hook transport policy despite isolated cross-process mailbox tests. D3D11 has a GPU option, while D3D10/D3D12/Vulkan/OpenGL native rendering is not implemented. The new **Capture Pipeline Design** panel is size-locked and UI-only: its choices are not persisted or connected to a live encoder. See [Native OSC policy](Project/Overlay%20On-Screen%20Control/NVIDIA%20OSC/README.md) and [Capture UI sizing evidence](docs/UI-CAPTURE-PIPELINE-SIZE-LOCK-20261024.md).
 
 **These are two different systems:** Game Profiles manages per-application GPU preferences in OSC through the local Graphics service. ApplicationOntology provides the published game-identity catalog and catalog updates; it does **not** store or apply a user's GPU profiles. Public catalog: [nv-ontology.pages.dev](https://nv-ontology.pages.dev/) · [ApplicationOntology-API source](https://github.com/ScotcsDuluka/ApplicationOntology-API). The working catalog repository is separate from this tree, and local edits are not automatically public deployments.
 
@@ -130,13 +132,13 @@ This is a **dated development snapshot**, not a compatibility matrix or release 
 |---|---|---|
 | **Launcher / read-only Core** | The current quick UI exposes ShadowPlay power, 11 built-in Core module cards, and an empty Add-ons area. Core cards show local status only; data-only appearance tooling remains outside the visible quick UI. | Core metadata is planned to be Server-owned but no verified catalog API is connected. Core users cannot edit settings/layout/backgrounds, disable components independently, or install/remove them as plug-ins; CEF 73 security still needs review. |
 | **Game Profiles / Windows GPU settings** | Graphics backend supports per-application preferences; the developer reports a multi-GPU laptop test confirming selected-GPU rendering and persistence after restart. | Validate across more Windows builds, drivers and games; do not present the UI as a full Windows Settings clone. |
-| **ApplicationOntology** | Local working catalog `C:\My Project\nv-ontology-pages\public\catalog.json` reports **v1.2.8 / 8 entries** in the 24 October inspection. NvContainer maintains a validated local cache for game matching. | Public API deployment of this local version was **not independently verified**. Executable-name matching alone does not authenticate game identity. |
+| **ApplicationOntology** | Local working catalog `C:\My Project\nv-ontology-pages\public\catalog.json` reports **v1.2.9 / 23 entries** in the 24 October inspection. NvContainer maintains a validated local cache for game matching. | Public API deployment of this local version was **not independently verified**. Executable-name matching alone does not authenticate game identity. |
 | **OSC Adapter / Duluka Hook** | D3D9/D3D9Ex and D3D11 native implementations exist. Separate-process tests exercise a **real DX9Ex Host producer and Hook receiver**, including GPU `CopyResource` without intermediate CPU readback and x64-to-x86 test routes. | DX9Ex mailbox remains experimental/opt-in. Live game attachment, frame cadence/FPS, focus/recovery and per-game compatibility remain distinct acceptance tests. |
 | **Capture / Container bridge** | DXGI display selection and Screenshot paths are in source. Container owns relay endpoints, **not** display enumeration or screenshot pixels; its recorded relay-mock suite passed **26/26** tests. | Default-denied write routes, exact deployed NvCapture interoperability, CEF UI behavior, real recording/replay and screenshot-save verification must be checked separately. The documented Replay route is **501**. |
 | **NodeAPI Gallery** | Bounded nested Recent scanning and checked CopyFile replaced false-success stubs. An MSE video/seek bridge is deployed as a served OSC asset; focused regression recorded **58/58** passes. | Play/pause, seek, A/V sync and long-recording behavior inside the actual OSC CEF are **not yet verified**. Gallery Remove intentionally returns **501**. |
 | **Container / NodeAPI security** | Loopback request guards, exact process-path checks, SHA-256 game-identity policy and pairing-secret work have isolated test evidence. | Same-origin/Host checks mitigate browser request abuse but do **not** strongly authenticate every same-user local process. Test real deployed policy before enabling injection or capture writes. |
 | **Ansel / ReShade** | Source contracts distinguish the Ansel Adapter boundary from the ReShade Ansel engine, with named-pipe and Game Filter UI integration. | A visible Game Filter menu does not confirm a real runtime effect or shader is active. |
-| **Duluka Account / Portal** | Native Launcher source now routes the Account button to an external fixed-HTTPS Portal. The Server provides existing-account login, account/device views and password change with isolated flow tests. | Public registration and CBT1 submission are disabled in shared mode. External end-to-end password login was not automation-verified. The Server's **Core module catalog** remains a separate unimplemented proposal. |
+| **Duluka Account / Portal** | Native Launcher source now routes the Account button to an external fixed-HTTPS Portal. The Server provides existing-account login, account/device views and password change with isolated flow tests. | Public registration and general CBT1 applications remain disabled in shared mode; invite-code redemption is separately gated for existing accounts. External end-to-end password login was not automation-verified. The Server's **Core module catalog** remains a separate unimplemented proposal. |
 
 **Architecture and ownership:** `NVIDIA Capture → NVIDIA Container → NVIDIA NodeAPI → OSC UI` for capture control/status; `NVIDIA OSC Host → OSC Adapter / Duluka Hook` for the separate experimental overlay transport. NvCapture is the screenshot/display authority, while Container validates and relays requests.
 
@@ -168,6 +170,28 @@ flowchart TB
     Capture --> Encoder["NVENC / FFmpeg regimes"]
     Capture --> Audio["WASAPI / A-V timing / mux"]
 ```
+
+### Capture architecture — control and media paths
+
+Capture uses **two distinct planes**: OSC/NodeAPI/Container pass settings, status and guarded commands; **NvCapture owns the GPU/audio work, output files and true recording state**. The diagram is an ownership map, **not** a claim that every write route is enabled in the installed runtime.
+
+```mermaid
+flowchart LR
+    OSC["OSC Capture UI"] <--> NODE["NodeAPI :59011"]
+    NODE <--> CONT["NvContainer :59012\npolicy + supervision"]
+    CONT <--> WORK["NvCapture.exe :59077\nmedia owner"]
+    WORK --> BACK{"Capture backend"}
+    BACK --> NAT["Duluka: DXGI → native NVENC H.264"]
+    BACK --> FF["FFmpeg: ddagrab/gdigrab → encoder"]
+    NAT --> MP4["Session result → MP4"]
+    FF --> MP4
+    AUD["Optional WASAPI system/mic"] -. "timing / mux" .-> MP4
+    WORK --> PNG["Selected display → FFmpeg single-frame PNG"]
+    WORK -. "actual state / result" .-> CONT
+    NODE -. "verified completion events" .-> OSC
+```
+
+**Production boundaries:** Capture writes in Container are **default-denied** and require explicit confirmation and compatible worker support; the legacy OSC Record toggle may still have a separate compatibility route. A recorded synthetic NVENC video test is **not** a complete real-screen/native-NVENC recording. Screenshot is independent of Record, and OBS/NvFBC routes remain unavailable/planned. See [full Capture control/media diagrams, backend details and test gates](Project/NVIDIA%20Capture/README.md).
 
 ### Where the source lives
 

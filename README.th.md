@@ -72,15 +72,15 @@
 | ระยะ | ผู้เข้าถึง | จุดประสงค์ | สถานะ |
 |---|---|---|---|
 | **NVIDIA ShadowPlay OBT3** | ผู้ใช้ทั่วไป | Flagship รุ่นเดิม | **เปิดให้ใช้งานแล้ว** |
-| **ShadowPlay NEXT CBT1** | ผู้ทดสอบที่ได้รับคัดเลือก เมื่อเปิดรับสมัคร | ทดสอบแพลตฟอร์ม ReBuild ในวงจำกัด | **กำลังเตรียมการ ยังไม่เปิดรับสมัคร** |
+| **ShadowPlay NEXT CBT1** | ผู้ใช้ Duluka Account เดิมที่ได้รับรหัสเชิญเป็นการส่วนตัว | ส่งใบสมัครผ่านระบบ Invite-only และรอผู้ดูแลอนุมัติ | **มีขั้นตอนเชิญเฉพาะรายแล้ว ยังไม่เปิดรับสมัครทั่วไป** |
 | **ShadowPlay NEXT OBT1** | ตั้งใจเปิดให้ผู้ใช้ทั่วไปทดสอบ | Open Beta รุ่นแรกของ NEXT | **เป้าหมาย: 1 ม.ค. 2570** |
 | **ShadowPlay NEXT 1.0** | ผู้ใช้ทั่วไปเมื่อระบบพร้อม | รุ่นที่ผ่านเกณฑ์เสถียรภาพและความเข้ากันได้ | **ยังไม่กำหนดวัน** |
 
 **CBT1 ต้องเน้นหลักฐานการทำงานจริง ไม่ใช่แค่ความตื่นเต้นจาก Trailer** โดยเฉพาะวงจรเปิด/ปิด Overlay, การส่ง Input, ความสมบูรณ์ของไฟล์วิดีโอ, ความเข้ากันได้ของ GPU/Adapter และพฤติกรรมที่แตกต่างกันตามเกม
 
-**ยังไม่มีลิงก์รับสมัคร CBT1 ใน README นี้** เพราะยังไม่เปิดรับผู้ทดสอบจริง เมื่อตัวระบบสมัครพร้อมและประกาศเปิดจึงค่อยเพิ่มลิงก์
+**ระบบ CBT1 แยก Invite-only ออกจากการสมัครทั่วไป:** มีขั้นตอนรับรหัสเชิญส่วนตัวสำหรับผู้ที่มี **Duluka Account เดิม** ผ่าน [เว็บไซต์ CBT1](https://nv-cbt.pages.dev/) โดยรหัสใช้ครั้งเดียว มีวันหมดอายุ และต้องให้ผู้ดูแลอนุมัติใบสมัคร **ยังปิดรับสมัคร CBT1 ทั่วไป** (`Cbt1:Enabled=false`) ส่วน Invite-only ใช้ Gate แยก ไม่ได้หมายความว่ามีตัวติดตั้ง CBT1 เปิดให้ดาวน์โหลดแล้ว อ่าน [เอกสาร Server](Server/README.md)
 
-**บัญชีผู้ใช้ไม่ใช่การสมัคร CBT1:** Source ของ Launcher มีปุ่ม **Account** เพื่อเปิด Duluka Account Portal ในเบราว์เซอร์ภายนอก (ไม่ใช่ฟอร์ม Login ภายใน CEF Launcher) ส่วน Portal แบบใช้ฐานข้อมูลบัญชีหลักยัง **ปิดการสมัครบัญชีใหม่จากภายนอก และปิดรับใบสมัคร CBT1** การเปิดหน้าเว็บ/ได้ HTTP 200 ยังไม่ยืนยันว่า Login ภายนอกครบวงจรผ่านแล้ว ดู [Server](Server/README.md) และ [Launcher](Project/Launcher.Cef/README.md)
+**บัญชีผู้ใช้ไม่ใช่การสมัคร CBT1:** Source ของ Launcher มีปุ่ม **Account** เพื่อเปิด Duluka Account Portal ในเบราว์เซอร์ภายนอก (ไม่ใช่ฟอร์ม Login ภายใน CEF Launcher) ส่วน Portal ที่ใช้ฐานข้อมูลบัญชีหลักยัง **ปิดสมัครบัญชีใหม่จากภายนอกและปิดรับ CBT1 ทั่วไป** แต่มี **ขั้นตอนสมัคร CBT1 ด้วยรหัสเชิญ** สำหรับบัญชีเดิมภายใต้ Gate แยก การเปิดหน้าเว็บ/ได้ HTTP 200 ยังไม่ยืนยันว่า Login ภายนอกครบวงจรผ่านแล้ว ดู [Server](Server/README.md) และ [Launcher](Project/Launcher.Cef/README.md)
 
 ---
 
@@ -94,15 +94,17 @@
 | **Freestyle V5** | ลากจัด Main-menu, Group/Control, Block แบบ Small / Side / Big, Auto-Fill, Undo / Done / Cancel พร้อม `md-menu` และ `md-select` จริง | **พัฒนาแล้ว / กำลังทดสอบ** |
 | **OSC Motion** | Transition, การจัดตำแหน่งล่วงหน้า และการทำงานร่วมกับวงจร Native OSC | **พัฒนาแล้ว / ยังตรวจ Open-Close** |
 | **Game Profiles / GPU Preferences** | จัดการโปรไฟล์รายแอปจากไฟล์ `.exe`, ตั้งชื่อ, เลือก GPU Adapter และกำหนด Windows Graphics Preferences ผ่าน NVIDIA Graphics Backend พร้อม Control เสริมใน Freestyle V5 | **ผู้พัฒนาทดสอบบนโน้ตบุ๊กจริง: พบ GPU แยกกัน เลือกการ์ดได้ เกมเรนเดอร์ผ่าน GPU ที่เลือกจริง และค่าที่บันทึกยังอยู่หลัง Restart** |
-| **ApplicationOntology / ฐานข้อมูลเกม** | แค็ตตาล็อก Game Identity แยกที่ `C:\\My Project\\nv-ontology-pages` มีข้อมูลเกม ชื่อ `.exe` คำใบ้ Graphics API และการแจ้งอัปเดต | **แค็ตตาล็อกในเครื่อง v1.2.8 / 8 รายการ (24 ต.ค. 2569); ยังไม่ยืนยันว่า Public API อัปเดตแล้ว; การจับคู่ชื่อไฟล์ไม่ใช่ SHA-256 Identity** |
-| **Game Filter** | การเชื่อม ReShade Effect/Preset กับหน้า OSC | **ทดลอง / ยังตรวจการเชื่อมจริง** |
+| **ApplicationOntology / ฐานข้อมูลเกม** | แค็ตตาล็อก Game Identity แยกที่ `C:\\My Project\\nv-ontology-pages` มีข้อมูลเกม ชื่อ `.exe` คำใบ้ Graphics API และการแจ้งอัปเดต | **แค็ตตาล็อกในเครื่อง v1.2.9 / 23 รายการ (24 ต.ค. 2569); ยังไม่ยืนยันว่า Public API อัปเดตแล้ว; การจับคู่ชื่อไฟล์ไม่ใช่ SHA-256 Identity** |
+| **Game Filter / ReShade Manager** | OSC Settings มีหน้าตรวจ ReShade ในโฟลเดอร์เกม, คำใบ้ Graphics API และเปิดเว็บ Setup ทางการโดยให้ผู้ใช้ยืนยันก่อน | **มี Info/Inspect API และ Guard ฝั่ง JS พร้อมผลทดสอบเฉพาะส่วน แต่ไม่มีคำสั่งติดตั้ง/ถอน DLL จาก NodeAPI; ยังไม่ยืนยันการคลิกจริงใน CEF และ Effect ในเกม** |
 | **DirectX Adapter / Hook** | มีโค้ด Native D3D9/D3D9Ex และ D3D11 พร้อมชุดทดสอบ DX9Ex GPU-to-GPU IPC ข้ามโปรเซสและ x86/x64 | **ทดลองอยู่; ยังไม่รับรอง Auto-Hook เกมจริง อัตราเฟรม หรือความเข้ากันได้ทุกเกม** |
 | **NVIDIA Capture** | Capture และ Encoder, ตรวจจอด้วย DXGI, เลือกจอ, Screenshot Engine และ Container Relay | **มีโค้ดและผลทดสอบเฉพาะส่วน; ยังไม่รับรอง Record/Replay และ UI End-to-End Runtime** |
 | **Encoder & Audio** | Native NVENC กับ FFmpeg หลายโหมด, WASAPI, Timing, Mux และ Integrity Checks | **ความพร้อมแตกต่างกันตาม Engine** |
 | **NVIDIA Container / Config** | ควบคุมโปรเซส, GameWatcher, Capture Relay, ตรวจคำขอและประสานโมดูล | **กำลังทดสอบ; Source, Staged Build และ Runtime ที่รันอยู่อาจไม่ตรงกัน** |
 | **Launcher / Modules** | หน้าแบบง่าย เปิด/ปิด ShadowPlay และแสดง Core Modules 11 รายการพร้อมสถานะ Runtime แบบอ่านอย่างเดียว; หน้า Add-ons ยังไม่มีโมดูลเสริม | **กำลังพัฒนา: Core ห้ามแก้ไข/ปิด/ถอนแยกจากชุดหลัก; ระบบข้อมูลจาก Server ยังเป็นสัญญาเสนอ ไม่ได้เชื่อมจริง; เครื่องมือ Appearance เก่าไม่ถูกโหลดในหน้า Core แบบใหม่** |
 | **Gallery / Media** | NodeAPI Recent, CopyFile, Metadata และ MSE/Seek Bridge | **ชุดทดสอบ Backend ผ่าน แต่ยังไม่ยืนยัน Play/Seek ใน CEF จริง; Delete ตอบ 501** |
-| **Duluka Account / Tester Portal** | Account Server แยกสำหรับ Username/Password, Session, จัดการอุปกรณ์ และ Portal ผ่านเบราว์เซอร์ พร้อมปุ่ม Account ใน Launcher | **มีโค้ดและผลทดสอบเฉพาะส่วน; Portal ที่ใช้บัญชีจริงปิดสมัครบัญชีใหม่และยังไม่เปิดสมัคร CBT1; ยังไม่รับรอง Login จากภายนอกครบวงจร** |
+| **Duluka Account / Tester Portal** | Account Server แยกสำหรับ Username/Password, Session, จัดการอุปกรณ์ และ Portal ผ่านเบราว์เซอร์ พร้อมปุ่ม Account ใน Launcher | **มีโค้ดและผลทดสอบเฉพาะส่วน; Portal บัญชีจริงปิดสมัครบัญชีใหม่และ CBT1 ทั่วไป แต่เปิดขั้นตอนขอสมัครด้วยรหัสเชิญสำหรับบัญชีเดิมภายใต้ Gate แยก; ยังไม่รับรอง Login ภายนอกครบวงจร** |
+
+**อัปเดต Hook Transport และ Capture UI ตาม Source (24 ต.ค. 2569):** D3D9 มี GPU Preview **เฉพาะ Windowed DWM/DirectComposition** พร้อม CPU Fallback ส่วน **D3D9Ex ยังไม่เปิด GPU ให้เลือกใน Production Transport Policy** แม้มีผลทดสอบ Mailbox ข้ามโปรเซส D3D11 มีทางเลือก GPU แต่ D3D10/D3D12/Vulkan/OpenGL ยังไม่มี Native Renderer ที่พร้อมใช้งาน หน้า **Capture Pipeline Design** ล็อกขนาด UI แล้ว แต่เป็นเพียง Preview **ยังไม่บันทึกค่าหรือเชื่อม Encoder จริง** ดู [OSC Host](Project/Overlay%20On-Screen%20Control/NVIDIA%20OSC/README.md) และ [เอกสาร Pipeline UI](docs/UI-CAPTURE-PIPELINE-SIZE-LOCK-20261024.md)
 
 **สองระบบนี้ไม่ใช่สิ่งเดียวกัน:** Game Profiles ใน OSC ใช้จัดการค่าการเลือก GPU รายแอปผ่านบริการ NVIDIA Graphics ในเครื่อง ส่วน ApplicationOntology เป็นระบบแค็ตตาล็อกและการระบุเกม/แจ้งอัปเดต **ไม่ได้เก็บหรือ Apply โปรไฟล์ GPU ของผู้ใช้** ดู [nv-ontology.pages.dev](https://nv-ontology.pages.dev/) และ [ซอร์ส ApplicationOntology-API](https://github.com/ScotcsDuluka/ApplicationOntology-API) โดยการแก้ข้อมูลใน Repository บนเครื่องไม่ได้หมายความว่า Deploy ขึ้นเว็บแล้ว
 
@@ -132,13 +134,13 @@
 |---|---|---|
 | **Launcher / Core แบบอ่านอย่างเดียว** | Quick UI ปัจจุบันมีสวิตช์ ShadowPlay, Core 11 โมดูลแสดงสถานะในเครื่อง และ Add-ons ที่ยังว่างอยู่; เครื่องมือ Appearance เก่ายังอยู่ใน Source แต่ไม่ได้เปิดใน Core UI | Core ไม่ให้ผู้ใช้แก้ Config/Layout/Background หรือเปิดปิด/ถอนทีละโมดูล ข้อมูล Core จาก Server ยังไม่เชื่อม API จริง และ CEF 73 ยังต้องตรวจความปลอดภัย |
 | **Game Profiles / Windows GPU** | Backend กำหนด GPU รายแอปได้; ผู้พัฒนารายงานว่าทดสอบโน้ตบุ๊กหลาย GPU แล้ว เกมเรนเดอร์ผ่านการ์ดที่เลือกจริง และค่าคงอยู่หลัง Restart | ยังไม่ยืนยันทุก Windows/Driver/เกม และ UI ยังไม่ได้โคลน Windows Graphics Settings ครบทุกความสามารถ |
-| **ApplicationOntology** | แค็ตตาล็อกในเครื่อง `C:\My Project\nv-ontology-pages\public\catalog.json` ระบุ **v1.2.8 / 8 รายการ** เมื่ออ่านวันที่ 24 ต.ค. 2569; Container ใช้แคชแค็ตตาล็อกที่ผ่านการตรวจข้อมูล | **ยังไม่ได้ตรวจว่ารุ่นนี้ Deploy ขึ้น Public API แล้ว**; ชื่อ `.exe` ตรงกันไม่ได้พิสูจน์ตัวตนเกมด้วย SHA-256 |
+| **ApplicationOntology** | แค็ตตาล็อกในเครื่อง `C:\My Project\nv-ontology-pages\public\catalog.json` ระบุ **v1.2.9 / 23 รายการ** เมื่ออ่านวันที่ 24 ต.ค. 2569; Container ใช้แคชแค็ตตาล็อกที่ผ่านการตรวจข้อมูล | **ยังไม่ได้ตรวจว่ารุ่นนี้ Deploy ขึ้น Public API แล้ว**; ชื่อ `.exe` ตรงกันไม่ได้พิสูจน์ตัวตนเกมด้วย SHA-256 |
 | **OSC Adapter / Duluka Hook** | มีโค้ด Native D3D9/D3D9Ex และ D3D11; ผลทดสอบแบบแยกโปรเซสใช้ **Host DX9Ex ตัวจริงส่งให้ Hook Receiver** ผ่าน GPU Shared Texture และเส้นทาง x64→x86 โดยไม่ต้อง Readback CPU ระหว่างการ CopyResource | DX9Ex Mailbox ยังเป็นการทดลอง ต้องตรวจ Hook เกมจริง อัตราเฟรม/FPS การเปิดปิด Overlay และการกลับมาทำงานเมื่อ Focus เปลี่ยน |
 | **Capture / Container Relay** | มี DXGI เลือกจอ, Screenshot และ API Relay ใน Source; Container ส่งต่อคำสั่ง ไม่จับภาพเอง; Relay Mock Tests บันทึกผลผ่าน **26/26** | Write API ปิดโดยค่าเริ่มต้น ต้องตรวจ NvCapture Runtime, OSC UI, การบันทึกจริงและไฟล์ภาพที่ได้; Replay ในสัญญาปัจจุบันตอบ **501** |
 | **NodeAPI Gallery** | แก้ Recent ให้ค้นโฟลเดอร์ย่อย, CopyFile ตรวจสำเร็จจริง และเพิ่ม MSE Video/Seek Bridge ที่เสิร์ฟหน้า OSC; ชุดทดสอบเฉพาะส่วนผ่าน **58/58** | ยังต้องทดสอบเล่นวิดีโอ Seek และ A/V Sync ใน CEF จริง; คำสั่ง Delete ตั้งใจตอบ **501** ไม่แสร้งว่าลบสำเร็จ |
 | **Container / NodeAPI Security** | มี Browser/Loopback Guards, ตรวจ Path ของโปรเซส, นโยบาย Game Identity ด้วย SHA-256 และงาน Pairing Secret พร้อมชุดทดสอบเฉพาะส่วน | ตรวจ Host/Origin ช่วยลดความเสี่ยงจากเว็บ แต่ไม่ใช่การยืนยันตัวตนของทุก Local Process; ต้องตรวจ Policy หลัง Deploy จริง |
 | **Ansel / ReShade** | แยก Ansel Adapter จาก ReShade Ansel Engine และมีสัญญา Named Pipe / Game Filter UI | ปุ่ม Game Filter แสดงได้ ไม่ได้แปลว่า Effect หรือ Shader ทำงานในเกมจริง |
-| **Duluka Account / Portal** | Source ของ Launcher มีปุ่ม Account ที่เปิด Portal HTTPS ในเบราว์เซอร์ภายนอก; Server มี Login บัญชีเดิม หน้า Account/Devices และเปลี่ยนรหัสผ่าน พร้อมชุดทดสอบแยก | Portal แบบใช้บัญชีหลักปิดสมัครบัญชีใหม่และ CBT1; ยังไม่ผ่านการทดสอบ Login ภายนอกแบบเต็มวงจร และ **Server Core Catalog** ยังเป็นแผน ไม่ได้เชื่อมจริง |
+| **Duluka Account / Portal** | Source ของ Launcher มีปุ่ม Account ที่เปิด Portal HTTPS ในเบราว์เซอร์ภายนอก; Server มี Login บัญชีเดิม หน้า Account/Devices และเปลี่ยนรหัสผ่าน พร้อมชุดทดสอบแยก | Portal บัญชีหลักยังปิดสมัครบัญชีใหม่และ CBT1 ทั่วไป แต่มีขั้นตอนสมัครแบบ Invite-only สำหรับบัญชีเดิม; ยังไม่ผ่าน Login ภายนอกแบบเต็มวงจร และ **Server Core Catalog** ยังเป็นแผน ไม่ได้เชื่อมจริง |
 
 **เส้นทางเจ้าของระบบ:** `NVIDIA Capture → NVIDIA Container → NVIDIA NodeAPI → OSC UI` สำหรับสถานะและคำสั่ง Capture ส่วน `NVIDIA OSC Host → OSC Adapter / Duluka Hook` เป็นเส้นทาง Overlay Transport ที่ยังทดลองอยู่ โดย NvCapture เป็นผู้เลือกจอและสร้าง Screenshot จริง
 
@@ -170,6 +172,28 @@ flowchart TB
     Capture --> Encoder["NVENC / FFmpeg Engines"]
     Capture --> Audio["WASAPI / Audio-Video Timing / Mux"]
 ```
+
+### ผังสถาปัตยกรรม Capture — คำสั่งและเส้นทางสื่อ
+
+ระบบ Capture แยก **Control Plane** (OSC / NodeAPI / Container) ออกจาก **Media Plane** (GPU / Audio / Encoder / ไฟล์) อย่างชัดเจน โดย **NvCapture เป็นเจ้าของการอัด การเลือกจอและผลลัพธ์ไฟล์จริง** ผังนี้แสดงความรับผิดชอบตาม Source/สัญญา API ไม่ได้ยืนยันว่าทุก Endpoint เปิดใช้งานใน Runtime แล้ว
+
+```mermaid
+flowchart LR
+    OSC["OSC / หน้า Capture"] <--> NODE["NodeAPI :59011"]
+    NODE <--> CONT["NvContainer :59012\nPolicy + Supervisor"]
+    CONT <--> WORK["NvCapture.exe :59077\nเจ้าของ Media"]
+    WORK --> BACK{"เลือก Backend"}
+    BACK --> NAT["Duluka: DXGI → Native NVENC H.264"]
+    BACK --> FF["FFmpeg: ddagrab/gdigrab → Encoder"]
+    NAT --> MP4["SessionResult → MP4"]
+    FF --> MP4
+    AUD["WASAPI System/Mic ถ้าเปิดใช้"] -. "Timing / Mux" .-> MP4
+    WORK --> PNG["เลือกจอ → FFmpeg ภาพเดียว → PNG"]
+    WORK -. "สถานะจริง / ผลลัพธ์" .-> CONT
+    NODE -. "แจ้งบันทึกสำเร็จเมื่อพิสูจน์ได้" .-> OSC
+```
+
+**ข้อจำกัด:** คำสั่งเขียนของ Container ปิดโดยค่าเริ่มต้นและต้องยืนยันพร้อมตรวจ Worker จริง ส่วน OSC บางคำสั่งยังผ่าน Compatibility Route เดิม การทดสอบ NVENC แบบ Synthetic **ไม่เท่ากับ** อัดจอจริงครบวงจร Screenshot เป็นเส้นทางแยกจาก Record และ OBS/NvFBC ยังไม่พร้อมใช้งาน อ่าน [ผัง Capture ฉบับเต็ม พร้อม Media Pipeline และเกณฑ์ทดสอบ](Project/NVIDIA%20Capture/README.md)
 
 ### โครงสร้าง Source Code
 
