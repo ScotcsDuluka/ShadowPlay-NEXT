@@ -3,6 +3,8 @@
 
 # SHADOWPLAY NEXT
 
+**Language:** **English** · [ภาษาไทย](README.th.md)
+
 ### FLAGSHIP BUILD. **FLAGSHIP REBUILD.**
 
 **THE INTERFACE YOU KNOW. THE POSSIBILITIES YOU DON'T.**
