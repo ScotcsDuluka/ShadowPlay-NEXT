@@ -2,6 +2,8 @@ using System.Net.Mail;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Duluka.Server.Auth;
+using Duluka.Server.Data;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Data.Sqlite;
 
@@ -34,6 +36,8 @@ public sealed class Cbt1Store
             PRAGMA journal_mode=WAL;
             CREATE TABLE IF NOT EXISTS Cbt1Applications (
                 Id TEXT NOT NULL PRIMARY KEY,
+                AccountId TEXT,
+                Username TEXT,
                 Alias TEXT NOT NULL,
                 Email TEXT NOT NULL COLLATE NOCASE UNIQUE,
                 WindowsVersion TEXT NOT NULL,
@@ -47,6 +51,31 @@ public sealed class Cbt1Store
                 ON Cbt1Applications(AppliedUtc DESC);
             """;
         command.ExecuteNonQuery();
+        // Additive upgrade for any databases created by the first CBT1 scaffold.
+        // Legacy applications remain unlinked; no account is guessed from email.
+        using var columns = connection.CreateCommand();
+        columns.CommandText = "PRAGMA table_info(Cbt1Applications)";
+        var found = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        using (var reader = columns.ExecuteReader())
+            while (reader.Read()) found.Add(reader.GetString(1));
+        if (!found.Contains("AccountId"))
+        {
+            using var add = connection.CreateCommand();
+            add.CommandText = "ALTER TABLE Cbt1Applications ADD COLUMN AccountId TEXT";
+            add.ExecuteNonQuery();
+        }
+        if (!found.Contains("Username"))
+        {
+            using var add = connection.CreateCommand();
+            add.CommandText = "ALTER TABLE Cbt1Applications ADD COLUMN Username TEXT";
+            add.ExecuteNonQuery();
+        }
+        using var unique = connection.CreateCommand();
+        unique.CommandText = """
+            CREATE UNIQUE INDEX IF NOT EXISTS IX_Cbt1Applications_AccountId
+            ON Cbt1Applications(AccountId) WHERE AccountId IS NOT NULL;
+            """;
+        unique.ExecuteNonQuery();
     }
 
     private SqliteConnection Connect()
@@ -57,16 +86,18 @@ public sealed class Cbt1Store
     }
 
     // Duplicate e-mails get the same public response to prevent enumeration.
-    public void Apply(Cbt1Application a)
+    public bool Apply(Cbt1Application a)
     {
         using var db = Connect();
         using var cmd = db.CreateCommand();
         cmd.CommandText = """
             INSERT OR IGNORE INTO Cbt1Applications
-              (Id,Alias,Email,WindowsVersion,GpuVendor,TestingFocus,Notes,AppliedUtc,Decision)
-            VALUES ($id,$alias,$email,$win,$gpu,$focus,$notes,$now,'pending');
+              (Id,AccountId,Username,Alias,Email,WindowsVersion,GpuVendor,TestingFocus,Notes,AppliedUtc,Decision)
+            VALUES ($id,$account,$username,$alias,$email,$win,$gpu,$focus,$notes,$now,'pending');
             """;
         cmd.Parameters.AddWithValue("$id", Guid.NewGuid().ToString("N"));
+        cmd.Parameters.AddWithValue("$account", a.AccountId);
+        cmd.Parameters.AddWithValue("$username", a.Username);
         cmd.Parameters.AddWithValue("$alias", a.Alias);
         cmd.Parameters.AddWithValue("$email", a.Email);
         cmd.Parameters.AddWithValue("$win", a.WindowsVersion);
@@ -74,7 +105,34 @@ public sealed class Cbt1Store
         cmd.Parameters.AddWithValue("$focus", a.TestingFocus);
         cmd.Parameters.AddWithValue("$notes", a.Notes);
         cmd.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToString("O"));
-        cmd.ExecuteNonQuery();
+        return cmd.ExecuteNonQuery() == 1;
+    }
+
+    public object? ForAccount(string accountId)
+    {
+        using var db = Connect();
+        using var cmd = db.CreateCommand();
+        cmd.CommandText = """
+            SELECT Id,Username,Alias,Email,WindowsVersion,GpuVendor,TestingFocus,
+                   Notes,AppliedUtc,Decision FROM Cbt1Applications
+            WHERE AccountId=$account LIMIT 1;
+            """;
+        cmd.Parameters.AddWithValue("$account", accountId);
+        using var rows = cmd.ExecuteReader();
+        if (!rows.Read()) return null;
+        return new
+        {
+            id = rows.GetString(0),
+            username = rows.IsDBNull(1) ? "" : rows.GetString(1),
+            alias = rows.GetString(2),
+            email = rows.GetString(3),
+            windowsVersion = rows.GetString(4),
+            gpuVendor = rows.GetString(5),
+            testingFocus = rows.GetString(6),
+            notes = rows.GetString(7),
+            appliedUtc = rows.GetString(8),
+            decision = rows.GetString(9)
+        };
     }
 
     public List<object> Recent(int limit)
@@ -83,7 +141,7 @@ public sealed class Cbt1Store
         using var db = Connect();
         using var cmd = db.CreateCommand();
         cmd.CommandText = """
-            SELECT Id,Alias,Email,WindowsVersion,GpuVendor,TestingFocus,
+            SELECT Id,Username,Alias,Email,WindowsVersion,GpuVendor,TestingFocus,
                    Notes,AppliedUtc,Decision FROM Cbt1Applications
             ORDER BY AppliedUtc DESC LIMIT $limit;
             """;
@@ -93,14 +151,15 @@ public sealed class Cbt1Store
             items.Add(new
             {
                 id = rows.GetString(0),
-                alias = rows.GetString(1),
-                email = rows.GetString(2),
-                windowsVersion = rows.GetString(3),
-                gpuVendor = rows.GetString(4),
-                testingFocus = rows.GetString(5),
-                notes = rows.GetString(6),
-                appliedUtc = rows.GetString(7),
-                decision = rows.GetString(8)
+                username = rows.IsDBNull(1) ? "" : rows.GetString(1),
+                alias = rows.GetString(2),
+                email = rows.GetString(3),
+                windowsVersion = rows.GetString(4),
+                gpuVendor = rows.GetString(5),
+                testingFocus = rows.GetString(6),
+                notes = rows.GetString(7),
+                appliedUtc = rows.GetString(8),
+                decision = rows.GetString(9)
             });
         return items;
     }
@@ -126,7 +185,7 @@ public sealed class Cbt1Store
 }
 
 public sealed record Cbt1Application(
-    string Alias, string Email, string WindowsVersion,
+    string AccountId, string Username, string Alias, string Email, string WindowsVersion,
     string GpuVendor, string TestingFocus, string Notes);
 
 internal sealed class Cbt1ApplyPayload
@@ -192,6 +251,20 @@ public static class Cbt1Registration
         return JsonSerializer.Deserialize<T>(buffer.AsSpan(0, length), JsonOptions);
     }
 
+    private static (string AccountId, string Username)? AuthenticatedTester(
+        HttpRequest request, SessionService sessions, Database accounts)
+    {
+        const string prefix = "Bearer ";
+        var header = request.Headers.Authorization.ToString();
+        if (!header.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return null;
+        var validation = sessions.Validate(header[prefix.Length..].Trim());
+        if (validation is null) return null;
+        var accountId = validation.Value.Account.AccountId;
+        var name = accounts.FindNativeCredentialByAccount(accountId)?.UsernameDisplay;
+        if (string.IsNullOrWhiteSpace(name)) return null;
+        return (accountId, name);
+    }
+
     private static bool BadText(string? s, int max) =>
         string.IsNullOrWhiteSpace(s) || s.Trim().Length > max ||
         s.Any(char.IsControl);
@@ -206,11 +279,25 @@ public static class Cbt1Registration
             return Results.Json(new { ok = true, accepting = Accepting(config), cycle = "CBT1" });
         });
 
+        group.MapGet("/me", (
+            HttpContext context, SessionService sessions, Database accounts, Cbt1Store store) =>
+        {
+            context.Response.Headers.CacheControl = "no-store";
+            var tester = AuthenticatedTester(context.Request, sessions, accounts);
+            if (tester is null) return Error(401, "cbt1.login_required", "Sign in with a username.");
+            return Results.Json(new { ok = true, username = tester.Value.Username,
+                application = store.ForAccount(tester.Value.AccountId) });
+        }).RequireRateLimiting("api");
+
         group.MapPost("/apply", async (
-            HttpContext context, IConfiguration config, Cbt1Store store) =>
+            HttpContext context, IConfiguration config, Cbt1Store store,
+            SessionService sessions, Database accounts) =>
         {
             if (!Accepting(config))
                 return Error(503, "cbt1.closed", "CBT1 applications are not open.");
+            var tester = AuthenticatedTester(context.Request, sessions, accounts);
+            if (tester is null)
+                return Error(401, "cbt1.login_required", "Sign in with a username.");
             if (!context.Request.HasJsonContentType())
                 return Error(415, "cbt1.json_required", "JSON request required.");
 
@@ -244,12 +331,17 @@ public static class Cbt1Registration
                 p.TestingFocus is not ("Overlay" or "Capture" or "GPU Profiles" or "DX9 Hook" or "UI" or "General"))
                 return Error(400, "cbt1.invalid_choice", "Select supported options.");
 
-            store.Apply(new Cbt1Application(
+            var saved = store.Apply(new Cbt1Application(
+                tester.Value.AccountId, tester.Value.Username,
                 p.Alias!.Trim(), email, p.WindowsVersion, p.GpuVendor,
                 p.TestingFocus, p.Notes?.Trim() ?? ""));
             context.Response.Headers.CacheControl = "no-store";
-            // Do not expose existence of a previous application or acceptance.
-            return Results.Json(new { ok = true, received = true });
+            // A tester can only see their own application; never reveal another
+            // account's details when an email uniqueness rule prevents insertion.
+            if (!saved && store.ForAccount(tester.Value.AccountId) is null)
+                return Error(409, "cbt1.cannot_apply", "Application could not be saved.");
+            return Results.Json(new { ok = true, received = true,
+                application = store.ForAccount(tester.Value.AccountId) });
         }).RequireRateLimiting("cbt1-apply");
 
         group.MapGet("/admin/applications", (
