@@ -49,6 +49,29 @@ Namespace DulukaEngine.Recording
         End Sub
 
         ''' <summary>
+        ''' Reject cross-device texture handoff if DXGI capture and NVENC did
+        ''' not initialize on exactly the same Windows adapter. In a multi-GPU
+        ''' machine each backend independently enumerates the first NVIDIA
+        ''' adapter; never assume their selections are identical.
+        ''' Pure logic seam is device-free and regression-tested.
+        ''' </summary>
+        Public Shared Sub RequireMatchingAdapterLuid(captureLow As UInteger,
+                                                      captureHigh As Integer,
+                                                      encoderLow As UInteger,
+                                                      encoderHigh As Integer)
+            If (captureLow = 0UI AndAlso captureHigh = 0) OrElse
+               (encoderLow = 0UI AndAlso encoderHigh = 0) Then
+                Throw New InvalidOperationException(
+                    "DXGI/NVENC adapter LUID unavailable; refusing unverified cross-device transfer.")
+            End If
+            If captureLow <> encoderLow OrElse captureHigh <> encoderHigh Then
+                Throw New InvalidOperationException(
+                    $"DXGI/NVENC adapter mismatch: capture={captureHigh:x8}:{captureLow:x8}, " &
+                    $"encoder={encoderHigh:x8}:{encoderLow:x8}. Recording cannot start with cross-GPU texture handoff.")
+            End If
+        End Sub
+
+        ''' <summary>
         ''' Initialize persistent GPU resources (D3D11 + DXGI + NVENC).
         ''' Called ONCE at process start. Subsequent calls throw.
         ''' Uses the proven default startup config (NVENC_H264 / 20 Mbps / GOP 60 / p4).
@@ -119,6 +142,14 @@ Namespace DulukaEngine.Recording
                     .EncodeHeight = encodeDims.Item2
                 }
                 _encoder.Initialize(encConfig)
+                ' Phase 7B: compare actual Windows adapter identities, not
+                ' model names or index assumptions. A second GTX 1080 Ti may
+                ' have the same display name but a different adapter LUID.
+                ' The outer Initialize Catch disposes both backends on failure.
+                RequireMatchingAdapterLuid(
+                    _capture.AdapterLuidLow, _capture.AdapterLuidHigh,
+                    _encoder.AdapterLuidLow, _encoder.AdapterLuidHigh)
+                _logger.Info("RecordingEngine: DXGI capture and NVENC adapter LUID MATCH")
                 _startupEcho = startup
 
                 ' ★ PHASE 1 (task §9): requested → selected → actual capture

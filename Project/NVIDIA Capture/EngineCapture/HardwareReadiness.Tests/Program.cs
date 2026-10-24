@@ -96,6 +96,40 @@ internal static class Program
               denied.RequiredBytes == long.MaxValue,
             "no disk filling needed to exercise insufficient-space guard");
         Check(!File.Exists(output), "dry-run did not create any MP4");
+
+        // Phase 7B: deterministic multi-GPU adapter identity guard. These
+        // values are synthetic LUIDs; the test never creates a D3D11 device.
+        static bool IsRejected(uint captureLow, int captureHigh,
+                               uint encoderLow, int encoderHigh,
+                               string reason)
+        {
+            try
+            {
+                RecordingEngine.RequireMatchingAdapterLuid(
+                    captureLow, captureHigh, encoderLow, encoderHigh);
+                return false;
+            }
+            catch (InvalidOperationException ex)
+            {
+                return ex.Message.Contains(reason, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+        RecordingEngine.RequireMatchingAdapterLuid(0x12345678u, 0,
+                                                   0x12345678u, 0);
+        Check(true, "same valid adapter LUID passes");
+        RecordingEngine.RequireMatchingAdapterLuid(0x11111111u, -7,
+                                                   0x11111111u, -7);
+        Check(true, "signed high-part of same LUID passes");
+        Check(IsRejected(0x11111111u, 7, 0x22222222u, 7, "mismatch"),
+              "different low-part refuses cross-GPU handoff");
+        Check(IsRejected(0x11111111u, 7, 0x11111111u, 8, "mismatch"),
+              "different high-part refuses cross-GPU handoff");
+        Check(IsRejected(0u, 0, 0x11111111u, 7, "unavailable"),
+              "unavailable capture LUID cannot be mistaken for adapter match");
+        Check(IsRejected(0x11111111u, 7, 0u, 0, "unavailable"),
+              "unavailable encoder LUID cannot be mistaken for adapter match");
+        Check(IsRejected(0u, 0, 0u, 0, "unavailable"),
+              "both missing LUIDs do not count as the same GPU");
         Console.WriteLine($"HARDWARE_PREFLIGHT_DRYRUN_PASS checks={passes} " +
             $"disk_required={muted.RequiredBytes} disk_free={muted.FreeBytes} " +
             "gpu_opened=false recording_started=false audio_opened=false");
