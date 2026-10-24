@@ -89,7 +89,8 @@ There is **no registration form linked here yet**. An application page will be l
 | **OSC / Native Host** | CEF + Angular interface, native Host integration, NVIDIA-style controls, route/input lifecycle | **Implemented / testing** |
 | **Freestyle V5** | Drag-and-drop Main-menu Groups and Controls, Small / Side / Big layouts, Auto-Fill, Undo / Done / Cancel, native `md-menu` and `md-select` | **Implemented / testing** |
 | **OSC Motion** | Original-style transitions, preflight layout positioning, native lifecycle integration | **Implemented; open/close QA ongoing** |
-| **Game Profiles** | Game detection, catalog/profile routing and configurable UI paths | **Active integration** |
+| **Game Profiles / GPU preferences** | Per-application executable profiles, names, GPU adapter selection and Windows Graphics preference controls via the NVIDIA Graphics backend; optional Freestyle V5 native Control | **User-reported manual multi-GPU laptop check passed: separate GPUs were detected and could be selected; wider save/apply and game-rendering verification pending** |
+| **ApplicationOntology game catalog** | Separate Cloudflare Pages catalog/identity API from `C:\\My Project\\nv-ontology-pages`: supported executable names, matching, render-API hints and update notifications | **Public API ready: v1.2.7 / 6 entries, checked 2026-10-24; name matches are not verified identities** |
 | **Game Filter** | ReShade effects/preset integration and OSC control surface | **Experimental integration** |
 | **DirectX Adapter / Hook** | D3D9/D3D9Ex and DXGI/D3D11 renderer paths, shared-frame transport work | **Experimental; per-API gates** |
 | **NVIDIA Capture** | Capture backends, GPU identity checks, video/audio pipelines and reliability work | **Active engineering; not a blanket production claim** |
@@ -97,18 +98,21 @@ There is **no registration form linked here yet**. An application page will be l
 | **NVIDIA Container / Config** | Process supervision, configuration and inter-component orchestration | **Active integration** |
 | **Launcher / Gallery / Localization** | Desktop launch flow, media management and English/Thai UI paths | **Under continued development** |
 
+**These are two different systems:** Game Profiles manages per-application GPU preferences in OSC through the local Graphics service. ApplicationOntology provides the published game-identity catalog and catalog updates; it does **not** store or apply a user's GPU profiles. Public catalog: [nv-ontology.pages.dev](https://nv-ontology.pages.dev/) · [ApplicationOntology-API source](https://github.com/ScotcsDuluka/ApplicationOntology-API). The working catalog repository is separate from this tree, and local edits are not automatically public deployments.
+
 The screen shown in the overlay is **not** a compatibility certificate. A visible button, a compiled Hook, or an enabled menu is not proof that the related end-to-end feature is ready for all games.
 
 ### Freestyle V5 — make the Main-menu yours
 
 - Arrange Groups across the left, center and right panels.
+- Optionally place the NEXT **Game Profiles** native Control alongside the original 12 Controls; availability and live behavior still depend on the local Graphics backend.
 - Compose **Big**, **Side** and **Small** Blocks with different slot layouts.
 - Drag, swap, insert and reassign Controls without cloning the original NVIDIA menu nodes.
 - Keep a single Settings Control; protect layout invariants.
 - Preview changes, **Undo**, **Done** or **Cancel** while keeping saved settings intact until confirmation.
 - Respect OSC Motion, native control behavior and locale changes.
 
-**Engineering evidence, 2026-10-23:** the selected offline V5 regression suite passed **135 / 135** tests; an earlier combined real-CEF interaction/viewport/lifecycle run passed **18 / 18** checks. A subsequent source-preview audit verified closed/idle native controls but **did not pass a live Native Host activation/open-cycle gate**. These are **dated, scoped results**, not an all-build release certification.
+**Engineering evidence, 2026-10-23:** the selected offline V5 regression suite passed **135 / 135** tests; an earlier combined real-CEF interaction/viewport/lifecycle run passed **18 / 18** checks. **Since those tests, the source catalog gained an optional 13th control, Game Profiles (12 original controls + one NEXT control); the quoted test counts do not certify that newer addition.** A subsequent source-preview audit verified closed/idle native controls but **did not pass a live Native Host activation/open-cycle gate**. These are **dated, scoped results**, not an all-build release certification.
 
 **Read:** [Freestyle V5 QA gate](Project/Overlay%20On-Screen%20Control/NVIDIA%20NodeAPI/tools/FREESTYLE-V5-RELEASE-QA-20261023.md) · [CEF RAF / Host activation audit](Project/Overlay%20On-Screen%20Control/NVIDIA%20NodeAPI/tools/FREESTYLE-V5-CEF-RAF-AUDIT-20261023.md)
 
@@ -173,6 +177,7 @@ Some examples from subsystem-specific validation records:
 | Freestyle V5 Node regression — **2026-10-23** | **135 passed / 0 failed** in the selected suite | Public release readiness |
 | Real OSC CEF combined checks — **2026-10-23** | **18 / 18** previously passed | All future runtime builds |
 | Later OSC CEF source preview — **2026-10-23** | 12 native controls observed; closed/idle state checked | A successful Native Host open transition |
+| Game Profiles multi-GPU laptop check — **user report, 2026-10-24** | Distinct GPUs were detected and could be selected separately on a second Windows laptop | Persistence across restarts or proof of which GPU a game rendered on |
 | D3D11 Hook smoke — **2026-10-22** | **9 Presents / 6 composed frames** in the recorded test | General game compatibility |
 | DX9 interactive smoke — **2026-10-22** | Foreground automation blocked that run | A passing real-game DX9 test |
 

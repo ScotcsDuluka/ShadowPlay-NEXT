@@ -91,7 +91,8 @@
 | **OSC / Native Host** | หน้าตา CEF + Angular, เชื่อม Native Host, NVIDIA Controls และวงจร Route/Input | **พัฒนาแล้ว / กำลังทดสอบ** |
 | **Freestyle V5** | ลากจัด Main-menu, Group/Control, Block แบบ Small / Side / Big, Auto-Fill, Undo / Done / Cancel พร้อม `md-menu` และ `md-select` จริง | **พัฒนาแล้ว / กำลังทดสอบ** |
 | **OSC Motion** | Transition, การจัดตำแหน่งล่วงหน้า และการทำงานร่วมกับวงจร Native OSC | **พัฒนาแล้ว / ยังตรวจ Open-Close** |
-| **Game Profiles** | การตรวจจับเกม การเชื่อมโปรไฟล์และแค็ตตาล็อกกับ UI | **กำลังเชื่อมต่อระบบ** |
+| **Game Profiles / GPU Preferences** | จัดการโปรไฟล์รายแอปจากไฟล์ `.exe`, ตั้งชื่อ, เลือก GPU Adapter และกำหนด Windows Graphics Preferences ผ่าน NVIDIA Graphics Backend พร้อม Control เสริมใน Freestyle V5 | **ผู้พัฒนารายงานว่าทดลองกับโน้ตบุ๊กที่มีหลาย GPU แล้ว: ตรวจพบการ์ดแยกกันและเลือกแยกได้จริง; ยังต้องตรวจ Save/Apply ในหลายเครื่องและ GPU ที่เกมใช้เรนเดอร์จริง** |
+| **ApplicationOntology / ฐานข้อมูลเกม** | API แค็ตตาล็อกเกมแยกบน Cloudflare Pages จาก `C:\\My Project\\nv-ontology-pages`: ระบุชื่อไฟล์เกม, ตรวจจับเบื้องต้น, คำใบ้ Graphics API และแจ้งอัปเดตแค็ตตาล็อก | **Public API พร้อม: v1.2.7 / 6 เกม (ตรวจ 24 ต.ค. 2569); จับคู่ชื่อไฟล์ไม่เท่ากับยืนยันตัวตน** |
 | **Game Filter** | การเชื่อม ReShade Effect/Preset กับหน้า OSC | **ทดลอง / ยังตรวจการเชื่อมจริง** |
 | **DirectX Adapter / Hook** | เส้นทาง D3D9/D3D9Ex และ DXGI/D3D11 พร้อมการส่งเฟรมแบบแชร์ | **ทดลอง / มีเกณฑ์ทดสอบแยกตาม API** |
 | **NVIDIA Capture** | Capture Backend, ตรวจอัตลักษณ์ GPU, Video/Audio Pipeline และการป้องกันความผิดพลาด | **พัฒนาต่อเนื่อง / ยังไม่รับรองครบทุกกรณี** |
@@ -99,18 +100,21 @@
 | **NVIDIA Container / Config** | ควบคุมโปรเซส คอนฟิก และประสานบริการต่าง ๆ | **กำลังเชื่อมต่อระบบ** |
 | **Launcher / Gallery / Localization** | ตัวเปิดโปรแกรม การจัดการสื่อ และหน้า UI ภาษาไทย/อังกฤษ | **กำลังพัฒนาต่อเนื่อง** |
 
+**สองระบบนี้ไม่ใช่สิ่งเดียวกัน:** Game Profiles ใน OSC ใช้จัดการค่าการเลือก GPU รายแอปผ่านบริการ NVIDIA Graphics ในเครื่อง ส่วน ApplicationOntology เป็นระบบแค็ตตาล็อกและการระบุเกม/แจ้งอัปเดต **ไม่ได้เก็บหรือ Apply โปรไฟล์ GPU ของผู้ใช้** ดู [nv-ontology.pages.dev](https://nv-ontology.pages.dev/) และ [ซอร์ส ApplicationOntology-API](https://github.com/ScotcsDuluka/ApplicationOntology-API) โดยการแก้ข้อมูลใน Repository บนเครื่องไม่ได้หมายความว่า Deploy ขึ้นเว็บแล้ว
+
 การเห็นปุ่มบนหน้าจอ **ไม่ได้แปลว่าระบบเบื้องหลังพร้อมใช้แล้ว** เช่น การตรวจพบ DirectX Module ไม่ใช่หลักฐานว่า Hook รองรับเกมนั้น และการแสดงปุ่มอัดวิดีโอก็ไม่ใช่หลักฐานว่าไฟล์ที่ได้สมบูรณ์
 
 ### Freestyle V5 — จัด Main-menu ในแบบของคุณ
 
 - แบ่งตำแหน่ง **Group** ได้ทั้งด้านซ้าย กลาง และขวา
+- สามารถเพิ่ม **Game Profiles Control** ของ NEXT นอกเหนือจาก Controls NVIDIA เดิม 12 ตัว โดยการเข้าใช้และสถานะจริงขึ้นกับ NVIDIA Graphics Backend ในเครื่อง
 - เลือก **Big / Side / Small Block** และรูปแบบ Slot
 - ลากสลับ ย้าย และเพิ่ม Controls โดยไม่โคลน NVIDIA Menu Nodes ต้นฉบับ
 - รักษา **Settings Control เพียงตำแหน่งเดียว** และตรวจสอบเงื่อนไข Layout
 - ทดลองแก้ไขด้วย **Undo / Done / Cancel** โดยไม่บันทึก Draft จนกว่าจะยืนยัน
 - รองรับ OSC Motion, รูปแบบ Native Control และการเปลี่ยนภาษา
 
-**หลักฐานวันที่ 23 ตุลาคม 2569:** ชุดทดสอบ Node ที่เลือกสำหรับ V5 ผ่าน **135 / 135** และการทดสอบ Interaction/Viewport/Lifecycle บน CEF จริงในรอบก่อนหน้าผ่าน **18 / 18** อย่างไรก็ตาม การทดสอบ Source Preview ครั้งถัดมาผ่านเฉพาะสถานะ Closed/Idle แต่ **ยังไม่ผ่านเกณฑ์ Native Host เปิด Overlay จริง** ตัวเลขนี้เป็นผลเฉพาะเวอร์ชันและขอบเขตที่ทดสอบ ไม่ใช่การรับรอง Release ทั้งชุด
+**หลักฐานวันที่ 23 ตุลาคม 2569:** ชุดทดสอบ Node ที่เลือกสำหรับ V5 ผ่าน **135 / 135** และการทดสอบ Interaction/Viewport/Lifecycle บน CEF จริงในรอบก่อนหน้าผ่าน **18 / 18** **แต่หลังจากนั้น Source เพิ่ม Game Profiles เป็น Control เสริมตัวที่ 13 (จากเดิม 12 ตัวของ NVIDIA) ผลทดสอบเก่าจึงยังไม่รับรองฟีเจอร์ที่เพิ่มใหม่** อย่างไรก็ตาม การทดสอบ Source Preview ครั้งถัดมาผ่านเฉพาะสถานะ Closed/Idle แต่ **ยังไม่ผ่านเกณฑ์ Native Host เปิด Overlay จริง** ตัวเลขนี้เป็นผลเฉพาะเวอร์ชันและขอบเขตที่ทดสอบ ไม่ใช่การรับรอง Release ทั้งชุด
 
 อ่านรายงาน: [Freestyle V5 QA](Project/Overlay%20On-Screen%20Control/NVIDIA%20NodeAPI/tools/FREESTYLE-V5-RELEASE-QA-20261023.md) · [CEF RAF / Native Host Audit](Project/Overlay%20On-Screen%20Control/NVIDIA%20NodeAPI/tools/FREESTYLE-V5-CEF-RAF-AUDIT-20261023.md)
 
@@ -177,6 +181,7 @@ Adapter มีโค้ดรองรับเส้นทาง D3D9/D3D9Ex �
 | Freestyle V5 Node Regression — **23 ต.ค. 2569** | **135 ผ่าน / 0 ไม่ผ่าน** ในชุดที่เลือก | NEXT พร้อมเป็น Public Release |
 | OSC CEF Combined — **23 ต.ค. 2569** | **18 / 18 ผ่าน** ในรอบที่บันทึก | Runtime ใหม่ทุก Build จะผ่านเหมือนกัน |
 | OSC CEF Source Preview รอบถัดมา — **23 ต.ค. 2569** | พบ Native Controls ครบ 12 และตรวจ Closed/Idle แล้ว | การเปิด Native Host สำเร็จตลอดวงจร |
+| ทดสอบ Game Profiles บนโน้ตบุ๊กหลาย GPU — **ผู้พัฒนารายงาน 24 ต.ค. 2569** | พบ GPU แยกกันและสามารถเลือกการ์ดแยกได้จริงบนเครื่องที่สอง | โปรไฟล์คงอยู่หลัง Restart หรือเกมเรนเดอร์ด้วย GPU ที่เลือกจริงทุกกรณี |
 | D3D11 Hook Smoke — **22 ต.ค. 2569** | **9 Presents / 6 Composed Frames** | ใช้งานได้กับทุกเกม |
 | DX9 Interactive Smoke — **22 ต.ค. 2569** | เครื่องมือทดสอบติดข้อจำกัด Foreground Window | ผ่านการทดสอบ DX9 กับเกมจริง |
 
