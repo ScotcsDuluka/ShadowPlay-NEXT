@@ -119,6 +119,15 @@ Old OSC localStorage entries remain a UI cache and are not automatically
 converted into INIs. A new game's first slot starts as a copy of the currently
 active ReShade preset. Reset still means the session's loaded-preset baseline.
 
+Preset operations never acknowledge offline selection as applied. The Node
+bridge checks that the selected native `NVIDIAAnsel.<pid>.<serial>` pipe is still
+present before mutating an INI. Successful preset mutations include
+`connected:true, applied:true` alongside the verified native response;
+disconnected requests return HTTP 503 with `codeText:ANSEL_UNAVAILABLE`,
+`connected:false`, `applied:false`, and `success:false`. The OSC UI
+persists the slot selection only after an acknowledged native mutation and
+shows `Game Filter not connected` if ReShade vanishes between click and reply.
+
 The earlier standalone OSC preset implementation is still used for test runtimes
 without native ReShade preset support.
 

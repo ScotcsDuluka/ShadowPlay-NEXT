@@ -4,6 +4,7 @@
 #include "ReShadeUiMetadata.h"
 #include "GamePresetRoot.h"
 #include <array>
+#include <atomic>
 #include <cstring>
 #include <filesystem>
 #include <map>
@@ -382,13 +383,27 @@ std::mutex contextsMutex;
 std::map<api::effect_runtime *, std::unique_ptr<Context>> contexts;
 unsigned nextSerial = 0;
 bool registered = false;
+std::atomic<bool> firstPresentObserved{false};
 
 void Present(api::effect_runtime *runtime) {
-    if (runtime->get_device()->get_api() != api::device_api::d3d11) return;
+    auto *device = runtime ? runtime->get_device() : nullptr;
+    if (!firstPresentObserved.exchange(true, std::memory_order_acq_rel)) {
+        const auto apiName = device ? std::to_string(static_cast<int>(device->get_api())) : "no-device";
+        const auto message = "Ansel Adapter: reshade_present callback fired, device_api=" + apiName;
+        reshade::log_message(reshade::log_level::info, message.c_str());
+    }
+    if (!device || device->get_api() != api::device_api::d3d11) return;
     std::lock_guard lock(contextsMutex);
     try {
         auto &context = contexts[runtime];
-        if (!context) context = std::make_unique<Context>(runtime, ++nextSerial);
+        if (!context) {
+            const unsigned serial = ++nextSerial;
+            context = std::make_unique<Context>(runtime, serial);
+            const auto message = "Ansel Adapter: created NVIDIAAnsel." +
+                std::to_string(GetCurrentProcessId()) + "." + std::to_string(serial) +
+                " for D3D11 ReShade runtime.";
+            reshade::log_message(reshade::log_level::info, message.c_str());
+        }
         const auto dispatch = [&](const Json &request) {
             auto reply = context->session.dispatch(request);
             if (reply.value("ok", false)) {

@@ -149,12 +149,14 @@ async function main() {
     result = await call('POST', '/Duluka/v.1.0/GameFilter/Preset/Select', {slot:2});
     assert.strictEqual(result.status,200,'selecting game-local INI preset 2 failed');
     assert.strictEqual(result.body.preset.activeSlot,2,'preset selection was not read back from the runtime');
+    assert.strictEqual(result.body.connected,true,'successful preset response did not certify a responding native runtime');
+    assert.strictEqual(result.body.applied,true,'successful preset response did not certify native application');
     result = await call('POST', '/Duluka/v.1.0/GameFilter/Preset/Save', {});
     assert.strictEqual(result.status,200,'ReShade INI preset save failed');
     result = await call('POST', '/Duluka/v.1.0/GameFilter/Preset/Toggle', {enabled:false});
     assert.strictEqual(result.status,200,'preset Off toggle failed');
     assert.strictEqual(result.body.state.enabled,false,'preset Off left the effects globally enabled');
-    assert(result.body.state.stack.length > 0,'preset Off erased enabled effect techniques');
+    assert(result.body.state.stack.length > 0,'preset Off erased enabled effect techniques: '+JSON.stringify(result.body.state));
     result = await call('POST', '/Duluka/v.1.0/GameFilter/Preset/Select', {slot:2});
     assert.strictEqual(result.status,200,'reselecting active INI preset failed');
     assert.strictEqual(result.body.state.enabled,true,'reselecting an INI preset did not restore effects');
@@ -181,12 +183,31 @@ async function main() {
     result = await call('GET', base + '/Filter'); assert.strictEqual(result.status, 405);
     result = await call('GET', base + '/GetFilters', undefined, {'x-ansel-game-pid':'invalid'}); assert.strictEqual(result.status, 400);
     result = await call('POST', base + '/GetFilters', {padding:'x'.repeat(66000)}); assert.strictEqual(result.status, 413);
+    // A previously open editor can still hold the old session after the game
+    // loses its pipe. A stale cached editor must never report preset success.
+    const originalList = client.list;
+    client.list = async () => [];
+    const dropped = await call('POST', '/Duluka/v.1.0/GameFilter/Preset/Select', {slot:2});
+    assert.strictEqual(dropped.status,503,'stale editor accepted a preset without a native pipe');
+    assert.strictEqual(dropped.body.codeText,'ANSEL_UNAVAILABLE');
+    assert.strictEqual(dropped.body.connected,false);
+    assert.strictEqual(dropped.body.applied,false);
+    client.list = originalList;
     const exit = new Promise(resolve => child.once('exit', resolve)); child.kill(); await exit;
     // The injected discovery stub must mirror the OS removing the closed pipe.
     client.list = async () => [];
     result = await call('POST', base + '/GetAvailable', {}); assert.strictEqual(result.body.available, false);
     assert(events.some(e => e.data.type === 'anselState' && e.data.connected === false));
     result = await call('POST', base + '/Filter', {type:'test/filter-a',stackIdx:0}); assert.strictEqual(result.status, 503);
+    for (const suffix of ['/Select','/Save','/Toggle']) {
+      const payload = suffix === '/Select' ? {slot:2} : suffix === '/Toggle' ? {enabled:true} : {};
+      const denied = await call('POST', '/Duluka/v.1.0/GameFilter/Preset' + suffix, payload);
+      assert.strictEqual(denied.status,503,'disconnected ReShade preset mutation was acknowledged: '+suffix);
+      assert.strictEqual(denied.body.codeText,'ANSEL_UNAVAILABLE','disconnected preset did not explain unavailable runtime');
+      assert.strictEqual(denied.body.connected,false);
+      assert.strictEqual(denied.body.applied,false);
+      assert.strictEqual(denied.body.success,false);
+    }
     result = await call('GET', base + '/ReshadeSupported'); assert.strictEqual(result.body.reshadeSupported, false);
     result = await call('POST', base + '/EnableMods', {globalEnable:false});
     assert.strictEqual(result.body.applied, false, 'preference save must not claim live application without a game');

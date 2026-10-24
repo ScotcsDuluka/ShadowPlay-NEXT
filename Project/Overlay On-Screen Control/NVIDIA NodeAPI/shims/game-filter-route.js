@@ -313,6 +313,16 @@ function mount(app, io, options) {
       }
       if (route === '/Preset/Select' || route === '/Preset/Save' || route === '/Preset/Toggle') {
         if (req.method !== 'POST') throw failure(405, 'METHOD_NOT_ALLOWED', 'POST is required');
+        // A cached editing session does not prove the in-game ReShade runtime
+        // still exists. Never acknowledge a preset while its native pipe is gone.
+        const livePipes = await client.list();
+        requireBridge(version);
+        if (!livePipes.includes(target.name)) {
+          const unavailable = failure(503, 'ANSEL_UNAVAILABLE',
+            'Game Filter is not connected to a responding D3D11 ReShade runtime; preset was not applied');
+          disconnected(unavailable);
+          throw unavailable;
+        }
         if (!state.preset || state.preset.supported !== true)
           throw failure(501, 'NOT_SUPPORTED', 'This runtime does not support ReShade INI presets');
         if (route === '/Preset/Select' && (!Number.isInteger(body.slot) || body.slot < 1 || body.slot > 3))
@@ -332,7 +342,7 @@ function mount(app, io, options) {
         lastCatalog = ''; // Force NVIDIA's filter listener to rebuild the list.
         publish(updated);
         updated.stack.forEach((_, idx) => emit(currentFilter(updated, idx)));
-        return res.json({success:true,preset:updated.preset,state:updated});
+        return res.json({success:true,connected:true,applied:true,preset:updated.preset,state:updated});
       }
       if (route === '/Filter/GetInfo') {
         if (!Number.isInteger(body.stackIdx) || body.stackIdx < 0 || body.stackIdx >= state.stack.length)
@@ -380,7 +390,8 @@ function mount(app, io, options) {
         needsSession = true;
       }
       res.status(error.status || 500).json({ type: 'Error', code: error.status || 500,
-        codeText: error.code || 'ANSEL_ERROR', message: error.message });
+        codeText: error.code || 'ANSEL_ERROR', message: error.message,
+        ...(presetRoute ? {connected:false,applied:false,success:false} : {}) });
     }
   });
   return { close: () => { stopped = true; cancelPresetSave(); if (timer) clearInterval(timer); }, poll };

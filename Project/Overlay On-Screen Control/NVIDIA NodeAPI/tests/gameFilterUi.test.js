@@ -412,7 +412,7 @@ async function scenario(existing, coldStart) {
     filters:[{id:'fx',name:'FX',controls:[{id:'Amount',currentValue:[0.33]}]}]});
   services.$http.post=(url,body)=>{
     nativeRequests.push({url,body});
-    return Promise.resolve({data:{success:true,state:nativeState,preset:nativeState.preset}});
+    return Promise.resolve({data:{success:true,connected:true,applied:true,state:nativeState,preset:nativeState.preset}});
   };
   camera.__dulukaNativePresets=true;
   camera.__dulukaNativePreset={supported:true,activeSlot:1};
@@ -473,6 +473,25 @@ async function scenario(existing, coldStart) {
   assert.strictEqual(nativeRequests[1].url,'/Duluka/v.1.0/GameFilter/Preset/Toggle');
   assert.strictEqual(nativeRequests[1].body.enabled,false,
     'Off cleared the INI stack instead of temporarily disabling effects');
+  // ReShade may disconnect between the click and native preset acknowledgement.
+  // An optimistic slot change must never persist or display a fake selection.
+  const savedChoiceBeforeFailure=store.DulukaModsSelectionStorage;
+  camera.__dulukaNativePresets=true;
+  camera.__anselConnected=true;
+  services.$http.post=()=>Promise.reject({status:503,
+    data:{codeText:'ANSEL_UNAVAILABLE',message:'No responding D3D11 ReShade runtime is connected'}});
+  selectStyle(0);
+  assert.strictEqual(store.DulukaModsSelectionStorage,savedChoiceBeforeFailure,
+    'UI persisted a native preset before receiving the game acknowledgement');
+  camera.applySlot(camera.modsSlots[0]);
+  assert.strictEqual(await camera.__dulukaPresetQueue,false,
+    'disconnected native preset returned success to the NVIDIA UI');
+  assert.strictEqual(camera.__anselConnected,false,'failed preset retained a connected status');
+  assert.strictEqual(camera.modsActiveSlot,undefined,'failed preset stayed selected in the UI');
+  assert.strictEqual(store.DulukaModsSelectionStorage,savedChoiceBeforeFailure,
+    'disconnected preset modified persistent selection');
+  assert(photoToasts.some(toast=>toast.message==='Game Filter not connected'),
+    'no visible disconnected-runtime notification reached the UI');
   camera.__dulukaNativePresets=false;
   services.$http.post=nativeHttpPost;
   state.connected=false;checkGame();

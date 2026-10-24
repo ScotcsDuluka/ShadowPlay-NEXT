@@ -68,6 +68,10 @@
         var index = Array.prototype.indexOf.call(buttons, button);
         if (index < 0 || index > camera.NUM_MODS_SLOTS) return;
         camera.__dulukaPresetClick = {slot:index + 1,off:index === camera.NUM_MODS_SLOTS};
+        // Do not persist an optimistic INI selection before the native game
+        // acknowledges it. A disconnected runtime must not leave a fake
+        // "selected" preset in localStorage.
+        if (camera.__dulukaNativePresets) return;
         var choices = readSelections();
         if (!choices || typeof choices !== 'object' || Array.isArray(choices)) return;
         choices[game] = index === camera.NUM_MODS_SLOTS ? -1 : index;
@@ -902,10 +906,26 @@
         var task = queue.catch(function () { return true; }).then(function () {
           return $injector.get('$http').post('/Duluka/v.1.0/GameFilter/Preset/' + action, payload);
         }).then(function (reply) {
-          if (!reply.data || !reply.data.success || !reply.data.state)
-            throw new Error('ReShade preset response missing state');
+          if (!reply.data || !reply.data.success || !reply.data.connected ||
+              reply.data.applied !== true || !reply.data.state)
+            throw new Error('No connected ReShade runtime confirmed the preset change');
           var state = reply.data.state;
           rememberRuntime($delegate, Object.assign({connected:true}, state));
+          var game = $delegate.__dulukaModsExecutable;
+          if (game) {
+            var choices = readSelections(), index = slot ? slot.id - 1 : -1;
+            if (!choices || typeof choices !== 'object' || Array.isArray(choices)) choices = {};
+            choices[game] = index;
+            $injector.get('oscDisplayService').setLocalStorage(selectionStorageKey, JSON.stringify(choices));
+            var data;
+            try { data = JSON.parse($injector.get('$window').localStorage.getItem('ModsDataStorage') || '{}'); }
+            catch (_) { data = {}; }
+            if (!data || typeof data !== 'object' || Array.isArray(data)) data = {};
+            if (!data[game] || typeof data[game] !== 'object' || Array.isArray(data[game])) data[game] = {};
+            data[game].modsIsEnabled = index >= 0;
+            if (index >= 0) data[game].lastSlot = index;
+            $injector.get('oscDisplayService').setLocalStorage('ModsDataStorage', JSON.stringify(data));
+          }
           if (slot) {
             var synced = syncNativeSlot($delegate, state, slot.id - 1);
             if (synced) state.stack.forEach(function (_, idx) {
@@ -915,12 +935,22 @@
           return true;
         }).catch(function (error) {
           console.error('[game-filter] ReShade preset transition failed', error);
-          $delegate.modsActiveSlot = previous;
-          if (previous) $delegate.lastSlot = $delegate.lastActiveSlot = previous.id - 1;
+          var disconnected = error && (error.status === 503 ||
+            error.data && ['ANSEL_UNAVAILABLE','BRIDGE_DISABLED'].indexOf(error.data.codeText) >= 0);
+          if (disconnected) {
+            rememberRuntime($delegate, null);
+            $delegate.modsActiveSlot = undefined;
+            $delegate.lastActiveSlot = -1;
+          } else {
+            $delegate.modsActiveSlot = previous;
+            if (previous) $delegate.lastSlot = $delegate.lastActiveSlot = previous.id - 1;
+          }
           if (typeof Notifier !== 'undefined')
-            Notifier.show('ReShade preset', {subtext:error.data && error.data.message ||
-              'The game did not accept this preset. Check the game folder permissions.',
-              group:'reshade-preset-error',icon:'\\uE940'});
+            Notifier.show(disconnected ? 'Game Filter not connected' : 'ReShade preset',
+              {subtext: error.data && error.data.message ||
+                (disconnected ? 'No responding D3D11 ReShade runtime. Reopen Game Filter after connecting the game.' :
+                'The game did not accept this preset. Check the game folder permissions.'),
+                group:'reshade-preset-error',icon:'\\uE940'});
           return false;
         });
         $delegate.__dulukaPresetQueue = task;
