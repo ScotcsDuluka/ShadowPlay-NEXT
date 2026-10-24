@@ -92,3 +92,35 @@ test('screenshot endpoint forwards only explicitly confirmed one-shot command', 
     assert.equal(unavailable.data.availability, 'Unavailable');
   });
 });
+
+test('screenshot relay timeout exceeds the Container 15-second worker budget', () => {
+  assert.equal(register.timeoutFor('GET', '/v1/capture/displays'), 2500);
+  assert.equal(register.timeoutFor('POST', '/v1/capture/display/select'), 5500);
+  assert.equal(register.timeoutFor('POST', '/v1/capture/screenshot'), 19000);
+});
+
+test('screenshot saved=false remains failure evidence, never gets converted to success', async () => {
+  await localStub((req, res) => {
+    assert.equal(req.url, '/v1/capture/screenshot');
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ saved: false, error: 'screenshot_dxgi_access_lost' }));
+  }, async port => {
+    const result = await routeRegistry(port).invoke('POST',
+      '/DulukaCapture/v.1.0/screenshot', { confirmed: true });
+    assert.equal(result.code, 200);
+    assert.equal(result.data.saved, false);
+    assert.equal(result.data.error, 'screenshot_dxgi_access_lost');
+  });
+});
+
+test('Container 504 screenshot timeout reports unknown outcome, not safe-to-retry', async () => {
+  await localStub((req, res) => {
+    assert.equal(req.url, '/v1/capture/screenshot');
+    res.writeHead(504); res.end('upstream timeout');
+  }, async port => {
+    const result = await routeRegistry(port).invoke('POST',
+      '/DulukaCapture/v.1.0/screenshot', { confirmed: true });
+    assert.equal(result.code, 504);
+    assert.equal(result.data.error, 'capture_screenshot_outcome_unknown');
+  });
+});

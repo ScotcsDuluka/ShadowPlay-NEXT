@@ -5,6 +5,14 @@
 // gateway. Container owns command authentication/authorization.
 const http = require('http');
 
+// Screenshot may take up to 15 seconds in the Container gateway (plus
+// forwarding overhead). Do not disconnect at the generic 5.5-second
+// write timeout and misreport an already-saved image as failed.
+function upstreamTimeoutMs(method, path) {
+  if (path === '/v1/capture/screenshot') return 19000;
+  return method === 'POST' ? 5500 : 2500;
+}
+
 module.exports = function registerDisplayRouting(app, options) {
   const configured = Number((options || {}).port ||
     process.env.NV_CONTAINER_CONTROL_API_PORT || 59012);
@@ -21,7 +29,7 @@ module.exports = function registerDisplayRouting(app, options) {
     const data = requestBody === null ? null : JSON.stringify(requestBody);
     const opts = {
       hostname: '127.0.0.1', port, method, path: upstreamPath,
-      timeout: method === 'POST' ? 5500 : 2500,
+      timeout: upstreamTimeoutMs(method, upstreamPath),
       headers: data ? { 'content-type': 'application/json',
         'content-length': Buffer.byteLength(data) } : {}
     };
@@ -42,7 +50,10 @@ module.exports = function registerDisplayRouting(app, options) {
         // Container may return plain-text 501/503; preserve an accurate
         // unavailable status instead of reporting a JSON parse failure.
         if (status !== 200) {
-          error(status === 501 ? 501 : 503, 'capture_gateway_unavailable');
+          const maybeScreenshot = upstreamPath === '/v1/capture/screenshot';
+          error(status === 501 ? 501 : status === 504 ? 504 : 503,
+            maybeScreenshot && status === 504 ?
+              'capture_screenshot_outcome_unknown' : 'capture_gateway_unavailable');
           return;
         }
         try {
@@ -69,7 +80,11 @@ module.exports = function registerDisplayRouting(app, options) {
       upstream.on('error', () => error(503, 'capture_gateway_read_failed'));
     });
     outbound.on('timeout', function () {
-      outbound.destroy(new Error('capture_gateway_timeout'));
+      // The GPU worker may still have completed after a timeout; do NOT
+      // auto-retry a screenshot or infer saved=false from transport state.
+      error(504, upstreamPath === '/v1/capture/screenshot' ?
+        'capture_screenshot_outcome_unknown' : 'capture_gateway_timeout');
+      outbound.destroy();
     });
     outbound.on('error', function () {
       error(503, 'capture_gateway_unavailable');
@@ -102,3 +117,6 @@ module.exports = function registerDisplayRouting(app, options) {
     forward('POST', '/v1/capture/screenshot', { confirmed: true }, res);
   });
 };
+
+// Test seam only: no network, no GPU access.
+module.exports.timeoutFor = upstreamTimeoutMs;
