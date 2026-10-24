@@ -54,6 +54,10 @@ Write-Output ("PHASE7A_TEST_VOLUME_FREE_GIB " + [math]::Round($drive.AvailableFr
 # creates no output file and never constructs/initializes the GPU engine.
 & dotnet run --project $tests -c Release --no-launch-profile
 Gate 'ProductionDiskHeadroomDryRun' ($LASTEXITCODE -eq 0)
+# DXGI enumeration requests only adapter/output DESCRIPTORS:
+# no D3D device and never IDXGIOutput1.DuplicateOutput.
+& dotnet run --project $tests -c Release --no-launch-profile --no-build -- --dxgi-only
+Gate 'ReadOnlyDXGIOutputInventory' ($LASTEXITCODE -eq 0)
 $after = Invoke-RestMethod -Uri 'http://127.0.0.1:59077/health' -TimeoutSec 3
 Gate 'WorkerStillIdle' ($after.ok -eq $true -and $after.ready -eq $true -and $after.recording -eq $false)
 Write-Output ("CAPTURE_PHASE7A_PREFLIGHT_PASS gpus=" + $gpu.Count + " read_only=true gpu_initialized=false screen_captured=false audio_opened=false deployed=false")
