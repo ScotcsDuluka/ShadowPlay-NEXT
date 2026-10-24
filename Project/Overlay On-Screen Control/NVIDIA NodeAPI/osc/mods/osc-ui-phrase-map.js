@@ -902,6 +902,7 @@ window.__oscUiPhraseKeys = {
   "Could not read the FPS setting. Try again.": "l10n.oscOverlayFpsLoadFailed",
   "Could not save FPS. The previous setting is still active.": "l10n.oscOverlayFpsSaveFailed",
   "Renderer Mode": "l10n.oscRendererTitle",
+    "Hook Settings": "l10n.oscHookTitle",
   "Choose the rendering mode for each part of the Overlay.": "l10n.oscRendererInfo",
   "Overlay UI": "l10n.oscRendererUi",
   "Background particles": "l10n.oscRendererBackground",

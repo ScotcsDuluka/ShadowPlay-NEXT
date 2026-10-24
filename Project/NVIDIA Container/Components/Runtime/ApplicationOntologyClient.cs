@@ -312,7 +312,31 @@ internal sealed class ApplicationOntologyClient : IDisposable
                 gameExecutableNames.Add(name);
                 executableNames.Add(name);
             }
-            games.Add(new OntologyGame(gameId, displayName, gameExecutableNames));
+            var renderApis = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (entry.TryGetProperty("renderApis", out var apiArray))
+            {
+                if (apiArray.ValueKind != JsonValueKind.Array)
+                    return OntologyCatalogSnapshot.Failure(502, reachable, "Catalog renderApis must be an array.");
+                foreach (var api in apiArray.EnumerateArray())
+                {
+                    var apiName = api.ValueKind == JsonValueKind.String ? api.GetString() : "";
+                    if (apiName is not ("d3d9" or "d3d10" or "d3d11" or "d3d12" or "vulkan" or "opengl") ||
+                        !renderApis.Add(apiName))
+                        return OntologyCatalogSnapshot.Failure(502, reachable, "Invalid or duplicate render API.");
+                }
+            }
+
+            var pinnedHashes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (!entry.TryGetProperty("sha256", out var hashes) || hashes.ValueKind != JsonValueKind.Array)
+                return OntologyCatalogSnapshot.Failure(502, reachable, "Catalog sha256 must be an array.");
+            foreach (var hash in hashes.EnumerateArray())
+            {
+                var value = hash.ValueKind == JsonValueKind.String ? hash.GetString() : "";
+                if (value.Length != 64 || !System.Text.RegularExpressions.Regex.IsMatch(value, "^[A-Fa-f0-9]{64}$") ||
+                    !pinnedHashes.Add(value))
+                    return OntologyCatalogSnapshot.Failure(502, reachable, "Invalid or duplicate SHA-256 hash.");
+            }
+            games.Add(new OntologyGame(gameId, displayName, gameExecutableNames, renderApis, pinnedHashes));
         }
 
         var declaredCount = ReadInt(catalogRoot, "gameCount", entries.GetArrayLength());
@@ -396,7 +420,9 @@ internal sealed class ApplicationOntologyClient : IDisposable
         }
 
         var executableName = Path.GetFileName(executablePath.GetString());
-        var resolution = ResolveExecutable(executableName);
+        var suppliedHash = payload.TryGetProperty("sha256", out var hashValue) &&
+            hashValue.ValueKind == JsonValueKind.String ? hashValue.GetString() : null;
+        var resolution = ResolveExecutable(executableName, suppliedHash);
         if (resolution == null)
             return (503, new
             {
@@ -413,25 +439,41 @@ internal sealed class ApplicationOntologyClient : IDisposable
             displayName = resolution.Matched ? resolution.DisplayName : null,
             reason = resolution.Reason,
             catalogVersion = resolution.CatalogVersion,
-            matchMethod = "executableName"
+            matchMethod = resolution.MatchMethod,
+            identityVerified = resolution.Matched && resolution.MatchMethod == "sha256",
+            renderApis = resolution.Matched ? resolution.RenderApis : Array.Empty<string>()
         });
     }
 
-    internal OntologyResolution ResolveExecutable(string executableName)
+    internal OntologyResolution ResolveExecutable(string executableName, string suppliedSha256 = null)
     {
         var snapshot = LoadCachedCatalog();
         if (!snapshot.Ready || string.IsNullOrWhiteSpace(executableName))
             return null;
-        var matches = snapshot.Games
-            .Where(game => game.ExecutableNames.Contains(executableName))
-            .Take(2)
-            .ToArray();
-        if (matches.Length == 1)
-            return new OntologyResolution(true, matches[0].GameId,
-                matches[0].DisplayName, "", snapshot.CatalogVersion);
-        return new OntologyResolution(false, "", "",
-            matches.Length > 1 ? "ambiguous" : "not_found",
-            snapshot.CatalogVersion);
+        var matches = snapshot.Games.Where(game => game.ExecutableNames.Contains(executableName))
+            .Take(2).ToArray();
+        if (matches.Length != 1)
+            return new OntologyResolution(false, "", "",
+                matches.Length > 1 ? "ambiguous" : "not_found",
+                snapshot.CatalogVersion, Array.Empty<string>(), "none");
+        var game = matches[0];
+        if (game.Sha256.Count > 0)
+        {
+            if (string.IsNullOrEmpty(suppliedSha256))
+                return new OntologyResolution(false, "", "", "hash_required",
+                    snapshot.CatalogVersion, Array.Empty<string>(), "none");
+            if (!game.Sha256.Contains(suppliedSha256))
+                return new OntologyResolution(false, "", "", "hash_mismatch",
+                    snapshot.CatalogVersion, Array.Empty<string>(), "none");
+            return new OntologyResolution(true, game.GameId, game.DisplayName, "",
+                snapshot.CatalogVersion, game.RenderApis.OrderBy(x => x).ToArray(), "sha256");
+        }
+        // A supplied hash does not prove identity when none is pinned.
+        if (!string.IsNullOrEmpty(suppliedSha256))
+            return new OntologyResolution(false, "", "", "hash_unverified",
+                snapshot.CatalogVersion, Array.Empty<string>(), "none");
+        return new OntologyResolution(true, game.GameId, game.DisplayName, "",
+            snapshot.CatalogVersion, game.RenderApis.OrderBy(x => x).ToArray(), "executableName");
     }
 
     private static string ReadString(JsonElement element, string property)
@@ -459,14 +501,18 @@ internal sealed class ApplicationOntologyClient : IDisposable
 internal sealed record OntologyGame(
     string GameId,
     string DisplayName,
-    IReadOnlySet<string> ExecutableNames);
+    IReadOnlySet<string> ExecutableNames,
+    IReadOnlySet<string> RenderApis,
+    IReadOnlySet<string> Sha256);
 
 internal sealed record OntologyResolution(
     bool Matched,
     string GameId,
     string DisplayName,
     string Reason,
-    string CatalogVersion);
+    string CatalogVersion,
+    IReadOnlyList<string> RenderApis,
+    string MatchMethod);
 
 internal sealed record OntologyCatalogSnapshot(
     int StatusCode,

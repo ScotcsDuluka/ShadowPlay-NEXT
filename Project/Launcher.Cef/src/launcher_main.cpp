@@ -153,11 +153,12 @@ int NvLauncherCefMain(void) {
   launcherutil::LogLine("http://127.0.0.1:" + std::to_string(server.port()) +
                         "/ serving " + ui_root);
 
+  params->trusted_url =
+      "http://127.0.0.1:" + std::to_string(server.port()) + "/index.html";
   if (cl->HasSwitch("url")) {
     params->url = cl->GetSwitchValue("url").ToString();
   } else {
-    params->url =
-        "http://127.0.0.1:" + std::to_string(server.port()) + "/index.html";
+    params->url = params->trusted_url;
   }
   launcherutil::LogLine("navigating to " + params->url);
 

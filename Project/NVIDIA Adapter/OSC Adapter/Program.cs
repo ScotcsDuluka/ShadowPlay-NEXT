@@ -31,18 +31,22 @@ internal static class Program
                 using var game = Process.GetProcessById(options.GamePid);
                 ValidateGameIdentity(game, options.GameExecutable);
 
-                // Passive diagnostics do not load a DLL or modify the game.
-                // Observing a runtime module is evidence of presence only;
-                // it does not prove that the corresponding API presents frames.
-                if (options.ProbeOnly)
-                {
-                    LogGraphicsApiEvidence(game, options.GameName);
-                    return 0;
-                }
+                // Evidence is passive. Native Hook alone verifies actual
+                // presentation, including the D3D9 vs D3D9Ex device variant.
+                var evidence = GraphicsApiProbe.Inspect(game, options.GameName);
+                Log(evidence.Diagnostic);
+                // Keep probe-only logging ABI stable: the API_PROBE record
+                // must remain the final entry for the probe test tag.
+                if (options.ProbeOnly) return 0;
+                var route = RenderApiPolicy.Resolve(options.RenderApi, evidence.Modules);
+                Log("API_ROUTE game=" + options.GameName + " pid=" + options.GamePid +
+                    " requested=" + (options.RenderApi ?? "legacy") +
+                    " family=" + route.Family + " allowed=" + route.Allowed +
+                    " reason=" + route.Reason);
 
-                // Record evidence during normal adapter launches too. The
-                // detector does not control or claim graphics API support.
-                LogGraphicsApiEvidence(game, options.GameName);
+                if (!route.Allowed)
+                    throw new InvalidOperationException("Refusing OSC Adapter attach: " + route.Reason);
+
                 var targetIs64Bit = IsSupportedX64Process(game.Handle);
                 if (targetIs64Bit != Environment.Is64BitProcess)
                 {
@@ -67,8 +71,9 @@ internal static class Program
                 if (!File.Exists(adapterPath))
                     throw new FileNotFoundException("The matching OSC Adapter DLL is missing.", adapterPath);
 
-                InjectDxgiAdapter(options.GamePid, adapterPath);
-                Log((options.AnselOnly ? "Ansel filter adapter" : "DXGI adapter") +
+                InjectNativeAdapter(options.GamePid, options.GameExecutable, adapterPath);
+                Log((options.AnselOnly ? "Ansel filter adapter" :
+                    route.Family == "legacy" ? "DXGI adapter" : "OSC adapter [" + route.Family + "]") +
                     " loaded for " + options.GameName + " (game PID " + options.GamePid + ").");
 
                 try
@@ -100,7 +105,7 @@ internal static class Program
         }
     }
 
-    private static (int GamePid, string GameName, string GameExecutable, bool ElevationRetry, bool AnselOnly, bool ProbeOnly) ParseArguments(string[] args)
+    private static (int GamePid, string GameName, string GameExecutable, bool ElevationRetry, bool AnselOnly, bool ProbeOnly, string? RenderApi) ParseArguments(string[] args)
     {
         var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         for (var i = 0; i + 1 < args.Length; i += 2)
@@ -126,12 +131,9 @@ internal static class Program
             bool.TryParse(anselText, out var anselRequested) && anselRequested;
         var probeOnly = values.TryGetValue("--probe-only", out var probeText) &&
             bool.TryParse(probeText, out var probeRequested) && probeRequested;
-        return (pid, name, Path.GetFullPath(executable), elevationRetry, anselOnly, probeOnly);
+        var renderApi = values.TryGetValue("--render-api", out var requested) ? requested : null;
+        return (pid, name, Path.GetFullPath(executable), elevationRetry, anselOnly, probeOnly, renderApi);
     }
-
-    // Read-only module evidence; graphics renderer support is separate.
-    private static void LogGraphicsApiEvidence(Process game, string gameName)
-        => Log(GraphicsApiProbe.Observe(game, gameName));
 
     private static bool IsAdministrator()
     {
@@ -241,7 +243,7 @@ internal static class Program
         return processMachine == ImageFileMachineUnknown;
     }
 
-    private static void InjectDxgiAdapter(int processId, string dllPath)
+    private static void InjectNativeAdapter(int processId, string expectedExecutable, string dllPath)
     {
         var process = OpenProcess(
             ProcessCreateThread | ProcessQueryInformation | ProcessVmOperation | ProcessVmWrite,
@@ -254,6 +256,19 @@ internal static class Program
         IntPtr thread = IntPtr.Zero;
         try
         {
+            // Pin the verified executable path to the very same PROCESS HANDLE
+            // used to load the DLL. Rechecking only by PID is vulnerable to
+            // PID reuse between the earlier check and OpenProcess.
+            var imagePath = new System.Text.StringBuilder(32768);
+            var imagePathChars = imagePath.Capacity;
+            if (!QueryFullProcessImageNameW(process, 0, imagePath, ref imagePathChars))
+                throw new Win32Exception(Marshal.GetLastWin32Error(),
+                    "Could not re-verify the injection target process image.");
+            if (!string.Equals(Path.GetFullPath(imagePath.ToString()), expectedExecutable,
+                    StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException(
+                    "Target executable changed before native adapter load; refusing attachment.");
+
             var encodedPath = System.Text.Encoding.Unicode.GetBytes(dllPath + '\0');
             remotePath = VirtualAllocEx(
                 process, IntPtr.Zero, (nuint)encodedPath.Length,
@@ -276,22 +291,39 @@ internal static class Program
             if (thread == IntPtr.Zero)
                 throw new Win32Exception(Marshal.GetLastWin32Error(), "CreateRemoteThread failed.");
 
-            var wait = WaitForSingleObject(thread, 10000);
-            if (wait == WaitTimeout)
-                wait = WaitForSingleObject(thread, Infinite);
-            if (wait != WaitObject0)
-                throw new Win32Exception(Marshal.GetLastWin32Error(), "Waiting for the remote loader thread failed.");
+            // Never block the managed Host indefinitely if a game or DLL
+            // loader is hung. An incomplete remote call may still be using
+            // its UTF-16 path; cleanup below must not free that memory.
+            var wait = WaitForSingleObject(thread, RemoteLoaderWaitPolicy.LoadTimeoutMs);
+            switch (RemoteLoaderWaitPolicy.Classify(wait))
+            {
+                case RemoteLoaderWaitOutcome.TimedOut:
+                    throw new TimeoutException("Remote adapter loader did not finish within 10 seconds; game process may still be loading the DLL.");
+                case RemoteLoaderWaitOutcome.Failed:
+                    throw new Win32Exception(Marshal.GetLastWin32Error(), "Waiting for the remote loader thread failed.");
+            }
             if (!GetExitCodeThread(thread, out var loadResult) || loadResult == 0)
                 throw new InvalidOperationException("LoadLibraryW failed inside the target process.");
         }
         finally
         {
+            // Only release the remote path if LoadLibraryW definitely ended.
+            // On timeout, retain the small allocation in the game rather than
+            // risk use-after-free. The OS reclaims it when the game exits.
+            bool loaderFinished = thread == IntPtr.Zero;
             if (thread != IntPtr.Zero)
             {
-                WaitForSingleObject(thread, Infinite);
+                var finalPoll = WaitForSingleObject(thread, 0);
+                loaderFinished = RemoteLoaderWaitPolicy.CanReleaseRemoteArguments(finalPoll);
                 CloseHandle(thread);
             }
-            if (remotePath != IntPtr.Zero) VirtualFreeEx(process, remotePath, 0, MemRelease);
+            if (remotePath != IntPtr.Zero)
+            {
+                if (loaderFinished)
+                    VirtualFreeEx(process, remotePath, 0, MemRelease);
+                else
+                    Log("WARNING: remote loader still active; retaining DLL path allocation until target exits.");
+            }
             CloseHandle(process);
         }
     }

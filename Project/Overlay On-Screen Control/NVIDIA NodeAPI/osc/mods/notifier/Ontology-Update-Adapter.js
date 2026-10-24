@@ -9,16 +9,14 @@
     var STORAGE_KEY = 'nv-ontology-update-state-v1';
     var POLL_MS = 5 * 60 * 1000;
     var REQUEST_TIMEOUT_MS = 10000;
-    var ICON_PATH = '/mods/notifier/NVIDIA.ico';
+    var UPDATE_ICON_GLYPH = '\uE91E'; // nvgcshare uniE91E
 
     if (!window.angular || !window.Notifier) return;
 
     angular.module('main').run(['eventAggregator', '$log', '$filter', function (eventAggregator, $log, $filter) {
         var state = readState();
         var remoteVersion = '';
-        var remoteGameCount = null;
         var localVersion = '';
-        var pendingFromVersion = '';
         var pendingVersion = '';
         var checking = false;
 
@@ -76,27 +74,20 @@
             var localOutdated = newerThan(remoteVersion, localVersion);
             if (!pendingVersion && !localOutdated) return;
 
-            var fromVersion = pendingFromVersion || localVersion;
             var group = 'nv-ontology-update:' + remoteVersion;
-            var detail = (validVersion(fromVersion) ? 'v' + fromVersion + ' → ' : '') +
-                'v' + remoteVersion;
+            var detail = 'v' + remoteVersion;
             var title = translateOrEnglish(
                 'l10n.notificationOntologyCatalogUpdate',
                 'nv-ontology catalog update available');
             var subtext = translateOrEnglish(
                 'l10n.notificationOntologyCatalogDetails',
-                'Catalog ' + detail, { arg1: detail });
-            if (typeof remoteGameCount === 'number') {
-                var gamesText = translateOrEnglish(
-                    'l10n.notificationOntologyGameCount',
-                    remoteGameCount + ' games', { arg1: remoteGameCount });
-                subtext += ' · ' + gamesText;
-            }
+                'Update to ' + detail, { arg1: detail });
 
             window.Notifier.show(title, {
                 key: 'NV_ONTOLOGY_UPDATED',
                 group: group,
-                iconPath: ICON_PATH,
+                icon: UPDATE_ICON_GLYPH,
+                positive: true,
                 subtext: subtext,
                 priority: true,
                 width: 420
@@ -104,7 +95,6 @@
             if (window.Notifier.hasActiveGroupPrefix(group)) {
                 state.lastNotifiedVersion = remoteVersion;
                 pendingVersion = '';
-                pendingFromVersion = '';
                 saveState();
                 $log.info('[ontology-update] notified about catalog ' + remoteVersion);
             } else {
@@ -121,9 +111,7 @@
                 Math.floor(payload.gameCount) !== payload.gameCount) return;
 
             remoteVersion = payload.catalogVersion;
-            remoteGameCount = payload.gameCount;
             if (newerThan(remoteVersion, state.lastSeenVersion)) {
-                pendingFromVersion = state.lastSeenVersion;
                 pendingVersion = remoteVersion;
                 state.lastSeenVersion = remoteVersion;
                 saveState();

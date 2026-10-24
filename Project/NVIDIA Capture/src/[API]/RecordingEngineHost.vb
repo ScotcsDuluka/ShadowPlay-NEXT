@@ -530,6 +530,26 @@ Partial Public Class UI_Engine
                     _newEngineSessionClock.Reset()
                     _newEngineSessionOutputPath = ""
 
+                    ' Headless NvCapture owns the real session result. A task can
+                    ' end naturally, fault, or finish before a Stop edge arrives.
+                    ' Always reconcile NodeAPI's legacy running cache to Idle;
+                    ' only a passed, finalized file may request a saved toast.
+                    If _headless AndAlso _rest IsNot Nothing Then
+                        Try
+                            Dim verifiedPath As String = Nothing
+                            If result IsNot Nothing AndAlso result.Pass AndAlso result.FileExists AndAlso
+                               Not String.IsNullOrWhiteSpace(result.OutputPath) AndAlso
+                               IO.File.Exists(result.OutputPath) Then
+                                verifiedPath = result.OutputPath
+                            End If
+                            _rest.ConfirmActual(False, verifiedPath)
+                            DebugLog("[REST] session completion: Actual=Idle, fileVerified=" &
+                                (verifiedPath IsNot Nothing).ToString())
+                        Catch ex As Exception
+                            DebugLog("[REST] session completion sync failed: " & ex.Message)
+                        End Try
+                    End If
+
                     Select Case action
                         Case SessionEndAction.Saved
                             Try

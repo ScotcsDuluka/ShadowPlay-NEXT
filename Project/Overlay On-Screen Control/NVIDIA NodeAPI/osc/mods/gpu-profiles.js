@@ -260,7 +260,9 @@
         {id:'overlay-fps',name:'Overlay FPS',icon:'icon-performance',visible:true,enabled:true,
           click:function () { return injector.get('$state').go('main.osc-fps'); }},
         {id:'renderer-mode',name:'Renderer Mode',icon:'icon-performance',visible:true,enabled:true,
-          click:function () { return injector.get('$state').go('main.osc-renderer'); }}
+          click:function () { return injector.get('$state').go('main.osc-renderer'); }},
+        {id:'hook-settings',name:'Hook Settings',icon:'icon-settings',visible:true,enabled:true,
+          click:function () { return injector.get('$state').go('main.osc-hook'); }}
       ]}};
       delete settings.click;
       settings.__dulukaSettingsSubmenu = true;
@@ -283,6 +285,11 @@
       if (!settings.state.Menu.items.some(function (item) { return item.id === 'renderer-mode'; })) {
         settings.state.Menu.items.push({id:'renderer-mode',name:'Renderer Mode',icon:'icon-performance',visible:true,enabled:true,
           click:function () { return window.angular.element(document.documentElement).injector().get('$state').go('main.osc-renderer'); }});
+        changed = true;
+      }
+      if (!settings.state.Menu.items.some(function (item) { return item.id === 'hook-settings'; })) {
+        settings.state.Menu.items.push({id:'hook-settings',name:'Hook Settings',icon:'icon-settings',visible:true,enabled:true,
+          click:function () { return window.angular.element(document.documentElement).injector().get('$state').go('main.osc-hook'); }});
         changed = true;
       }
       var quietItem = settings.state.Menu.items.filter(function (item) { return item.id === 'quiet-mode'; })[0];

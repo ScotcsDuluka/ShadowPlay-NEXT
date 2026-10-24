@@ -13,6 +13,8 @@ namespace duluka::d3d11
         std::uint64_t reshadeCallbackCount = 0;
         std::uint64_t lastBridgeFrameNumber = 0;
         std::uint64_t cacheCopyCount = 0;
+        std::uint64_t backBufferRtvReuseCount = 0;
+        std::uint64_t backBufferRtvCreateCount = 0;
         std::uint64_t cachedFrameNumber = 0;
         bool cacheValid = false;
         bool bridgeConnected = false;

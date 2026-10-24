@@ -10,6 +10,7 @@
 #include <atomic>
 #include <cstdint>
 #include <cstring>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -22,6 +23,8 @@ namespace {
 HANDLE g_d3d9_frame_mapping = nullptr;
 osc_frame_bridge::D3D9Frame* g_d3d9_frame = nullptr;
 LONG64 g_d3d9_frame_number = 0;
+// Both the publish worker and UI visibility path modify one seqlock.
+std::mutex g_d3d9_frame_write_mutex;
 VisibilityProvider g_visibility_provider = nullptr;
 void LogPublisher(const char* message) {
     ::Log(message);
@@ -35,13 +38,23 @@ static bool EnsureD3D9FrameMapping() {
             g_d3d9_frame->version == osc_frame_bridge::D3D9FrameVersion;
 
     const DWORD sizeHigh = static_cast<DWORD>(
-        osc_frame_bridge::D3D9FrameMappingBytes >> 32);
+        static_cast<std::uint64_t>(osc_frame_bridge::D3D9FrameMappingBytes) >> 32);
     const DWORD sizeLow = static_cast<DWORD>(
         osc_frame_bridge::D3D9FrameMappingBytes & 0xFFFFFFFF);
+    // Isolated producer fixtures may supply a private mapping. Production
+    // still uses the unchanged versioned CPU bridge mapping name.
+    wchar_t testMappingName[128]{};
+    const DWORD testMappingLength = GetEnvironmentVariableW(
+        L"NVIDIA_OSC_HOST_D3D9_FRAME_MAPPING_NAME",
+        testMappingName, static_cast<DWORD>(std::size(testMappingName)));
+    if (testMappingLength >= std::size(testMappingName))
+        return false;
+    const wchar_t* mappingName = testMappingLength
+        ? testMappingName : osc_frame_bridge::D3D9FrameMappingName;
     SetLastError(ERROR_SUCCESS);
     g_d3d9_frame_mapping = CreateFileMappingW(
         INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE,
-        sizeHigh, sizeLow, osc_frame_bridge::D3D9FrameMappingName);
+        sizeHigh, sizeLow, mappingName);
     if (!g_d3d9_frame_mapping) {
         LogPublisher("[d3d9-bridge] CreateFileMappingW failed: " +
             std::to_string(GetLastError()));
@@ -102,6 +115,7 @@ static bool EnsureD3D9FrameMapping() {
 }
 } // namespace
 void SetD3D9FrameVisibility(bool visible) {
+    std::lock_guard<std::mutex> writeGuard(g_d3d9_frame_write_mutex);
     if (!g_d3d9_frame ||
         g_d3d9_frame->magic != osc_frame_bridge::D3D9FrameMagic ||
         g_d3d9_frame->version != osc_frame_bridge::D3D9FrameVersion)
@@ -116,6 +130,7 @@ void SetD3D9FrameVisibility(bool visible) {
 bool PublishD3D9FramePixels(const std::uint8_t* source,
     UINT sourceRowPitch, const std::vector<D3D11_BOX>& dirtyBoxes,
     UINT width, UINT height, bool fullFrame) {
+    std::lock_guard<std::mutex> writeGuard(g_d3d9_frame_write_mutex);
     if (!source || !width || !height ||
         static_cast<std::uint64_t>(width) * height * 4 >
             osc_frame_bridge::MaxFrameBytes ||
@@ -169,6 +184,25 @@ bool PublishD3D9FramePixels(const std::uint8_t* source,
     return true;
 }
 
+bool SnapshotFullD3D9Frame(std::vector<std::uint8_t>& pixels, UINT& width, UINT& height) {
+    std::lock_guard<std::mutex> writeGuard(g_d3d9_frame_write_mutex);
+    if (!g_d3d9_frame ||
+        g_d3d9_frame->magic != osc_frame_bridge::D3D9FrameMagic ||
+        g_d3d9_frame->version != osc_frame_bridge::D3D9FrameVersion ||
+        g_d3d9_frame->frameNumber == 0 ||
+        !g_d3d9_frame->width || !g_d3d9_frame->height ||
+        static_cast<std::uint64_t>(g_d3d9_frame->width) *
+            g_d3d9_frame->height * 4 > osc_frame_bridge::MaxFrameBytes ||
+        g_d3d9_frame->rowPitch != g_d3d9_frame->width * 4 ||
+        g_d3d9_frame->pixelBytes != g_d3d9_frame->width *
+            g_d3d9_frame->height * 4)
+        return false;
+    width = g_d3d9_frame->width;
+    height = g_d3d9_frame->height;
+    pixels.assign(g_d3d9_frame->pixels,
+        g_d3d9_frame->pixels + g_d3d9_frame->pixelBytes);
+    return true;
+}
 void SetVisibilityProvider(VisibilityProvider provider) {
     g_visibility_provider = provider;
 }

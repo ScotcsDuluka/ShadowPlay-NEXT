@@ -73,3 +73,26 @@ badTimestamp.publishedUtc = 'not-a-date';
 assert.strictEqual(validator.isValidGameWatcherStatus(badTimestamp), false, 'invalid timestamp should fail');
 
 console.log('PASS: valid snapshot, stale snapshot, count mismatch, missing game identity, and invalid timestamp.');
+
+var withRenderApi = JSON.parse(JSON.stringify(valid));
+withRenderApi.status.matchedGames[0].renderApis = ['d3d11'];
+withRenderApi.status.matchedGames[0].matchMethod = 'executableName';
+withRenderApi.status.matchedGames[0].identityVerified = false;
+assert.strictEqual(validator.isValidGameWatcherStatus(withRenderApi), true,
+    'GameWatcher metadata includes unverified name match and render API');
+
+var verifiedGame = JSON.parse(JSON.stringify(withRenderApi));
+verifiedGame.status.matchedGames[0].matchMethod = 'sha256';
+verifiedGame.status.matchedGames[0].identityVerified = true;
+assert.strictEqual(validator.isValidGameWatcherStatus(verifiedGame), true,
+    'SHA256 verified identity is allowed in the same schema');
+
+var badApi = JSON.parse(JSON.stringify(withRenderApi));
+badApi.status.matchedGames[0].renderApis = ['d3d13'];
+assert.strictEqual(validator.isValidGameWatcherStatus(badApi), false,
+    'unknown render API is rejected');
+
+var fakeVerified = JSON.parse(JSON.stringify(withRenderApi));
+fakeVerified.status.matchedGames[0].identityVerified = true;
+assert.strictEqual(validator.isValidGameWatcherStatus(fakeVerified), false,
+    'name-only matches must never claim verified SHA');

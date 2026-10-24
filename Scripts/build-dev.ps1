@@ -93,13 +93,14 @@ function Copy-Tree([string]$Source, [string]$Destination) {
     if ($LASTEXITCODE -gt 7) { throw "robocopy failed: $Source -> $Destination (exit $LASTEXITCODE)" }
 }
 
-function Copy-RuntimeFiles([string]$Source, [string]$Destination) {
+function Copy-RuntimeFiles([string]$Source, [string]$Destination, [string[]]$ExcludeNames = @()) {
     if (-not (Test-Path -LiteralPath $Source)) { throw "Required Project build output missing: $Source" }
     Ensure-Dir $Destination
     Get-ChildItem -LiteralPath $Source -Recurse -File -Force |
         Where-Object {
             $_.Extension -in '.exe','.dll','.json' -and
-            $_.FullName -notmatch '\\(obj|Debug)\\'
+            $_.FullName -notmatch '\\(obj|Debug)\\' -and
+            $ExcludeNames -notcontains $_.Name
         } |
         ForEach-Object {
             $sourceFile = $_.FullName
@@ -129,8 +130,8 @@ $activeProjects = @(
     @{ Path = 'NVIDIA Adapter\OSC Adapter\Duluka Hook\NVIDIA OSC Adapter.vcxproj'; Platform = 'x64' },
     @{ Path = 'NVIDIA Adapter\OSC Adapter\Duluka Hook\NVIDIA OSC Adapter.vcxproj'; Platform = 'Win32' },
     @{ Path = 'NVIDIA Adapter\Ansel Adapter\ReShade Ansel\NVIDIA Ansel Adapter.vcxproj'; Platform = 'x64' },
-    @{ Path = 'NVIDIA Adapter\OSC Adapter\Duluka Hook\NVIDIA OSC Adapter Host.csproj'; Platform = 'x64' },
-    @{ Path = 'NVIDIA Adapter\OSC Adapter\Duluka Hook\NVIDIA OSC Adapter Host.csproj'; Platform = 'x86' },
+    @{ Path = 'NVIDIA Adapter\OSC Adapter\NVIDIA OSC Adapter Host.csproj'; Platform = 'x64' },
+    @{ Path = 'NVIDIA Adapter\OSC Adapter\NVIDIA OSC Adapter Host.csproj'; Platform = 'x86' },
     @{ Path = 'Overlay On-Screen Control\NVIDIA NodeAPI\NVIDIA Web Helper\NVIDIA Web Helper.vbproj'; Platform = 'x64' },
     @{ Path = 'NVIDIA Container\NvContainer.csproj'; Platform = 'AnyCPU' },
     @{ Path = 'NVIDIA Capture\NVIDIA Capture.vbproj'; Platform = 'AnyCPU' },
@@ -187,13 +188,32 @@ $nvConfigOutput = Join-Path $BuildRoot 'NVIDIA Config'
 Ensure-Dir $nvConfigOutput
 Get-ChildItem -LiteralPath (Join-Path $ProjectRoot 'NVIDIA Config') -File -Filter '*.json' |
     ForEach-Object {
-    Copy-FileSafe $_.FullName (Join-Path $nvConfigOutput $_.Name)
+        $destination = Join-Path $nvConfigOutput $_.Name
+        if ($_.Name -ieq 'nvcontainer.json') {
+            if (Test-Path -LiteralPath $destination) {
+                # Existing runtime may still be using a legacy pairing key.
+                # Source templates must never overwrite its active configuration.
+                Write-Output '[config] preserving existing nvcontainer.json (pairing migration is separate)'
+                return
+            }
+            $protectedPairing = Join-Path $env:LOCALAPPDATA 'ShadowPlay NEXT\Secrets\pairing-current-user.dpapi'
+            if (-not (Test-Path -LiteralPath $protectedPairing)) {
+                throw 'New NvContainer deployment requires pre-enrolled per-user protected pairing secret'
+            }
+        }
+        Copy-FileSafe $_.FullName $destination
     }
 $captureFlag = Join-Path $ProjectRoot 'NVIDIA Config\capture-disabled.flag'
 if (Test-Path -LiteralPath $captureFlag) {
     Copy-FileSafe $captureFlag (Join-Path $nvConfigOutput 'capture-disabled.flag')
 }
-Copy-Tree (Join-Path $ProjectRoot 'NVIDIA Config\nvnode') (Join-Path $nvConfigOutput 'nvnode')
+# Never copy the checked-in NvNode init *example* onto a runtime file.
+# The real init is written by NvContainer from the resolved pairing identity.
+$nvNodeSrc = Join-Path $ProjectRoot 'NVIDIA Config\nvnode'
+$nvNodeDst = Join-Path $nvConfigOutput 'nvnode'
+Ensure-Dir $nvNodeDst
+robocopy $nvNodeSrc $nvNodeDst /E /XF nvnode-init-duluka.json /R:1 /W:1 /NJH /NJS /NP /NDL /NFL /NS /NC | Out-Null
+if ($LASTEXITCODE -gt 7) { throw 'NvNode config copy failed' }
 
 if ($preservedOverlayConfig) {
     [System.IO.File]::WriteAllText(
@@ -213,7 +233,18 @@ if (Test-Path -LiteralPath $legacyOverlayConfig) {
 
 # Stage the controller and its hotkey helper from their active Project owners.
 $containerOutput = Join-Path $BuildRoot 'NVIDIA Container'
-Copy-RuntimeFiles (Join-Path $ProjectRoot ("NVIDIA Container\bin\Release\{0}" -f $TargetFramework)) $containerOutput
+$containerSource = Join-Path $ProjectRoot ("NVIDIA Container\bin\Release\{0}" -f $TargetFramework)
+$nativeCoreFiles = @('NvContainer.exe','NvContainer.dll','NvContainer.deps.json','NvContainer.runtimeconfig.json')
+# Install the supervisor as a verified four-file set, not partial EXE/DLL
+# overwrites. When the running supervisor owns these files, stage automatically
+# and report a pending activation; no game or OSC process is force-stopped.
+Copy-RuntimeFiles $containerSource $containerOutput $nativeCoreFiles
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Install-NvContainerBuild.ps1') -SourceDirectory $containerSource -BuildDirectory $containerOutput
+if ($LASTEXITCODE -eq 2) {
+    $pending.Add('NvContainer native update staged; install after its normal shutdown.')
+} elseif ($LASTEXITCODE -ne 0) {
+    throw 'NvContainer verified installation failed.'
+}
 Copy-RuntimeFiles (Join-Path $ProjectRoot ("NVIDIA Container\NVIDIA ShadowPlay Helper\bin\Release\{0}" -f $TargetFramework)) $containerOutput
 $captureOutput = Join-Path $BuildRoot 'NVIDIA Capture'
 Copy-RuntimeFiles (Join-Path $ProjectRoot ("NVIDIA Capture\bin\Release\{0}" -f $TargetFramework)) $captureOutput
@@ -239,16 +270,17 @@ if (Test-Path -LiteralPath $containerGraphicsExe) {
 # The x64 host routes x86 games to the matching host/DLL in the x86 subfolder.
 # Keep each host and native module together.
 $adapterOutput = Join-Path $BuildRoot 'NVIDIA Adapter'
-$adapterSource = Join-Path $ProjectRoot 'NVIDIA Adapter\OSC Adapter\Duluka Hook'
+$adapterSource = Join-Path $ProjectRoot 'NVIDIA Adapter\OSC Adapter'
+$hookEngineSource = Join-Path $adapterSource 'Duluka Hook'
 $adapterHostOutput = Join-Path $adapterSource (
     "bin\x64\Release\{0}\win-x64" -f $TargetFramework)
-$adapterNativeDll = Join-Path $adapterSource 'bin\x64\Release\NVIDIA OSC Adapter Hook.dll'
+$adapterNativeDll = Join-Path $hookEngineSource 'bin\x64\Release\NVIDIA OSC Adapter Hook.dll'
 Copy-RuntimeFiles $adapterHostOutput $adapterOutput
 $adapterX86Output = Join-Path $adapterOutput 'x86'
 $adapterX86HostOutput = Join-Path $adapterSource (
     "bin\x86\Release\{0}\win-x86" -f $TargetFramework)
 Copy-RuntimeFiles $adapterX86HostOutput $adapterX86Output
-Copy-FileSafe (Join-Path $adapterSource 'bin\Win32\Release\NVIDIA OSC Adapter Hook.dll') (Join-Path $adapterX86Output 'NVIDIA OSC Adapter Hook.dll')
+Copy-FileSafe (Join-Path $hookEngineSource 'bin\Win32\Release\NVIDIA OSC Adapter Hook.dll') (Join-Path $adapterX86Output 'NVIDIA OSC Adapter Hook.dll')
 Copy-FileSafe $adapterNativeDll (Join-Path $adapterOutput (Split-Path -Leaf $adapterNativeDll))
 Copy-FileSafe (Join-Path $ProjectRoot 'NVIDIA Adapter\Ansel Adapter\ReShade Ansel\bin\x64\Release\NVIDIA Ansel Adapter.dll') (Join-Path $adapterOutput 'NVIDIA Ansel Adapter.dll')
 

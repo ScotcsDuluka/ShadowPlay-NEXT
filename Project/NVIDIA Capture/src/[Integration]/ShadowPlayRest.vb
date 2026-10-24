@@ -56,7 +56,7 @@ Public Class ShadowPlayRestClient
             ' Use the default local Node API port during cold/missing config.
         End Try
 
-        Dim secret = "0ca906d2784f0d14e399874f5c5ed4a1"
+        Dim secret = ""
         Try
             ' Keep the Duluka pairing cookie, never read genuine NVIDIA data.
             Dim ini = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -139,8 +139,18 @@ Public Class ShadowPlayRestClient
     End Function
 
     ''' <summary>Engine confirms the ACTUAL running state — backend publishes /Record/Running from it.</summary>
-    Public Sub ConfirmActual(running As Boolean)
-        Request("POST", "/Duluka/v.1.0/Actual", If(running, "{""running"":true}", "{""running"":false}"))
+    Public Sub ConfirmActual(running As Boolean, Optional savedOutputPath As String = Nothing)
+        ' A Boolean transition proves stopped, NOT that a file was finalized.
+        ' Only the completed SessionResult watcher may supply a saved file.
+        Dim verifiedSaved As Boolean = Not running AndAlso
+            Not String.IsNullOrWhiteSpace(savedOutputPath) AndAlso
+            File.Exists(savedOutputPath)
+        Dim payload As String = System.Text.Json.JsonSerializer.Serialize(New With {
+            .running = running,
+            .recordingSaved = verifiedSaved,
+            .outputPath = If(verifiedSaved, savedOutputPath, "")
+        })
+        Request("POST", "/Duluka/v.1.0/Actual", payload)
     End Sub
 
     Public Sub ConfirmRecordStarted()

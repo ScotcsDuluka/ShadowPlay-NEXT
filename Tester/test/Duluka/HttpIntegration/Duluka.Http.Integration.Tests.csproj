@@ -12,7 +12,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\..\Duluka\Duluka.Server\Duluka.Server.csproj" />
+    <ProjectReference Include="..\..\..\..\Server\Duluka.Server\Duluka.Server.csproj" />
   </ItemGroup>
 
 </Project>

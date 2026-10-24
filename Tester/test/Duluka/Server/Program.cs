@@ -688,9 +688,8 @@ internal static class Program
         var dbPath = Path.Combine(Path.GetTempPath(), $"duluka-mig-{Guid.NewGuid():N}.db");
         try
         {
-            using (var raw = new Database(dbPath, NullLogger<Database>.Instance))
-            {
-                raw.Bootstrap();
+            using (var raw = new Microsoft.Data.Sqlite.SqliteConnection(
+                new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder { DataSource = dbPath, Pooling = false }.ToString()))
             {
                 raw.Open();
                 ExecRaw(raw, """
@@ -1915,7 +1914,7 @@ internal static class Program
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         for (var i = 0; i < 10 && dir is not null; i++)
         {
-            var candidate = Path.Combine(dir.FullName, "Duluka", "Duluka.Server", "Duluka.Server.csproj");
+            var candidate = Path.Combine(dir.FullName, "Server", "Duluka.Server", "Duluka.Server.csproj");
             if (File.Exists(candidate)) return candidate;
             dir = dir.Parent;
         }

@@ -28,7 +28,8 @@
     "NVIDIA Web Helper + NvNode": "Overlay On-Screen Control/NVIDIA NodeAPI",
     "NVIDIA OSC": "Overlay On-Screen Control/NVIDIA OSC",
     "NvContainer + nvsphelper": "NVIDIA Container",
-    "OSC Adapter Host + DXGI hook module": "NVIDIA Adapter/OSC Adapter/Duluka Hook",
+    "OSC Adapter Host / Controller": "NVIDIA Adapter/OSC Adapter",
+    "Duluka Hook Engine / DXGI interception": "NVIDIA Adapter/OSC Adapter/Duluka Hook",
     "Per-game GPU preferences + runtime verification": "NVIDIA Graphics",
     "Launcher CEF body": "NVIDIA Launcher/Cef"
   }

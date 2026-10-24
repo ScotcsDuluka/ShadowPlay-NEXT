@@ -7,7 +7,9 @@ $installation = & $vswhere -latest -products * -requires Microsoft.VisualStudio.
 if (-not $installation) { throw 'Visual Studio C++ tools are required.' }
 $buildExe = Join-Path $installation 'MSBuild\Current\Bin\MSBuild.exe'
 function Build-Project($name, $platform) {
-    $projectFile = Join-Path $hookRoot $name
+    $projectFile = if ($name.EndsWith('.csproj')) {
+        Join-Path (Split-Path -Parent $hookRoot) $name
+    } else { Join-Path $hookRoot $name }
     if ($name.EndsWith('.csproj')) {
         & $buildExe $projectFile /t:Restore /p:Configuration=Release "/p:Platform=$platform" /m:1 /nr:false /v:minimal /nologo
         if ($LASTEXITCODE -ne 0) { throw "Restore failed: $name ($platform)" }
@@ -25,8 +27,8 @@ foreach ($platform in @('x86', 'x64')) { Build-Project 'NVIDIA OSC Adapter Host.
 $validation = Join-Path $repoRoot 'Build\Dx9Validation'
 $tfm = 'net10.0-windows10.0.26100.0'
 New-Item -ItemType Directory -Path $validation,(Join-Path $validation 'x86') -Force | Out-Null
-Copy-Item -Path (Join-Path $hookRoot "bin\x64\Release\$tfm\win-x64\*") -Destination $validation -Force
-Copy-Item -Path (Join-Path $hookRoot "bin\x86\Release\$tfm\win-x86\*") -Destination (Join-Path $validation 'x86') -Force
+Copy-Item -Path (Join-Path (Split-Path -Parent $hookRoot) "bin\x64\Release\$tfm\win-x64\*") -Destination $validation -Force
+Copy-Item -Path (Join-Path (Split-Path -Parent $hookRoot) "bin\x86\Release\$tfm\win-x86\*") -Destination (Join-Path $validation 'x86') -Force
 Copy-Item -LiteralPath (Join-Path $hookRoot 'bin\Win32\Release\NVIDIA OSC Adapter Hook.dll') -Destination (Join-Path $validation 'x86') -Force
 $testExe = Join-Path $hookRoot 'tests\bin\Win32\Release\NVIDIA OSC Adapter D3D9 Smoke Test.exe'
 $testDll = Join-Path $validation 'x86\NVIDIA OSC Adapter Hook.dll'

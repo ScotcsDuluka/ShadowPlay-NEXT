@@ -12,5 +12,18 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWindowsForms>true</UseWindowsForms>
+    <!-- Adapter sources are explicit: never compile C# under Duluka Hook engine/bin/obj. -->
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
+  <ItemGroup>
+    <!-- Container validates a literal UTF-8 CLI marker inside this managed DLL.
+         Keep it in assembly metadata so both x64/x86 pass the runtime gate. -->
+    <AssemblyMetadata Include="OSC.Adapter.RenderApiCliContract" Value="--render-api" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="src\Detection\GraphicsApiProbe.cs" />
+    <Compile Include="src\Detection\RenderApiPolicy.cs" />
+    <Compile Include="src\Detection\RemoteLoaderWaitPolicy.cs" />
+  </ItemGroup>
 </Project>

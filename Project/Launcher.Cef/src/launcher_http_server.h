@@ -7,6 +7,8 @@
 #define LAUNCHER_HTTP_SERVER_H_
 
 #include <atomic>
+#include <condition_variable>
+#include <mutex>
 #include <string>
 #include <thread>
 
@@ -23,12 +25,18 @@ class LauncherHttpServer {
  private:
   void AcceptLoop();
   void HandleConnection(SOCKET s);
+  struct WorkItem { LauncherHttpServer* server; SOCKET socket; };
+  static unsigned __stdcall WorkerTramp(void* work);
 
   std::string ui_root_;
   std::atomic<int> port_;
   std::atomic<bool> stop_;
   SOCKET listen_sock_ = INVALID_SOCKET;
   std::thread accept_thread_;
+  std::mutex workers_mutex_;
+  std::condition_variable workers_done_;
+  unsigned active_workers_ = 0;
+  static constexpr unsigned kMaxConcurrentConnections = 16;
 };
 
 #endif  // LAUNCHER_HTTP_SERVER_H_

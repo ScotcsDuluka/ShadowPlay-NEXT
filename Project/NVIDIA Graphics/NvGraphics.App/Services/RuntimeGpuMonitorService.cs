@@ -83,6 +83,7 @@ public sealed class RuntimeGpuMonitorService
             }
             sampleCount++;
 
+            var countedTargetPids = new HashSet<int>();
             foreach (var sample in samples)
             {
                 activePidsOverall.Add(sample);
@@ -96,7 +97,8 @@ public sealed class RuntimeGpuMonitorService
                 }
 
                 targetPathByPid[sample.Pid] = path;
-                targetSeenIn[sample.Pid] = targetSeenIn.GetValueOrDefault(sample.Pid) + 1;
+                if (countedTargetPids.Add(sample.Pid))
+                    targetSeenIn[sample.Pid] = targetSeenIn.GetValueOrDefault(sample.Pid) + 1;
 
                 if (!engineTypesByPid.TryGetValue(sample.Pid, out var types))
                     engineTypesByPid[sample.Pid] = types = new HashSet<string>();
@@ -105,7 +107,8 @@ public sealed class RuntimeGpuMonitorService
                 var key = (sample.Pid, s, sample.Luid);
                 var cur = activity.TryGetValue(key, out var v) ? v : (0.0, false);
                 cur.Item1 = Math.Min(100.0, cur.Item1 + sample.UtilizationPercent);
-                cur.Item2 |= sample.EngineType == "3d";
+                cur.Item2 |= sample.EngineType == "3d" &&
+                             sample.UtilizationPercent >= _options.ActivityThresholdPercent;
                 activity[key] = cur;
             }
 

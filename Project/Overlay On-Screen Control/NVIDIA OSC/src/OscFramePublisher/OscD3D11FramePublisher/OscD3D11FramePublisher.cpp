@@ -18,7 +18,9 @@
 #include "include/internal/cef_types_wrappers.h"
 #include "../../../../../NVIDIA Adapter/OSC Adapter/Duluka Hook/include/osc_frame_bridge.h"
 #include "../OscD3D9FramePublisher/OscD3D9FramePublisher.h"
+#include "../OscD3D9ExFramePublisher/OscD3D9ExFramePublisher.h"
 #include "../Common/OscFrameUtilities.h"
+#include "../Common/OscPublishCadence.h"
 namespace osc::d3d11_frame_publisher {
 static HostBindings g_host{};
 static ID3D11Device* HostGpuDevice() { return g_host.gpuDevice ? g_host.gpuDevice() : nullptr; }
@@ -44,12 +46,20 @@ static std::uint64_t g_adapter_frame_resource_generation = 0;
 static ID3D11Device* g_adapter_frame_device = nullptr;
 static ID3D11DeviceContext* g_adapter_frame_context = nullptr;
 static std::mutex g_adapter_publish_mutex;
+// The publish mutex serializes the source serial with queue submissions.
+// A timer-driven recovery copy carries the last serial, not a NEW frame.
+static std::uint64_t g_cef_content_serial = 0;
+static osc::frame_cadence::FrameCadence g_frame_cadence{};
+static std::atomic<bool> g_publish_worker_stopping{ false };
+static std::atomic<bool> g_d3d9ex_cpu_only{ false };
+static bool GetDeviceAdapterLuid(ID3D11Device*, LUID&);
 static constexpr size_t AdapterReadbackSlotCount = 3;
 struct AdapterReadbackSlot {
  ID3D11Texture2D* texture = nullptr;
  ID3D11Query* completion = nullptr;
  bool pending = false;
  bool fullFrame = false;
+ std::uint64_t cefContentSerial = 0;
  std::vector<D3D11_BOX> dirtyBoxes;
 };
 static AdapterReadbackSlot g_adapter_readback_slots[AdapterReadbackSlotCount]{};
@@ -64,6 +74,288 @@ static DXGI_FORMAT g_adapter_frame_format = DXGI_FORMAT_UNKNOWN;
 static bool g_adapter_frame_initialized = false;
 static bool g_adapter_force_full_readback = false;
 static std::vector<CefRect> g_adapter_deferred_dirty_rects;
+
+// Phase 0.2: a bounded, opt-in GPU-only input queue. CEF's shared handle is
+// never retained: CopyResource is submitted while OnAcceleratedPaint still owns
+// the handle. The worker owns two independent GPU textures and queries.
+static constexpr size_t GpuPreviewStageCount = 2;
+struct GpuPreviewStage {
+    ID3D11Texture2D* texture = nullptr;
+    ID3D11Query* completion = nullptr;
+    std::uint64_t serial = 0;
+    ULONGLONG queuedAtMs = 0;
+    bool queued = false;
+    bool processing = false;
+};
+static GpuPreviewStage g_gpu_preview_stages[GpuPreviewStageCount]{};
+static UINT g_gpu_preview_width = 0, g_gpu_preview_height = 0;
+static ID3D11Device* g_gpu_preview_device = nullptr;
+static UINT g_gpu_preview_requested_width = 0, g_gpu_preview_requested_height = 0;
+static std::uint64_t g_gpu_preview_serial = 0;
+// Publish worker exclusively owns this counter and GPU submission flush.
+static std::uint64_t g_gpu_preview_last_flushed_serial = 0;
+// Prevent an older GPU query from publishing after a newer frame was consumed.
+static std::uint64_t g_gpu_preview_last_consumed_serial = 0;
+static ULONGLONG g_gpu_preview_next_prepare_ms = 0;
+static std::atomic<std::uint64_t> g_gpu_preview_queued{0};
+static std::atomic<std::uint64_t> g_gpu_preview_dropped{0};
+static std::atomic<std::uint64_t> g_gpu_preview_sent{0};
+static std::atomic<std::uint64_t> g_gpu_preview_not_ready{0};
+static std::atomic<ULONGLONG> g_gpu_preview_last_sent_ms{0};
+static std::atomic<ULONGLONG> g_gpu_preview_last_queued_ms{0};
+// Report queue age and callback submission cost, not game-frame time.
+static std::atomic<std::uint64_t> g_gpu_preview_enqueue_cpu_us{0};
+static std::atomic<std::uint64_t> g_gpu_preview_enqueue_count{0};
+static std::atomic<std::uint64_t> g_gpu_preview_ready_latency_ms{0};
+static std::atomic<std::uint64_t> g_gpu_preview_ready_count{0};
+
+static bool GpuPreviewEnabled() {
+    if (g_d3d9ex_cpu_only.load(std::memory_order_acquire)) return false;
+    static const bool enabled = [] {
+        char flag[8]{};
+        return GetEnvironmentVariableA("OSC_DX9EX_CEF_GPU_PREVIEW",
+            flag, sizeof(flag)) == 1 && flag[0] == '1';
+    }();
+    return enabled;
+}
+static void ReleaseGpuPreviewStagesLocked() {
+    for (auto& slot : g_gpu_preview_stages) {
+        if (slot.completion) { slot.completion->Release(); slot.completion = nullptr; }
+        if (slot.texture) { slot.texture->Release(); slot.texture = nullptr; }
+        slot.queued = false;
+        slot.processing = false;
+        slot.serial = 0;
+        slot.queuedAtMs = 0;
+    }
+    g_gpu_preview_width = g_gpu_preview_height = 0;
+    if (g_gpu_preview_device) {
+        g_gpu_preview_device->Release();
+        g_gpu_preview_device=nullptr;
+    }
+}
+bool QueueD3D9ExGpuFrameLocked(ID3D11Texture2D* cefTexture) {
+    if (!GpuPreviewEnabled() || !cefTexture ||
+        g_publish_worker_stopping.load(std::memory_order_acquire) ||
+        !HostGameFocused() || !HostOverlayVisible())
+        return false;
+    // Only BGRA8 single-sample, whole-frame copies. Dirty-rect tracking is
+    // intentionally not used: every accepted stage is an independent frame.
+    D3D11_TEXTURE2D_DESC desc{};
+    cefTexture->GetDesc(&desc);
+    if (!desc.Width || !desc.Height || desc.MipLevels != 1 ||
+        desc.ArraySize != 1 || desc.SampleDesc.Count != 1 ||
+        (desc.Format != DXGI_FORMAT_B8G8R8A8_UNORM &&
+         desc.Format != DXGI_FORMAT_B8G8R8A8_TYPELESS) ||
+        static_cast<std::uint64_t>(desc.Width)*desc.Height*4 >
+            osc_frame_bridge::MaxFrameBytes)
+        return false;
+    ID3D11Device* owner = nullptr;
+    cefTexture->GetDevice(&owner);
+    const bool sameDevice = owner && owner == HostGpuDevice();
+    if (owner) owner->Release();
+    if (!sameDevice) return false;
+
+    g_gpu_preview_requested_width = desc.Width;
+    g_gpu_preview_requested_height = desc.Height;
+    if (g_gpu_preview_width != desc.Width ||
+        g_gpu_preview_height != desc.Height ||
+        g_gpu_preview_device != HostGpuDevice()) {
+        ++g_gpu_preview_dropped;
+        return false; // worker prepares resources without blocking CEF
+    }
+    for (auto& slot : g_gpu_preview_stages) {
+        if (!slot.texture || !slot.completion ||
+            slot.queued || slot.processing) continue;
+        // D3D11 context is multithread-protected; NO CPU Map/Wait/GetData.
+        LARGE_INTEGER begin{},end{},freq{};
+        QueryPerformanceCounter(&begin);
+        HostGpuContext()->CopyResource(slot.texture, cefTexture);
+        HostGpuContext()->End(slot.completion);
+        QueryPerformanceCounter(&end);
+        QueryPerformanceFrequency(&freq);
+        if (freq.QuadPart > 0) {
+            g_gpu_preview_enqueue_cpu_us.fetch_add(
+                static_cast<std::uint64_t>(
+                    (end.QuadPart-begin.QuadPart)*1000000 / freq.QuadPart),
+                std::memory_order_relaxed);
+            ++g_gpu_preview_enqueue_count;
+        }
+        slot.serial = ++g_gpu_preview_serial;
+        slot.queuedAtMs = GetTickCount64();
+        g_gpu_preview_last_queued_ms.store(slot.queuedAtMs,
+            std::memory_order_relaxed);
+        slot.queued = true;
+        ++g_gpu_preview_queued;
+        return true;
+    }
+    ++g_gpu_preview_dropped; // bounded capacity: drop, never build backlog
+    return false;
+}
+static void PrepareGpuPreviewOnWorker() {
+    if (!GpuPreviewEnabled()) return;
+    UINT width=0,height=0;
+    ID3D11Device* device=nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_adapter_publish_mutex);
+        width=g_gpu_preview_requested_width;
+        height=g_gpu_preview_requested_height;
+        if (!width || !height ||
+            (g_gpu_preview_width==width &&
+             g_gpu_preview_height==height &&
+             g_gpu_preview_device==HostGpuDevice()) ||
+            GetTickCount64()<g_gpu_preview_next_prepare_ms) return;
+        for (const auto& slot : g_gpu_preview_stages)
+            if (slot.queued || slot.processing) return;
+        device=HostGpuDevice();
+        if (!device) return;
+        device->AddRef();
+    }
+    GpuPreviewStage prepared[GpuPreviewStageCount]{};
+    bool success=true;
+    D3D11_TEXTURE2D_DESC td{};
+    td.Width=width;td.Height=height;
+    td.MipLevels=1;td.ArraySize=1;td.SampleDesc.Count=1;
+    td.Format=DXGI_FORMAT_B8G8R8A8_UNORM;
+    td.Usage=D3D11_USAGE_DEFAULT;
+    td.BindFlags=D3D11_BIND_SHADER_RESOURCE;
+    D3D11_QUERY_DESC q{};q.Query=D3D11_QUERY_EVENT;
+    for (auto& s : prepared) {
+        if (FAILED(device->CreateTexture2D(&td,nullptr,&s.texture)) ||
+            FAILED(device->CreateQuery(&q,&s.completion))) {
+            success=false;
+            break;
+        }
+    }
+    {
+        std::lock_guard<std::mutex> lock(g_adapter_publish_mutex);
+        bool empty=true;
+        for (const auto& slot : g_gpu_preview_stages)
+            if (slot.queued || slot.processing) empty=false;
+        if (success && empty && HostGpuDevice()==device &&
+            g_gpu_preview_requested_width==width &&
+            g_gpu_preview_requested_height==height &&
+            !g_publish_worker_stopping.load(std::memory_order_acquire)) {
+            ReleaseGpuPreviewStagesLocked();
+            for (size_t i=0;i<GpuPreviewStageCount;++i) {
+                g_gpu_preview_stages[i]=prepared[i];
+                prepared[i]={};
+            }
+            g_gpu_preview_width=width;
+            g_gpu_preview_height=height;
+            device->AddRef();
+            g_gpu_preview_device=device;
+        } else {
+            g_gpu_preview_next_prepare_ms=GetTickCount64()+250;
+        }
+    }
+    for (auto& s : prepared) {
+        if (s.texture) s.texture->Release();
+        if (s.completion) s.completion->Release();
+    }
+    device->Release();
+}
+// CPU memory publication remains enabled even in GPU preview. Only the
+// redundant CPU -> legacy-GPU path yields briefly to an actively receiving
+// CEF GPU queue; it resumes automatically when that queue becomes idle.
+static bool PreferGpuPreviewToCpuGpuUpload() {
+    if (!GpuPreviewEnabled()) return false;
+    const ULONGLONG last=g_gpu_preview_last_queued_ms.load(
+        std::memory_order_relaxed);
+    const ULONGLONG now=GetTickCount64();
+    return last && now>=last && now-last<750;
+}
+static void ProcessGpuPreviewOnWorker() {
+    if (!GpuPreviewEnabled()) return;
+    // Do not access the Host context without an independent strong reference:
+    // CEF could resize while the worker handles this slot.
+    ID3D11Texture2D* texture=nullptr;
+    ID3D11Query* query=nullptr;
+    GpuPreviewStage* chosen=nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_adapter_publish_mutex);
+        for (auto& slot : g_gpu_preview_stages) {
+            if (slot.queued && !slot.processing &&
+                (!chosen || slot.serial > chosen->serial))
+                chosen=&slot; // latest-wins
+        }
+        if (!chosen || !chosen->texture || !chosen->completion) return;
+        chosen->processing=true;
+        texture=chosen->texture;texture->AddRef();
+        query=chosen->completion;query->AddRef();
+    }
+
+    // The CEF callback submits CopyResource + End only. Flush on the
+    // worker once per generation so an idle GPU-only path makes progress.
+    if (HostGpuContext() && chosen->serial > g_gpu_preview_last_flushed_serial) {
+        HostGpuContext()->Flush(); // submits commands; NOT a GPU completion wait
+        g_gpu_preview_last_flushed_serial=chosen->serial;
+    }
+    const HRESULT completion=HostGpuContext()
+        ? HostGpuContext()->GetData(query,nullptr,0,
+            D3D11_ASYNC_GETDATA_DONOTFLUSH) : E_FAIL;
+    bool published=false;
+    const bool stale = chosen->serial <= g_gpu_preview_last_consumed_serial;
+    if (completion==S_OK) {
+        ++g_gpu_preview_ready_count;
+        const ULONGLONG readyAt=GetTickCount64();
+        g_gpu_preview_ready_latency_ms.fetch_add(
+            readyAt>=chosen->queuedAtMs
+                ? readyAt-chosen->queuedAtMs : 0,
+            std::memory_order_relaxed);
+    }
+    if (completion==S_OK && !stale &&
+        HostGameFocused() && HostOverlayVisible()) {
+        const auto* consumer=GetConsumerAdapterInfo();
+        const LONG pid=consumer ? consumer->ownerProcessId : 0;
+        const LONG api=consumer ?
+            osc_frame_bridge::LoadConsumerRenderApi(*consumer) : 0;
+        const LONG64 packedLuid=consumer ? consumer->adapterLuid : 0;
+        LUID hostLuid{};
+        if (consumer &&
+            consumer->magic==osc_frame_bridge::ConsumerAdapterMagic &&
+            consumer->version==osc_frame_bridge::ConsumerAdapterVersion &&
+            pid>0 && packedLuid!=0 &&
+            api==osc_frame_bridge::ConsumerRenderApiD3D9 &&
+            ([&]() {
+                std::lock_guard<std::mutex> guard(g_adapter_publish_mutex);
+                return GetDeviceAdapterLuid(HostGpuDevice(),hostLuid);
+            })()) {
+            const std::uint64_t h=
+                (static_cast<std::uint64_t>(
+                    static_cast<std::uint32_t>(hostLuid.HighPart))<<32) |
+                hostLuid.LowPart;
+            if (h==static_cast<std::uint64_t>(packedLuid) &&
+                osc::d3d9ex_frame_publisher::CanPublish(
+                    static_cast<DWORD>(pid),hostLuid))
+                published=osc::d3d9ex_frame_publisher::TryPublishGpuTexture(
+                    HostGpuDevice(),HostGpuContext(),texture,hostLuid,
+                    static_cast<DWORD>(pid));
+        }
+    }
+    {
+        std::lock_guard<std::mutex> lock(g_adapter_publish_mutex);
+        if (completion==S_FALSE) {
+            ++g_gpu_preview_not_ready;
+        } else {
+            chosen->queued=false; // drop unavailable/outdated frames
+            if (completion==S_OK) {
+                g_gpu_preview_last_consumed_serial =
+                    (std::max)(g_gpu_preview_last_consumed_serial,
+                        chosen->serial);
+                if (stale) ++g_gpu_preview_dropped;
+            }
+            if (published) {
+                ++g_gpu_preview_sent;
+                g_gpu_preview_last_sent_ms.store(GetTickCount64(),
+                    std::memory_order_relaxed);
+            }
+        }
+        chosen->processing=false;
+    }
+    query->Release();
+    texture->Release();
+}
+
 static void ReleaseAdapterFrameTexture() {
     for (auto& slot : g_adapter_readback_slots) {
         if (slot.texture) {
@@ -76,6 +368,7 @@ static void ReleaseAdapterFrameTexture() {
         }
         slot.pending = false;
         slot.fullFrame = false;
+        slot.cefContentSerial = 0;
         slot.dirtyBoxes.clear();
     }
     g_adapter_readback_write = 0;
@@ -182,8 +475,6 @@ static void StopPublishWorker();
 static HANDLE g_publish_worker_stop_event = nullptr;
 static HANDLE g_publish_worker_thread = nullptr;
 static std::atomic<long> g_publish_inflight{ 0 };
-static std::atomic<bool> g_publish_worker_stopping{ false };
-
 // Callers hold g_adapter_publish_mutex. The worker reserves its resource access
 // under the same mutex, so zero cannot become nonzero during a rebuild.
 static bool DeferResourceTransitionLocked() {
@@ -445,7 +736,8 @@ static bool EnsureAdapterFrameTexture(ID3D11Texture2D* sourceTexture) {
 }
 
 
-static bool PublishCompletedAdapterFrame() {
+static bool PublishCompletedAdapterFrame(std::uint64_t& completedCefSerial) {
+    completedCefSerial = 0;
     AdapterReadbackSlot& slot =
         g_adapter_readback_slots[g_adapter_readback_read];
     {
@@ -505,8 +797,32 @@ static bool PublishCompletedAdapterFrame() {
                 d3d9Published = osc::d3d9_frame_publisher::PublishD3D9FramePixels(mappedBytes,
                     mapped.RowPitch, slot.dirtyBoxes, sourceDesc.Width,
                     sourceDesc.Height, slot.fullFrame);
-                if (!d3d9Published)
+                if (!d3d9Published) {
                     PublisherLog("[d3d9-bridge] CPU frame publication failed");
+                } else if (g_adapter_frame_device && g_adapter_frame_context) {
+                    // DX9Ex is strictly opt-in: the trusted in-game receiver
+                    // must advertise Stage/Commit capability + matching LUID.
+                    // Reconstruct a COMPLETE image from the CPU v1 bridge:
+                    // staging dirty rectangles are not a full GPU frame.
+                    const auto* consumer = GetConsumerAdapterInfo();
+                    const DWORD gamePid = consumer && consumer->ownerProcessId > 0
+                        ? static_cast<DWORD>(consumer->ownerProcessId) : 0;
+                    if (!g_d3d9ex_cpu_only.load(std::memory_order_acquire) &&
+                        !PreferGpuPreviewToCpuGpuUpload() &&
+                        osc::d3d9ex_frame_publisher::CanPublish(
+                            gamePid, g_adapter_frame_target_luid)) {
+                        std::vector<std::uint8_t> fullPixels;
+                        UINT frameWidth = 0, frameHeight = 0;
+                        if (osc::d3d9_frame_publisher::SnapshotFullD3D9Frame(
+                                fullPixels, frameWidth, frameHeight)) {
+                            osc::d3d9ex_frame_publisher::TryPublish(
+                                g_adapter_frame_device, g_adapter_frame_context,
+                                fullPixels.data(), frameWidth * 4,
+                                frameWidth, frameHeight,
+                                g_adapter_frame_target_luid, gamePid);
+                        }
+                    }
+                }
             }
             HostGpuContext()->Unmap(slot.texture, 0);
             g_adapter_frame_context->Flush();
@@ -549,8 +865,11 @@ static bool PublishCompletedAdapterFrame() {
             g_adapter_frame_initialized = true;
             g_adapter_force_full_readback = false;
         }
+        if (published)
+            completedCefSerial = slot.cefContentSerial;
         slot.pending = false;
         slot.fullFrame = false;
+        slot.cefContentSerial = 0;
         slot.dirtyBoxes.clear();
         g_adapter_readback_read =
             (g_adapter_readback_read + 1) % AdapterReadbackSlotCount;
@@ -614,6 +933,7 @@ bool QueueFrameReadbackLocked(ID3D11Texture2D* sourceTexture,
             slot.texture, 0, box.left, box.top, 0, sourceTexture, 0, &box);
     HostGpuContext()->End(slot.completion);
     HostGpuContext()->Flush();
+    slot.cefContentSerial = g_cef_content_serial;
     slot.pending = true;
     g_adapter_readback_write =
         (g_adapter_readback_write + 1) % AdapterReadbackSlotCount;
@@ -623,7 +943,8 @@ bool QueueFrameReadbackLocked(ID3D11Texture2D* sourceTexture,
     return true;
 }
 
-bool PublishMetadataLocked(bool forceHidden) {
+bool PublishMetadataLocked(bool forceHidden,
+    std::uint64_t completedCefContentSerial) {
     // [FIX-B] serialize bridge seqlock writes: the UI thread (visibility
     // changes) and the publish worker both push metadata now.
     static std::mutex g_bridge_metadata_mutex;
@@ -697,10 +1018,12 @@ bool PublishMetadataLocked(bool forceHidden) {
     g_frame_bridge->processId = GetCurrentProcessId();
     g_frame_bridge->sharedResourceId = g_adapter_frame_resource_id;
     const bool overlayVisible = HostOverlayVisible();
-    if (!forceHidden && overlayVisible)
-        ++g_frame_bridge->frameNumber;
-    else
-        g_frame_bridge->frameNumber = 0;
+    // Resource metadata and liveness may be published repeatedly. Never
+    // make the Hook re-copy unchanged GPU pixels by advancing frameNumber.
+    // Only successfully committed pixels from a new CEF view callback do.
+    g_frame_bridge->frameNumber = g_frame_cadence.Next(
+        g_frame_bridge->frameNumber, completedCefContentSerial,
+        !forceHidden && overlayVisible, completedCefContentSerial != 0);
     std::atomic_thread_fence(std::memory_order_release);
     InterlockedIncrement(&g_frame_bridge->sequence);
     osc::d3d9_frame_publisher::SetD3D9FrameVisibility(overlayVisible && !forceHidden);
@@ -761,7 +1084,7 @@ void PublishFrameLocked(ID3D11Texture2D* sourceTexture,
     if (!frameReady)
         return;
 
-    PublishMetadataLocked();
+    PublishMetadataLocked(false, g_cef_content_serial);
 }
 
 
@@ -775,6 +1098,36 @@ static DWORD WINAPI OscPublishWorkerProc(LPVOID) {
         const DWORD wait =
             WaitForSingleObject(g_publish_worker_stop_event, 4);
         if (wait == WAIT_OBJECT_0 || wait == WAIT_FAILED) break;
+        // Poll pending GPU-completion and Stage/Commit acknowledgements
+        // without ever executing D3D9Ex calls in the game's Present.
+        osc::d3d9ex_frame_publisher::Poll();
+        if (g_d3d9ex_cpu_only.load(std::memory_order_acquire))
+            osc::d3d9ex_frame_publisher::Withdraw();
+        PrepareGpuPreviewOnWorker();
+        ProcessGpuPreviewOnWorker();
+        if (GpuPreviewEnabled()) {
+            static ULONGLONG lastPreviewLog=0;
+            const ULONGLONG tick=GetTickCount64();
+            if (!lastPreviewLog || tick-lastPreviewLog>=5000) {
+                lastPreviewLog=tick;
+                char line[220]{};
+                const auto count=g_gpu_preview_enqueue_count.load();
+                const auto readyCount=g_gpu_preview_ready_count.load();
+                const auto submitted=g_gpu_preview_queued.load();
+                sprintf_s(line,"[dx9ex-gpu-preview] queued=%llu drop=%llu gpu-submit=%llu unready=%llu cb-copy-us-avg=%llu stage-ready-ms-avg=%llu",
+                    static_cast<unsigned long long>(submitted),
+                    static_cast<unsigned long long>(g_gpu_preview_dropped.load()),
+                    static_cast<unsigned long long>(g_gpu_preview_sent.load()),
+                    static_cast<unsigned long long>(g_gpu_preview_not_ready.load()),
+                    static_cast<unsigned long long>(count
+                        ?g_gpu_preview_enqueue_cpu_us.load()/count:0),
+                    static_cast<unsigned long long>(readyCount
+                        ?g_gpu_preview_ready_latency_ms.load()/readyCount:0));
+                PublisherLog(line);
+            }
+            if (!HostGameFocused() || !HostOverlayVisible())
+                osc::d3d9ex_frame_publisher::Withdraw();
+        }
 
         {
             std::lock_guard<std::mutex> lock(g_adapter_publish_mutex);
@@ -816,13 +1169,15 @@ static DWORD WINAPI OscPublishWorkerProc(LPVOID) {
             g_publish_inflight.fetch_add(1, std::memory_order_acq_rel);
         }
 
-        const bool published = PublishCompletedAdapterFrame();
+        std::uint64_t completedCefSerial = 0;
+        const bool published = PublishCompletedAdapterFrame(completedCefSerial);
         {
             std::lock_guard<std::mutex> lock(g_adapter_publish_mutex);
             if (published &&
                 !g_publish_worker_stopping.load(std::memory_order_acquire))
                 PublishMetadataLocked(
-                    !(HostGameFocused() && HostOverlayVisible()));
+                    !(HostGameFocused() && HostOverlayVisible()),
+                    completedCefSerial);
             // Metadata also references the resource dimensions/id, so finish
             // the reservation only after publishing it under the same lock.
             g_publish_inflight.fetch_sub(1, std::memory_order_acq_rel);
@@ -874,6 +1229,13 @@ static void StopPublishWorker() {
 
 
 void Initialize(const HostBindings& bindings) { g_host = bindings; }
+void SetD3D9ExCpuOnly(bool cpuOnly) {
+    g_d3d9ex_cpu_only.store(cpuOnly, std::memory_order_release);
+}
+void MarkCefContentUpdatedLocked() {
+    ++g_cef_content_serial;
+    if (g_cef_content_serial == 0) ++g_cef_content_serial;
+}
 std::mutex& Mutex() { return g_adapter_publish_mutex; }
 bool ForceFullReadbackLocked() { return g_adapter_force_full_readback; }
 void SetForceFullReadbackLocked(bool force) { g_adapter_force_full_readback = force; }
@@ -882,5 +1244,12 @@ bool HasPendingReadbackLocked() {
   [](const AdapterReadbackSlot& slot) { return slot.pending; });
 }
 bool HasCrossAdapterDeviceLocked() { return g_adapter_frame_device != nullptr; }
-void Stop() { StopPublishWorker(); }
+void Stop() {
+    StopPublishWorker();
+    {
+        std::lock_guard<std::mutex> lock(g_adapter_publish_mutex);
+        ReleaseGpuPreviewStagesLocked();
+    }
+    osc::d3d9ex_frame_publisher::Stop();
+}
 }

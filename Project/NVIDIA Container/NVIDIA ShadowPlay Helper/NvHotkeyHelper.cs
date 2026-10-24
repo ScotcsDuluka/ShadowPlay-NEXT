@@ -10,13 +10,16 @@
 // WinExe: ห้ามแตะ Console ทุกชนิด (handle invalid = crash) — log ลงไฟล์เท่านั้น
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
+using System.Threading.Tasks;
 
 static class NvShadowPlayHelper
 {
@@ -31,8 +34,9 @@ static class NvShadowPlayHelper
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr window, StringBuilder text, int count);
     [DllImport("user32.dll")]
     static extern int PeekMessageW(out MSG m, IntPtr h, uint a, uint b, uint remove);
-    [DllImport("winmm.dll")]
-    static extern uint timeBeginPeriod(uint period);
+    [DllImport("user32.dll", SetLastError = true)]
+    static extern uint MsgWaitForMultipleObjectsEx(uint count, IntPtr handles, uint milliseconds, uint wakeMask, uint flags);
+    const uint QS_ALLINPUT = 0x04FF, MWMO_INPUTAVAILABLE = 0x0004, WAIT_FAILED = 0xFFFFFFFF;
 
     [StructLayout(LayoutKind.Sequential)]
     struct MSG { public IntPtr hwnd; public uint message; public IntPtr wParam; public IntPtr lParam; public uint time; public int ptX; public int ptY; }
@@ -44,6 +48,12 @@ static class NvShadowPlayHelper
     static readonly string ConfigPath = Path.Combine(BuildRoot, "NVIDIA Config", "nvsphelper.json");
     static readonly string SettingsPath = Path.Combine(BuildRoot, "Overlay On-Screen Control", "NVIDIA NodeAPI", "shadowplay-settings.json");
     static string _fireUrl = "http://127.0.0.1:59012/v1/hotkey/{name}";
+    // OSC's existing Hotkey/Monitor endpoint is toggled by the keyboard-shortcut editor.
+    static readonly string MonitorUrl = "http://127.0.0.1:59011/ShadowPlay/v.1.0/Hotkey/Monitor";
+    static readonly HttpClient MonitorClient = new HttpClient(new HttpClientHandler { UseProxy = false })
+    { Timeout = TimeSpan.FromMilliseconds(500) };
+    static int _monitorDesired = 1; // 0 = editor capturing shortcuts, 1 = global keys enabled
+    static bool _monitorRegistered = true; // only main thread may register/unregister Win32 keys
     static string _logFile = Path.Combine(BuildRoot, "NvContainer", "Logs", "nvsphelper.log");
 
     static string FindBuildRoot()
@@ -61,7 +71,7 @@ static class NvShadowPlayHelper
         ["screenshot"]           = new[] { 18, 112 },   // Alt+F1
         ["recordtoggle"]         = new[] { 18, 120 },   // Alt+F9
         ["recordsave"]           = new[] { 18, 121 },   // Alt+F10
-        ["dvrtoggle"]            = new[] { 16, 18, 121 }, // Ctrl+Alt+F10
+        ["dvrtoggle"]            = new[] { 17, 18, 121 }, // Ctrl+Alt+F10
         ["instantreplaytoggle"]  = new[] { 18, 117 },   // Alt+F7
         ["broadcasttoggle"]      = new[] { 18, 119 },   // Alt+F8
         ["broadcastpausetoggle"] = new[] { 16, 18, 119 },
@@ -111,6 +121,118 @@ static class NvShadowPlayHelper
     static readonly Dictionary<string, uint> _awaitingKeyRelease = new Dictionary<string, uint>();
     static readonly Dictionary<string, long> _lastHotkeyMessage = new Dictionary<string, long>();
     const long HOTKEY_QUEUE_QUIET_MS = 150;
+    // Serialize callbacks: toggles must reach Container in keypress order.
+    // A bounded queue prevents a disconnected Container from exhausting the ThreadPool.
+    // Never replay stale toggles after a backend outage.
+    const long MAX_DISPATCH_AGE_MS = 2000;
+    static readonly BlockingCollection<Tuple<string, string, long>> DispatchQueue =
+        new BlockingCollection<Tuple<string, string, long>>(new ConcurrentQueue<Tuple<string, string, long>>(), 64);
+
+    static bool IsStaleDispatch(long queuedAt) => Environment.TickCount64 - queuedAt > MAX_DISPATCH_AGE_MS;
+
+    static void EnqueuePost(string url, string body = "{}")
+    {
+        if (!DispatchQueue.TryAdd(Tuple.Create(url, body, Environment.TickCount64)))
+            Log("[hotkey] dispatch queue full; dropped request for " + url);
+    }
+
+    static void StartDispatcher()
+    {
+        var worker = new Thread(() =>
+        {
+            foreach (var item in DispatchQueue.GetConsumingEnumerable())
+            {
+                if (IsStaleDispatch(item.Item3) || Volatile.Read(ref _monitorDesired) == 0)
+                {
+                    Log("[hotkey] stale queued request dropped: " + item.Item1);
+                    continue;
+                }
+                Post(item.Item1, item.Item2);
+            }
+        }) { IsBackground = true, Name = "NvHotkeyDispatch" };
+        worker.Start();
+    }
+
+    static bool? ParseMonitorEnabled(string json)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object) return null;
+            if (doc.RootElement.TryGetProperty("enable", out var v) &&
+                (v.ValueKind == JsonValueKind.True || v.ValueKind == JsonValueKind.False))
+                return v.GetBoolean();
+        }
+        catch (JsonException) { }
+        return null;
+    }
+
+    static bool? ReadMonitorEnabled()
+    {
+        try
+        {
+            return ParseMonitorEnabled(MonitorClient.GetStringAsync(MonitorUrl).GetAwaiter().GetResult());
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            // Keep the last confirmed monitoring state during transient NodeAPI outages.
+            return null;
+        }
+    }
+
+    static void StartMonitorProbe()
+    {
+        var worker = new Thread(() =>
+        {
+            long lastSuccess = Environment.TickCount64;
+            while (true)
+            {
+                var enable = ReadMonitorEnabled();
+                if (enable.HasValue)
+                {
+                    Interlocked.Exchange(ref _monitorDesired, enable.Value ? 1 : 0);
+                    lastSuccess = Environment.TickCount64;
+                }
+                else if (Environment.TickCount64 - lastSuccess > 10000)
+                {
+                    // Backend has vanished: restore standalone shortcuts rather than
+                    // leave a permanently muted Helper after an OSC crash.
+                    Interlocked.Exchange(ref _monitorDesired, 1);
+                }
+                Thread.Sleep(180);
+            }
+        }) { IsBackground = true, Name = "NvHotkeyMonitor" };
+        worker.Start();
+    }
+
+    static void SuspendAll()
+    {
+        foreach (var kv in Registered)
+            if (!UnregisterHotKey(IntPtr.Zero, kv.Key))
+                Log("[monitor] unregister failed id=" + kv.Key + " err=" + Marshal.GetLastWin32Error());
+        Registered.Clear();
+        FailedKeys.Clear();
+        UpgradableKeys.Clear();
+        _awaitingKeyRelease.Clear();
+        _lastHotkeyMessage.Clear();
+        _registeredHotkeySignature = "";
+        // Drop events already queued before editor was opened.
+        while (DispatchQueue.TryTake(out _)) { }
+        Log("[monitor] keyboard-shortcut editor active; native hotkeys released");
+    }
+
+    static void SyncMonitorState()
+    {
+        bool wantRegistration = Volatile.Read(ref _monitorDesired) != 0;
+        if (wantRegistration == _monitorRegistered) return;
+        _monitorRegistered = wantRegistration;
+        if (wantRegistration)
+        {
+            Log("[monitor] shortcuts editor closed; restoring hotkeys");
+            RegisterAll(); // Always load latest user bindings, including edits made while paused.
+        }
+        else SuspendAll();
+    }
 
     static void LoadConfig()
     {
@@ -152,8 +274,8 @@ static class NvShadowPlayHelper
     // อ่านคีย์ทั้งหมด: settings ของผู้ใช้ก่อน → default มาเติมที่ขาด
     static Dictionary<string, int[]> LoadAllKeys(bool keepCurrentOnFailure = false)
     {
+        // Put explicit user bindings first so they win over conflicting defaults.
         var all = new Dictionary<string, int[]>(StringComparer.Ordinal);
-        foreach (var kv in Defaults) all[kv.Key] = kv.Value;
         try
         {
             using var doc = JsonDocument.Parse(File.ReadAllText(SettingsPath));
@@ -175,6 +297,8 @@ static class NvShadowPlayHelper
             if (ex is not FileNotFoundException && ex is not DirectoryNotFoundException)
                 Log("[settings] read failed; using defaults: " + ex.Message);
         }
+        foreach (var kv in Defaults)
+            if (!all.ContainsKey(kv.Key)) all[kv.Key] = kv.Value;
         return all;
     }
 
@@ -196,14 +320,11 @@ static class NvShadowPlayHelper
 
         var all = snapshot ?? LoadAllKeys();
         var signature = HotkeySignature(all);
-        // ★ [P2#5 Copilot] reconcile: คีย์ที่ผู้ใช้ลบ/แก้ — ถอดออกจากตาราง retry ทั้งหมด
-        var live = new System.Collections.Generic.HashSet<string>(all.Keys);
-        var deadF = new System.Collections.Generic.List<string>();
-        foreach (var fk in FailedKeys) if (!live.Contains(fk.Key)) deadF.Add(fk.Key);
-        foreach (var n in deadF) { FailedKeys.Remove(n); Log("[hk] reconcile: ถอด " + n + " ออกจาก FailedKeys (ไม่มีใน settings แล้ว)"); }
-        var deadU = new System.Collections.Generic.List<string>();
-        foreach (var uk in UpgradableKeys) if (!live.Contains(uk.Key)) deadU.Add(uk.Key);
-        foreach (var n in deadU) { UpgradableKeys.Remove(n); Log("[hk] reconcile: ถอด " + n + " ออกจาก UpgradableKeys"); }
+        // Rebuild retry state from scratch; stale name-only retries can re-register
+        // an obsolete shortcut after the user changes its modifiers/key.
+        FailedKeys.Clear();
+        UpgradableKeys.Clear();
+        var usedChords = new HashSet<ulong>();
         foreach (var kv in all)
         {
             var keys = kv.Value;
@@ -227,6 +348,14 @@ static class NvShadowPlayHelper
                 Log("[hk] ข้าม " + kv.Key + " (ต้องมี modifier) keys=" + string.Join(",", keys));
                 continue;
             }
+            // Never mistake our own duplicate shortcut for an external NVIDIA conflict.
+            // Do not synthesize a Shift fallback for a collision inside our settings.
+            ulong chord = ((ulong)mods << 32) | vk;
+            if (!usedChords.Add(chord))
+            {
+                Log("[hk] duplicate internal shortcut ignored: " + kv.Key);
+                continue;
+            }
             int id = _nextId++;
             uint hotkeyFlags = mods | MOD_NOREPEAT;
             if (RegisterHotKey(IntPtr.Zero, id, hotkeyFlags, vk))
@@ -246,6 +375,7 @@ static class NvShadowPlayHelper
                 {
                     Registered[id] = Tuple.Create(kv.Key, shifted, vk);
                     UpgradableKeys[kv.Key] = Tuple.Create(mods, vk);   // เก็บ mods หลัก (Alt) — upgrade จะได้ Alt+X จริง
+                    FailedKeys.Remove(kv.Key);
                     Log("[hk] " + kv.Key + " ชนกับแท้ → fallback = +Shift (id " + id + ")");
                 }
                 else {
@@ -260,8 +390,14 @@ static class NvShadowPlayHelper
 
     static void WatchSettings()
     {
+        // Settings can be created after the helper starts. Keep default hotkeys
+        // working instead of crashing when the NodeAPI directory is absent.
+        var directory = Path.GetDirectoryName(SettingsPath);
+        if (_settingsWatcher != null || !Directory.Exists(directory)) return;
+        try
+        {
         // Keep a strong reference for the lifetime of the message loop.
-        _settingsWatcher = new FileSystemWatcher(Path.GetDirectoryName(SettingsPath), "*")
+        _settingsWatcher = new FileSystemWatcher(directory, "*")
         {
             NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size |
                 NotifyFilters.FileName | NotifyFilters.CreationTime
@@ -284,6 +420,13 @@ static class NvShadowPlayHelper
             Interlocked.Exchange(ref _settingsChangedAt, Environment.TickCount64);
         };
         _settingsWatcher.EnableRaisingEvents = true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            _settingsWatcher?.Dispose();
+            _settingsWatcher = null;
+            Log("[settings] file watcher unavailable; periodic probe remains active: " + ex.Message);
+        }
     }
 
     static void ProbeSettings()
@@ -292,6 +435,7 @@ static class NvShadowPlayHelper
         // Only stat here; parse settings when a change was actually observed.
         if (Environment.TickCount64 - _lastSettingsProbe < 500) return;
         _lastSettingsProbe = Environment.TickCount64;
+        if (_settingsWatcher == null) WatchSettings();
         try
         {
             var info = new FileInfo(SettingsPath);
@@ -320,21 +464,32 @@ static class NvShadowPlayHelper
         GC.KeepAlive(single);
 
         LoadConfig();
-        if (timeBeginPeriod(1) != 0)
-            Log("[hotkey] warning: could not set 1ms timer resolution");
+        var initialMonitor = ReadMonitorEnabled();
+        if (initialMonitor.HasValue)
+            Interlocked.Exchange(ref _monitorDesired, initialMonitor.Value ? 1 : 0);
+        StartDispatcher();
+        StartMonitorProbe();
 
-        // Watch the settings file before registering so an update during startup
-        // cannot be missed. Saves are atomic, so listen for replacement as well.
+        // Watch settings before registering, including atomic replacement.
         WatchSettings();
-        RegisterAll();
+        if (Volatile.Read(ref _monitorDesired) == 0)
+        {
+            _monitorRegistered = false;
+            Log("[monitor] started inside shortcuts editor; hotkeys not registered");
+        }
+        else RegisterAll();
 
         var m = new MSG();
         while (true)
         {
+            // Win32 registrations are owned by this thread; release them for the
+            // entire keyboard-shortcut editor lifetime so its key capture sees Alt+Z.
+            SyncMonitorState();
             // Peek (ไม่บล็อก) — เพื่อเช็คธง re-register สม่ำเสมอ
             while (PeekMessageW(out m, IntPtr.Zero, 0, 0, 1) != 0)
             {
                 if (m.message != WM_HOTKEY) continue;
+                if (!_monitorRegistered || Volatile.Read(ref _monitorDesired) == 0) continue;
                 int id = m.wParam.ToInt32();
                 if (!Registered.TryGetValue(id, out var info)) continue;
                 string name = info.Item1;
@@ -342,24 +497,24 @@ static class NvShadowPlayHelper
                 _lastHotkeyMessage[canonical] = Environment.TickCount64;
                 if (_awaitingKeyRelease.ContainsKey(canonical)) continue;
                 _awaitingKeyRelease[canonical] = info.Item3;
-                var n = canonical;
-                var hotkeyName = name;
-                ThreadPool.QueueUserWorkItem(delegate
+                if (canonical == "overlayfocus")
                 {
-                    if (n == "overlayfocus")
-                    {
-                        var window = GetForegroundWindow();
-                        GetWindowThreadProcessId(window, out var pid);
-                        var title = new StringBuilder(512);
-                        GetWindowText(window, title, title.Capacity);
-                        string executable = "";
-                        try { using var process = System.Diagnostics.Process.GetProcessById((int)pid); executable = process.ProcessName; } catch { }
-                        Post("http://127.0.0.1:59011/Duluka/v.1.0/GameFilter/Focus", JsonSerializer.Serialize(new { pid, executable, title = title.ToString() }));
-                        return;
-                    }
-                    Log("[hotkey] " + hotkeyName + " (" + n + ") -> fire");
-                    if (_fireUrl.Length > 0) Post(_fireUrl.Replace("{name}", n));
-                });
+                    // Snapshot foreground identity at keypress time, not after an HTTP delay.
+                    var window = GetForegroundWindow();
+                    GetWindowThreadProcessId(window, out var pid);
+                    var title = new StringBuilder(512);
+                    GetWindowText(window, title, title.Capacity);
+                    string executable = "";
+                    try { using var process = System.Diagnostics.Process.GetProcessById((int)pid); executable = process.ProcessName; } catch { }
+                    EnqueuePost("http://127.0.0.1:59011/Duluka/v.1.0/GameFilter/Focus",
+                        JsonSerializer.Serialize(new { pid, executable, title = title.ToString() }));
+                }
+                else
+                {
+                    Log("[hotkey] " + name + " (" + canonical + ") -> queued");
+                    if (!string.IsNullOrEmpty(_fireUrl))
+                        EnqueuePost(_fireUrl.Replace("{name}", Uri.EscapeDataString(canonical)));
+                }
             }
             var released = new System.Collections.Generic.List<string>();
             foreach (var pending in _awaitingKeyRelease)
@@ -370,7 +525,7 @@ static class NvShadowPlayHelper
                 if (keyUp && queueQuiet) released.Add(pending.Key);
             }
             foreach (var key in released) _awaitingKeyRelease.Remove(key);
-            if ((FailedKeys.Count > 0 || UpgradableKeys.Count > 0) && Environment.TickCount64 - _lastRetry > 10000) {
+            if (_monitorRegistered && (FailedKeys.Count > 0 || UpgradableKeys.Count > 0) && Environment.TickCount64 - _lastRetry > 10000) {
                 _lastRetry = Environment.TickCount64;
                 // Try upgrading to the primary key while preserving the active fallback.
                 var ups = new Dictionary<string, Tuple<uint, uint>>(UpgradableKeys);
@@ -420,13 +575,17 @@ static class NvShadowPlayHelper
                     continue;
                 }
                 var signature = HotkeySignature(keys);
-                if (!string.Equals(signature, _registeredHotkeySignature, StringComparison.Ordinal))
+                if (_monitorRegistered && Volatile.Read(ref _monitorDesired) != 0 &&
+                    !string.Equals(signature, _registeredHotkeySignature, StringComparison.Ordinal))
                 {
                     Log("[hk] hotkey settings changed — re-register immediately");
                     RegisterAll(keys);
                 }
             }
-            Thread.Sleep(1);
+            // Wait for OS messages without polling 1,000 times/sec or forcing 1ms system timers.
+            // File changes and retry scheduling are checked at least every 15ms.
+            if (MsgWaitForMultipleObjectsEx(0, IntPtr.Zero, 15, QS_ALLINPUT, MWMO_INPUTAVAILABLE) == WAIT_FAILED)
+                Thread.Sleep(15);
         }
     }
 

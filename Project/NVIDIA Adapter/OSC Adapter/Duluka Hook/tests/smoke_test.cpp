@@ -1,4 +1,4 @@
-#include <windows.h>
+﻿#include <windows.h>
 #include <d3d11.h>
 #include <d3d11_1.h>
 #include <dxgi.h>
@@ -12,8 +12,11 @@
 #include <string>
 #include <vector>
 #include "../include/osc_frame_bridge.h"
+#include "../include/d3d11_timing_diagnostics.h"
 
 using GetAdapterStatus = BOOL(WINAPI *)(std::uint64_t *, BOOL *);
+using GetD3D11Timing = BOOL(WINAPI *)(
+    duluka::d3d11_timing::Snapshot *, std::uint32_t);
 using GetResizeStatus = BOOL(WINAPI *)(std::uint64_t *);
 using GetOverlayStatus = BOOL(WINAPI *)(std::uint64_t *, BOOL *, BOOL *, long *);
 using PresentFunction = HRESULT(STDMETHODCALLTYPE *)(IDXGISwapChain *, UINT, UINT);
@@ -512,7 +515,9 @@ int wmain(int argc, wchar_t **argv)
         GetProcAddress(adapter, "NvOscAdapterGetResizeStatus"));
     auto getOverlayStatus = reinterpret_cast<GetOverlayStatus>(
         GetProcAddress(adapter, "NvOscAdapterGetOverlayStatus"));
-    if (!getStatus || !getResizeStatus || !getOverlayStatus)
+    auto getD3D11Timing = reinterpret_cast<GetD3D11Timing>(
+        GetProcAddress(adapter, "NvOscAdapterGetD3D11TimingSnapshot"));
+    if (!getStatus || !getResizeStatus || !getOverlayStatus || !getD3D11Timing)
     {
         std::cerr << "Adapter status exports are missing.\n";
         return 4;
@@ -808,6 +813,7 @@ int wmain(int argc, wchar_t **argv)
     for (int frame = 0; frame < 5; ++frame)
     {
         constexpr float clearColor[4] = { 0, 0, 0, 1 };
+        context->OMSetRenderTargets(1, &backBufferView, nullptr);
         context->ClearRenderTargetView(backBufferView, clearColor);
         result = swapChain->Present(0, 0);
         if (FAILED(result))
@@ -1099,6 +1105,27 @@ int wmain(int argc, wchar_t **argv)
     DestroyWindow(window);
     UnregisterClassW(WindowClassName, windowClass.hInstance);
 
+    // Poll once from the test control thread, NEVER from a hook callback.
+    duluka::d3d11_timing::Snapshot snapshot{};
+    if (getD3D11Timing(nullptr, sizeof(snapshot)) ||
+        getD3D11Timing(&snapshot, sizeof(snapshot)-1) ||
+        !getD3D11Timing(&snapshot, sizeof(snapshot)) ||
+        snapshot.size != sizeof(snapshot) ||
+        snapshot.version != duluka::d3d11_timing::Version ||
+        snapshot.presentCallbacks < count ||
+        snapshot.overlayDraws < overlayDrawCount ||
+        snapshot.gamePresentSamples == 0 ||
+        snapshot.overlayCallbackSamples == 0 ||
+        (overlayDrawCount > 0 && snapshot.backBufferRtvReused == 0))
+    {
+        std::cerr << "D3D11 off-render-thread timing snapshot validation failed.\n";
+        return 29;
+    }
+    std::cout << "PASS D3D11 timing snapshot: copies=" << snapshot.overlayCacheCopies
+        << " rtvCreated=" << snapshot.backBufferRtvCreated
+        << " rtvReused=" << snapshot.backBufferRtvReused
+        << " overlayMaxTicks=" << snapshot.overlayCallbackMaxTicks
+        << " gamePresentMaxTicks=" << snapshot.gamePresentMaxTicks << ".\n";
     FreeLibrary(adapter);
     std::cout << "PASS: hooked " << count << " Presents and composited "
         << overlayDrawCount << " shared-texture frames.\n";

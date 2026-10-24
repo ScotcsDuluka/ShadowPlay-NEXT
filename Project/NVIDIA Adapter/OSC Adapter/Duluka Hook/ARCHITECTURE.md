@@ -1,5 +1,7 @@
 ﻿# Duluka Hook — API-specific architecture
 
+**Role: Hook Engine (Duluka Hook).** The managed OSC Adapter Host / Controller now lives one directory higher, in `../NVIDIA OSC Adapter Host.csproj`. This directory owns only the native Hook/Renderer, ABI contracts, and native tests. The deployed DLL name and exports remain unchanged.
+
 ## Goal
 
 Each graphics API has an independent Hook path and Renderer path. Detection must identify the API actually used by a running process and report confidence/evidence; it must not infer support from a game name or executable name alone.

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Win32.SafeHandles;
@@ -12,7 +13,9 @@ internal sealed record GameMatch(
     string GameId,
     string DisplayName,
     string CatalogVersion,
-    DateTime MatchedUtc);
+    DateTime MatchedUtc,
+    IReadOnlyList<string> RenderApis,
+    string MatchMethod);
 
 internal sealed class GameWatcher : IDisposable
 {
@@ -40,7 +43,9 @@ internal sealed class GameWatcher : IDisposable
         string GameId,
         string DisplayName,
         string Reason,
-        string CatalogVersion);
+        string CatalogVersion,
+        IReadOnlyList<string> RenderApis,
+        string MatchMethod);
 
     private readonly object _sync = new();
     private readonly ApplicationOntologyClient _ontology;
@@ -58,6 +63,7 @@ internal sealed class GameWatcher : IDisposable
     private HashSet<string> _catalogExecutableNames = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<int, GameMatch> _matchedProcesses = new();
     private string _catalogVersion = "";
+    private string _catalogIdentityFingerprint = "";
     private int _catalogGameCount;
     private bool _catalogReady;
     private bool _catalogReachable;
@@ -177,18 +183,22 @@ internal sealed class GameWatcher : IDisposable
 
                 if (_enabled && _catalogReady && _catalogGameCount > 0 && _catalogExecutableNames.Count > 0)
                 {
+                    // Pin-based identity verification must be per process image,
+                    // never cached under a shared executable basename.
+                    var liveSignatures = candidates.Values.Select(x => x.Signature)
+                        .ToHashSet(StringComparer.Ordinal);
+                    foreach (var stale in _resolutionCache.Keys.Where(x => !liveSignatures.Contains(x)).ToArray())
+                        _resolutionCache.Remove(stale);
                     var toResolve = candidates.Values
-                        .Where(candidate => !_resolutionCache.ContainsKey(candidate.ExecutableName))
-                        .GroupBy(candidate => candidate.ExecutableName, StringComparer.OrdinalIgnoreCase)
-                        .Select(group => group.First())
+                        .Where(candidate => !_resolutionCache.ContainsKey(candidate.Signature))
                         .ToArray();
 
                     if (toResolve.Length > 0)
-                        ResolveCandidates(toResolve);
+                        await ResolveCandidatesAsync(toResolve, cancellationToken).ConfigureAwait(false);
 
                     foreach (var candidate in candidates.Values)
                     {
-                        if (!_resolutionCache.TryGetValue(candidate.ExecutableName, out var resolution) ||
+                        if (!_resolutionCache.TryGetValue(candidate.Signature, out var resolution) ||
                             !resolution.Matched)
                             continue;
 
@@ -204,10 +214,13 @@ internal sealed class GameWatcher : IDisposable
                             resolution.GameId,
                             resolution.DisplayName,
                             resolution.CatalogVersion,
-                            DateTime.UtcNow);
+                            DateTime.UtcNow,
+                            resolution.RenderApis,
+                            resolution.MatchMethod);
                         _matchedProcesses[candidate.ProcessId] = match;
                         _log("[game-watcher] matched " + match.DisplayName + " (" + match.GameId +
-                            ") PID=" + match.ProcessId + " via executableName");
+                            ") PID=" + match.ProcessId + " via " + match.MatchMethod +
+                            " renderApis=" + string.Join(",", match.RenderApis));
                         _oscAdapter.StartForGame(match);
                     }
                 }
@@ -242,9 +255,20 @@ internal sealed class GameWatcher : IDisposable
     {
         if (snapshot.Ready)
         {
+            // The same catalog version may contain corrected hashes or render
+            // APIs. Invalidate previous identity decisions on any such change.
+            var identityFingerprint = JsonSerializer.Serialize(snapshot.Games
+                .OrderBy(x => x.GameId, StringComparer.Ordinal)
+                .Select(x => new {
+                    x.GameId, x.DisplayName,
+                    Names = x.ExecutableNames.OrderBy(v => v, StringComparer.OrdinalIgnoreCase),
+                    Apis = x.RenderApis.OrderBy(v => v, StringComparer.Ordinal),
+                    Hashes = x.Sha256.OrderBy(v => v, StringComparer.OrdinalIgnoreCase)
+                }));
             var catalogChanged =
                 !string.Equals(previousVersion, snapshot.CatalogVersion, StringComparison.Ordinal) ||
-                !previousNames.SetEquals(snapshot.ExecutableNames);
+                !previousNames.SetEquals(snapshot.ExecutableNames) ||
+                !string.Equals(_catalogIdentityFingerprint, identityFingerprint, StringComparison.Ordinal);
             if (catalogChanged)
             {
                 if (previousVersion.Length > 0)
@@ -255,6 +279,7 @@ internal sealed class GameWatcher : IDisposable
                     _log("[game-watcher] catalog changed; cleared cached game identity decisions");
                 }
                 previousVersion = snapshot.CatalogVersion;
+                _catalogIdentityFingerprint = identityFingerprint;
                 previousNames = new HashSet<string>(
                     snapshot.ExecutableNames, StringComparer.OrdinalIgnoreCase);
             }
@@ -352,23 +377,55 @@ internal sealed class GameWatcher : IDisposable
         return !string.IsNullOrWhiteSpace(executablePath);
     }
 
-    private void ResolveCandidates(IReadOnlyList<ObservedProcess> candidates)
+    private async Task ResolveCandidatesAsync(IReadOnlyList<ObservedProcess> candidates,
+        CancellationToken cancellationToken)
     {
         foreach (var candidate in candidates)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var resolution = _ontology.ResolveExecutable(candidate.ExecutableName);
             if (resolution == null)
             {
                 _lastError = "Local game catalog is unavailable.";
                 continue;
             }
-            _resolutionCache[candidate.ExecutableName] = new CachedResolution(
+
+            if (!resolution.Matched && resolution.Reason == "hash_required")
+            {
+                // Only hash allowlisted processes with a pinned SHA-256. No
+                // hashing every scan; this signature is cached for its lifetime.
+                // Never fall back to basename if the hash fails to verify.
+                try
+                {
+                    var info = new FileInfo(candidate.ExecutablePath);
+                    if (info.Length > 0 && info.Length <= 512L * 1024 * 1024)
+                    {
+                        await using var stream = new FileStream(candidate.ExecutablePath,
+                            FileMode.Open, FileAccess.Read,
+                            FileShare.ReadWrite | FileShare.Delete, 81920,
+                            FileOptions.Asynchronous | FileOptions.SequentialScan);
+                        var digest = await SHA256.HashDataAsync(stream, cancellationToken)
+                            .ConfigureAwait(false);
+                        resolution = _ontology.ResolveExecutable(candidate.ExecutableName,
+                            Convert.ToHexString(digest));
+                    }
+                    else
+                        _log("[game-watcher] pinned image skipped: size invalid or exceeds 512 MiB");
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+                {
+                    _log("[game-watcher] pinned image could not be verified: " + ex.GetType().Name);
+                }
+            }
+
+            _resolutionCache[candidate.Signature] = new CachedResolution(
                 resolution.Matched, resolution.GameId, resolution.DisplayName,
-                resolution.Reason, resolution.CatalogVersion);
-            if (!resolution.Matched &&
-                string.Equals(resolution.Reason, "ambiguous", StringComparison.Ordinal))
-                _log("[game-watcher] catalog executable name is ambiguous: " +
-                    candidate.ExecutableName);
+                resolution.Reason, resolution.CatalogVersion,
+                resolution.RenderApis, resolution.MatchMethod);
+            if (!resolution.Matched && resolution.Reason != "not_found")
+                _log("[game-watcher] skipped unverifiable identity " + candidate.ExecutableName +
+                    " reason=" + resolution.Reason);
         }
     }
 
@@ -418,7 +475,10 @@ internal sealed class GameWatcher : IDisposable
                     gameId = match.GameId,
                     displayName = match.DisplayName,
                     catalogVersion = match.CatalogVersion,
-                    matchedUtc = match.MatchedUtc
+                    matchedUtc = match.MatchedUtc,
+                    renderApis = match.RenderApis,
+                    matchMethod = match.MatchMethod,
+                    identityVerified = match.MatchMethod == "sha256"
                 }).ToArray(),
                 catalogError = _publishedCatalogError,
                 lastError = _publishedLastError
@@ -475,7 +535,10 @@ internal sealed class GameWatcher : IDisposable
                     gameId = match.GameId,
                     displayName = match.DisplayName,
                     catalogVersion = match.CatalogVersion,
-                    matchedUtc = match.MatchedUtc
+                    matchedUtc = match.MatchedUtc,
+                    renderApis = match.RenderApis,
+                    matchMethod = match.MatchMethod,
+                    identityVerified = match.MatchMethod == "sha256"
                 }).ToArray(),
                 lastCatalogRefreshUtc = _publishedLastCatalogRefreshUtc,
                 lastScanUtc = _publishedLastScanUtc,

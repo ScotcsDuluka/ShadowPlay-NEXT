@@ -96,7 +96,10 @@ test('initial public observation establishes baseline; next version shows exactl
     await h.poll();
     assert.equal(h.notifications.length, 1);
     assert.equal(h.notifications[0].message, 'nv-ontology catalog update available');
-    assert.match(h.notifications[0].opts.subtext, /Catalog v1\.2\.6.*v1\.2\.7 · 7 games/);
+    assert.equal(h.notifications[0].opts.subtext, 'Update to v1.2.7');
+    assert.equal(h.notifications[0].opts.icon, '\uE91E');
+    assert.equal(h.notifications[0].opts.iconPath, undefined);
+    assert.equal(h.notifications[0].opts.positive, true);
     assert.equal(h.notifications[0].opts.priority, true);
     assert.equal(JSON.parse(h.storage.get(STORAGE_KEY)).lastNotifiedVersion, '1.2.7');
     await h.poll();
@@ -111,7 +114,7 @@ test('older local GameWatcher catalog triggers a notification on first public ch
     h.handlers['nv-ontology-local-catalog-version']('1.2.5');
     await h.firstPoll();
     assert.equal(h.notifications.length, 1);
-    assert.match(h.notifications[0].opts.subtext, /1\.2\.5.*1\.2\.6/);
+    assert.equal(h.notifications[0].opts.subtext, 'Update to v1.2.6');
 });
 
 test('blocked notifier slot is retried without losing update', async () => {
@@ -158,15 +161,45 @@ test('English is the primary catalog update language', async () => {
     h.setPayload({ catalogVersion: '1.2.7', gameCount: 7 });
     await h.poll();
     assert.equal(h.notifications[0].message, 'nv-ontology catalog update available');
-    assert.equal(h.notifications[0].opts.subtext, 'Catalog v1.2.6 → v1.2.7 · 7 games');
+    assert.equal(h.notifications[0].opts.subtext, 'Update to v1.2.7');
 });
 
-test('Thai locale translates title, catalog label and game count', async () => {
+test('Thai locale translates the update title and new version', async () => {
     const thai = readLocale('th-TH.json');
     const h = harness(new Map(), thai);
     await h.firstPoll();
     h.setPayload({ catalogVersion: '1.2.7', gameCount: 7 });
     await h.poll();
     assert.equal(h.notifications[0].message, 'มีอัปเดตแค็ตตาล็อก nv-ontology');
-    assert.equal(h.notifications[0].opts.subtext, 'แค็ตตาล็อก v1.2.6 → v1.2.7 · 7 เกม');
+    assert.equal(h.notifications[0].opts.subtext, 'อัปเดตเป็น v1.2.7');
+});
+
+test('other OSC languages gracefully fall back to English, never raw l10n keys', async () => {
+    const german = readLocale('de-DE.json');
+    const h = harness(new Map(), german);
+    await h.firstPoll();
+    h.setPayload({ catalogVersion: '1.2.7', gameCount: 6 });
+    await h.poll();
+    assert.equal(h.notifications.length, 1);
+    assert.equal(h.notifications[0].message, 'nv-ontology catalog update available');
+    assert.equal(h.notifications[0].opts.subtext, 'Update to v1.2.7');
+    assert.equal(h.notifications[0].opts.icon, '\uE91E');
+    assert.equal(h.notifications[0].opts.positive, true);
+});
+
+test('ontology Toast never prints previous version, arrow or game count', async () => {
+    const thai = readLocale('th-TH.json');
+    const h = harness(new Map(), thai);
+    await h.firstPoll();
+    h.setPayload({ catalogVersion: '1.2.7', gameCount: 6 });
+    await h.poll();
+    assert.equal(h.notifications.length, 1);
+    assert.deepEqual([
+        h.notifications[0].message,
+        h.notifications[0].opts.subtext
+    ], [
+        'มีอัปเดตแค็ตตาล็อก nv-ontology',
+        'อัปเดตเป็น v1.2.7'
+    ]);
+    assert.doesNotMatch(h.notifications[0].opts.subtext, /→|->|1\.2\.6|เกม|games|catalog/);
 });

@@ -29,7 +29,7 @@
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
-      <AdditionalIncludeDirectories>$(ProjectDir)include\reshade-api-v3;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)include\reshade-api-v3;$(ProjectDir)third_party\minhook\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
@@ -48,8 +48,17 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="src\Hook\D3D11\D3D11Hook.cpp" />
+    <ClCompile Include="third_party\minhook\src\hook.c" />
+    <ClCompile Include="third_party\minhook\src\buffer.c" />
+    <ClCompile Include="third_party\minhook\src\trampoline.c" />
+    <ClCompile Include="third_party\minhook\src\hde\hde32.c">
+      <ExcludedFromBuild Condition="'$(Platform)'=='x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="third_party\minhook\src\hde\hde64.c">
+      <ExcludedFromBuild Condition="'$(Platform)'=='Win32'">true</ExcludedFromBuild>
+    </ClCompile>    <ClCompile Include="src\Hook\D3D11\D3D11Hook.cpp" />
     <ClCompile Include="src\Hook\D3D9\D3D9Hook.cpp" />
+    <ClCompile Include="src\Hook\D3D9\D3D9ExGpuMailbox.cpp" />
     <ClCompile Include="src\Renderer\D3D9\D3D9Renderer.cpp" />
     <ClCompile Include="src\Renderer\D3D11\D3D11Renderer.cpp" />
     <ClCompile Include="src\Renderer\D3D11\D3D11SharedTextureRelay.cpp" />

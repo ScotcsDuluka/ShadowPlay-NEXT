@@ -18,7 +18,10 @@
     "$note": "Initial DXGI shared-texture compositor. Keep disabled until controlled-app compatibility and safe detach behavior are reviewed.",
     "executable": "NVIDIA Adapter\\NVIDIA OSC Adapter.exe",
     "workingDirectory": "NVIDIA Adapter",
-    "stopGraceSeconds": 3
+    "stopGraceSeconds": 3,
+    "enableDx9AutoHook": false,
+    "dx9TestTargets": [],
+    "$dx9_note": "Disabled by default. DX9 uses SHA-256 unless explicit development allowUnverifiedIdentity override; upgraded x64/x86 Host and native compatibility still required."
   },
   "testMode": {
     "enabled": true,
@@ -27,7 +30,9 @@
   "captureRuntime": {
     "enabled": true,
     "apiPort": 59077,
-    "$note": "NvContainer starts NvCapture.exe headless. Manual recording uses the live NodeAPI state route; no recording starts until requested."
+    "allowDisplayCommands": false,
+    "allowScreenshotCommands": false,
+    "$note": "Capture display selection and screenshot gateway commands are opt-in, after authenticated IPC and NvCapture API version checks."
   },
   "buildRoot": ".",
   "children": {
@@ -46,7 +51,6 @@
   },
   "pairing": {
     "port": 59001,
-    "secret": "0CA906D2784F0D14E399874F5C5ED4A1",
     "eventName": "Global\\{1E6C4F0F-8ABF-4709-AAAD-0341CF2D44A7}-Duluka",
     "mapName": "{8BA1E16C-FC54-4595-9782-E370A5FBE8DA}-Duluka"
   },

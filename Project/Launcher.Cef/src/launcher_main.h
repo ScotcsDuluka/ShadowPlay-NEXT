@@ -8,6 +8,7 @@
 
 struct LauncherLaunchParams {
   std::string url;            // page to load (http://127.0.0.1:<port>/index.html)
+  std::string trusted_url;    // ONLY Launcher-hosted page may use privileged CEF RPC
   bool show_window = true;    // --hidden suppresses
   bool supervise = true;      // --no-supervise (smoke/proof runs)
   bool gpu_accel = true;      // NVIDIA Share.json nv-gpu-accel parity switch

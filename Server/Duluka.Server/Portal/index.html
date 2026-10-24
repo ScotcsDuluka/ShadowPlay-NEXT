@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="ShadowPlay NEXT Duluka Account staging tester portal.">
+  <title>Duluka Account | ShadowPlay NEXT</title>
+  <link rel="stylesheet" href="/portal/app.css">
+  <script src="/portal/app.js" defer></script>
+</head>
+<body>
+  <div class="background-grid" aria-hidden="true"></div>
+  <div class="page">
+    <header class="site-header">
+      <a class="brand" href="/portal" aria-label="Duluka Account home">
+        <span class="brand-mark" aria-hidden="true">N</span>
+        <span class="brand-copy"><strong>SHADOWPLAY <b>NEXT</b></strong><small>DULUKA ACCOUNT</small></span>
+      </a>
+      <span class="environment"><span class="led"></span> STAGING ENVIRONMENT</span>
+    </header>
+
+    <main>
+      <section class="hero">
+        <p class="eyebrow">TESTER ACCESS / BUILD PREVIEW</p>
+        <h1>One account.<br><span>More ways to play.</span></h1>
+        <p class="hero-sub">Create a test account, sign in with a username, and check your CBT1 application status. This is a temporary test environment, not the production account service.</p>
+        <div class="hero-tags" aria-label="Key features">
+          <span>USERNAME SIGN-IN</span><span>DEVICE SESSION</span><span>CBT1 ACCESS</span>
+        </div>
+      </section>
+
+      <section class="workspace" aria-label="Duluka account and CBT1">
+        <div class="surface account-surface">
+          <div class="surface-head"><span class="section-number">01 / ACCOUNT</span><span class="pill" id="account-state">NOT SIGNED IN</span></div>
+          <div id="auth-panel">
+            <h2>Welcome to Duluka.</h2>
+            <p class="supporting">Sign in or create a temporary tester account.</p>
+            <div class="switcher" role="group" aria-label="Account action">
+              <button type="button" id="show-login" class="switch active" aria-pressed="true">Sign in</button>
+              <button type="button" id="show-register" class="switch" aria-pressed="false">Create account</button>
+            </div>
+            <form id="login-form" class="auth-form">
+              <label for="login-username">Username</label>
+              <input id="login-username" name="username" type="text" required autocomplete="username" minlength="3" maxlength="32" pattern="[A-Za-z0-9._-]{3,32}" placeholder="Your username">
+              <label for="login-password">Password</label>
+              <input id="login-password" name="password" type="password" required autocomplete="current-password" minlength="8" maxlength="128" placeholder="Your password">
+              <button class="action" type="submit">SIGN IN <span aria-hidden="true">↗</span></button>
+            </form>
+            <form id="register-form" class="auth-form" hidden>
+              <label for="register-username">Choose a username</label>
+              <input id="register-username" name="username" type="text" required autocomplete="username" minlength="3" maxlength="32" pattern="[A-Za-z0-9._-]{3,32}" placeholder="3–32 letters, numbers, . _ -">
+              <label for="register-password">Choose a password</label>
+              <input id="register-password" name="password" type="password" required autocomplete="new-password" minlength="8" maxlength="128" placeholder="8–128 characters">
+              <button class="action" type="submit">CREATE TEST ACCOUNT <span aria-hidden="true">↗</span></button>
+            </form>
+          </div>
+          <div id="signed-in-panel" hidden>
+            <h2>Access granted.</h2>
+            <p class="supporting">Currently signed in as</p>
+            <div class="signed-user" id="current-username">—</div>
+            <p class="small-notice">This session belongs to your current browser tab. Test accounts may be deleted when staging restarts.</p>
+            <button class="secondary" id="sign-out" type="button">SIGN OUT</button>
+          </div>
+          <p id="auth-message" class="message" role="status" aria-live="polite"></p>
+        </div>
+
+        <div class="surface cbt-surface">
+          <div class="surface-head"><span class="section-number">02 / CLOSED BETA</span><span class="pill" id="cbt-state">CHECKING</span></div>
+          <h2>CBT1 Applications</h2>
+          <p class="supporting">Apply to test ShadowPlay NEXT. You must sign in before submitting an application.</p>
+          <div class="phase"><div class="phase-icon">01</div><div><strong>Closed Beta Test 1</strong><small id="cbt-explanation">Checking application availability…</small></div></div>
+          <div id="application-summary" class="application-summary" hidden>
+            <span>YOUR APPLICATION</span><strong id="application-decision">PENDING</strong><p id="application-description"></p>
+          </div>
+          <form id="apply-form" class="apply-form" hidden>
+            <label for="app-alias">Display name</label>
+            <input id="app-alias" name="alias" maxlength="40" required placeholder="Your test nickname">
+            <label for="app-email">Email address</label>
+            <input id="app-email" name="email" type="email" maxlength="254" required autocomplete="email" placeholder="example@example.com">
+            <div class="form-pair">
+              <div><label for="app-windows">Windows</label><select id="app-windows" name="windowsVersion" required><option value="Windows 11">Windows 11</option><option value="Windows 10">Windows 10</option></select></div>
+              <div><label for="app-gpu">GPU</label><select id="app-gpu" name="gpuVendor" required><option value="NVIDIA">NVIDIA</option><option value="AMD">AMD</option><option value="Intel">Intel</option><option value="Mixed">Mixed</option><option value="Other">Other</option></select></div>
+            </div>
+            <label for="app-focus">Testing focus</label>
+            <select id="app-focus" name="testingFocus" required>
+              <option>Overlay</option><option>Capture</option><option>GPU Profiles</option><option>DX9 Hook</option><option>UI</option><option>General</option>
+            </select>
+            <label for="app-notes">Notes (optional)</label>
+            <textarea id="app-notes" name="notes" maxlength="500" rows="3" placeholder="Tell us what you want to test"></textarea>
+            <div class="honeypot" aria-hidden="true"><label for="app-website">Website</label><input id="app-website" name="website" type="text" autocomplete="off" tabindex="-1"></div>
+            <label class="check-label"><input id="app-consent" name="consent" type="checkbox" required><span>I agree to submit this test application.</span></label>
+            <button class="action" type="submit">SEND APPLICATION <span aria-hidden="true">↗</span></button>
+          </form>
+          <p id="cbt-message" class="message" role="status" aria-live="polite"></p>
+        </div>
+      </section>
+      <aside class="warning-banner"><strong>STAGING ONLY.</strong> Do not reuse an important password or submit sensitive personal information. Public CBT1 applications remain disabled until verified.</aside>
+    </main>
+    <footer><span>DULUKA / SHADOWPLAY NEXT</span><span>EARLY ACCESS PREVIEW · NOT PRODUCTION</span></footer>
+  </div>
+</body>
+</html>

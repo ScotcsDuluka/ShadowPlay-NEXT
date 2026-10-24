@@ -54,6 +54,13 @@ static class NvContainer
     {
         Timeout = TimeSpan.FromMilliseconds(2000)
     };
+    // Separate transport for Capture Gateway. NvCapture POST may take 15-30 seconds;
+    // the 2-second watchdog health client would incorrectly time out those commands.
+    static readonly HttpClient CaptureGatewayHttp = new HttpClient(
+        new HttpClientHandler { UseProxy = false })
+    {
+        Timeout = System.Threading.Timeout.InfiniteTimeSpan
+    };
     static bool NvCaptureMissingPathLogged;
     static bool NvCaptureReadyStateKnown;
     static bool NvCaptureLastReady;
@@ -131,41 +138,43 @@ static class NvContainer
     }
 
     // Diagnostics only. Never starts a recorder or switches the production backend.
-    static object GetCaptureEngineCatalog()
-    {
-        var enabled = CaptureRuntimeEnabled();
-        var ready = enabled && NvCaptureReady();
-        // The policy is intentionally locked. Current configured/active route
-        // comes from the worker, not from guessing which provider the user selected.
-        var worker = enabled ? TryReadCaptureWorkerRoute() : null;
-        return CaptureEngineCatalog.Snapshot(
-            Path.Combine(BuildRoot, "NVIDIA Config", "capture-engines.json"),
-            enabled, ready, worker);
-    }
-
-    static JsonElement? TryReadCaptureWorkerRoute()
+    static CaptureWorkerGateway CaptureHub;
+    static string CapturePolicyPath() => Path.Combine(BuildRoot, "NVIDIA Config", "capture-engines.json");
+    static Dx9TestTarget[] ReadDx9TestTargets()
     {
         try
         {
-            using var response = NvCaptureHealthHttp.GetAsync(
-                "http://127.0.0.1:" + CaptureRuntimeApiPort() + "/engines").GetAwaiter().GetResult();
-            if (!response.IsSuccessStatusCode) return null;
-            using var document = JsonDocument.Parse(
-                response.Content.ReadAsStringAsync().GetAwaiter().GetResult());
-            var root = document.RootElement;
-            if (!root.TryGetProperty("schemaVersion", out var version) ||
-                version.GetInt32() != 2 ||
-                !root.TryGetProperty("readOnly", out var readOnly) ||
-                readOnly.ValueKind != JsonValueKind.True ||
-                !root.TryGetProperty("configured", out _))
-                return null;
-            return root.Clone();
+            var value = C.GetProperty("oscAdapter").GetProperty("dx9TestTargets");
+            if (value.ValueKind != JsonValueKind.Array || value.GetArrayLength() > 8)
+                return Array.Empty<Dx9TestTarget>();
+            var targets = new List<Dx9TestTarget>();
+            foreach (var item in value.EnumerateArray())
+            {
+                if (item.ValueKind != JsonValueKind.Object ||
+                    !item.TryGetProperty("gameId", out var gameId) ||
+                    !item.TryGetProperty("executablePath", out var executablePath) ||
+                    gameId.ValueKind != JsonValueKind.String ||
+                    executablePath.ValueKind != JsonValueKind.String ||
+                    string.IsNullOrWhiteSpace(gameId.GetString()) ||
+                    string.IsNullOrWhiteSpace(executablePath.GetString()) ||
+                    !Path.IsPathFullyQualified(executablePath.GetString()))
+                    return Array.Empty<Dx9TestTarget>();
+                targets.Add(new Dx9TestTarget(gameId.GetString(), executablePath.GetString()));
+            }
+            return targets.ToArray();
         }
-        catch
-        {
-            return null; // Worker may be starting; never manufacture route truth.
-        }
+        catch { return Array.Empty<Dx9TestTarget>(); }
     }
+
+    static object GetCaptureEngineCatalog() => CaptureHub.Engines(CapturePolicyPath());
+    static object GetCaptureWorkerStatus() => CaptureHub.Status();
+    static object GetCaptureContract() => CaptureHub.Contract();
+    static object GetCaptureCapabilities() => CaptureHub.Capabilities(CapturePolicyPath());
+    static (int Status, object Response) GetCaptureDisplays() => CaptureHub.DisplayInventory();
+    static (int Status, object Response) ForwardCaptureDisplayCommand(bool screenshot, JsonElement request) =>
+        CaptureHub.DisplayCommand(screenshot, request);
+    static (int Status, object Response) ForwardCaptureRecordCommand(bool start, JsonElement request) =>
+        CaptureHub.RecordCommand(start, request);
 
     static int CaptureRuntimeApiPort()
     {
@@ -467,59 +476,103 @@ static class NvContainer
     const uint PAGE_READWRITE = 0x04, FILE_MAP_ALL = 0x0F;
     const int SW_RESTORE = 9;
 
-    static void HoldPairing()
+    static bool TryPairing(out JsonElement settings, out string secret)
     {
-        string evName, mapName; int port; string secret;
+        settings = default;
+        secret = null;
         try
         {
-            var p = C.GetProperty("pairing");
-            evName = p.GetProperty("eventName").GetString();
-            mapName = p.GetProperty("mapName").GetString();
-            port = p.GetProperty("port").GetInt32();
-            secret = p.GetProperty("secret").GetString();
+            settings = C.GetProperty("pairing");
+            secret = PairingSecretStore.Resolve(settings);
+            return true;
+        }
+        catch (PairingSecretException ex)
+        {
+            // Only a fixed error code; neither the credential nor a plaintext
+            // legacy JSON value may enter the log.
+            Log("[pairing] unavailable: " + ex.Message);
+            return false;
         }
         catch
         {
-            // ★ coexistence: ชื่อ MMF/event ต้องไม่ซ้ำกับ NVIDIA App แท้ (มันใช้ตัวเดิม)
-            evName = @"Global\{1E6C4F0F-8ABF-4709-AAAD-0341CF2D44A7}-Duluka";
-            mapName = "{8BA1E16C-FC54-4595-9782-E370A5FBE8DA}-Duluka";
-            port = 59001; secret = "0CA906D2784F0D14E399874F5C5ED4A1";
+            Log("[pairing] unavailable: invalid pairing configuration");
+            return false;
         }
-        CreateEventW(IntPtr.Zero, false, false, evName);
-        var map = CreateFileMappingW(new IntPtr(-1), IntPtr.Zero, PAGE_READWRITE, 0, 4096, mapName);
-        if (map == IntPtr.Zero) { Log("[pairing] MMF create failed err=" + Marshal.GetLastWin32Error()); return; }
-        var view = MapViewOfFile(map, FILE_MAP_ALL, 0, 0, 4096);
-        if (view == IntPtr.Zero) { Log("[pairing] map view failed err=" + Marshal.GetLastWin32Error()); return; }
-        var json = Encoding.ASCII.GetBytes("{\"port\":" + port + ",\"secret\":\"" + secret + "\"}");
-        var buf = new byte[4096];
-        Array.Copy(json, buf, json.Length);
-        Marshal.Copy(buf, 0, view, 4096);
-        Log("[pairing] event + MMF held (port " + port + " + secret)");
     }
 
-    // ไม่มี launcher แล้วในโหมด ours — แม่เขียนสัญญาณ wake ให้ node เอง
-    static void WriteNvNodeInit()
+    static void HoldPairing()
     {
+        if (!TryPairing(out var settings, out var secret)) return;
         try
         {
+            var eventName = settings.GetProperty("eventName").GetString();
+            var mapName = settings.GetProperty("mapName").GetString();
+            int port = settings.GetProperty("port").GetInt32();
+            if (string.IsNullOrWhiteSpace(eventName) ||
+                string.IsNullOrWhiteSpace(mapName) || port < 1 || port > 65535)
+            {
+                Log("[pairing] invalid event/mapping configuration");
+                return;
+            }
+            // Legacy NvNode/Share compatibility lane. This mapping still
+            // publishes plaintext to processes allowed to open the MMF.
+            // DPAPI secures persistence, NOT this legacy IPC transport.
+            var info = JsonSerializer.Serialize(new { port, secret });
+            var bytes = Encoding.ASCII.GetBytes(info);
+            if (bytes.Length >= 4096)
+            {
+                Log("[pairing] mapping payload too large");
+                return;
+            }
+            CreateEventW(IntPtr.Zero, false, false, eventName);
+            var map = CreateFileMappingW(new IntPtr(-1), IntPtr.Zero, PAGE_READWRITE, 0, 4096, mapName);
+            if (map == IntPtr.Zero)
+            {
+                Log("[pairing] MMF create failed: " + Marshal.GetLastWin32Error());
+                return;
+            }
+            var view = MapViewOfFile(map, FILE_MAP_ALL, 0, 0, 4096);
+            if (view == IntPtr.Zero)
+            {
+                Log("[pairing] MMF map failed: " + Marshal.GetLastWin32Error());
+                return;
+            }
+            var buffer = new byte[4096];
+            Array.Copy(bytes, buffer, bytes.Length);
+            Marshal.Copy(buffer, 0, view, buffer.Length);
+            Log("[pairing] legacy event and MMF initialized (port " + port + ")");
+        }
+        catch
+        {
+            Log("[pairing] legacy IPC initialization failed");
+        }
+    }
+
+    // NvNode currently consumes a legacy plaintext init file under per-user
+    // LocalAppData. Do not change its transport during a Source-only migration.
+    static void WriteNvNodeInit()
+    {
+        if (!TryPairing(out var settings, out var secret)) return;
+        try
+        {
+            int port = settings.GetProperty("port").GetInt32();
+            if (port < 1 || port > 65535)
+            {
+                Log("[nvnode-init] invalid pairing port");
+                return;
+            }
             string pathRaw = Str("nvnodeInitPath",
                 "%LOCALAPPDATA%\\NVIDIA Corporation\\NvNode\\nvnode-init-duluka.json");
             string path = Environment.ExpandEnvironmentVariables(pathRaw);
-            string secret = "0CA906D2784F0D14E399874F5C5ED4A1";
-            int port = 59001;
-            try
-            {
-                var p = C.GetProperty("pairing");
-                port = p.GetProperty("port").GetInt32();
-                secret = p.GetProperty("secret").GetString();
-            } catch { }
             Directory.CreateDirectory(Path.GetDirectoryName(path));
-            File.WriteAllText(path,
-                "{\"port\":" + port + ",\"secret\":\"" + secret.ToLower() + "\"}",
+            File.WriteAllText(path, JsonSerializer.Serialize(new { port, secret = secret.ToLowerInvariant() }),
                 Encoding.ASCII);
-            Log("[nvnode-init] เขียน " + path);
+            Log("[nvnode-init] legacy init refreshed");
         }
-        catch (Exception ex) { Log("[nvnode-init] FAIL: " + ex.Message); }
+        catch
+        {
+            Log("[nvnode-init] failed to publish legacy init");
+        }
     }
 
     static Process Spawn(string exe, string wd, string args = null)
@@ -808,7 +861,10 @@ static class NvContainer
                 ConfigString("oscAdapter", "executable", @"NVIDIA Adapter\NVIDIA OSC Adapter.exe"),
                 ConfigString("oscAdapter", "workingDirectory", "NVIDIA Adapter"),
                 ConfigInt("oscAdapter", "stopGraceSeconds", 3, 0, 15),
-                Log);
+                Log,
+                ConfigBool("oscAdapter", "allowUnverifiedIdentity", false),
+                ConfigBool("oscAdapter", "enableDx9AutoHook", false),
+                ReadDx9TestTargets());
             GameWatcher = new GameWatcher(
                 ApplicationOntologyClient,
                 OscAdapterLifecycle,
@@ -818,10 +874,17 @@ static class NvContainer
                 PublishGameWatcherStatus,
                 Log);
             GameWatcher.Start();
+            CaptureHub = new CaptureWorkerGateway(CaptureGatewayHttp,
+                CaptureRuntimeApiPort(), CaptureRuntimeEnabled(),
+                ConfigBool("captureRuntime", "allowRecordCommands", false), TestModeEnabled(),
+                ConfigBool("captureRuntime", "allowDisplayCommands", false),
+                ConfigBool("captureRuntime", "allowScreenshotCommands", false));
             TestApi = new ContainerTestApi(TestModeEnabled(), ControlApiPort(), Log,
                 PublishContainerEvents, ObsRuntime, MarkNvGraphicsReady, NvGraphicsStatus,
                 OpenNvGraphics, ApplicationOntologyClient, GameWatcher, OscAdapterLifecycle,
-                GetCaptureEngineCatalog);
+                GetCaptureEngineCatalog, GetCaptureWorkerStatus, GetCaptureCapabilities,
+                ForwardCaptureRecordCommand, GetCaptureDisplays, ForwardCaptureDisplayCommand,
+                GetCaptureContract);
             TestApi.Start();
             Log("[test-api] test mode " + (TestModeEnabled() ? "enabled: capture/filter actions are simulated" : "disabled"));
             HoldPairing();
@@ -912,7 +975,9 @@ static class NvContainer
 
                 EnsureNvGraphics();
                 var nodeApiReady = enabled && NodeApiHealthy(nodeApiPort);
-                if (nodeApiReady) EnsureNvCapture();
+                // Capture is an independent worker. An OSC/UI outage or an intentional
+                // overlay shutdown must not prevent an enabled capture worker from starting.
+                EnsureNvCapture();
                 if (!enabled) continue;
 
                 EnsureRunning(hk, "nvsphelper", Path.GetDirectoryName(hk));

@@ -104,6 +104,74 @@ public sealed class WindowsGpuPreferenceService
             gpuPreference + tail;
     }
 
+
+    /// <summary>Windows selection 0=auto, 1=power saving, 2=high performance.</summary>
+    public static int? ParseWindowsGpuPolicy(string valueData)
+    {
+        if (string.IsNullOrWhiteSpace(valueData)) return null;
+        foreach (var part in valueData.Split(';', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var pair = part.Split('=', 2);
+            if (pair.Length == 2 && pair[0].Trim().Equals("GpuPreference",
+                    StringComparison.OrdinalIgnoreCase) &&
+                int.TryParse(pair[1].Trim(), out var policy) && policy >= 0 && policy <= 2)
+                return policy;
+        }
+        return null;
+    }
+
+    public static string BuildWindowsPolicyValueData(int policy, string existingData = null)
+    {
+        if (policy is < 0 or > 2) throw new ArgumentOutOfRangeException(nameof(policy));
+        var keep = new List<string>();
+        foreach (var part in (existingData ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var pair = part.Split('=', 2);
+            if (pair.Length == 2 &&
+                (pair[0].Trim().Equals("SpecificAdapter", StringComparison.OrdinalIgnoreCase) ||
+                 pair[0].Trim().Equals("GpuPreference", StringComparison.OrdinalIgnoreCase)))
+                continue;
+            keep.Add(part.Trim());
+        }
+        return "GpuPreference=" + policy + ";" +
+               (keep.Count == 0 ? "" : string.Join(";", keep) + ";");
+    }
+
+    /// <summary>Apply Windows performance policy while preserving unrelated app tokens.
+    /// Only user-initiated saves write this registry value.</summary>
+    public PreferenceResult ApplyWindowsPolicy(string appId, int policy)
+    {
+        try
+        {
+            if (policy is < 0 or > 2)
+                return new PreferenceResult { Success = false, Message = "Unsupported Windows GPU policy." };
+            appId = appId?.Trim();
+            if (string.IsNullOrWhiteSpace(appId))
+                return new PreferenceResult { Success = false, Message = "Application ID is required." };
+            var (raw, kind) = _registry.GetValue(KeyPath, appId);
+            if (raw is not null && kind != RegistryValueKind.String)
+                return new PreferenceResult { Success = false, Message = "Entry is not a REG_SZ value." };
+            var newValue = BuildWindowsPolicyValueData(policy, raw as string);
+            _backups.SaveBackup(KeyPath, appId, raw, kind,
+                "apply Windows performance preference " + policy + " for " + appId);
+            _registry.SetValue(KeyPath, appId, newValue, RegistryValueKind.String);
+            var (actual, actualKind) = _registry.GetValue(KeyPath, appId);
+            var success = actualKind == RegistryValueKind.String &&
+                          string.Equals(actual as string, newValue, StringComparison.Ordinal);
+            return new PreferenceResult
+            {
+                Success = success,
+                Message = success ? "Windows GPU policy saved and verified." :
+                                    "Windows GPU policy write could not be verified.",
+                VerifiedValue = actual as string
+            };
+        }
+        catch (Exception ex)
+        {
+            return new PreferenceResult { Success = false, Message = "Could not save GPU policy: " + ex.Message };
+        }
+    }
+
     // ---------- read / apply / remove / restore ----------
 
     /// <summary>Returns the value data for an executable, or null when not configured.
@@ -169,6 +237,58 @@ public sealed class WindowsGpuPreferenceService
         catch (Exception ex)
         {
             return new PreferenceResult { Success = false, Message = $"Could not apply preference: {ex.Message}" };
+        }
+    }
+
+    /// <summary>
+    /// Clear only GPU-selection tokens. Preserve independent Windows graphics
+    /// settings stored alongside them, and remove the value only if nothing remains.
+    /// </summary>
+    public PreferenceResult ResetGpuSelection(string appId)
+    {
+        try
+        {
+            appId = appId?.Trim();
+            if (string.IsNullOrWhiteSpace(appId))
+                return new PreferenceResult { Message = "Application ID is required." };
+            var (raw, kind) = _registry.GetValue(KeyPath, appId);
+            if (raw is null)
+                return new PreferenceResult { Success = true,
+                    Message = "No Windows GPU selection existed." };
+            if (kind != RegistryValueKind.String)
+                return new PreferenceResult { Message = "Cannot reset a non-REG_SZ entry." };
+
+            var preserved = (raw as string ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries)
+                .Where(token =>
+                {
+                    var pair = token.Split('=', 2);
+                    return pair.Length != 2 ||
+                        (!pair[0].Trim().Equals("SpecificAdapter", StringComparison.OrdinalIgnoreCase) &&
+                         !pair[0].Trim().Equals("GpuPreference", StringComparison.OrdinalIgnoreCase));
+                }).ToArray();
+            var next = preserved.Length == 0 ? null : string.Join(";", preserved) + ";";
+            if (string.Equals(next, raw as string, StringComparison.Ordinal))
+                return new PreferenceResult { Success = true,
+                    Message = "This entry has no GPU-selection override.", VerifiedValue = raw as string };
+
+            _backups.SaveBackup(KeyPath, appId, raw, kind, "reset GPU selection for " + appId);
+            if (next is null) _registry.DeleteValue(KeyPath, appId);
+            else _registry.SetValue(KeyPath, appId, next, RegistryValueKind.String);
+            var (actual, actualKind) = _registry.GetValue(KeyPath, appId);
+            var verified = next is null ? actual is null
+                : actualKind == RegistryValueKind.String &&
+                    string.Equals(actual as string, next, StringComparison.Ordinal);
+            return new PreferenceResult
+            {
+                Success = verified,
+                Message = verified ? "GPU selection reset; other Windows graphics settings preserved."
+                                   : "Windows GPU reset did not verify.",
+                VerifiedValue = actual as string
+            };
+        }
+        catch (Exception ex)
+        {
+            return new PreferenceResult { Message = "GPU reset failed: " + ex.Message };
         }
     }
 

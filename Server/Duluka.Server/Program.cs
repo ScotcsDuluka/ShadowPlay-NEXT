@@ -1,6 +1,9 @@
 using System.Threading.RateLimiting;
+using System.Net;
 using System.Text.Json;
 using Duluka.Server.Admin;
+using Duluka.Server.CBT1;
+using Duluka.Server.Portal;
 using Duluka.Server.Auth;
 using Duluka.Server.Data;
 using Duluka.Server.Domain;
@@ -21,11 +24,38 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 // no password/token in plain config).
 builder.Configuration.AddEnvironmentVariables(prefix: "DULUKA_");
 
+// Public API is opt-in; only a loopback proxy may feed it.
+var publicApiMode = builder.Configuration.GetValue<bool>("PublicApi:Enabled");
+var publicProxy = (builder.Configuration["PublicApi:Proxy"] ?? "cloudflare").Trim().ToLowerInvariant();
+var publicHostname = (builder.Configuration["PublicApi:Hostname"] ?? "").Trim().TrimEnd('.');
+if (publicApiMode && publicProxy is not ("cloudflare" or "tailscale"))
+    throw new InvalidOperationException("PublicApi:Proxy must be cloudflare or tailscale.");
+if (publicApiMode && publicProxy == "tailscale" &&
+    (publicHostname.Length > 253 || !publicHostname.EndsWith(".ts.net", StringComparison.OrdinalIgnoreCase)
+     || publicHostname.StartsWith('.') || publicHostname.Contains('/') || publicHostname.Contains(':')))
+    throw new InvalidOperationException("Tailscale public API requires an explicit *.ts.net PublicApi:Hostname.");
+if (publicApiMode)
+{
+    var binds = (builder.Configuration["Urls"] ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    if (binds.Length == 0 || binds.Any(s => !Uri.TryCreate(s, UriKind.Absolute, out var uri)
+        || uri.Scheme != "http" || !IPAddress.TryParse(uri.Host, out var ip) || !IPAddress.IsLoopback(ip)))
+        throw new InvalidOperationException("PublicApi mode requires explicit HTTP loopback-only Urls (e.g. http://127.0.0.1:5115).");
+}
+
+// Bound all JSON requests, including avatar uploads and invalid JSON inputs.
+builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = 1024 * 1024);
+
 builder.Services.AddSingleton<OAuthFlowStore>();
 builder.Services.AddSingleton<GitHubOAuthService>();
 builder.Services.AddSingleton<AccountProvisioningService>();
 builder.Services.AddSingleton<NativeAuthService>();
 builder.Services.AddSingleton<SessionService>();
+builder.Services.AddSingleton<Cbt1Store>();
+// Browser API calls come only from the project's GitHub Pages origin.
+builder.Services.AddCors(options => options.AddPolicy("cbt1-web", policy =>
+    policy.WithOrigins("https://scotcsduluka.github.io")
+          .WithMethods("GET", "POST", "DELETE")
+          .AllowAnyHeader()));
 builder.Services.AddHttpClient("github");
 
 builder.Services.AddSingleton<Database>(sp =>
@@ -35,6 +65,23 @@ builder.Services.AddSingleton<Database>(sp =>
     db.Bootstrap();
     return db;
 });
+
+// Forwarded addresses are accepted ONLY from a loopback ingress in PublicApi mode.
+// Tailscale's proxy explicitly sets X-Forwarded-For; malformed/multi-value
+// addresses are not used for per-client rate-limit partitions.
+static string RateLimitIdentity(HttpContext ctx, bool publicMode, string proxy)
+{
+    if (publicMode && IPAddress.IsLoopback(ctx.Connection.RemoteIpAddress ?? IPAddress.None))
+    {
+        var name = proxy == "tailscale" ? "X-Forwarded-For" : "CF-Connecting-IP";
+        if (ctx.Request.Headers.TryGetValue(name, out var values)
+            && values.Count == 1 && !values[0]!.Contains(',')
+            && IPAddress.TryParse(values[0], out var actual))
+            return actual.ToString();
+        return "unattributed-loopback-proxy";
+    }
+    return ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+}
 
 // Rate-limit boundary (C/6): auth entry points are the abuse surface — a fixed
 // per-IP window on flow starts, a wider window on authenticated API calls.
@@ -56,11 +103,14 @@ builder.Services.AddRateLimiter(options =>
             message = "Too many requests — retry later.",
         }, ct));
     };
+    options.AddPolicy("cbt1-apply", ctx => RateLimitPartition.GetFixedWindowLimiter(
+        RateLimitIdentity(ctx, publicApiMode, publicProxy),
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = 3, Window = TimeSpan.FromHours(1) }));
     options.AddPolicy("auth-start", ctx => RateLimitPartition.GetFixedWindowLimiter(
-        ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        RateLimitIdentity(ctx, publicApiMode, publicProxy),
         _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1) }));
     options.AddPolicy("api", ctx => RateLimitPartition.GetFixedWindowLimiter(
-        ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        RateLimitIdentity(ctx, publicApiMode, publicProxy),
         _ => new FixedWindowRateLimiterOptions { PermitLimit = 240, Window = TimeSpan.FromMinutes(1) }));
 });
 
@@ -71,7 +121,58 @@ builder.Services.AddSingleton(adminLogs);
 builder.Logging.AddProvider(new AdminLogBufferProvider(adminLogs));
 
 var app = builder.Build();
+if (publicApiMode)
+{
+    // Public surface: HTTPS Tailscale/Cloudflare -> trusted loopback proxy.
+    // Never expose operator routes; Host/header rewriting cannot override this.
+    app.Use(async (ctx, next) =>
+    {
+        if (ctx.Request.Path.StartsWithSegments("/admin", StringComparison.OrdinalIgnoreCase)
+            || ctx.Request.Path.StartsWithSegments("/v1/cbt1/admin", StringComparison.OrdinalIgnoreCase))
+        {
+            ctx.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+        if (!IPAddress.IsLoopback(ctx.Connection.RemoteIpAddress ?? IPAddress.None))
+        {
+            ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return;
+        }
+        if (ctx.Request.Path.StartsWithSegments("/healthz", StringComparison.OrdinalIgnoreCase))
+        {
+            await next();
+            return;
+        }
+        var forwardedProto = ctx.Request.Headers["X-Forwarded-Proto"];
+        if (forwardedProto.Count != 1 || !string.Equals(forwardedProto[0], "https", StringComparison.OrdinalIgnoreCase))
+        {
+            ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return;
+        }
+        var ipHeader = ctx.Request.Headers[publicProxy == "tailscale" ? "X-Forwarded-For" : "CF-Connecting-IP"];
+        if (ipHeader.Count != 1 || ipHeader[0]!.Contains(',') || !IPAddress.TryParse(ipHeader[0], out _))
+        {
+            ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return;
+        }
+        if (publicProxy == "tailscale")
+        {
+            // Tailscale Serve/Funnel sets forwarded Host from the original HTTPS request.
+            var forwardedHost = ctx.Request.Headers["X-Forwarded-Host"];
+            if (forwardedHost.Count != 1 || !string.Equals(
+                    forwardedHost[0]!.TrimEnd('.'), publicHostname, StringComparison.OrdinalIgnoreCase))
+            {
+                ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
+                return;
+            }
+        }
+        await next();
+    });
+}
+if (publicApiMode) app.MapPortal();
+app.UseCors("cbt1-web");
 app.UseRateLimiter();
+app.MapCbt1();
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -732,7 +833,10 @@ app.MapPost("/v1/account/devices/{deviceId}/revoke", (string deviceId, HttpReque
 }).RequireRateLimiting("api");
 
 // ─── local operator console (/admin) ────────────────────────────────────
-AdminConsole.Map(app, db, adminLogs);
+// Public deployment intentionally has NO admin routes at all. The admin console
+// remains available in ordinary, local-only operator mode.
+if (!publicApiMode)
+    AdminConsole.Map(app, db, adminLogs);
 
 app.Start();
 WarnIfExternalBind(app.Urls);

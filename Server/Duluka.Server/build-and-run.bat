@@ -3,8 +3,8 @@ rem ================================================================
 rem  build-and-run.bat - build + run Duluka.Server in ONE shot.
 rem  Rebuilds (Release) every time, then starts the server.
 rem  Double-click or run from any working directory (spaces OK).
-rem  Run with "public" to open the server to OTHER machines (LAN);
-rem  see Duluka\README.md for the internet/TLS notes.
+rem  Public HTTP is disabled for account credentials.
+rem  For public HTTPS use ..\start-public-tunnel.ps1.
 rem
 rem  API    : http://127.0.0.1:5115   (default: this machine only)
 rem  Admin  : http://127.0.0.1:5115/admin
@@ -14,15 +14,12 @@ setlocal
 title Duluka.Server - build and run
 cd /d "%~dp0"
 
-rem ---- Optional: "public" opens the bind to other machines (LAN) ----
-if /i not "%~1"=="public" goto bind_default
-set "DULUKA_Urls=http://0.0.0.0:5115"
-echo   PUBLIC MODE: other machines can connect (bind 0.0.0.0:5115).
-echo   v0 is PLAIN HTTP - for internet use put a TLS proxy/tunnel in front.
-echo   If clients still cannot connect, allow the port once (as admin):
-echo     netsh advfirewall firewall add rule name="Duluka.Server 5115" dir=in action=allow protocol=TCP localport=5115
-echo.
-:bind_default
+rem ---- Direct public HTTP is not allowed for account credentials. ----
+if /i "%~1"=="public" (
+    echo   [BLOCKED] Plain HTTP public mode is disabled for Duluka Account.
+    echo   Use Server\start-public-tunnel.ps1 with Cloudflare HTTPS instead.
+    exit /b 2
+)
 
 echo.
 echo   ================================================

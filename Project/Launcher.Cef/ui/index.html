@@ -3,140 +3,496 @@
 <head>
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>NVIDIA ShadowPlay</title>
-<link rel="stylesheet" href="app.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ShadowPlay NEXT · Command Center</title>
+<link rel="stylesheet" href="app.css?v=modules20261024">
+<link rel="stylesheet" href="quick-ui.css?v=magisk-cards-20261024">
 </head>
-<body>
-
-  <!-- ==================== NAV (drag region) ==================== -->
-  <nav id="titlebar">
+<body class="quick-mode">
+  <nav id="titlebar" aria-label="Window">
     <div class="nav-brand">
+      <div class="brand-mark" aria-hidden="true"><span></span><span></span></div>
       <span class="nav-name">NVIDIA <b>SHADOWPLAY</b></span>
-      <span class="hero-badge" data-i18n="launcher">LAUNCHER</span>
+      <span class="brand-next">NEXT</span>
     </div>
     <div class="titlebar-actions">
+      <span class="top-system-state" id="headerHealth" data-i18n="connecting">CONNECTING</span>
       <label for="launcherLanguage" data-i18n="language">Language</label>
       <select id="launcherLanguage" data-i18n-aria-label="languageSelect" aria-label="Launcher language">
-        <option value="en-US">English</option>
-        <option value="th-TH">ไทย</option>
+        <option value="en-US">English</option><option value="th-TH">ไทย</option>
       </select>
       <div class="winbtns">
-      <button id="btnMin" class="winbtn" title="Minimize" aria-label="Minimize" data-i18n-title="minimize" data-i18n-aria-label="minimize">
-        <svg viewBox="0 0 12 12"><path d="M1 6h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-      </button>
-      <button id="btnClose" class="winbtn winbtn-close" title="Close" aria-label="Close" data-i18n-title="close" data-i18n-aria-label="close">
-        <svg viewBox="0 0 12 12"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-      </button>
+        <button id="btnMin" class="winbtn" type="button" title="Minimize" aria-label="Minimize" data-i18n-title="minimize" data-i18n-aria-label="minimize"><svg viewBox="0 0 12 12"><path d="M1 6h10" stroke="currentColor" stroke-width="1.4"/></svg></button>
+        <button id="btnClose" class="winbtn winbtn-close" type="button" title="Close" aria-label="Close" data-i18n-title="close" data-i18n-aria-label="close"><svg viewBox="0 0 12 12"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.4"/></svg></button>
       </div>
     </div>
   </nav>
 
-  <!-- ==================== MAIN ==================== -->
-  <main>
-    <!-- HERO -->
-    <section class="hero">
-      <span class="hero-badge big" data-i18n="suite">GAME RECORDING SUITE</span>
-      <h1 class="hero-title">NVIDIA ShadowPlay</h1>
-      <h2 class="animated-text-gradient hero-sub" data-i18n="subtitle">Capture Every Moment</h2>
-      <p class="hero-desc" data-i18n="description">
-        Manage your overlay engine and monitor the services that power
-        capture. Status and preferences are synchronized with the local system.
-      </p>
-      <div class="hero-cta-group">
-      </div>
-      <div class="hero-meta">
-        <span class="lane-chip" id="chipEngine" title="Overlay controller (NvContainer.exe)" data-i18n="controller" data-i18n-title="controllerHint">CONTROLLER</span>
-        <span class="lane-chip" id="chipCef" title="On-screen overlay presenter (NVIDIA OSC.exe)" data-i18n="presenter" data-i18n-title="presenterHint">PRESENTER</span>
-        <span class="lane-chip" id="chipHub" title="Local API service (engine dependent)" data-i18n="apiService" data-i18n-title="apiHint">API SERVICE</span>
-      </div>
-    </section>
-
-    <!-- SERVICES — OBT3-banner grammar: corner brackets + runway + sheen -->
-    <section class="svc-banner">
-      <span class="obt3-corner c1"></span><span class="obt3-corner c2"></span>
-      <span class="obt3-corner c3"></span><span class="obt3-corner c4"></span>
-      <div class="obt3-runway"><span></span></div>
-      <div class="obt3-inner">
-        <div class="obt3-head">
-          <span class="obt3-tag" data-i18n="status">Status</span>
-          <span class="obt3-title" data-i18n="services">SERVICES</span>
-          <span class="obt3-live" data-i18n="monitoring">&#9679; MONITORING</span>
+  <!-- Three primary destinations. Per-module settings open from each card. -->
+  <div class="quick-layout" id="quickLayout">
+    <aside class="quick-sidebar">
+      <div class="quick-brand-label">SHADOWPLAY <span>NEXT</span></div>
+      <div class="quick-menu-caption" data-i18n="quickMenuCaption">LAUNCHER</div>
+      <nav class="quick-nav" aria-label="ShadowPlay navigation">
+        <button type="button" id="quickNavPower" class="quick-nav-button active" aria-current="page"><span class="quick-nav-icon" aria-hidden="true">◉</span><span data-i18n="quickPowerTab">ShadowPlay</span><span class="quick-nav-chevron">›</span></button>
+        <button type="button" id="quickNavCore" class="quick-nav-button"><span class="quick-nav-icon" aria-hidden="true">▦</span><span data-i18n="quickCoreTab">Core modules</span><span class="quick-nav-chevron">›</span></button>
+        <button type="button" id="quickNavAddons" class="quick-nav-button"><span class="quick-nav-icon" aria-hidden="true">✦</span><span data-i18n="quickAddonTab">Add-ons</span><span class="quick-nav-chevron">›</span></button>
+      </nav>
+      <div class="quick-sidebar-footer"><span class="quick-side-light"></span><span data-i18n="quickLocalOnly">LOCAL MODULE SYSTEM</span></div>
+    </aside>
+    <main class="quick-main" id="quickMain">
+      <section class="quick-page active" id="quickPagePower" aria-label="ShadowPlay">
+        <div class="quick-heading"><span class="quick-eyebrow" data-i18n="quickControlLabel">CONTROL / SHADOWPLAY</span><h1>SHADOWPLAY <em>NEXT</em></h1><p data-i18n="quickPowerIntro">Turn ShadowPlay on or off in one place.</p></div>
+        <div class="quick-power-card">
+          <div class="quick-power-symbol" id="quickPowerSymbol" aria-hidden="true">⏻</div>
+          <div class="quick-power-details">
+            <span class="quick-eyebrow" data-i18n="quickPowerLabel">SHADOWPLAY STATUS</span>
+            <h2 id="quickPowerState" data-i18n="connecting">CONNECTING</h2>
+            <p id="quickPowerNote" data-i18n="quickPowerExplain">Power controls the configured overlay system.</p>
+          </div>
+          <button type="button" class="quick-power-button" id="quickPowerToggle" disabled data-i18n="quickPowerOn">TURN ON</button>
         </div>
-        <ul class="svc">
-          <li>
-            <span class="dot" id="dotOverlay"></span>
-            <div class="svc-text">
-              <div class="svc-name" data-i18n="overlayService">SHADOWPLAY OVERLAY</div>
-              <div class="svc-state" id="stateOverlay" data-i18n="stopped">STOPPED</div>
-            </div>
-          </li>
-          <li>
-            <span class="dot" id="dotContainer"></span>
-            <div class="svc-text">
-              <div class="svc-name" data-i18n="overlayController">OVERLAY CONTROLLER</div>
-              <div class="svc-state" id="stateContainer" data-i18n="stopped">STOPPED</div>
-            </div>
-          </li>
-          <li>
-            <span class="dot" id="dotNotifier"></span>
-            <div class="svc-text">
-              <div class="svc-name" data-i18n="notifierService">WINFORM NOTIFIER</div>
-              <div class="svc-state" id="stateNotifier" data-i18n="stopped">STOPPED</div>
-            </div>
-          </li>
-          <li>
-            <span class="dot" id="dotNvApi"></span>
-            <div class="svc-text">
-              <div class="svc-name" data-i18n="localApiService">LOCAL API SERVICE</div>
-              <div class="svc-state" id="stateNvApi" data-i18n="stopped">STOPPED</div>
-            </div>
-          </li>
-        </ul>
-        <button id="btnOpenOverlay" class="btn-primary block" data-i18n="openOverlay">OPEN OVERLAY</button>
-      </div>
-    </section>
-  </main>
-
-  <!-- ==================== FEATURES ==================== -->
-  <section class="features">
-    <div class="feature-card">
-      <div class="feat-row">
-        <div class="feat-text">
-          <span class="card-status" data-i18n="overlayInGame">Overlay In-game</span>
-          <h3>NVIDIA ShadowPlay</h3>
-          <p data-i18n="featureDescription">Turn the selected overlay engine on or off.</p>
+        <div class="quick-utility-row">
+          <button type="button" id="quickOpenOverlay" class="quick-open-overlay" data-i18n="openOverlay">OPEN OVERLAY</button>
+          <span id="quickEngineStatus" class="quick-subtle" data-i18n="quickRuntimeUnknown">Checking local services…</span>
         </div>
-        <span class="toggle" id="tglOverlay" role="switch" aria-label="Overlay enabled" data-i18n-aria-label="overlayEnabled" aria-checked="false" tabindex="0"></span>
+        <p class="quick-notice" data-i18n="quickPowerCaution">Power status comes from saved settings; it does not guarantee recording or injection is ready.</p>
+      </section>
+
+      <section class="quick-page" id="quickPageCore" aria-label="Core modules">
+        <div class="quick-heading"><span class="quick-eyebrow" data-i18n="quickModulesLabel">MODULES / CORE</span><h1 data-i18n="quickCoreTab">CORE MODULES</h1><p data-i18n="quickCoreIntro">Essential ShadowPlay NEXT services and interfaces.</p></div>
+        <div class="quick-core-toolbar">
+          <span class="quick-core-count" data-i18n="quickCoreCount">11 built-in modules</span>
+          <label for="quickModuleLayout" data-i18n="quickLayoutLabel">Layout</label>
+          <select id="quickModuleLayout" aria-label="Module layout"><option value="list" data-i18n="quickLayoutList">Module cards</option><option value="grid" data-i18n="quickLayoutGrid">Compact grid</option></select>
+        </div>
+        <div class="quick-module-grid" id="quickCoreGrid">
+          <article class="quick-module" data-module="Container">
+            <div class="quick-module-head">
+              <span class="quick-module-icon" aria-hidden="true">▣</span>
+              <div class="quick-module-copy">
+                <strong>NVIDIA Container</strong>
+                <span class="quick-module-meta" data-i18n="quickBuiltIn">ShadowPlay NEXT · Built-in</span>
+              </div>
+              <span class="quick-module-state" id="quickStatusContainer" data-i18n="moduleWaiting">—</span>
+            </div>
+            <p class="quick-module-description" data-i18n="quickDescContainer">NVIDIA Container</p>
+            <div class="quick-module-bottom">
+              <span class="quick-module-category" data-i18n="quickCoreBadge">CORE MODULE</span>
+              <button type="button" class="quick-config-open" data-config-module="Container" data-i18n="quickConfigure">SETTINGS →</button>
+            </div>
+          </article>
+          <article class="quick-module" data-module="Overlay">
+            <div class="quick-module-head">
+              <span class="quick-module-icon" aria-hidden="true">▤</span>
+              <div class="quick-module-copy">
+                <strong>On-Screen Control</strong>
+                <span class="quick-module-meta" data-i18n="quickBuiltIn">ShadowPlay NEXT · Built-in</span>
+              </div>
+              <span class="quick-module-state" id="quickStatusOverlay" data-i18n="moduleWaiting">—</span>
+            </div>
+            <p class="quick-module-description" data-i18n="quickDescOverlay">On-Screen Control</p>
+            <div class="quick-module-bottom">
+              <span class="quick-module-category" data-i18n="quickCoreBadge">CORE MODULE</span>
+              <button type="button" class="quick-config-open" data-config-module="Overlay" data-i18n="quickConfigure">SETTINGS →</button>
+            </div>
+          </article>
+          <article class="quick-module" data-module="NodeApi">
+            <div class="quick-module-head">
+              <span class="quick-module-icon" aria-hidden="true">⌘</span>
+              <div class="quick-module-copy">
+                <strong>NVIDIA NodeAPI</strong>
+                <span class="quick-module-meta" data-i18n="quickBuiltIn">ShadowPlay NEXT · Built-in</span>
+              </div>
+              <span class="quick-module-state" id="quickStatusNodeApi" data-i18n="moduleWaiting">—</span>
+            </div>
+            <p class="quick-module-description" data-i18n="quickDescNodeApi">NVIDIA NodeAPI</p>
+            <div class="quick-module-bottom">
+              <span class="quick-module-category" data-i18n="quickCoreBadge">CORE MODULE</span>
+              <button type="button" class="quick-config-open" data-config-module="NodeApi" data-i18n="quickConfigure">SETTINGS →</button>
+            </div>
+          </article>
+          <article class="quick-module" data-module="Capture">
+            <div class="quick-module-head">
+              <span class="quick-module-icon" aria-hidden="true">◉</span>
+              <div class="quick-module-copy">
+                <strong>NVIDIA Capture</strong>
+                <span class="quick-module-meta" data-i18n="quickBuiltIn">ShadowPlay NEXT · Built-in</span>
+              </div>
+              <span class="quick-module-state" id="quickStatusCapture" data-i18n="moduleWaiting">—</span>
+            </div>
+            <p class="quick-module-description" data-i18n="quickDescCapture">NVIDIA Capture</p>
+            <div class="quick-module-bottom">
+              <span class="quick-module-category" data-i18n="quickCoreBadge">CORE MODULE</span>
+              <button type="button" class="quick-config-open" data-config-module="Capture" data-i18n="quickConfigure">SETTINGS →</button>
+            </div>
+          </article>
+          <article class="quick-module" data-module="Graphics">
+            <div class="quick-module-head">
+              <span class="quick-module-icon" aria-hidden="true">▧</span>
+              <div class="quick-module-copy">
+                <strong>NVIDIA Graphics</strong>
+                <span class="quick-module-meta" data-i18n="quickBuiltIn">ShadowPlay NEXT · Built-in</span>
+              </div>
+              <span class="quick-module-state" id="quickStatusGraphics" data-i18n="moduleWaiting">—</span>
+            </div>
+            <p class="quick-module-description" data-i18n="quickDescGraphics">NVIDIA Graphics</p>
+            <div class="quick-module-bottom">
+              <span class="quick-module-category" data-i18n="quickCoreBadge">CORE MODULE</span>
+              <button type="button" class="quick-config-open" data-config-module="Graphics" data-i18n="quickConfigure">SETTINGS →</button>
+            </div>
+          </article>
+          <article class="quick-module" data-module="Helper">
+            <div class="quick-module-head">
+              <span class="quick-module-icon" aria-hidden="true">⌨</span>
+              <div class="quick-module-copy">
+                <strong>ShadowPlay Helper</strong>
+                <span class="quick-module-meta" data-i18n="quickBuiltIn">ShadowPlay NEXT · Built-in</span>
+              </div>
+              <span class="quick-module-state" id="quickStatusHelper" data-i18n="moduleWaiting">—</span>
+            </div>
+            <p class="quick-module-description" data-i18n="quickDescHelper">ShadowPlay Helper</p>
+            <div class="quick-module-bottom">
+              <span class="quick-module-category" data-i18n="quickCoreBadge">CORE MODULE</span>
+              <button type="button" class="quick-config-open" data-config-module="Helper" data-i18n="quickConfigure">SETTINGS →</button>
+            </div>
+          </article>
+          <article class="quick-module" data-module="Adapter">
+            <div class="quick-module-head">
+              <span class="quick-module-icon" aria-hidden="true">⌁</span>
+              <div class="quick-module-copy">
+                <strong>OSC Adapter</strong>
+                <span class="quick-module-meta" data-i18n="quickBuiltIn">ShadowPlay NEXT · Built-in</span>
+              </div>
+              <span class="quick-module-state" id="quickStatusAdapter" data-i18n="moduleWaiting">—</span>
+            </div>
+            <p class="quick-module-description" data-i18n="quickDescAdapter">OSC Adapter</p>
+            <div class="quick-module-bottom">
+              <span class="quick-module-category" data-i18n="quickCoreBadge">CORE MODULE</span>
+              <button type="button" class="quick-config-open" data-config-module="Adapter" data-i18n="quickConfigure">SETTINGS →</button>
+            </div>
+          </article>
+          <article class="quick-module" data-module="Hook">
+            <div class="quick-module-head">
+              <span class="quick-module-icon" aria-hidden="true">⚙</span>
+              <div class="quick-module-copy">
+                <strong>Duluka Hook</strong>
+                <span class="quick-module-meta" data-i18n="quickBuiltIn">ShadowPlay NEXT · Built-in</span>
+              </div>
+              <span class="quick-module-state" id="quickStatusHook" data-i18n="moduleWaiting">—</span>
+            </div>
+            <p class="quick-module-description" data-i18n="quickDescHook">Duluka Hook</p>
+            <div class="quick-module-bottom">
+              <span class="quick-module-category" data-i18n="quickCoreBadge">CORE MODULE</span>
+              <button type="button" class="quick-config-open" data-config-module="Hook" data-i18n="quickConfigure">SETTINGS →</button>
+            </div>
+          </article>
+          <article class="quick-module" data-module="Ansel">
+            <div class="quick-module-head">
+              <span class="quick-module-icon" aria-hidden="true">✧</span>
+              <div class="quick-module-copy">
+                <strong>Ansel Adapter</strong>
+                <span class="quick-module-meta" data-i18n="quickBuiltIn">ShadowPlay NEXT · Built-in</span>
+              </div>
+              <span class="quick-module-state" id="quickStatusAnsel" data-i18n="moduleWaiting">—</span>
+            </div>
+            <p class="quick-module-description" data-i18n="quickDescAnsel">Ansel Adapter</p>
+            <div class="quick-module-bottom">
+              <span class="quick-module-category" data-i18n="quickCoreBadge">CORE MODULE</span>
+              <button type="button" class="quick-config-open" data-config-module="Ansel" data-i18n="quickConfigure">SETTINGS →</button>
+            </div>
+          </article>
+          <article class="quick-module" data-module="Ffmpeg">
+            <div class="quick-module-head">
+              <span class="quick-module-icon" aria-hidden="true">▦</span>
+              <div class="quick-module-copy">
+                <strong>FFmpeg</strong>
+                <span class="quick-module-meta" data-i18n="quickBuiltIn">ShadowPlay NEXT · Built-in</span>
+              </div>
+              <span class="quick-module-state" id="quickStatusFfmpeg" data-i18n="moduleWaiting">—</span>
+            </div>
+            <p class="quick-module-description" data-i18n="quickDescFfmpeg">FFmpeg</p>
+            <div class="quick-module-bottom">
+              <span class="quick-module-category" data-i18n="quickCoreBadge">CORE MODULE</span>
+              <button type="button" class="quick-config-open" data-config-module="Ffmpeg" data-i18n="quickConfigure">SETTINGS →</button>
+            </div>
+          </article>
+          <article class="quick-module" data-module="Config">
+            <div class="quick-module-head">
+              <span class="quick-module-icon" aria-hidden="true">▥</span>
+              <div class="quick-module-copy">
+                <strong>NVIDIA Config</strong>
+                <span class="quick-module-meta" data-i18n="quickBuiltIn">ShadowPlay NEXT · Built-in</span>
+              </div>
+              <span class="quick-module-state" id="quickStatusConfig" data-i18n="moduleWaiting">—</span>
+            </div>
+            <p class="quick-module-description" data-i18n="configRoleTitle">NVIDIA Config</p>
+            <div class="quick-module-bottom">
+              <span class="quick-module-category" data-i18n="quickCoreBadge">CORE MODULE</span>
+              <button type="button" class="quick-config-open" data-config-module="Config" data-i18n="quickConfigure">SETTINGS →</button>
+            </div>
+          </article>
+        </div>
+        <p class="quick-notice" data-i18n="quickStatusNotice">Installed does not mean the engine is running.</p>
+      </section>
+
+
+      <section class="quick-page" id="quickPageConfig" aria-label="Config Module">
+        <div class="quick-heading"><span class="quick-eyebrow" data-i18n="quickConfigLabel">MODULES / CONFIG</span><h1 id="quickConfigTitle" data-i18n="quickConfigTab">MODULE SETTINGS</h1><p data-i18n="quickConfigIntro">Appearance settings belong to each module, not the Launcher.</p></div>
+        <div class="quick-config-return">
+          <button type="button" class="quick-back-button" id="quickGoCore" data-i18n="quickBackToCore">← CORE MODULES</button>
+          <span class="quick-config-state" id="quickConfigStatus" data-i18n="moduleWaiting">WAITING FOR DATA</span>
+        </div>
+        <div class="quick-config-preview" id="quickConfigPreview">
+          <div><span class="quick-eyebrow" data-i18n="quickPreviewTitle">MODULE PREVIEW</span><h2 id="quickConfigName">NVIDIA Container</h2><p data-i18n="quickConfigPreviewHint">Background changes affect the selected module only.</p></div>
+          <span class="quick-config-preview-mark">NEXT</span>
+        </div>
+        <div class="quick-appearance-title"><span class="quick-eyebrow" data-i18n="quickThemeLabel">MODULE THEME</span><h2 data-i18n="quickThemeTitle">Themes & backgrounds</h2></div>
+        <div id="quickAppearanceSlot"></div>
+        <p class="quick-notice" data-i18n="quickConfigSafeNotice">Display settings only. No game hooks, recording or service activation is changed.</p>
+      </section>
+
+      <section class="quick-page" id="quickPageAddons" aria-label="Add-ons">
+        <div class="quick-heading"><span class="quick-eyebrow" data-i18n="quickExtensionsLabel">MODULES / ADD-ONS</span><h1 data-i18n="quickAddonTab">ADD-ONS</h1><p data-i18n="quickAddonIntro">Optional components, media dependencies and launcher themes.</p></div>
+        <div class="quick-empty-addons"><span class="quick-empty-icon" aria-hidden="true">◇</span><h2 data-i18n="quickAddonEmpty">No add-on modules installed</h2><p data-i18n="quickAddonEmptyDetail">Only core modules are listed for now. Optional modules will appear here when supported.</p></div>
+      </section>
+    </main>
+  </div>
+
+  <div class="workspace">
+    <aside class="sidebar">
+      <div class="sidebar-top">
+        <span class="section-cap" data-i18n="workspace">WORKSPACE</span>
+        <div class="sidebar-product">SHADOWPLAY<span> / NEXT</span></div>
+      </div>
+      <div class="sidebar-nav" role="navigation" aria-label="Command Center">
+        <button type="button" class="side-link active" id="navOverview" aria-current="page" data-i18n-aria-label="navOverview"><span class="nav-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></span><span data-i18n="navOverview">Overview</span><span class="nav-arrow" aria-hidden="true">›</span></button>
+        <div class="module-links">
+          <span class="section-cap module-nav-label" data-i18n="modules">MODULES</span>
+          <button type="button" class="side-link" id="navCapture" data-i18n-aria-label="navCapture"><span class="nav-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14"/><circle cx="12" cy="12" r="4"/></svg></span><span data-i18n="navCapture">NVIDIA Capture</span><span class="nav-module-state" id="navStateCapture" aria-hidden="true"></span><span class="nav-arrow" aria-hidden="true">›</span></button>
+          <button type="button" class="side-link" id="navGraphics" data-i18n-aria-label="navGraphics"><span class="nav-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13"/><path d="M8 21h8M12 17v4M7 13l3-4 3 3 4-5"/></svg></span><span data-i18n="navGraphics">NVIDIA Graphics</span><span class="nav-module-state" id="navStateGraphics" aria-hidden="true"></span><span class="nav-arrow" aria-hidden="true">›</span></button>
+          <button type="button" class="side-link" id="navOverlay" data-i18n-aria-label="navOverlay"><span class="nav-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16"/><path d="M3 9h18M8 9v11M12 13h5M12 16h3"/></svg></span><span data-i18n="navOverlay">On-Screen Control</span><span class="nav-module-state" id="navStateOverlay" aria-hidden="true"></span><span class="nav-arrow" aria-hidden="true">›</span></button>
+          <button type="button" class="side-link" id="navNodeApi" data-i18n-aria-label="navNodeApi"><span class="nav-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5L2 12l6 7M16 5l6 7-6 7M14 3l-4 18"/></svg></span><span data-i18n="navNodeApi">NVIDIA NodeAPI</span><span class="nav-module-state" id="navStateNodeApi" aria-hidden="true"></span><span class="nav-arrow" aria-hidden="true">›</span></button>
+          <button type="button" class="side-link" id="navContainer" data-i18n-aria-label="navContainer"><span class="nav-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2l9 5v10l-9 5-9-5V7zM3 7l9 5 9-5M12 12v10M7.5 4.5l9 5"/></svg></span><span data-i18n="navContainer">NVIDIA Container</span><span class="nav-module-state" id="navStateContainer" aria-hidden="true"></span><span class="nav-arrow" aria-hidden="true">›</span></button>
+          <button type="button" class="side-link" id="navAdapter" data-i18n-aria-label="navAdapter"><span class="nav-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3v5M17 3v5M5 8h14v3a7 7 0 0 1-14 0zM12 18v4"/></svg></span><span data-i18n="navAdapter">OSC Adapter</span><span class="nav-module-state" id="navStateAdapter" aria-hidden="true"></span><span class="nav-arrow" aria-hidden="true">›</span></button>
+          <button type="button" class="side-link" id="navHook" data-i18n-aria-label="navHook"><span class="nav-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 3h8v8a6 6 0 0 1-12 0V9h4M12 3v4M8 20h8"/></svg></span><span data-i18n="navHook">Duluka Hook</span><span class="nav-module-state" id="navStateHook" aria-hidden="true"></span><span class="nav-arrow" aria-hidden="true">›</span></button>
+          <button type="button" class="side-link" id="navAnsel" data-i18n-aria-label="navAnsel"><span class="nav-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 4h5M4 4v5M20 4h-5M20 4v5M4 20h5M4 20v-5M20 20h-5M20 20v-5"/><circle cx="12" cy="12" r="4"/></svg></span><span data-i18n="navAnsel">Ansel Adapter</span><span class="nav-module-state" id="navStateAnsel" aria-hidden="true"></span><span class="nav-arrow" aria-hidden="true">›</span></button>
+          <button type="button" class="side-link" id="navHelper" data-i18n-aria-label="navHelper"><span class="nav-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9h1M10 9h1M14 9h1M18 9h1M6 13h1M10 13h1M14 13h1M18 13h1M7 16h10"/></svg></span><span data-i18n="navHelper">ShadowPlay Helper</span><span class="nav-module-state" id="navStateHelper" aria-hidden="true"></span><span class="nav-arrow" aria-hidden="true">›</span></button>
+          <button type="button" class="side-link" id="navFfmpeg" data-i18n-aria-label="navFfmpeg"><span class="nav-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18"/><path d="M3 8h18M3 16h18M8 3v5M16 3v5M8 16v5M16 16v5M10 10l5 2-5 2z"/></svg></span><span data-i18n="navFfmpeg">FFmpeg</span><span class="nav-module-state" id="navStateFfmpeg" aria-hidden="true"></span><span class="nav-arrow" aria-hidden="true">›</span></button>
+          <button type="button" class="side-link" id="navSettings" data-i18n-aria-label="navSettings"><span class="nav-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h3m6 0h7M4 17h9m6 0h1"/><circle cx="10" cy="7" r="3"/><circle cx="16" cy="17" r="3"/></svg></span><span data-i18n="navSettings">NVIDIA Config</span><span class="nav-module-state" id="navStateConfig" aria-hidden="true"></span><span class="nav-arrow" aria-hidden="true">›</span></button>
+        </div>
+        <div class="sidebar-tools">
+          <button type="button" class="side-link" id="navServices" data-i18n-aria-label="navServices"><span class="nav-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="7"/><rect x="3" y="14" width="18" height="7"/><path d="M7 6.5h1M7 17.5h1M12 6.5h5M12 17.5h5"/></svg></span><span data-i18n="navServices">Services</span><span class="nav-arrow" aria-hidden="true">›</span></button>
+        </div>
+      </div>
+      <div class="sidebar-foot">
+        <span class="section-cap" data-i18n="localSystem">LOCAL SYSTEM</span>
+        <div class="sidebar-status"><span class="status-led" id="sidebarLed"></span><span id="sidebarHealth" data-i18n="connecting">CONNECTING</span></div>
+        <span class="sidebar-foot-note" data-i18n="localOnly">LOCAL CONTROL · 127.0.0.1</span>
+      </div>
+    </aside>
+
+    <div class="main-column">
+      <div class="content-scroll" id="contentScroll">
+        <section class="view active" id="viewOverview" aria-label="Overview">
+          <div class="page-heading"><div><span class="eyebrow" data-i18n="workspaceHome">WORKSPACE / OVERVIEW</span><h1 data-i18n="commandCenter">COMMAND CENTER</h1></div><span class="heading-stamp">NVIDIA / NEXT</span></div>
+          <div class="hero-layout">
+            <div class="hero">
+              <span class="hero-badge big" data-i18n="suite">GAME RECORDING SUITE</span>
+              <h2 class="hero-title">SHADOWPLAY <em>NEXT</em></h2>
+              <h3 class="hero-sub" data-i18n="subtitle">Capture Every Moment</h3>
+              <p class="hero-desc" data-i18n="description">Manage your overlay engine and monitor the services that power capture. Status and preferences are synchronized with the local system.</p>
+              <div class="hero-cta-group">
+                <button id="btnOpenOverlay" type="button" class="btn-primary" data-i18n="openOverlay">OPEN OVERLAY</button>
+                <button id="btnJumpServices" type="button" class="btn-outline" data-i18n="viewServices">VIEW SERVICES</button>
+              </div>
+            </div>
+            <div class="health-panel">
+              <div class="panel-top"><span class="eyebrow" data-i18n="systemSignal">SYSTEM SIGNAL</span><span class="live-dash" data-i18n="monitoring">● MONITORING</span></div>
+              <div class="health-state" id="systemHealth" data-i18n="connecting">CONNECTING</div>
+              <p class="health-caption" data-i18n="httpHealthNote">Service status is not capture readiness.</p>
+              <div class="signal-rows">
+                <div class="signal-row"><span class="signal-icon" id="signalController"></span><span data-i18n="controller">CONTROLLER</span><span class="lane-chip" id="chipEngine" data-i18n="stopped">STOPPED</span></div>
+                <div class="signal-row"><span class="signal-icon" id="signalPresenter"></span><span data-i18n="presenter">PRESENTER</span><span class="lane-chip" id="chipCef" data-i18n="stopped">STOPPED</span></div>
+                <div class="signal-row"><span class="signal-icon" id="signalApi"></span><span data-i18n="apiService">API SERVICE</span><span class="lane-chip" id="chipHub" data-i18n="stopped">STOPPED</span></div>
+              </div>
+              <div class="signal-base"><span data-i18n="status">Status</span><span id="signalTimestamp" data-i18n="waitingData">WAITING FOR DATA</span></div>
+            </div>
+          </div>
+          <div class="overview-cards">
+            <div class="summary-card"><div class="summary-top"><span data-i18n="navCapture">Capture</span><span class="mini-index">01 / VIDEO</span></div><div class="summary-title" data-i18n="captureTitle">Capture workspace</div><p data-i18n="captureHint">Recording, replay and screenshots are controlled in OSC.</p><button class="link-action" type="button" id="btnGotoCapture" data-i18n="exploreCapture">EXPLORE CAPTURE →</button></div>
+            <div class="summary-card"><div class="summary-top"><span data-i18n="navGraphics">Graphics</span><span class="mini-index">02 / GPU</span></div><div class="summary-title" data-i18n="graphicsTitle">Graphics management</div><p data-i18n="graphicsHint">GPU preferences and profiles are handled by NVIDIA Graphics.</p><button class="link-action" type="button" id="btnGotoGraphics" data-i18n="exploreGraphics">EXPLORE GRAPHICS →</button></div>
+            <div class="summary-card"><div class="summary-top"><span data-i18n="engineTitle">OVERLAY ENGINE</span><span class="mini-index">03 / ENGINE</span></div><div class="summary-title" id="overviewEngine">—</div><p data-i18n="modeDescription">Selects the engine; does not power the overlay.</p><button class="link-action" type="button" id="btnGotoSettings" data-i18n="manageSettings">MANAGE SETTINGS →</button></div>
+          </div>
+        </section>
+
+        <section class="view" id="viewCapture" aria-label="NVIDIA Capture" data-i18n-aria-label="navCapture">
+          <div class="page-heading"><div><span class="eyebrow" data-i18n="workspaceCapture">WORKSPACE / CAPTURE</span><h1 data-i18n="navCapture">NVIDIA Capture</h1></div><span class="heading-stamp">01 / CAPTURE</span></div>
+          <div class="module-overview"><div class="module-status-item"><span data-i18n="moduleStatus">Status</span><strong class="module-state" id="moduleStateCapture" data-i18n="moduleWaiting">WAITING FOR DATA</strong></div><div class="module-status-item"><span data-i18n="moduleFiles">Module files</span><strong class="module-availability" id="moduleAvailabilityCapture" data-i18n="moduleWaiting">WAITING FOR DATA</strong></div></div>
+          <div class="section-lead"><span class="hero-badge" data-i18n="captureManaged">MANAGED IN OSC</span><p data-i18n="captureHint">Recording, replay and screenshots are controlled in OSC.</p><button id="btnCaptureOverlay" type="button" class="btn-primary" data-i18n="openOverlay">OPEN OVERLAY</button></div>
+          <div class="feature-grid">
+            <article class="module-card"><span class="module-num">01</span><span class="module-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg></span><h2 data-i18n="captureRecord">Recording</h2><p data-i18n="captureRecordDesc">Start and manage your recording from the OSC Capture menu.</p><span class="module-foot" data-i18n="noDirectControl">NO DIRECT LAUNCHER CONTROL</span></article>
+            <article class="module-card"><span class="module-num">02</span><span class="module-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 10a9 9 0 1 1 1 8M3 3v7h7M12 7v5l3 2"/></svg></span><h2 data-i18n="captureReplay">Instant Replay</h2><p data-i18n="captureReplayDesc">Configure and control replay from the in-game overlay.</p><span class="module-foot" data-i18n="noDirectControl">NO DIRECT LAUNCHER CONTROL</span></article>
+            <article class="module-card"><span class="module-num">03</span><span class="module-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="15"/><path d="M8 5l2-3h4l2 3"/><circle cx="12" cy="12" r="4"/></svg></span><h2 data-i18n="captureShot">Screenshot</h2><p data-i18n="captureShotDesc">Open OSC to capture screenshots using your configured display.</p><span class="module-foot" data-i18n="noDirectControl">NO DIRECT LAUNCHER CONTROL</span></article>
+          </div>
+          <div class="module-detail-grid">
+            <article class="module-detail-card"><span class="module-detail-label" data-i18n="moduleRole">ROLE</span><h2 data-i18n="captureRoleTitle">Capture engine</h2><p data-i18n="captureRoleDesc">Provides the recording, replay and screenshot pipeline controlled through OSC.</p></article>
+            <article class="module-detail-card"><span class="module-detail-label" data-i18n="moduleComponents">COMPONENTS</span><h2 data-i18n="captureComponentsTitle">Capture pipeline</h2><ul class="module-components"><li data-i18n="captureEngineComponent">NVIDIA Capture engine</li><li data-i18n="captureMediaComponent">Capture sources and media tools</li></ul><p data-i18n="captureStateNote">Installed files do not confirm that a recording source or encoder is ready.</p></article>
+          </div>
+        </section>
+
+        <section class="view" id="viewGraphics" aria-label="NVIDIA Graphics" data-i18n-aria-label="navGraphics">
+          <div class="page-heading"><div><span class="eyebrow" data-i18n="workspaceGraphics">WORKSPACE / GRAPHICS</span><h1 data-i18n="navGraphics">NVIDIA Graphics</h1></div><span class="heading-stamp">02 / GRAPHICS</span></div>
+          <div class="module-overview"><div class="module-status-item"><span data-i18n="moduleStatus">Status</span><strong class="module-state" id="moduleStateGraphics" data-i18n="moduleWaiting">WAITING FOR DATA</strong></div><div class="module-status-item"><span data-i18n="moduleFiles">Module files</span><strong class="module-availability" id="moduleAvailabilityGraphics" data-i18n="moduleWaiting">WAITING FOR DATA</strong></div></div>
+          <div class="section-lead graphics-lead"><span class="hero-badge" data-i18n="managedByGraphics">NVIDIA GRAPHICS MODULE</span><p data-i18n="graphicsHint">GPU preferences and profiles are handled by NVIDIA Graphics.</p><p class="module-foot" data-i18n="graphicsScope">This Launcher displays navigation only; it does not change Windows GPU preferences.</p></div>
+          <div class="feature-grid two">
+            <article class="module-card"><span class="module-num">01</span><span class="module-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="14"/><path d="M8 21h8M12 17v4M7 12l3-4 3 3 4-5"/></svg></span><h2 data-i18n="gpuPreferences">GPU Preferences</h2><p data-i18n="gpuPreferencesDesc">Application GPU selection belongs to the NVIDIA Graphics module.</p><span class="module-foot" data-i18n="separateModule">EXTERNAL MODULE</span></article>
+            <article class="module-card"><span class="module-num">02</span><span class="module-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 4h14v17l-7-4-7 4zM9 8h6M9 11h6"/></svg></span><h2 data-i18n="gameProfiles">Game Profiles</h2><p data-i18n="gameProfilesDesc">Per-game mappings and GPU profiles are managed separately.</p><span class="module-foot" data-i18n="separateModule">EXTERNAL MODULE</span></article>
+          </div>
+          <div class="module-detail-grid">
+            <article class="module-detail-card"><span class="module-detail-label" data-i18n="moduleRole">ROLE</span><h2 data-i18n="graphicsRoleTitle">Graphics preferences</h2><p data-i18n="graphicsRoleDesc">Provides application GPU preferences and graphics information through NVIDIA Graphics.</p></article>
+            <article class="module-detail-card"><span class="module-detail-label" data-i18n="moduleComponents">COMPONENTS</span><h2 data-i18n="graphicsComponentsTitle">Graphics module</h2><ul class="module-components"><li>NVIDIA Graphics</li><li data-i18n="graphicsProfilesComponent">GPU inventory and preference profiles</li></ul></article>
+          </div>
+        </section>
+
+        <section class="view" id="viewOverlay" aria-label="On-Screen Control" data-i18n-aria-label="navOverlay">
+          <div class="page-heading"><div><span class="eyebrow" data-i18n="workspaceOverlay">MODULES / OVERLAY</span><h1 data-i18n="navOverlay">On-Screen Control</h1></div><span class="heading-stamp">03 / OSC</span></div>
+          <div class="module-overview"><div class="module-status-item"><span data-i18n="moduleStatus">Status</span><strong class="module-state" id="moduleStateOverlay" data-i18n="moduleWaiting">WAITING FOR DATA</strong></div><div class="module-status-item"><span data-i18n="moduleFiles">Module files</span><strong class="module-availability" id="moduleAvailabilityOverlay" data-i18n="moduleWaiting">WAITING FOR DATA</strong></div></div>
+          <div class="section-lead"><span class="hero-badge" data-i18n="overlayBadge">ON-SCREEN WORKSPACE</span><p data-i18n="overlayModuleDesc">The OSC interface brings capture menus, gallery and overlay settings together.</p><button id="btnModuleOverlay" type="button" class="btn-primary" data-i18n="openOverlay">OPEN OVERLAY</button></div>
+          <div class="module-detail-grid">
+            <article class="module-detail-card"><span class="module-detail-label" data-i18n="moduleRole">ROLE</span><h2 data-i18n="overlayRoleTitle">Overlay interface</h2><p data-i18n="overlayRoleDesc">Presents the overlay UI and routes your actions to the local services.</p></article>
+            <article class="module-detail-card"><span class="module-detail-label" data-i18n="moduleComponents">COMPONENTS</span><h2 data-i18n="overlayComponentsTitle">OSC host and UI</h2><ul class="module-components"><li>NVIDIA OSC.exe</li><li data-i18n="overlayUiComponent">OSC interface assets</li></ul><p data-i18n="overlayStateNote">A running OSC process does not confirm rendering inside a game.</p></article>
+          </div>
+        </section>
+
+        <section class="view" id="viewNodeApi" aria-label="NVIDIA NodeAPI" data-i18n-aria-label="navNodeApi">
+          <div class="page-heading"><div><span class="eyebrow" data-i18n="workspaceNodeApi">MODULES / LOCAL API</span><h1 data-i18n="navNodeApi">NVIDIA NodeAPI</h1></div><span class="heading-stamp">04 / API</span></div>
+          <div class="module-overview"><div class="module-status-item"><span data-i18n="moduleStatus">Status</span><strong class="module-state" id="moduleStateNodeApi" data-i18n="moduleWaiting">WAITING FOR DATA</strong></div><div class="module-status-item"><span data-i18n="moduleFiles">Module files</span><strong class="module-availability" id="moduleAvailabilityNodeApi" data-i18n="moduleWaiting">WAITING FOR DATA</strong></div></div>
+          <div class="module-detail-grid">
+            <article class="module-detail-card"><span class="module-detail-label" data-i18n="moduleRole">ROLE</span><h2 data-i18n="nodeApiRoleTitle">Local OSC and API host</h2><p data-i18n="nodeApiRoleDesc">Hosts the local OSC interface and API routes used by the overlay and capture services.</p></article>
+            <article class="module-detail-card"><span class="module-detail-label" data-i18n="moduleComponents">COMPONENTS</span><h2 data-i18n="nodeApiComponentsTitle">Local service runtime</h2><ul class="module-components"><li data-i18n="nodeApiRuntimeComponent">NodeAPI service</li><li data-i18n="nodeApiOscComponent">OSC interface and API handlers</li></ul><p data-i18n="nodeApiStateNote">Process status comes from the Launcher supervisor.</p></article>
+          </div>
+        </section>
+
+        <section class="view" id="viewContainer" aria-label="NVIDIA Container" data-i18n-aria-label="navContainer">
+          <div class="page-heading"><div><span class="eyebrow" data-i18n="workspaceContainer">MODULES / SUPERVISOR</span><h1 data-i18n="navContainer">NVIDIA Container</h1></div><span class="heading-stamp">05 / CONTAINER</span></div>
+          <div class="module-overview"><div class="module-status-item"><span data-i18n="moduleStatus">Status</span><strong class="module-state" id="moduleStateContainer" data-i18n="moduleWaiting">WAITING FOR DATA</strong></div><div class="module-status-item"><span data-i18n="moduleFiles">Module files</span><strong class="module-availability" id="moduleAvailabilityContainer" data-i18n="moduleWaiting">WAITING FOR DATA</strong></div></div>
+          <div class="module-detail-grid">
+            <article class="module-detail-card"><span class="module-detail-label" data-i18n="moduleRole">ROLE</span><h2 data-i18n="containerRoleTitle">Service supervision</h2><p data-i18n="containerRoleDesc">Coordinates the overlay services and their lifecycle for the selected engine.</p></article>
+            <article class="module-detail-card"><span class="module-detail-label" data-i18n="moduleComponents">COMPONENTS</span><h2 data-i18n="containerComponentsTitle">Overlay controller</h2><ul class="module-components"><li>NvContainer.exe</li><li data-i18n="containerLifecycleComponent">Local service lifecycle</li></ul><p data-i18n="containerStateNote">The Services page shows the supervised service snapshot.</p></article>
+          </div>
+        </section>
+
+        <section class="view" id="viewAdapter" aria-label="OSC Adapter" data-i18n-aria-label="navAdapter">
+          <div class="page-heading"><div><span class="eyebrow" data-i18n="workspaceAdapter">MODULES / ADAPTER</span><h1 data-i18n="navAdapter">OSC Adapter</h1></div><span class="heading-stamp">06 / ADAPTER</span></div>
+          <div class="module-overview"><div class="module-status-item"><span data-i18n="moduleStatus">Status</span><strong class="module-state" id="moduleStateAdapter" data-i18n="moduleWaiting">WAITING FOR DATA</strong></div><div class="module-status-item"><span data-i18n="moduleFiles">Module files</span><strong class="module-availability" id="moduleAvailabilityAdapter" data-i18n="moduleWaiting">WAITING FOR DATA</strong></div></div>
+          <div class="module-detail-grid">
+            <article class="module-detail-card"><span class="module-detail-label" data-i18n="moduleRole">ROLE</span><h2 data-i18n="adapterRoleTitle">Game overlay bridge</h2><p data-i18n="adapterRoleDesc">Coordinates the OSC connection with the graphics adapter and target game process.</p></article>
+            <article class="module-detail-card"><span class="module-detail-label" data-i18n="moduleComponents">COMPONENTS</span><h2 data-i18n="adapterComponentsTitle">Adapter host</h2><ul class="module-components"><li data-i18n="adapterHostComponent">OSC Adapter host</li><li data-i18n="adapterPolicyComponent">Graphics API detection and routing</li></ul><p data-i18n="adapterStateNote">A running host does not confirm an active game overlay.</p></article>
+          </div>
+        </section>
+
+        <section class="view" id="viewHook" aria-label="Duluka Hook" data-i18n-aria-label="navHook">
+          <div class="page-heading"><div><span class="eyebrow" data-i18n="workspaceHook">MODULES / GRAPHICS HOOK</span><h1 data-i18n="navHook">Duluka Hook</h1></div><span class="heading-stamp">07 / HOOK</span></div>
+          <div class="module-overview"><div class="module-status-item"><span data-i18n="moduleStatus">Status</span><strong class="module-state" id="moduleStateHook" data-i18n="moduleWaiting">WAITING FOR DATA</strong></div><div class="module-status-item"><span data-i18n="moduleFiles">Module files</span><strong class="module-availability" id="moduleAvailabilityHook" data-i18n="moduleWaiting">WAITING FOR DATA</strong></div></div>
+          <div class="module-detail-grid">
+            <article class="module-detail-card"><span class="module-detail-label" data-i18n="moduleRole">ROLE</span><h2 data-i18n="hookRoleTitle">Graphics hook component</h2><p data-i18n="hookRoleDesc">Provides the graphics hook used to present OSC frames inside supported game processes.</p></article>
+            <article class="module-detail-card"><span class="module-detail-label" data-i18n="moduleComponents">COMPONENTS</span><h2 data-i18n="hookComponentsTitle">DLL integration</h2><ul class="module-components"><li data-i18n="hookDllComponent">Duluka Hook DLL</li><li data-i18n="hookFrameComponent">Graphics presentation and frame bridge</li></ul><p data-i18n="dllStateNote">Installed DLL files do not confirm injection or an active game session.</p></article>
+          </div>
+        </section>
+
+        <section class="view" id="viewAnsel" aria-label="Ansel Adapter" data-i18n-aria-label="navAnsel">
+          <div class="page-heading"><div><span class="eyebrow" data-i18n="workspaceAnsel">MODULES / ANSEL</span><h1 data-i18n="navAnsel">Ansel Adapter</h1></div><span class="heading-stamp">08 / ANSEL</span></div>
+          <div class="module-overview"><div class="module-status-item"><span data-i18n="moduleStatus">Status</span><strong class="module-state" id="moduleStateAnsel" data-i18n="moduleWaiting">WAITING FOR DATA</strong></div><div class="module-status-item"><span data-i18n="moduleFiles">Module files</span><strong class="module-availability" id="moduleAvailabilityAnsel" data-i18n="moduleWaiting">WAITING FOR DATA</strong></div></div>
+          <div class="module-detail-grid">
+            <article class="module-detail-card"><span class="module-detail-label" data-i18n="moduleRole">ROLE</span><h2 data-i18n="anselRoleTitle">Ansel integration component</h2><p data-i18n="anselRoleDesc">Provides the Ansel adapter DLL component used by the overlay integration.</p></article>
+            <article class="module-detail-card"><span class="module-detail-label" data-i18n="moduleComponents">COMPONENTS</span><h2 data-i18n="anselComponentsTitle">Ansel adapter DLL</h2><ul class="module-components"><li data-i18n="anselDllComponent">Ansel Adapter DLL</li></ul><p data-i18n="dllStateNote">Installed DLL files do not confirm injection or an active game session.</p></article>
+          </div>
+        </section>
+
+        <section class="view" id="viewHelper" aria-label="ShadowPlay Helper" data-i18n-aria-label="navHelper">
+          <div class="page-heading"><div><span class="eyebrow" data-i18n="workspaceHelper">MODULES / HOTKEYS</span><h1 data-i18n="navHelper">ShadowPlay Helper</h1></div><span class="heading-stamp">09 / HELPER</span></div>
+          <div class="module-overview"><div class="module-status-item"><span data-i18n="moduleStatus">Status</span><strong class="module-state" id="moduleStateHelper" data-i18n="moduleWaiting">WAITING FOR DATA</strong></div><div class="module-status-item"><span data-i18n="moduleFiles">Module files</span><strong class="module-availability" id="moduleAvailabilityHelper" data-i18n="moduleWaiting">WAITING FOR DATA</strong></div></div>
+          <div class="module-detail-grid">
+            <article class="module-detail-card"><span class="module-detail-label" data-i18n="moduleRole">ROLE</span><h2 data-i18n="helperRoleTitle">Keyboard shortcuts</h2><p data-i18n="helperRoleDesc">Handles ShadowPlay hotkeys and sends their actions to the local overlay services.</p></article>
+            <article class="module-detail-card"><span class="module-detail-label" data-i18n="moduleComponents">COMPONENTS</span><h2 data-i18n="helperComponentsTitle">Hotkey helper</h2><ul class="module-components"><li data-i18n="helperProcessComponent">ShadowPlay Helper process</li><li data-i18n="helperHotkeysComponent">Global hotkey handling</li></ul><p data-i18n="helperStateNote">Shortcut behavior depends on the configured keys and available services.</p></article>
+          </div>
+        </section>
+
+        <section class="view" id="viewFfmpeg" aria-label="FFmpeg" data-i18n-aria-label="navFfmpeg">
+          <div class="page-heading"><div><span class="eyebrow" data-i18n="workspaceFfmpeg">MODULES / MEDIA TOOLS</span><h1 data-i18n="navFfmpeg">FFmpeg</h1></div><span class="heading-stamp">10 / FFMPEG</span></div>
+          <div class="module-overview"><div class="module-status-item"><span data-i18n="moduleStatus">Status</span><strong class="module-state" id="moduleStateFfmpeg" data-i18n="moduleWaiting">WAITING FOR DATA</strong></div><div class="module-status-item"><span data-i18n="moduleFiles">Module files</span><strong class="module-availability" id="moduleAvailabilityFfmpeg" data-i18n="moduleWaiting">WAITING FOR DATA</strong></div></div>
+          <div class="module-detail-grid">
+            <article class="module-detail-card"><span class="module-detail-label" data-i18n="moduleRole">ROLE</span><h2 data-i18n="ffmpegRoleTitle">Capture media dependencies</h2><p data-i18n="ffmpegRoleDesc">FFmpeg and ffprobe support media processing and inspection in the capture pipeline.</p></article>
+            <article class="module-detail-card"><span class="module-detail-label" data-i18n="moduleComponents">COMPONENTS</span><h2 data-i18n="ffmpegComponentsTitle">Media toolchain</h2><ul class="module-components"><li>ffmpeg.exe</li><li>ffprobe.exe</li></ul><p data-i18n="ffmpegStateNote">File availability does not confirm an active recording or encoder readiness.</p></article>
+          </div>
+        </section>
+
+        <section class="view" id="viewServices" aria-label="Services">
+          <div class="page-heading"><div><span class="eyebrow" data-i18n="workspaceServices">WORKSPACE / SERVICES</span><h1 data-i18n="services">SERVICES</h1></div><span class="heading-stamp">03 / RUNTIME</span></div>
+          <div class="services-topline"><span data-i18n="servicesInfo">Live launcher supervisor snapshot</span><span class="live-dash" data-i18n="monitoring">● MONITORING</span></div>
+          <ul class="svc">
+            <li><span class="dot" id="dotOverlay"></span><div class="svc-text"><div class="svc-name" data-i18n="overlayService">SHADOWPLAY OVERLAY</div><div class="svc-detail" data-i18n="overlayServiceDetail">Selected overlay service</div></div><div class="svc-state" id="stateOverlay" data-i18n="stopped">STOPPED</div></li>
+            <li><span class="dot" id="dotContainer"></span><div class="svc-text"><div class="svc-name" data-i18n="overlayController">OVERLAY CONTROLLER</div><div class="svc-detail">NvContainer.exe</div></div><div class="svc-state" id="stateContainer" data-i18n="stopped">STOPPED</div></li>
+            <li><span class="dot" id="dotNvApi"></span><div class="svc-text"><div class="svc-name" data-i18n="localApiService">LOCAL API SERVICE</div><div class="svc-detail" data-i18n="httpServiceDetail">Active local API service</div></div><div class="svc-state" id="stateNvApi" data-i18n="stopped">STOPPED</div></li>
+            <li><span class="dot" id="dotNotifier"></span><div class="svc-text"><div class="svc-name" data-i18n="notifierService">WINFORM NOTIFIER</div><div class="svc-detail" data-i18n="legacyNotifierDetail">Legacy notification lane</div></div><div class="svc-state" id="stateNotifier" data-i18n="stopped">STOPPED</div></li>
+          </ul>
+          <p class="services-note" data-i18n="httpHealthNote">Service status is not capture readiness.</p>
+        </section>
+
+        <section class="view" id="viewSettings" aria-label="NVIDIA Config" data-i18n-aria-label="navSettings">
+          <div class="page-heading"><div><span class="eyebrow" data-i18n="workspaceSettings">WORKSPACE / CONFIG</span><h1 data-i18n="navSettings">NVIDIA Config</h1></div><span class="heading-stamp">11 / CONFIG</span></div>
+          <div class="module-overview"><div class="module-status-item"><span data-i18n="moduleStatus">Status</span><strong class="module-state" id="moduleStateConfig" data-i18n="moduleWaiting">WAITING FOR DATA</strong></div><div class="module-status-item"><span data-i18n="moduleFiles">Module files</span><strong class="module-availability" id="moduleAvailabilityConfig" data-i18n="moduleWaiting">WAITING FOR DATA</strong></div></div>
+          <div class="settings-grid">
+            <div class="settings-card">
+              <span class="mini-index" data-i18n="overlayInGame">Overlay In-game</span>
+              <div class="setting-line"><div><h2>NVIDIA ShadowPlay</h2><p data-i18n="featureDescription">Turn the selected overlay engine on or off.</p></div><span class="toggle" id="tglOverlay" role="switch" aria-label="Overlay enabled" data-i18n-aria-label="overlayEnabled" aria-checked="false" tabindex="0"></span></div>
+            </div>
+            <div class="settings-card">
+              <span class="mini-index" data-i18n="engineTitle">OVERLAY ENGINE</span>
+              <div class="setting-line vertical"><div class="mode-row"><span class="mode-label active" id="lblWinform" role="button" tabindex="0">WINFORM</span><span class="mode-toggle" id="tglEngine" role="switch" aria-label="Overlay engine mode" data-i18n-aria-label="overlayMode" aria-checked="false" tabindex="0"><span class="mode-knob"></span></span><span class="mode-label" id="lblCef" role="button" tabindex="0">CEF</span></div><p class="mode-desc" id="modeDesc" data-i18n="modeDescription">Selects the engine; does not power the overlay.</p></div>
+            </div>
+          </div>
+          <div class="settings-tip"><span class="accent-bar"></span><span data-i18n="settingsInfo">Settings are saved by the native Launcher and synchronized with local services.</span></div>
+          <div class="appearance-card" id="appearanceSettings">
+            <div><span class="mini-index" data-i18n="appearanceModule">APPEARANCE MODULES</span><h2 data-i18n="appearanceTitle">Launcher profiles & background</h2>
+              <p data-i18n="appearanceDescription">Choose an installed visual module to change the Launcher background and NVIDIA accent. No module code is executed.</p></div>
+            <div class="appearance-controls"><select id="appearanceProfile" aria-label="Appearance profile" data-i18n-aria-label="appearanceTitle"><option value="default">NVIDIA Classic</option></select>
+              <button type="button" class="btn-primary" id="btnApplyAppearance" data-i18n="appearanceApply">APPLY PROFILE</button></div>
+            <div class="appearance-actions">
+              <button type="button" class="btn-outline" id="btnImportBackground" data-i18n="appearanceImport">IMPORT BACKGROUND</button>
+              <button type="button" class="btn-outline" id="btnInstallAppearance" data-i18n="appearanceInstall">INSTALL .SPMOD</button>
+              <button type="button" class="btn-secondary" id="btnRemoveAppearance" data-i18n="appearanceRemove" disabled>REMOVE SELECTED</button>
+            </div>
+            <div class="appearance-preview">
+              <div class="appearance-preview-art" id="appearancePreview" aria-hidden="true"><span>SHADOWPLAY NEXT</span></div>
+              <div class="appearance-preview-text">
+                <span class="mini-index" data-i18n="appearancePreviewTitle">PROFILE PREVIEW</span>
+                <strong id="appearancePreviewName">NVIDIA Classic</strong>
+                <span id="appearanceInstalledCount">0 modules installed</span>
+              </div>
+            </div>
+            <div class="appearance-meta" id="appearanceInfo" role="status" aria-live="polite">NVIDIA Classic · v1.0.0 · ShadowPlay NEXT</div>
+            <p class="appearance-hint" data-i18n="appearanceHint">Install .spmod appearance packs with the local installer. Native executable modules remain disabled.</p>
+          </div>
+          <div class="module-detail-grid">
+            <article class="module-detail-card"><span class="module-detail-label" data-i18n="moduleRole">ROLE</span><h2 data-i18n="configRoleTitle">Shared configuration</h2><p data-i18n="configRoleDesc">Provides configuration shared by the Launcher and local ShadowPlay modules.</p></article>
+            <article class="module-detail-card"><span class="module-detail-label" data-i18n="moduleComponents">COMPONENTS</span><h2 data-i18n="configComponentsTitle">Configuration module</h2><ul class="module-components"><li>NVIDIA Config</li><li data-i18n="configPreferencesComponent">Overlay engine and application preferences</li></ul></article>
+          </div>
+        </section>
       </div>
     </div>
-    <div class="feature-card">
-      <div class="mode-panel">
-        <div class="mode-title" data-i18n="engineTitle">OVERLAY ENGINE</div>
-        <div class="mode-row">
-          <span class="mode-label active" id="lblWinform" role="button" tabindex="0">WINFORM</span>
-          <span class="mode-toggle" id="tglEngine" role="switch" aria-label="Overlay engine mode" data-i18n-aria-label="overlayMode" aria-checked="false" tabindex="0"><span class="mode-knob"></span></span>
-          <span class="mode-label" id="lblCef" role="button" tabindex="0">CEF</span>
-        </div>
-        <div class="mode-desc" id="modeDesc" data-i18n="modeDescription">Selects the engine; does not power the overlay.</div>
-      </div>
-    </div>
-  </section>
+  </div>
 
-  <!-- ==================== FOOTER ==================== -->
   <footer>
-    <div class="foot-left">
-      <span class="ver">NVIDIA SHADOWPLAY · CEF 73</span>
-      <span class="bridge" id="bridgeState" role="status" aria-live="polite" data-i18n="connecting">CONNECTING</span>
-      <span class="action-status" id="actionStatus" role="status" aria-live="polite"></span>
-    </div>
-    <div class="foot-right">
-      <button id="btnObt3" class="btn-secondary">OBT3 &rarr;</button>
-      <button id="btnExit" class="btn-danger" data-i18n="exitAll">EXIT ALL</button>
-    </div>
+    <div class="foot-left"><span class="ver">SHADOWPLAY NEXT</span><span class="bridge" id="bridgeState" role="status" aria-live="polite" data-i18n="connecting">CONNECTING</span><span class="action-status" id="actionStatus" role="status" aria-live="polite"></span></div>
+    <div class="foot-right"><button id="btnObt3" type="button" class="btn-secondary">OBT3 ↗</button><button id="btnExit" type="button" class="btn-danger" data-i18n="exitAll">EXIT ALL</button></div>
   </footer>
 
 <script src="osc-locales.js"></script>
 <script src="i18n.js"></script>
 <script src="app.js"></script>
+<script src="module-profiles.js?v=modules-magisk-20261024"></script>
+<script src="quick-ui.js?v=magisk-cards-20261024"></script>
 </body>
 </html>

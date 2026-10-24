@@ -8,7 +8,7 @@ $buildExe = Join-Path $installation 'MSBuild\Current\Bin\MSBuild.exe'
 $anselAdapterRoot = Join-Path $repoRoot 'Project\NVIDIA Adapter\Ansel Adapter'
 $anselEngineRoot = Join-Path $anselAdapterRoot 'ReShade Ansel'
 $hookRoot = Join-Path $repoRoot 'Project\NVIDIA Adapter\OSC Adapter\Duluka Hook'
-foreach ($projectFile in @((Join-Path $anselEngineRoot 'NVIDIA Ansel Adapter.vcxproj'), (Join-Path $hookRoot 'NVIDIA OSC Adapter.vcxproj'), (Join-Path $hookRoot 'NVIDIA OSC Adapter Host.csproj'), (Join-Path $anselEngineRoot 'tests\Ansel Session Tests.vcxproj'))) {
+foreach ($projectFile in @((Join-Path $anselEngineRoot 'NVIDIA Ansel Adapter.vcxproj'), (Join-Path $hookRoot 'NVIDIA OSC Adapter.vcxproj'), (Join-Path (Split-Path -Parent $hookRoot) 'NVIDIA OSC Adapter Host.csproj'), (Join-Path $anselEngineRoot 'tests\Ansel Session Tests.vcxproj'))) {
     if ([IO.Path]::GetExtension($projectFile) -eq '.csproj') {
         & $buildExe $projectFile /t:Restore /p:Configuration=Release /p:Platform=x64 /m:1 /nr:false /v:minimal /nologo
         if ($LASTEXITCODE -ne 0) { throw "Restore failed: $projectFile" }

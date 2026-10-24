@@ -52,6 +52,11 @@ function isValidGpuPreferenceApplied(data) {
     if (typeof data.exePath !== 'string' || data.exePath.length < 3 || data.exePath.length > 512) return false;
     if (typeof data.adapterId !== 'string' || data.adapterId.length > 128) return false;
     if (data.isSystemDefault !== true && data.adapterId.length === 0) return false;
+    // Optional v1 Windows GPU policy (0=auto, 1=power saving, 2=high performance).
+    if (data.windowsGpuPolicy != null &&
+        (!(data.windowsGpuPolicy === 0 || data.windowsGpuPolicy === 1 ||
+           data.windowsGpuPolicy === 2) || data.isSystemDefault !== true ||
+         data.adapterId.length !== 0)) return false;
     /* optional display fields — must be strings when present (C# allows empty) */
     if (data.adapterName != null && (typeof data.adapterName !== 'string' || data.adapterName.length > 256)) return false;
     if (data.displayName != null && (typeof data.displayName !== 'string' || data.displayName.length > 128)) return false;

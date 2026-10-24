@@ -4,8 +4,11 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- Other agents add tests beside Program.cs; do not compile their top-level statements. -->
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Program.cs" />
     <Compile Include="../Components/Runtime/CaptureEngineCatalog.cs" Link="CaptureEngineCatalog.cs" />
   </ItemGroup>
 </Project>

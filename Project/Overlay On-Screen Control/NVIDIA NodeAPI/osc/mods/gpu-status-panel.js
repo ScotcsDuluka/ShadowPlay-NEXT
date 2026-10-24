@@ -99,8 +99,8 @@
     '</div><md-switch md-invert class="settings-switch" ng-model="filterSettings.connectionManager" ng-change="filterSettings.save()" ng-disabled="filterSettings.busy || !filterSettings.loaded" aria-labelledby="nv-reshade-manager-label" aria-describedby="nv-reshade-manager-help" hover-focus></md-switch></div>',
     '<div class="nv-freestyle-row"><div class="nv-freestyle-label">',
     '<span class="settings-switch-label">Install ReShade</span>',
-    '<p id="nv-reshade-install-help" class="settings-describe">The installer is not available yet.</p>',
-    '</div><button type="button" class="osc-button osc-button-gray osc-button-disabled" disabled aria-describedby="nv-reshade-install-help">Install ReShade</button></div>',
+    '<p id="nv-reshade-install-help" class="settings-describe">Inspect a game, review its Graphics API and installation evidence, then use official ReShade Setup.</p>',
+    '</div><button type="button" class="osc-button osc-button-gray" ng-click="filterSettings.openReShadeManager()" aria-describedby="nv-reshade-install-help" hover-focus>Open ReShade Manager</button></div>',
     '</section>',
     '<div class="nv-freestyle-feedback">',
     '<p class="settings-describe" role="status" aria-live="polite" aria-atomic="true">{{filterSettings.status}}</p>',
@@ -153,6 +153,13 @@
       settings.innerHTML = filterSettingsTemplate;
       settings.__nvScope = scope;
       model = scope.filterSettings = createFilterSettingsModel(injector.get('$http'));
+      model.openReShadeManager = function () {
+        if (window.NvReShadeManager && window.NvReShadeManager.open)
+          return window.NvReShadeManager.open();
+        model.error = 'ReShade Manager UI is not loaded. Check the OSC mods.';
+        scope.$evalAsync();
+        return false;
+      };
       scope.$on('$destroy', model.dispose);
       injector.get('$compile')(settings)(scope);
       host.appendChild(settings);

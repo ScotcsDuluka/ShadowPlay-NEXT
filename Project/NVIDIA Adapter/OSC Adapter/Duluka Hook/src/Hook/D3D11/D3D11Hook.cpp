@@ -15,6 +15,7 @@
 #include <mutex>
 #include <string>
 #include "../../../include/osc_frame_bridge.h"
+#include "../../../include/d3d11_timing_diagnostics.h"
 #include "../../Renderer/D3D11/D3D11Renderer.h"
 #include "../../Renderer/D3D9/D3D9Renderer.h"
 #include <reshade.hpp>
@@ -35,13 +36,28 @@ namespace
     std::atomic<std::uint64_t> g_presentCount{ 0 };
     std::atomic<std::uint64_t> g_contendedPresentCount{ 0 };
     std::atomic<std::uint64_t> g_reentrantPresentCount{ 0 };
+    std::atomic<std::uint64_t> g_overlayCallbackTotalTicks{ 0 };
+    std::atomic<std::uint64_t> g_overlayCallbackMaxTicks{ 0 };
+    std::atomic<std::uint64_t> g_overlayCallbackSamples{ 0 };
+    std::atomic<std::uint64_t> g_gamePresentTotalTicks{ 0 };
+    std::atomic<std::uint64_t> g_gamePresentMaxTicks{ 0 };
+    std::atomic<std::uint64_t> g_gamePresentSamples{ 0 };
+    std::atomic<std::uint64_t> g_reshadeCallbackTotalTicks{ 0 };
+    std::atomic<std::uint64_t> g_reshadeCallbackMaxTicks{ 0 };
+    std::atomic<std::uint64_t> g_reshadeCallbackSamples{ 0 };
     // Kept for exported ABI compatibility. ResizeBuffers is deliberately not
     // intercepted; the compositor reacquires/releases the back buffer per Present.
     std::atomic<std::uint64_t> g_resizeBuffersCount{ 0 };
     std::atomic<bool> g_hookInstalled{ false };
     std::atomic<bool> g_reshadeAddonRegistered{ false };
-    std::atomic<bool> g_firstPresentLogged{ false };
     std::atomic<bool> g_recursiveFallbackLogged{ false };
+    std::atomic<std::uint64_t> g_suppressedRenderLogs{ 0 };
+    thread_local bool g_insideRenderCallback = false;
+    struct RenderCallbackScope {
+        bool previous = g_insideRenderCallback;
+        RenderCallbackScope() { g_insideRenderCallback = true; }
+        ~RenderCallbackScope() { g_insideRenderCallback = previous; }
+    };
     thread_local unsigned int g_presentDepth = 0;
     thread_local bool g_recursiveFallbackActive = false;
     PresentFunction g_originalPresent = nullptr;
@@ -86,6 +102,10 @@ namespace
 
 
     void Log(const char *message);
+    void RecordDuration(LONGLONG ticks,
+        std::atomic<std::uint64_t>& total,
+        std::atomic<std::uint64_t>& maximum,
+        std::atomic<std::uint64_t>& samples);
     HRESULT STDMETHODCALLTYPE HookPresent(
         IDXGISwapChain *swapChain,
         UINT syncInterval,
@@ -209,6 +229,10 @@ namespace
 
     void Log(const char *message)
     {
+        if (g_insideRenderCallback) {
+            g_suppressedRenderLogs.fetch_add(1, std::memory_order_relaxed);
+            return;
+        }
         OutputDebugStringA("[NVIDIA OSC Adapter] ");
         OutputDebugStringA(message);
         OutputDebugStringA("\n");
@@ -285,6 +309,14 @@ namespace
 
     bool IsGameProcessForeground()
     {
+        // Foreground state is not GPU frame data. Avoid three environment /
+        // desktop queries for every frame; a 50ms visibility delay is safe.
+        thread_local ULONGLONG nextCheckMs = 0;
+        thread_local bool cachedForeground = false;
+        const ULONGLONG now = GetTickCount64();
+        if (now < nextCheckMs)
+            return cachedForeground;
+        nextCheckMs = now + 50;
         wchar_t testMappingName[128]{};
         wchar_t expectedTestMappingName[128]{};
         if (GetEnvironmentVariableW(
@@ -295,9 +327,13 @@ namespace
                 L"Local\\NVIDIAOSC.Frame.Test.ConsumerAdapter.%lu",
                 GetCurrentProcessId()) >= 0 &&
             wcscmp(testMappingName, expectedTestMappingName) == 0)
+        {
+            cachedForeground = true;
             return true;
-        return osc_frame_bridge::IsGameOrNvidiaOverlayForeground(
+        }
+        cachedForeground = osc_frame_bridge::IsGameOrNvidiaOverlayForeground(
             GetCurrentProcessId());
+        return cachedForeground;
     }
 
     void OnReShadeRuntimeDestroyed(reshade::api::effect_runtime *runtime)
@@ -315,6 +351,19 @@ namespace
 
     void OnReShadePresent(reshade::api::effect_runtime *runtime)
     {
+        RenderCallbackScope renderLogGuard;
+        struct ReShadeTimerScope {
+            LARGE_INTEGER start{};
+            ReShadeTimerScope() { QueryPerformanceCounter(&start); }
+            ~ReShadeTimerScope() {
+                LARGE_INTEGER end{};
+                QueryPerformanceCounter(&end);
+                RecordDuration(end.QuadPart - start.QuadPart,
+                    g_reshadeCallbackTotalTicks,
+                    g_reshadeCallbackMaxTicks,
+                    g_reshadeCallbackSamples);
+            }
+        } reshadeTimer;
         if (!runtime)
             return;
         reshade::api::device *reshadeDevice = runtime->get_device();
@@ -514,50 +563,60 @@ namespace
                 "late register watch thread.\n");
     }
 
+    void RecordDuration(LONGLONG ticks,
+                        std::atomic<std::uint64_t>& total,
+                        std::atomic<std::uint64_t>& maximum,
+                        std::atomic<std::uint64_t>& samples)
+    {
+        if (ticks < 0) return;
+        const auto value = static_cast<std::uint64_t>(ticks);
+        total.fetch_add(value, std::memory_order_relaxed);
+        samples.fetch_add(1, std::memory_order_relaxed);
+        auto previous = maximum.load(std::memory_order_relaxed);
+        while (previous < value &&
+               !maximum.compare_exchange_weak(
+                   previous, value, std::memory_order_relaxed))
+        {}
+    }
+
     HRESULT STDMETHODCALLTYPE HookPresent(
         IDXGISwapChain *swapChain,
         UINT syncInterval,
         UINT flags)
     {
+        RenderCallbackScope renderLogGuard;
         struct PresentDepthScope
         {
             PresentDepthScope() { ++g_presentDepth; }
             ~PresentDepthScope() { --g_presentDepth; }
         } depthScope;
         const bool isReentrant = g_presentDepth > 1;
-        const auto presentCount = g_presentCount.fetch_add(1, std::memory_order_relaxed) + 1;
-        if (!g_firstPresentLogged.exchange(true, std::memory_order_relaxed))
-            Log("DXGI Present hook received its first frame callback.");
+        g_presentCount.fetch_add(1, std::memory_order_relaxed);
+
         if (isReentrant)
         {
             g_reentrantPresentCount.fetch_add(1, std::memory_order_relaxed);
             return ForwardRecursivePresent(swapChain, syncInterval, flags);
         }
+        LARGE_INTEGER overlayStart{}, overlayEnd{};
+        QueryPerformanceCounter(&overlayStart);
         const bool lockAcquired = duluka::d3d11::OnPresent(
             swapChain, IsGameProcessForeground(),
             g_reshadeAddonRegistered.load(std::memory_order_acquire));
+        QueryPerformanceCounter(&overlayEnd);
+        RecordDuration(overlayEnd.QuadPart - overlayStart.QuadPart,
+            g_overlayCallbackTotalTicks, g_overlayCallbackMaxTicks,
+            g_overlayCallbackSamples);
         if (!lockAcquired)
             g_contendedPresentCount.fetch_add(1, std::memory_order_relaxed);
-        else if (presentCount == 1 || presentCount % 1200 == 0)
-        {
-            const auto status = duluka::d3d11::GetStatus();
-            char diagnostic[512]{};
-            sprintf_s(diagnostic, sizeof(diagnostic),
-                "Present diagnostics: presents=%llu draws=%llu busy=%llu reentrant=%llu "
-                "bridge=%s texture=%s stage=%s hr=0x%08lX swap=%ux%u error=0x%08lX",
-                static_cast<unsigned long long>(presentCount),
-                static_cast<unsigned long long>(status.drawCount),
-                static_cast<unsigned long long>(g_contendedPresentCount.load(std::memory_order_relaxed)),
-                static_cast<unsigned long long>(g_reentrantPresentCount.load(std::memory_order_relaxed)),
-                status.bridgeConnected ? "connected" : "disconnected",
-                status.textureReady ? "ready" : "not-ready",
-                status.diagnosticStage ? status.diagnosticStage : "unknown",
-                static_cast<unsigned long>(status.diagnosticHresult),
-                status.swapWidth, status.swapHeight,
-                static_cast<unsigned long>(status.lastError));
-            Log(diagnostic);
-        }
-        return g_originalPresent(swapChain, syncInterval, flags);
+        LARGE_INTEGER originalStart{}, originalEnd{};
+        QueryPerformanceCounter(&originalStart);
+        const HRESULT result = g_originalPresent(swapChain, syncInterval, flags);
+        QueryPerformanceCounter(&originalEnd);
+        RecordDuration(originalEnd.QuadPart - originalStart.QuadPart,
+            g_gamePresentTotalTicks, g_gamePresentMaxTicks,
+            g_gamePresentSamples);
+        return result;
     }
 
     // ResizeBuffers is intentionally not intercepted. The in-game compositor
@@ -842,6 +901,46 @@ extern "C" __declspec(dllexport) BOOL WINAPI NvOscAdapterGetOverlayStatus(
     return TRUE;
 }
 
+extern "C" __declspec(dllexport) BOOL WINAPI NvOscAdapterGetD3D11TimingSnapshot(
+    duluka::d3d11_timing::Snapshot *output, std::uint32_t bytes)
+{
+    if (!output || bytes != sizeof(duluka::d3d11_timing::Snapshot))
+        return FALSE;
+    // Call from outside the render thread. GetStatus holds the renderer mutex
+    // only while taking a read-only snapshot.
+    const auto state = duluka::d3d11::GetStatus();
+    duluka::d3d11_timing::Snapshot snap{};
+    snap.presentCallbacks = g_presentCount.load(std::memory_order_relaxed);
+    snap.busyRenderSkips = g_contendedPresentCount.load(std::memory_order_relaxed);
+    snap.recursiveCallbacks = g_reentrantPresentCount.load(std::memory_order_relaxed);
+    snap.overlayDraws = state.drawCount;
+    snap.reshadeCallbacks = state.reshadeCallbackCount;
+    snap.bridgeFrameNumber = state.lastBridgeFrameNumber;
+    snap.overlayCacheCopies = state.cacheCopyCount;
+    snap.backBufferRtvCreated = state.backBufferRtvCreateCount;
+    snap.backBufferRtvReused = state.backBufferRtvReuseCount;
+    snap.suppressedRenderLogs = g_suppressedRenderLogs.load(std::memory_order_relaxed);
+    snap.overlayCallbackTotalTicks =
+        g_overlayCallbackTotalTicks.load(std::memory_order_relaxed);
+    snap.overlayCallbackMaxTicks =
+        g_overlayCallbackMaxTicks.load(std::memory_order_relaxed);
+    snap.overlayCallbackSamples =
+        g_overlayCallbackSamples.load(std::memory_order_relaxed);
+    snap.gamePresentTotalTicks =
+        g_gamePresentTotalTicks.load(std::memory_order_relaxed);
+    snap.gamePresentMaxTicks =
+        g_gamePresentMaxTicks.load(std::memory_order_relaxed);
+    snap.gamePresentSamples =
+        g_gamePresentSamples.load(std::memory_order_relaxed);
+    snap.reshadeCallbackTotalTicks =
+        g_reshadeCallbackTotalTicks.load(std::memory_order_relaxed);
+    snap.reshadeCallbackMaxTicks =
+        g_reshadeCallbackMaxTicks.load(std::memory_order_relaxed);
+    snap.reshadeCallbackSamples =
+        g_reshadeCallbackSamples.load(std::memory_order_relaxed);
+    *output = snap;
+    return TRUE;
+}
 BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID reserved)
 {
     if (reason == DLL_PROCESS_ATTACH)

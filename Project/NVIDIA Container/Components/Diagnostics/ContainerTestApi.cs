@@ -20,6 +20,12 @@ internal sealed class ContainerTestApi
     private readonly GameWatcher _gameWatcher;
     private readonly OscAdapterLifecycle _oscAdapterLifecycle;
     private readonly Func<object> _getCaptureEngineCatalog;
+    private readonly Func<object> _getCaptureWorkerStatus;
+    private readonly Func<object> _getCaptureCapabilities;
+    private readonly Func<object> _getCaptureContract;
+    private readonly Func<bool, JsonElement, (int Status, object Response)> _forwardRecordCommand;
+    private readonly Func<(int Status, object Response)> _getCaptureDisplays;
+    private readonly Func<bool, JsonElement, (int Status, object Response)> _forwardDisplayCommand;
     private readonly object _stateLock = new object();
     private bool _recordEnabled;
     private bool _irEnabled;
@@ -34,7 +40,12 @@ internal sealed class ContainerTestApi
         Func<int, long, bool> markNvGraphicsReady, Func<object> getNvGraphicsStatus,
         Func<bool> openNvGraphics, ApplicationOntologyClient applicationOntologyClient,
         GameWatcher gameWatcher, OscAdapterLifecycle oscAdapterLifecycle,
-        Func<object> getCaptureEngineCatalog)
+        Func<object> getCaptureEngineCatalog, Func<object> getCaptureWorkerStatus,
+        Func<object> getCaptureCapabilities,
+        Func<bool, JsonElement, (int Status, object Response)> forwardRecordCommand,
+        Func<(int Status, object Response)> getCaptureDisplays,
+        Func<bool, JsonElement, (int Status, object Response)> forwardDisplayCommand,
+        Func<object> getCaptureContract)
     {
         _enabled = enabled;
         _log = log;
@@ -47,6 +58,12 @@ internal sealed class ContainerTestApi
         _gameWatcher = gameWatcher;
         _oscAdapterLifecycle = oscAdapterLifecycle;
         _getCaptureEngineCatalog = getCaptureEngineCatalog;
+        _getCaptureWorkerStatus = getCaptureWorkerStatus;
+        _getCaptureCapabilities = getCaptureCapabilities;
+        _getCaptureContract = getCaptureContract;
+        _forwardRecordCommand = forwardRecordCommand;
+        _getCaptureDisplays = getCaptureDisplays;
+        _forwardDisplayCommand = forwardDisplayCommand;
         _listener = new TcpListener(IPAddress.Loopback, port);
     }
 
@@ -103,6 +120,12 @@ internal sealed class ContainerTestApi
                 }
 
                 var request = ReadRequest(stream);
+                var security = ControlRequestSecurity.Validate(request.Method, request.Headers);
+                if (security.Status != 200)
+                {
+                    Write(stream, security.Status, new { error = security.Error });
+                    return;
+                }
                 if (request.Method == "GET" && request.Path == "/v1/ontology/status")
                 {
                     var result = _applicationOntologyClient.GetStatus();
@@ -156,6 +179,56 @@ internal sealed class ContainerTestApi
                 if (request.Method == "GET" && request.Path == "/v1/capture/engines")
                 {
                     Write(stream, 200, _getCaptureEngineCatalog());
+                    return;
+                }
+                if (request.Method == "GET" && request.Path == "/v1/capture/status")
+                {
+                    Write(stream, 200, _getCaptureWorkerStatus());
+                    return;
+                }
+                if (request.Method == "GET" && request.Path == "/v1/capture/contract")
+                {
+                    Write(stream, 200, _getCaptureContract());
+                    return;
+                }
+                if (request.Method == "GET" && request.Path == "/v1/capture/capabilities")
+                {
+                    Write(stream, 200, _getCaptureCapabilities());
+                    return;
+                }
+                if (request.Method == "POST" && request.Path is
+                    "/v1/capture/record/start" or "/v1/capture/record/stop")
+                {
+                    using var commandDocument = JsonDocument.Parse(request.Body);
+                    var result = _forwardRecordCommand(
+                        request.Path == "/v1/capture/record/start", commandDocument.RootElement);
+                    Write(stream, result.Status, result.Response);
+                    return;
+                }
+                if (request.Method == "GET" && request.Path == "/v1/capture/displays")
+                {
+                    var result = _getCaptureDisplays();
+                    Write(stream, result.Status, result.Response);
+                    return;
+                }
+                if (request.Method == "POST" && request.Path is
+                    "/v1/capture/display/select" or "/v1/capture/screenshot")
+                {
+                    if (request.Body.Length > 4096)
+                    {
+                        Write(stream, 413, new { saved = false, code = "capture_request_too_large" });
+                        return;
+                    }
+                    using var displayDocument = JsonDocument.Parse(request.Body);
+                    var result = _forwardDisplayCommand(
+                        request.Path == "/v1/capture/screenshot", displayDocument.RootElement);
+                    Write(stream, result.Status, result.Response);
+                    return;
+                }
+                if (request.Path.StartsWith("/v1/capture/replay/", StringComparison.Ordinal))
+                {
+                    Write(stream, 501, new { code = "not_supported_by_worker_contract",
+                        availability = "Unavailable" });
                     return;
                 }
 
@@ -353,6 +426,10 @@ internal sealed class ContainerTestApi
             {
                 try { Write(client.GetStream(), 400, new { error = "invalid JSON", message = ex.Message }); } catch { }
             }
+            catch (IOException)
+            {
+                try { Write(client.GetStream(), 400, new { error = "malformed HTTP request" }); } catch { }
+            }
             catch (Exception ex)
             {
                 _log("[test-api] request failed: " + ex.Message);
@@ -397,7 +474,7 @@ internal sealed class ContainerTestApi
         }
     }
 
-    private static (string Method, string Path, byte[] Body) ReadRequest(NetworkStream stream)
+    private static (string Method, string Path, byte[] Body, Dictionary<string, string> Headers) ReadRequest(NetworkStream stream)
     {
         var headerBytes = new List<byte>();
         while (headerBytes.Count < 16384)
@@ -418,13 +495,22 @@ internal sealed class ContainerTestApi
         if (requestLine.Length < 2) throw new IOException("Invalid HTTP request line");
         var path = new Uri("http://127.0.0.1" + requestLine[1]).AbsolutePath;
         var contentLength = 0;
+        var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         for (var i = 1; i < lines.Length; i++)
         {
-            if (!lines[i].StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase)) continue;
-            if (!int.TryParse(lines[i].Substring("Content-Length:".Length).Trim(), out contentLength) ||
+            var separator = lines[i].IndexOf(':');
+            if (separator <= 0) continue;
+            var name = lines[i].Substring(0, separator).Trim();
+            var value = lines[i].Substring(separator + 1).Trim();
+            if (!headers.TryAdd(name, value))
+                throw new IOException("Duplicate HTTP request header");
+            if (!name.Equals("Content-Length", StringComparison.OrdinalIgnoreCase)) continue;
+            if (!int.TryParse(value, out contentLength) ||
                 contentLength < 0 || contentLength > 262144)
                 throw new IOException("Invalid or oversized Content-Length");
         }
+        if (headers.ContainsKey("Transfer-Encoding"))
+            throw new IOException("Chunked requests are not supported by the control API");
 
         var body = new byte[contentLength];
         var offset = 0;
@@ -434,7 +520,7 @@ internal sealed class ContainerTestApi
             if (read == 0) throw new IOException("Client closed before sending the request body");
             offset += read;
         }
-        return (requestLine[0], path, body);
+        return (requestLine[0], path, body, headers);
     }
 
     private object Dispatch(string method, string path, JsonElement body)
@@ -753,6 +839,7 @@ internal sealed class ContainerTestApi
             : statusCode == 502 ? "Bad Gateway"
             : statusCode == 503 ? "Service Unavailable"
             : statusCode == 504 ? "Gateway Timeout"
+            : statusCode == 501 ? "Not Implemented"
             : "Internal Server Error";
         var headers = System.Text.Encoding.ASCII.GetBytes(
             "HTTP/1.1 " + statusCode + " " + statusText + "\r\n" +

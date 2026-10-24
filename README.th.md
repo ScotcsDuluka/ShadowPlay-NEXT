@@ -121,6 +121,29 @@
 
 ---
 
+## สรุปสถานะวิศวกรรม — 24 ตุลาคม 2569
+
+ตารางนี้เป็น **สถานะการพัฒนาตามหลักฐานที่บันทึกไว้** ไม่ใช่การรับรองว่าระบบทุกส่วนผ่านเกมจริงหรือมีตัวติดตั้ง ShadowPlay NEXT เปิดให้ดาวน์โหลดแล้ว
+
+| ระบบ | หลักฐานที่ตรวจพบ | สิ่งที่ยังต้องตรวจ |
+|---|---|---|
+| **Launcher / Modules** | CEF 73 Command Center มีเมนู **11 โมดูล** และตรวจสถานะแพ็กเกจ/โปรเซสตามชนิดโมดูลได้ มีโค้ด Appearance Profiles สำหรับสีและภาพพื้นหลัง พร้อมปุ่ม Overlay/Settings เดิม | กดหน้าโมดูลไม่ใช่การติดตั้งหรือเริ่มโมดูล และ Appearance ยังไม่ใช่ Package Manager แบบ Magisk ที่ผ่านการรับรอง; CEF เก่ายังต้องปรับความปลอดภัย |
+| **Game Profiles / Windows GPU** | Backend กำหนด GPU รายแอปได้; ผู้พัฒนารายงานว่าทดสอบโน้ตบุ๊กหลาย GPU แล้ว เกมเรนเดอร์ผ่านการ์ดที่เลือกจริง และค่าคงอยู่หลัง Restart | ยังไม่ยืนยันทุก Windows/Driver/เกม และ UI ยังไม่ได้โคลน Windows Graphics Settings ครบทุกความสามารถ |
+| **ApplicationOntology** | แค็ตตาล็อกในเครื่อง `C:\My Project\nv-ontology-pages\public\catalog.json` ระบุ **v1.2.8 / 8 รายการ** เมื่ออ่านวันที่ 24 ต.ค. 2569; Container ใช้แคชแค็ตตาล็อกที่ผ่านการตรวจข้อมูล | **ยังไม่ได้ตรวจว่ารุ่นนี้ Deploy ขึ้น Public API แล้ว**; ชื่อ `.exe` ตรงกันไม่ได้พิสูจน์ตัวตนเกมด้วย SHA-256 |
+| **OSC Adapter / Duluka Hook** | มีโค้ด Native D3D9/D3D9Ex และ D3D11; ผลทดสอบแบบแยกโปรเซสใช้ **Host DX9Ex ตัวจริงส่งให้ Hook Receiver** ผ่าน GPU Shared Texture และเส้นทาง x64→x86 โดยไม่ต้อง Readback CPU ระหว่างการ CopyResource | DX9Ex Mailbox ยังเป็นการทดลอง ต้องตรวจ Hook เกมจริง อัตราเฟรม/FPS การเปิดปิด Overlay และการกลับมาทำงานเมื่อ Focus เปลี่ยน |
+| **Capture / Container Relay** | มี DXGI เลือกจอ, Screenshot และ API Relay ใน Source; Container ส่งต่อคำสั่ง ไม่จับภาพเอง; Relay Mock Tests บันทึกผลผ่าน **26/26** | Write API ปิดโดยค่าเริ่มต้น ต้องตรวจ NvCapture Runtime, OSC UI, การบันทึกจริงและไฟล์ภาพที่ได้; Replay ในสัญญาปัจจุบันตอบ **501** |
+| **NodeAPI Gallery** | แก้ Recent ให้ค้นโฟลเดอร์ย่อย, CopyFile ตรวจสำเร็จจริง และเพิ่ม MSE Video/Seek Bridge ที่เสิร์ฟหน้า OSC; ชุดทดสอบเฉพาะส่วนผ่าน **58/58** | ยังต้องทดสอบเล่นวิดีโอ Seek และ A/V Sync ใน CEF จริง; คำสั่ง Delete ตั้งใจตอบ **501** ไม่แสร้งว่าลบสำเร็จ |
+| **Container / NodeAPI Security** | มี Browser/Loopback Guards, ตรวจ Path ของโปรเซส, นโยบาย Game Identity ด้วย SHA-256 และงาน Pairing Secret พร้อมชุดทดสอบเฉพาะส่วน | ตรวจ Host/Origin ช่วยลดความเสี่ยงจากเว็บ แต่ไม่ใช่การยืนยันตัวตนของทุก Local Process; ต้องตรวจ Policy หลัง Deploy จริง |
+| **Ansel / ReShade** | แยก Ansel Adapter จาก ReShade Ansel Engine และมีสัญญา Named Pipe / Game Filter UI | ปุ่ม Game Filter แสดงได้ ไม่ได้แปลว่า Effect หรือ Shader ทำงานในเกมจริง |
+
+**เส้นทางเจ้าของระบบ:** `NVIDIA Capture → NVIDIA Container → NVIDIA NodeAPI → OSC UI` สำหรับสถานะและคำสั่ง Capture ส่วน `NVIDIA OSC Host → OSC Adapter / Duluka Hook` เป็นเส้นทาง Overlay Transport ที่ยังทดลองอยู่ โดย NvCapture เป็นผู้เลือกจอและสร้าง Screenshot จริง
+
+**อย่าสับสน:** แก้ Source → Test → Build → Deploy/Restart → ตรวจ Runtime → ออก Public Release เป็นคนละขั้นตอนกัน การแก้ README อย่างเดียวไม่จำเป็นต้อง Restart Engine
+
+อ่านหลักฐานเพิ่มเติม: [Launcher](Project/Launcher.Cef/README.md) · [OSC Adapter](Project/NVIDIA%20Adapter/OSC%20Adapter/README.md) · [DX9Ex GPU Test](Project/Overlay%20On-Screen%20Control/NVIDIA%20OSC/HOST-DX9EX-IPC-DIRECT-GPU-20261024.md) · [Capture Relay](Project/NVIDIA%20Container/CAPTURE-DISPLAY-RELAY-CONTRACT-20261024.md) · [Gallery](Project/Overlay%20On-Screen%20Control/NVIDIA%20NodeAPI/NODEAPI-GALLERY-PLAYER-SEEK-20261024.md) · [Security](Project/NVIDIA%20Container/SECURITY-STABILITY-20261024.md)
+
+---
+
 ## สถาปัตยกรรมเบื้องหลัง Flagship ReBuild
 
 ผังนี้เป็น **ภาพรวมความรับผิดชอบของระบบ** ไม่ใช่คำรับรองว่าการเชื่อมต่อทุกเส้นทางพร้อมใช้งานในรุ่น Public

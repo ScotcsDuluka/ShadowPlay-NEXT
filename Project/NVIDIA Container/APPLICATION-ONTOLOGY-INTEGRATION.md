@@ -121,3 +121,48 @@ process names. The OSC push event is schema-validated and keeps Hook Overlay
 disabled. A separate local .NET server exposes catalog download endpoints for
 development, but the watcher uses its own persistent cache and does not
 depend on that server for game detection.
+
+## Identity accuracy and render API safeguards — 2026-10-23
+
+The production catalog currently published at `nv-ontology.pages.dev` is
+**v1.2.6 with six games**. The local `nv-ontology-pages` working tree contains
+a proposed **v1.2.7** adding `d3d11` to Among Us. It has not been deployed.
+
+New validation in `ApplicationOntologyClient` retains each entry's
+`renderApis` (optional array of known API identifiers) and `sha256` (required
+array of 64-digit hexadecimal hashes). Invalid/duplicate APIs and hashes
+reject the entire downloaded catalog before it can replace the local cache.
+
+- An executable-name match **without trusted hash pins** is reported as
+  `matchMethod: "executableName"`, `identityVerified: false`. It is
+  useful for game discovery but **not proof** of the executable's identity.
+- An entry with SHA-256 pins cannot match on its name alone. GameWatcher
+  hashes the on-disk image (only allowlisted candidates, at most 512 MiB, once
+  per observed process signature), then requires a pinned hash match.
+  Hash mismatch, inaccessible file, over-large file and ambiguous name
+  fail closed. Nothing is written into the game's directory.
+- Supplying a hash for a game without trusted pins does not magically
+  establish identity (`hash_unverified`).
+- `matchedGames` status/Event now includes `renderApis`,
+  `matchMethod`, and `identityVerified`. NodeAPI schema v1 accepts and
+  validates these additions while remaining compatible with older events.
+- A catalog change in hash or API data invalidates cached identity
+  decisions, even if the upstream accidentally reuses its version string.
+- `OscAdapterLifecycle` starts only for an entry with exactly one declared
+  render API, `d3d11`, when the adapter is separately enabled by config.
+  DX9, DX12, OpenGL, Vulkan, mixed-API and unknown entries are *not*
+  automatically sent to the D3D11-only hook. This is a safety gate based
+  on catalog metadata, **not** runtime proof of the active graphics API.
+
+Tests live in `Tests/OntologyIdentity.Tests.csproj`. Run with the local
+catalog path:
+
+```powershell
+dotnet run --project "Project/NVIDIA Container/Tests/OntologyIdentity.Tests.csproj" -c Release -- "C:\My Project\nv-ontology-pages\public\catalog.json"
+```
+
+Native Release x64 was built separately without replacing the running
+NvContainer. Pending files: `build/NVIDIA ShadowPlay/NVIDIA Container/PendingUpdates/OntologyIdentity-v1.2.7`.
+The new NodeAPI event validator is staged in the product Build. Cloudflare
+has not been deployed or modified remotely. Do not overwrite the active
+NvContainer.dll while the supervisor and any game hooks are running.

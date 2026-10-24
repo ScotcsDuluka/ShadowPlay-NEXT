@@ -374,3 +374,109 @@ test('Video Settings uses compact static sections, not a nested scrollbar', () =
   assert.doesNotMatch(css, /overflow-y:\s*(auto|scroll)/);
   assert.doesNotMatch(css, /max-height:\s*[0-9].*overflow/);
 });
+
+function nvencSyntheticCatalog(status) {
+  const body = containerCatalog();
+  body.policyValid = true;
+  body.providers[1].encoders = [
+    'h264_nvenc', 'hevc_nvenc', 'av1_nvenc', 'libx264'
+  ];
+  body.workerRuntime = { schemaVersion: 2, ffmpegBinary: {
+    binaryRunnable: true,
+    nvencSyntheticValidation: {
+      status: status || 'complete', gpuCount: 2,
+      results: [0, 1].flatMap(gpuIndex => [
+        { gpuIndex, encoder: 'h264_nvenc', syntheticEncodePassed: true,
+          realRecordingVerified: false },
+        { gpuIndex, encoder: 'hevc_nvenc', syntheticEncodePassed: true,
+          realRecordingVerified: false },
+        { gpuIndex, encoder: 'av1_nvenc', syntheticEncodePassed: false,
+          realRecordingVerified: false }
+      ])
+    }
+  }};
+  return body;
+}
+
+test('live Capture synthetic proof disables AV1 on both GPUs but keeps NVIDIA md-select choices', async () => {
+  const h = startHarness();
+  const view = h.hooks.prime();
+  h.hooks.setCatalog(h.hooks.parseCatalog(nvencSyntheticCatalog()));
+  h.hooks.setState({ ...goodSettings(), encoder: 'NVENC_AV1' });
+  view.scope.captureSettingsReady = true;
+  h.hooks.syncCodecs();
+  assert.deepEqual(Array.from(h.hooks.allowed('FFmpeg')),
+    ['NVENC_H264', 'NVENC_HEVC', 'LibX264']);
+  const av1 = view.scope.captureEncoderChoices.find(x => x.value === 'NVENC_AV1');
+  assert.equal(av1.disabled, true);
+  assert.match(av1.label, /GPU test failed/);
+  assert.equal(h.hooks.state().encoder, 'NVENC_AV1',
+    'saved unsupported codec must remain unchanged and visible');
+  assert.equal(view.scope.captureUi.encoder, 'NVENC_AV1');
+  assert.match(view.scope.captureCodecStatus, /FAILED on all 2 tested GPUs/);
+  assert.equal(await h.hooks.save(), false);
+  assert.equal(h.requests.length, 0, 'read-only refresh and invalid save never POST');
+  view.scope.captureUi.encoder = 'NVENC_H264';
+  view.scope.onEncoderChange();
+  await Promise.resolve();
+  assert.equal(h.hooks.state().encoder, 'NVENC_H264');
+  assert.equal(h.requests.length, 1);
+});
+
+test('synthetic pass means encode tested, not recording-ready or selected GPU ready', () => {
+  const h = startHarness();
+  const view = h.hooks.prime();
+  h.hooks.setCatalog(h.hooks.parseCatalog(nvencSyntheticCatalog()));
+  h.hooks.setState(goodSettings());
+  h.hooks.syncCodecs();
+  assert.match(view.scope.captureCodecStatus, /passed on 2\/2 GPUs/);
+  assert.match(view.scope.captureCodecStatus, /real recording are unverified/);
+  assert.equal(view.scope.captureEncoderChoices.find(x => x.value === 'NVENC_HEVC').disabled, false);
+});
+
+test('not_run and missing NVENC verification do not claim unsupported hardware', () => {
+  for (const body of [nvencSyntheticCatalog('not_run'),
+    { ...nvencSyntheticCatalog(), workerRuntime: undefined }]) {
+    const h = startHarness();
+    const view = h.hooks.prime();
+    h.hooks.setCatalog(h.hooks.parseCatalog(body));
+    h.hooks.setState({ ...goodSettings(), encoder: 'NVENC_AV1' });
+    h.hooks.syncCodecs();
+    assert.equal(view.scope.captureEncoderChoices.find(x => x.value === 'NVENC_AV1').disabled, false);
+    assert.match(view.scope.captureCodecStatus, /GPU support unverified/);
+    assert.ok(h.hooks.allowed('FFmpeg').includes('NVENC_AV1'));
+  }
+});
+
+test('incomplete or duplicate GPU evidence cannot falsely disable a codec', () => {
+  const cases = [
+    body => { body.workerRuntime.ffmpegBinary.nvencSyntheticValidation.results.pop(); },
+    body => { body.workerRuntime.ffmpegBinary.nvencSyntheticValidation.results =
+      body.workerRuntime.ffmpegBinary.nvencSyntheticValidation.results
+        .filter(x => x.encoder !== 'av1_nvenc').concat([
+          { gpuIndex: 0, encoder: 'av1_nvenc', syntheticEncodePassed: false },
+          { gpuIndex: 0, encoder: 'av1_nvenc', syntheticEncodePassed: false }
+        ]); },
+    body => { body.workerRuntime.ffmpegBinary.nvencSyntheticValidation.results =
+      body.workerRuntime.ffmpegBinary.nvencSyntheticValidation.results.map(x =>
+        x.encoder === 'av1_nvenc' ? { ...x, syntheticEncodePassed: 'false' } : x); }
+  ];
+  for (const alter of cases) {
+    const body = nvencSyntheticCatalog();
+    alter(body);
+    const h = startHarness();
+    h.hooks.setCatalog(h.hooks.parseCatalog(body));
+    assert.ok(h.hooks.allowed('FFmpeg').includes('NVENC_AV1'));
+  }
+});
+
+test('FFmpeg verification must never disable Duluka Native H264 route', () => {
+  const h = startHarness();
+  const body = nvencSyntheticCatalog();
+  body.workerRuntime.ffmpegBinary.nvencSyntheticValidation.results =
+    body.workerRuntime.ffmpegBinary.nvencSyntheticValidation.results.map(x =>
+      x.encoder === 'h264_nvenc' ? { ...x, syntheticEncodePassed: false } : x);
+  h.hooks.setCatalog(h.hooks.parseCatalog(body));
+  assert.deepEqual(Array.from(h.hooks.allowed('Duluka')), ['NVENC_H264']);
+  assert.equal(h.hooks.allowed('FFmpeg').includes('NVENC_H264'), false);
+});

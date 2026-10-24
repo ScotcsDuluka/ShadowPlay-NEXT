@@ -6,6 +6,7 @@
 #include <windows.h>
 
 #include "launcher_util.h"
+#include "launcher_shutdown_policy.h"
 
 using launcherutil::LogLine;
 
@@ -44,7 +45,12 @@ bool HubRunning() {
 }
 
 bool BackendRunning() {
-  return launcherutil::IsTcpPortOpen(59011);
+  // Port-open alone may belong to an unrelated or half-ready local service.
+  // The bundled Web Helper must exist and the HTTP static entry must answer.
+  return launcherutil::ProcessRunningFromPath(
+             kWebHelper, RootP(L"Overlay On-Screen Control\\NVIDIA NodeAPI",
+                               L"NVIDIA Web Helper.exe")) &&
+         launcherutil::HttpGetLocal(59011, L"/");
 }
 
 std::wstring OscExePath() {
@@ -52,7 +58,10 @@ std::wstring OscExePath() {
 }
 
 bool OscRunning() {
-  return launcherutil::ProcessRunningFromPath(kCefOverlay, OscExePath());
+  // Landing HTTP 200 proves the UI host responds, not that Hook/CEF pixels
+  // are actually drawing in a game; keep those readiness concepts separate.
+  return launcherutil::ProcessRunningFromPath(kCefOverlay, OscExePath()) &&
+         launcherutil::HttpGetLocal(59013, L"/");
 }
 
 void StartIfMissing(const wchar_t* name, const std::wstring& exe_path,
@@ -78,6 +87,29 @@ void StartIfMissing(const wchar_t* name, const std::wstring& exe_path,
 std::wstring RootP(const wchar_t* folder, const wchar_t* file) {
   return launcherutil::JoinPath(
       launcherutil::JoinPath(launcherutil::GetRootDir(), folder), file);
+}
+
+LauncherModuleState ProcessModule(const wchar_t* name,
+                                  const std::wstring& path) {
+  LauncherModuleState state(true);
+  state.installed = launcherutil::FileExists(path);
+  state.running = launcherutil::ProcessRunningFromPath(name, path);
+  return state;
+}
+
+LauncherModuleState InstalledModule(bool installed) {
+  LauncherModuleState state;
+  state.installed = installed;
+  return state;
+}
+
+std::string ModuleJson(const LauncherModuleState& state) {
+  return "{\"installed\":" + std::string(state.installed ? "true" : "false") +
+         ",\"processTracking\":" +
+         std::string(state.process_tracking ? "true" : "false") +
+         ",\"running\":" +
+         std::string(state.process_tracking && state.running ? "true" : "false") +
+         "}";
 }
 
 // First existing hub exe wins: staged name, legacy name, then the layout
@@ -112,6 +144,17 @@ std::string LauncherState::ToJson() const {
        ",\"cefOverlay\":" + std::string(cef_overlay ? "true" : "false") + "}";
   o += ",\"overlayEnabled\":" + std::string(overlay_enabled ? "true" : "false");
   o += ",\"engineOverlay\":" + std::string(engine_overlay ? "true" : "false");
+  o += ",\"modules\":{\"Capture\":" + ModuleJson(modules.capture);
+  o += ",\"Graphics\":" + ModuleJson(modules.graphics);
+  o += ",\"Overlay\":" + ModuleJson(modules.overlay);
+  o += ",\"NodeApi\":" + ModuleJson(modules.node_api);
+  o += ",\"Container\":" + ModuleJson(modules.container);
+  o += ",\"Adapter\":" + ModuleJson(modules.adapter);
+  o += ",\"Hook\":" + ModuleJson(modules.hook);
+  o += ",\"Ansel\":" + ModuleJson(modules.ansel);
+  o += ",\"Helper\":" + ModuleJson(modules.helper);
+  o += ",\"Ffmpeg\":" + ModuleJson(modules.ffmpeg);
+  o += ",\"Config\":" + ModuleJson(modules.config) + "}";
   o += "}";
   return o;
 }
@@ -139,6 +182,45 @@ LauncherState LauncherSupervisor::Snapshot() {
   st.notifier = launcherutil::ProcessRunning(kNotifier);
   st.container = launcherutil::ProcessRunningFromPath(
       kContainer, RootP(L"NVIDIA Container", L"NvContainer.exe"));
+
+  // Report only exact files/processes owned by this product root. These
+  // inventory fields deliberately do not reuse HTTP readiness as process
+  // presence, and never inspect configuration contents or load native DLLs.
+  st.modules.capture = ProcessModule(
+      L"NvCapture", RootP(L"NVIDIA Capture", L"NvCapture.exe"));
+  st.modules.graphics = ProcessModule(
+      L"NvGraphics", RootP(L"NVIDIA Graphics", L"NvGraphics.exe"));
+  st.modules.overlay = ProcessModule(kCefOverlay, OscExePath());
+  st.modules.node_api = ProcessModule(
+      kWebHelper, RootP(L"Overlay On-Screen Control\\NVIDIA NodeAPI",
+                       L"NVIDIA Web Helper.exe"));
+  st.modules.container.installed = launcherutil::FileExists(
+      RootP(L"NVIDIA Container", L"NvContainer.exe"));
+  st.modules.container.running = st.container;
+  st.modules.adapter = ProcessModule(
+      L"NVIDIA OSC Adapter",
+      RootP(L"NVIDIA Adapter", L"NVIDIA OSC Adapter.exe"));
+  const LauncherModuleState adapter_x86 = ProcessModule(
+      L"NVIDIA OSC Adapter",
+      RootP(L"NVIDIA Adapter\\x86", L"NVIDIA OSC Adapter.exe"));
+  st.modules.adapter.installed =
+      st.modules.adapter.installed || adapter_x86.installed;
+  st.modules.adapter.running =
+      st.modules.adapter.running || adapter_x86.running;
+  st.modules.hook = InstalledModule(launcherutil::FileExists(
+      RootP(L"NVIDIA Adapter", L"NVIDIA OSC Adapter Hook.dll")) ||
+      launcherutil::FileExists(
+          RootP(L"NVIDIA Adapter\\x86", L"NVIDIA OSC Adapter Hook.dll")));
+  st.modules.ansel = InstalledModule(launcherutil::FileExists(
+      RootP(L"NVIDIA Adapter", L"NVIDIA Ansel Adapter.dll")));
+  st.modules.helper = ProcessModule(
+      L"nvsphelper", RootP(L"NVIDIA Container", L"nvsphelper.exe"));
+  st.modules.ffmpeg = InstalledModule(launcherutil::FileExists(
+      RootP(L"NVIDIA Capture\\FFmpeg", L"ffmpeg.exe")) &&
+      launcherutil::FileExists(
+          RootP(L"NVIDIA Capture\\FFmpeg", L"ffprobe.exe")));
+  st.modules.config = InstalledModule(launcherutil::FileExists(
+      RootP(L"NVIDIA Config", L"config.json")));
   return st;
 }
 
@@ -316,24 +398,17 @@ bool LauncherSupervisor::SendOpenOverlay() {
 }
 
 void LauncherSupervisor::InstallerExit() {
-  // Single-source config: clear the overlay switch (Main.vb RadioButton2).
-  launcherutil::WriteConfigBool(L"Overlay", L"UseOverlayEnabled", false);
-  const struct { const wchar_t* name; const wchar_t* path; } owned[] = {
-      {L"NVIDIA Notifier", L"NvOverlay\\WinForm\\NVIDIA Notifier.exe"},
-      {L"NVIDIA ShadowPlay", L"NvOverlay\\WinForm\\NVIDIA ShadowPlay.exe"},
-      {L"nvsphelper64", L"ShadowPlay\\nvsphelper64.exe"},
-      {L"nvsphelper64", L"NVIDIA Container\\nvsphelper64.exe"},
-      {L"NvContainer", L"NVIDIA Container\\NvContainer.exe"},
-      {L"NvBackend", L"NvBackend\\NvBackend.exe"},
-      {L"NVIDIA Backend", L"NvBackend\\NVIDIA Backend.exe"},
-      {L"NVIDIA Backend", L"NVIDIA Backend.exe"},
-      {L"NvCapture", L"NVIDIA Container\\CaptureEngine\\NvCapture.exe"},
-      {L"NVIDIA Web Helper", L"Overlay On-Screen Control\\NVIDIA NodeAPI\\NVIDIA Web Helper.exe"},
-      {L"NVIDIA OSC", L"Overlay On-Screen Control\\NVIDIA OSC\\NVIDIA OSC.exe"},
-  };
-  for (size_t i = 0; i < sizeof(owned) / sizeof(owned[0]); ++i) {
-    launcherutil::KillProcessFromPath(
-        owned[i].name, RootP(L"", owned[i].path));
+  // A failed config write must not trigger a kill pass: the supervisor would
+  // see power still enabled and could respawn the child service family.
+  if (!launcherutil::WriteConfigBool(L"Overlay", L"UseOverlayEnabled", false)) {
+    LogLine("installer exit aborted: could not persist overlay disabled");
+    return;
   }
-  LogLine("installer exit complete");
+  std::size_t count = 0;
+  const auto* owned = launcher_shutdown::OwnedExecutables(&count);
+  for (std::size_t i = 0; i < count; ++i) {
+    launcherutil::StopOwnedProcessFromPath(
+        owned[i].image_name, RootP(L"", owned[i].relative_path));
+  }
+  LogLine("installer exit finished: exact-path graceful/forced stop pass");
 }

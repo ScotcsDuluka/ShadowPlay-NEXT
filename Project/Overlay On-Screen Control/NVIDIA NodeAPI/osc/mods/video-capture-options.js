@@ -5,7 +5,7 @@
   var catalogEndpoint = '/DulukaCapture/v.1.0/engines';
   var panelId = 'nv-video-capture-options';
   var panelStackId = 'nv-video-capture-panels';
-  var panelVersion = '69';
+  var panelVersion = '70';
   var state = null;
   var statusNode = null;
   var captureFields = [];
@@ -54,6 +54,40 @@
     libx264: 'LibX264',
     libx265: 'LibX265'
   };
+  // Synthetic encoder tests come from NvCapture via Container/NodeAPI.
+  // A binary listing is not proof of GPU support, and a synthetic pass is
+  // NOT evidence that live recording works end-to-end.
+  function readNvencGpuEvidence(body) {
+    var worker = body && body.workerRuntime;
+    var binary = worker && worker.ffmpegBinary;
+    var scan = binary && binary.nvencSyntheticValidation;
+    var verdicts = {};
+    if (!scan || scan.status !== 'complete' ||
+        !Number.isInteger(scan.gpuCount) || scan.gpuCount < 1 ||
+        scan.gpuCount > 8 || !Array.isArray(scan.results)) return verdicts;
+    ['h264_nvenc', 'hevc_nvenc', 'av1_nvenc'].forEach(function (name) {
+      var rows = scan.results.filter(function (row) {
+        return row && row.encoder === name;
+      });
+      if (rows.length !== scan.gpuCount) return;
+      var seen = {};
+      var valid = rows.every(function (row) {
+        if (!Number.isInteger(row.gpuIndex) || row.gpuIndex < 0 ||
+            row.gpuIndex >= 8 || typeof row.syntheticEncodePassed !== 'boolean' ||
+            Object.prototype.hasOwnProperty.call(seen, row.gpuIndex)) return false;
+        seen[row.gpuIndex] = true;
+        return true;
+      });
+      if (!valid || Object.keys(seen).length !== scan.gpuCount) return;
+      verdicts[catalogEncoderAliases[name]] = {
+        verdict: rows.every(function (row) { return !row.syntheticEncodePassed; })
+          ? 'failed' : 'passed',
+        passedCount: rows.filter(function (row) { return row.syntheticEncodePassed; }).length,
+        gpuCount: scan.gpuCount
+      };
+    });
+    return verdicts;
+  }
   function parseEncoderCatalog(body) {
     if (!body || body.schemaVersion !== 1 || body.readOnly !== true ||
         !Array.isArray(body.providers)) {
@@ -76,6 +110,7 @@
     });
     return {
       routes: mapping,
+      gpuEvidence: readNvencGpuEvidence(body),
       policyValid: body.policyValid === true,
       binaryVerified: body.providers.some(function (item) {
         return item && item.id === 'FFmpeg' && item.capabilityVerified === true;
@@ -85,21 +120,35 @@
       })
     };
   }
+  function encoderGpuEvidence(engine, key) {
+    return engine === 'FFmpeg' && encoderCatalog && encoderCatalog.gpuEvidence
+      ? encoderCatalog.gpuEvidence[key] : null;
+  }
   function allowedEncoders(engine) {
     return encoderCatalog && encoderCatalog.routes[engine] ?
-      encoderCatalog.routes[engine].slice() : [];
+      encoderCatalog.routes[engine].filter(function (key) {
+        var evidence = encoderGpuEvidence(engine, key);
+        return !evidence || evidence.verdict !== 'failed';
+      }) : [];
   }
   function syncEncoderControls() {
     if (!panelScope || !state) return;
+    var listed = encoderCatalog && encoderCatalog.routes[state.engineMode]
+      ? encoderCatalog.routes[state.engineMode] : [];
     var available = allowedEncoders(state.engineMode);
+    var evidence = encoderGpuEvidence(state.engineMode, state.encoder);
     var choices = encoderChoices.filter(function (choice) {
-      return available.indexOf(choice[0]) >= 0;
+      return listed.indexOf(choice[0]) >= 0;
     }).map(function (choice) {
-      return { value: choice[0], label: choice[1], disabled: false };
+      var blocked = available.indexOf(choice[0]) < 0;
+      return {
+        value: choice[0],
+        label: choice[1] + (blocked ? ' (GPU test failed)' : ''),
+        disabled: blocked
+      };
     });
-    if (encoderCatalog && available.indexOf(state.encoder) < 0) {
-      // Preserve the actual persisted encoder in the visible UI; never
-      // silently rewrite it to NVENC_H264 during GET/read-only rendering.
+    if (encoderCatalog && listed.indexOf(state.encoder) < 0) {
+      // Read-only rendering must never overwrite an unsupported SAVED key.
       choices.push({ value: state.encoder,
         label: (encoderNames[state.encoder] || state.encoder) +
           ' (saved; unsupported for ' + state.engineMode + ')',
@@ -107,15 +156,20 @@
     }
     panelScope.captureEncoderChoices = choices;
     panelScope.captureUi.encoder = state.encoder;
+    var detail = 'FFmpeg codec advertised; GPU support unverified. Intel QSV requires an available Intel GPU; AMD AMF needs separate testing.';
+    if (evidence && evidence.verdict === 'passed') {
+      detail = 'NVENC synthetic encode passed on ' + evidence.passedCount + '/' +
+        evidence.gpuCount + ' GPUs; selected GPU and real recording are unverified.';
+    } else if (evidence && evidence.verdict === 'failed') {
+      detail = 'NVENC synthetic encode FAILED on all ' + evidence.gpuCount +
+        ' tested GPUs. Codec disabled; saved selection unchanged.';
+    }
     panelScope.captureCodecStatus = !encoderCatalog ?
       'Codec routes unavailable — reload to retry.' :
-      (available.indexOf(state.encoder) < 0 ?
+      (listed.indexOf(state.encoder) < 0 ?
         'Saved codec unavailable in the selected engine; select another codec.' :
         state.engineMode === 'Duluka' ?
-          'Duluka Native: H.264 NVENC only.' :
-          (encoderCatalog.hardwareVerified ?
-            'FFmpeg hardware readiness reported by Capture.' :
-            'FFmpeg codec list ≠ GPU support. Intel QSV requires an available Intel GPU.')) +
+          'Duluka Native: H.264 NVENC only.' : detail) +
       (encoderCatalog && !encoderCatalog.policyValid ?
         ' Capture routing policy unverified.' : '');
     schedulePanelDigest();

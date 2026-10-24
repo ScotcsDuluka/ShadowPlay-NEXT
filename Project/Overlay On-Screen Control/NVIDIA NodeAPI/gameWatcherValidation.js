@@ -32,6 +32,16 @@ function isValidMatchedGame(game) {
     if (!isString(game.executablePath, 3, 2048)) return false;
     if (!isString(game.gameId, 1, 128) || !isString(game.displayName, 1, 128)) return false;
     if (!isString(game.catalogVersion, 0, 64) || !isUtc(game.matchedUtc, false)) return false;
+    if (game.renderApis !== undefined &&
+        (!Array.isArray(game.renderApis) || game.renderApis.length > 6 ||
+         game.renderApis.some(function (api) {
+             return ['d3d9', 'd3d10', 'd3d11', 'd3d12', 'vulkan', 'opengl'].indexOf(api) === -1;
+         }))) return false;
+    if (game.matchMethod !== undefined &&
+        ['executableName', 'sha256'].indexOf(game.matchMethod) === -1) return false;
+    if (game.identityVerified !== undefined &&
+        (typeof game.identityVerified !== 'boolean' ||
+         game.identityVerified !== (game.matchMethod === 'sha256'))) return false;
     return true;
 }
 

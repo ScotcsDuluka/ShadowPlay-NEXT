@@ -1,5 +1,128 @@
 # Launcher.Cef — CEF launcher lane (root Launcher.exe + NvLauncher\Cef\Launcher.dll)
 
+## Simple Launcher — three destinations (2026-10-24)
+
+The default Launcher is intentionally limited to:
+1. **ShadowPlay** — ON/OFF using the existing `tglOverlay` /
+   `LAUNCHER_SET_OVERLAY` bridge, plus Open Overlay.
+2. **Core modules** — Container, OSC, NodeAPI, Capture, Graphics, Helper.
+3. **Add-on modules** — OSC Adapter, Duluka Hook, Ansel Adapter, FFmpeg,
+   and the existing data-only Appearance/Background module manager.
+
+The interface uses `ui/quick-ui.js`, `ui/quick-ui.css` and new markup
+in `ui/index.html`. The former full dashboard remains hidden but retains
+existing IDs/RPC event handlers for compatibility and rollback. The native
+Supervisor's `modules` inventory is still the source of truth: process
+presence and package-installed state are not treated as engine readiness.
+No new process installation, DLL injection, or arbitrary third-party code
+execution was introduced. The Exit All and OBT3 buttons are hidden in this
+simple presentation, not deleted from the native backend. The appearance
+manager is moved into the visible Add-ons tab without duplicating its IDs.
+Its selected image is applied to the new visible main panel.
+
+Validation: `node --test tests/quick-ui.test.cjs` — 4/4 PASS, existing
+Launcher UI/localization/appearance tests — 25/25 PASS, Git diff check PASS.
+Launcher-only staging completed with a backup; real CEF UI rendered at
+1152x648. The live power-off action is intentionally NOT exercised during
+this UI acceptance pass, to avoid disrupting the user's running overlay.
+Previous historical UI descriptions remain below for project history.
+
+## All-module navigation — 2026-10-24
+
+The sidebar exposes the active product modules: NVIDIA Capture, NVIDIA
+Graphics, On-Screen Control, NVIDIA NodeAPI, NVIDIA Container, OSC Adapter,
+Duluka Hook, Ansel Adapter, ShadowPlay Helper, FFmpeg and NVIDIA Config.
+Launcher itself remains the Overview page; Services remains a separate
+system summary. The module list scrolls independently of the content.
+
+`LAUNCHER_GET_STATE` and native pushes now include a `modules` object with
+fixed IDs `Capture`, `Graphics`, `Overlay`, `NodeApi`, `Container`, `Adapter`,
+`Hook`, `Ansel`, `Helper`, `Ffmpeg`, `Config`. Each reports `installed`,
+`processTracking` and `running`. Process identity is checked against this
+product's exact executable paths; Adapter also recognizes its x86 sibling.
+Hook, Ansel, FFmpeg and Config report package presence, not running state.
+FFmpeg requires both `ffmpeg.exe` and `ffprobe.exe`.
+
+Module navigation changes only the visible page. It does not start a
+module, attach a Hook, change settings, or certify capture/game readiness.
+Existing Open Overlay and Settings controls retain their original RPCs.
+Older hosts without module inventory display an unknown status.
+
+## Command Center UI — 2026-10-24
+
+Replaced the previous single-page hero/services/features layout with a
+CEF 73-compatible NVIDIA-inspired **five-view sidebar UI**:
+Overview, Capture, Graphics, Services, Settings.
+
+- Files: `ui/index.html`, `ui/app.css`, `ui/app.js`, `ui/i18n.js`.
+- Overview: ShadowPlay NEXT hero, existing `LAUNCHER_OPEN_OVERLAY` action,
+  live *Launcher* service indicator, and navigation cards. Status explicitly
+  does **not** claim game injection or recording readiness.
+- Capture and Graphics are informational navigation views for now, not
+  fabricated native capture/GPU controls. Capture's Open Overlay reuses the
+  existing command instead of adding a new backend contract.
+- Services retains the supervisor's four status dots and actual dynamic
+  `RUNNING/STOPPED/LOADING` fields.
+- Settings retains the exact `LAUNCHER_SET_OVERLAY` and
+  `LAUNCHER_SET_ENGINE_OVERLAY` RPC switch IDs and behavior.
+- All new UI labels have English and Thai translations; 28 selectable OSC
+  locale codes remain supported with English fallback for new strings.
+- CEF 73 safe CSS: native square edges, grid-gap rather than flex-gap,
+  supported :focus selectors, MiSansThai, and GeForce display fonts.
+- Regression: `node --test Project/Launcher.Cef/tests/command-center-ui.test.cjs`
+  4/4 pass; existing Launcher localization 7/7 and OSC sync 2/2 pass.
+- Deployed through `deploy-launcher.ps1 -NoBuild -RestartLauncher`,
+  without changing any shared CEF, Capture, OSC, Container or GPU binaries.
+  Deployment artifact hashes were verified and actual Launcher CEF rendered
+  the new page at 1152x648, with HTTP 200.
+
+## Launcher-only maintenance — 2026-10-24
+
+The deployed product layout is now `Build/NVIDIA ShadowPlay/NVIDIA Launcher/Cef`,
+not the older `NvLauncher/Cef` name in historical examples below. Keep
+configuration under `NVIDIA Config` and DO NOT use the all-project build
+script for Launcher-only updates.
+
+- `deploy-launcher.ps1 -NoBuild -RestartLauncher` stages only the root
+  Launcher.exe, Launcher.dll and `NVIDIA Launcher/Cef/Resources/launcher`
+  assets. It first closes ONLY the exact-root Launcher browser gracefully,
+  makes timestamped backups under `Build/DeploymentBackups/launcher-*`,
+  replaces changed artifacts with SHA-256 verification and restarts Launcher.
+  If the Launcher refuses to close, deployment aborts instead of forcing it.
+  Without `-NoBuild`, `CEF_ROOT` is required and only the two native
+  Launcher projects are compiled. `-Clean` is rejected.
+- `tests/run-shutdown-policy-tests.ps1`: native isolated fake-process
+  EXIT ALL regression (seven scenarios and owned-path manifest) plus HTTP
+  request policy regression (eleven cases), without touching live processes.
+- EXIT ALL now requires successful Overlay-disabled config persistence,
+  exact executable-name/full-path identity, and a bounded 1.5-second
+  graceful UI WM_CLOSE interval before a same-handle force fallback.
+  Headless children lacking a polite service protocol still use the
+  bounded fallback: actual recording finalization is NOT guaranteed.
+  Production EXIT ALL while recording remains a separate live acceptance
+  gate. The procedure was not executed against the active runtime.
+- The Launcher loopback UI server now checks same-port localhost Host
+  headers, bounds HTTP headers to 16 KiB, uses read/send timeouts,
+  caps concurrency at 16 requests, and waits for workers on shutdown.
+  Its CEF bridge accepts privileged queries only from the trusted
+  Launcher-served main frame; `--url` overrides have no privileged RPC.
+- Status for NodeAPI and OSC combines exact-path service presence with a
+  bounded HTTP GET / returning 200. This indicates HTTP UI availability,
+  NOT confirmed game Hook rendering, recording or shader readiness.
+- CEF 73 remains the pinned upstream runtime, built with `no_sandbox=1`.
+  Origin gating mitigates one direct privileged-RPC path, but DOES NOT make
+  this outdated CEF secure against malicious web content. A separate
+  coordinated CEF/OSC upgrade and sandbox enablement plan is required.
+
+2026-10-24 evidence: MSVC Release x64 Launcher.dll/Launcher.exe PASS
+without new warnings; isolated shutdown and HTTP tests PASS; existing
+Launcher localization 7/7 and OSC language sync 2/2 PASS. Safe deployment
+reported LAUNCHER_STAGE_PASS, and the running UI returned HTTP 200 on
+`/index.html`; foreign Host rejected 400, POST rejected 405.
+Source/live hashes matched after staging. No other service was restarted
+or killed, no config file was modified by the deployment process.
+
+
 UI style (owner call 2026-09-25 "ขอแนว Web Github"): mirrors the
 github.io site design language — sharp 90° corners everywhere, corner
 brackets + runway + sheen on the SERVICES banner (OBT3-banner grammar),

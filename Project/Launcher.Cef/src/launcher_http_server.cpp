@@ -2,11 +2,14 @@
 #include "launcher_http_server.h"
 
 #include <stdio.h>
+#include <process.h>
+#include <new>
 
 #include <sstream>
 #include <vector>
 
 #include "launcher_util.h"
+#include "launcher_http_policy.h"
 
 namespace {
 
@@ -46,7 +49,9 @@ int StatusReason(int code, std::string* reason) {
     case 400: *reason = "Bad Request"; return 400;
     case 404: *reason = "Not Found"; return 404;
     case 405: *reason = "Method Not Allowed"; return 405;
-    default: *reason = "Service Unavailable"; return 503;
+    case 429: *reason = "Too Many Requests"; return 429;
+    case 503: *reason = "Service Unavailable"; return 503;
+    default: *reason = "Internal Server Error"; return 500;
   }
 }
 
@@ -92,7 +97,9 @@ void SendResponse(SOCKET s, int code, const std::string& content_type,
   head << "HTTP/1.1 " << code << " " << reason << "\r\n"
        << "Content-Type: " << content_type << "\r\n"
        << "Connection: close\r\n"
-       << "Cache-Control: no-cache\r\n";
+       << "Cache-Control: no-cache\r\n"
+       << "X-Content-Type-Options: nosniff\r\n"
+       << "X-Frame-Options: DENY\r\n";
   if (body_text) {
     head << "Content-Length: " << body_text->size() << "\r\n\r\n";
     std::string h = head.str();
@@ -176,39 +183,74 @@ void LauncherHttpServer::AcceptLoop() {
       if (stop_.load()) break;
       continue;
     }
-    // One thread per connection; connections are short-lived and local.
-    std::thread(&LauncherHttpServer::HandleConnection, this, c).detach();
+    // Bound worker count and join on Stop(); detached workers may NOT outlive
+    // the server object's owning CEF process.
+    {
+      std::lock_guard<std::mutex> lock(workers_mutex_);
+      if (stop_.load() || active_workers_ >= kMaxConcurrentConnections) {
+        const std::string busy = "launcher UI busy";
+        SendResponse(c, 429, "text/plain", &busy, NULL);
+        closesocket(c);
+        continue;
+      }
+      ++active_workers_;
+    }
+    WorkItem* job = new (std::nothrow) WorkItem{this, c};
+    const uintptr_t worker = job
+        ? _beginthreadex(NULL, 0, &LauncherHttpServer::WorkerTramp,
+                         job, 0, NULL)
+        : 0;
+    if (!worker) {
+      delete job;
+      {
+        std::lock_guard<std::mutex> lock(workers_mutex_);
+        --active_workers_;
+      }
+      closesocket(c);
+      workers_done_.notify_all();
+    } else {
+      CloseHandle(reinterpret_cast<HANDLE>(worker));
+    }
   }
+}
+
+unsigned __stdcall LauncherHttpServer::WorkerTramp(void* work) {
+  WorkItem* job = static_cast<WorkItem*>(work);
+  LauncherHttpServer* server = job->server;
+  const SOCKET socket = job->socket;
+  delete job;
+  server->HandleConnection(socket);
+  {
+    std::lock_guard<std::mutex> lock(server->workers_mutex_);
+    --server->active_workers_;
+  }
+  server->workers_done_.notify_all();
+  return 0;
 }
 
 void LauncherHttpServer::HandleConnection(SOCKET s) {
   std::string request;
   char buf[8192];
-  // Read until the header block ends (requests carry no bodies).
-  for (;;) {
-    int n = recv(s, buf, sizeof(buf), 0);
+  // A stalled loopback client must never consume a worker indefinitely.
+  // One global 3s deadline (not 3s per recv) and a strict 16 KiB limit.
+  const DWORD timeout_ms = 750;
+  setsockopt(s, SOL_SOCKET, SO_RCVTIMEO,
+             reinterpret_cast<const char*>(&timeout_ms), sizeof(timeout_ms));
+  setsockopt(s, SOL_SOCKET, SO_SNDTIMEO,
+             reinterpret_cast<const char*>(&timeout_ms), sizeof(timeout_ms));
+  const ULONGLONG deadline = GetTickCount64() + 3000;
+  while (GetTickCount64() < deadline && request.size() <= 16 * 1024 &&
+         request.find("\r\n\r\n") == std::string::npos) {
+    const int n = recv(s, buf, sizeof(buf), 0);
     if (n <= 0) break;
     request.append(buf, n);
-    if (request.size() > 32 * 1024) break;
-    if (request.find("\r\n\r\n") != std::string::npos) break;
   }
-  size_t line_end = request.find("\r\n");
-  std::string line =
-      line_end == std::string::npos ? request : request.substr(0, line_end);
-  std::string method, target;
-  {
-    size_t sp1 = line.find(' ');
-    size_t sp2 = sp1 == std::string::npos ? std::string::npos
-                                          : line.find(' ', sp1 + 1);
-    if (sp1 != std::string::npos && sp2 != std::string::npos) {
-      method = line.substr(0, sp1);
-      target = line.substr(sp1 + 1, sp2 - sp1 - 1);
-    }
-  }
-
-  if (method != "GET") {
-    std::string body = "method not allowed";
-    SendResponse(s, 405, "text/plain", &body, NULL);
+  std::string target;
+  const int result = launcher_http_policy::ValidateHeaders(
+      request, static_cast<unsigned>(port_.load()), &target);
+  if (result != 200) {
+    const std::string body = result == 405 ? "method not allowed" : "bad request";
+    SendResponse(s, result, "text/plain", &body, NULL);
     closesocket(s);
     return;
   }
@@ -274,5 +316,9 @@ void LauncherHttpServer::Stop() {
       listen_sock_ = INVALID_SOCKET;
     }
     if (accept_thread_.joinable()) accept_thread_.join();
+    // Socket sends/receives above have finite timeouts; wait until all worker
+    // lambdas have stopped touching this object before it is destroyed.
+    std::unique_lock<std::mutex> lock(workers_mutex_);
+    workers_done_.wait(lock, [this]() { return active_workers_ == 0; });
   }
 }

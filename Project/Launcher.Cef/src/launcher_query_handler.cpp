@@ -11,6 +11,8 @@
 #include "include/cef_task.h"
 
 #include "launcher_json.h"
+#include "launcher_main.h"
+#include "launcher_module_actions.h"
 #include "launcher_supervisor.h"
 #include "launcher_util.h"
 #include "launcher_win.h"
@@ -102,6 +104,15 @@ bool LauncherQueryHandler::OnQuery(CefRefPtr<CefBrowser> browser,
                                    CefRefPtr<CefFrame> frame, int64 query_id,
                                    const CefString& request, bool persistent,
                                    CefRefPtr<Callback> callback) {
+  // Privileged CEF bridge is usable ONLY from our own ephemeral loopback
+  // static page. --url testing overrides and child/remote frames are untrusted.
+  const auto* launch = GetLaunchParams();
+  const std::string frame_url = frame ? frame->GetURL().ToString() : "";
+  if (!frame || !frame->IsMain() || !launch ||
+      frame_url != launch->trusted_url) {
+    RespondFail(callback, -4, "untrusted launcher page");
+    return true;
+  }
   const std::string request_str = request.ToString();
 
   // Malformed-request ladder — parity with ShareQueryHandler::OnQuery.
@@ -117,6 +128,64 @@ bool LauncherQueryHandler::OnQuery(CefRefPtr<CefBrowser> browser,
   const std::string cmd = launcherjson::GetStr(req, "command");
   if (cmd.empty()) {
     RespondFail(callback, -3, "no command");
+    return true;
+  }
+
+  if (cmd == "LAUNCHER_IMPORT_BACKGROUND") {
+    std::wstring image_path;
+    const auto selected = launchermodules::PickBackground(host_wnd_, &image_path);
+    if (!selected.ok) {
+      RespondOk(callback, selected.cancelled
+          ? "{\"ok\":false,\"cancelled\":true}"
+          : "{\"ok\":false,\"error\":\"background selection failed\"}");
+      return true;
+    }
+    std::thread([callback, image_path]() {
+      const auto result = launchermodules::RunInstalledScript(
+          L"import-background.ps1", L"-ImageFile", image_path);
+      launcherutil::LogLine(std::string("background import ") +
+          (result.ok ? "success" : result.message));
+      RespondOk(callback, result.ok ? "{\"ok\":true}"
+                                    : "{\"ok\":false,\"error\":\"background import failed\"}");
+    }).detach();
+    return true;
+  }
+
+  if (cmd == "LAUNCHER_INSTALL_APPEARANCE") {
+    std::wstring file;
+    const auto selection = launchermodules::PickPackage(host_wnd_, &file);
+    if (!selection.ok) {
+      RespondOk(callback, selection.cancelled
+          ? "{\"ok\":false,\"cancelled\":true}"
+          : "{\"ok\":false,\"error\":\"file selection failed\"}");
+      return true;
+    }
+    std::thread([callback, file]() {
+      const auto result = launchermodules::RunInstalledScript(
+          L"install-appearance-module.ps1", L"-Package", file);
+      launcherutil::LogLine(std::string("appearance install ") +
+          (result.ok ? "success" : result.message));
+      RespondOk(callback, result.ok ? "{\"ok\":true}"
+                                    : "{\"ok\":false,\"error\":\"package installation failed\"}");
+    }).detach();
+    return true;
+  }
+
+  if (cmd == "LAUNCHER_UNINSTALL_APPEARANCE") {
+    const std::string id = launcherjson::GetStr(req, "id");
+    if (!launchermodules::ValidModuleId(id)) {
+      RespondFail(callback, -3, "invalid appearance module id");
+      return true;
+    }
+    std::thread([callback, id]() {
+      const auto result = launchermodules::RunInstalledScript(
+          L"uninstall-appearance-module.ps1", L"-Id",
+          launcherutil::Utf8ToWide(id));
+      launcherutil::LogLine(std::string("appearance remove ") +
+          (result.ok ? "success" : result.message));
+      RespondOk(callback, result.ok ? "{\"ok\":true}"
+                                    : "{\"ok\":false,\"error\":\"module removal failed\"}");
+    }).detach();
     return true;
   }
 

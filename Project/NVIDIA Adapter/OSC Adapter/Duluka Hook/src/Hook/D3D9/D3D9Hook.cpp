@@ -1,10 +1,11 @@
-﻿#include <windows.h>
+#include <windows.h>
 #include <d3d9.h>
 #include <d3d9types.h>
 #include <dxgi1_2.h>
 #include <strsafe.h>
 #include <tlhelp32.h>
 
+#include <algorithm>
 #include <atomic>
 #include <cstdint>
 #include <cstdio>
@@ -13,8 +14,12 @@
 #include <mutex>
 #include <string>
 #include <vector>
+#include <utility>
 
 #include "../../../include/osc_frame_bridge.h"
+#include "../../../include/d3d9_timing_diagnostics.h"
+#include "../../../include/d3d9ex_gpu_mailbox.h"
+#include "MinHook.h"
 #include "../../Renderer/D3D9/D3D9Renderer.h"
 
 #pragma comment(lib, "d3d9.lib")
@@ -27,6 +32,16 @@ bool ReShadeAddonDrawActive();
 #if defined(_M_IX86)
 #pragma comment(linker, "/EXPORT:NvOscAdapterRenderD3D9ForTest=_NvOscAdapterRenderD3D9ForTest@4")
 #pragma comment(linker, "/EXPORT:NvOscAdapterGetD3D9Status=_NvOscAdapterGetD3D9Status@12")
+#pragma comment(linker, "/EXPORT:NvOscAdapterRegisterD3D9Device=_NvOscAdapterRegisterD3D9Device@4")
+#pragma comment(linker, "/EXPORT:NvOscAdapterUnregisterD3D9Device=_NvOscAdapterUnregisterD3D9Device@4")
+#pragma comment(linker, "/EXPORT:NvOscAdapterBindD3D9ExGpuFrame=_NvOscAdapterBindD3D9ExGpuFrame@24")
+#pragma comment(linker, "/EXPORT:NvOscAdapterUnbindD3D9ExGpuFrame=_NvOscAdapterUnbindD3D9ExGpuFrame@4")
+#pragma comment(linker, "/EXPORT:NvOscAdapterGetD3D9AdapterStatus=_NvOscAdapterGetD3D9AdapterStatus@16")
+#pragma comment(linker, "/EXPORT:NvOscAdapterGetD3D9TimingSnapshot=_NvOscAdapterGetD3D9TimingSnapshot@8")
+#pragma comment(linker, "/EXPORT:NvOscAdapterStageD3D9ExGpuFrame=_NvOscAdapterStageD3D9ExGpuFrame@24")
+#pragma comment(linker, "/EXPORT:NvOscAdapterCommitD3D9ExGpuFrame=_NvOscAdapterCommitD3D9ExGpuFrame@12")
+#pragma comment(linker, "/EXPORT:NvOscAdapterDiscardD3D9ExPendingGpuFrame=_NvOscAdapterDiscardD3D9ExPendingGpuFrame@4")
+#pragma comment(linker, "/EXPORT:NvOscAdapterPumpD3D9ExGpuMailbox=_NvOscAdapterPumpD3D9ExGpuMailbox@4")
 #endif
 
 namespace
@@ -84,6 +99,8 @@ namespace
     CreateDeviceExFunction g_originalCreateDeviceEx = nullptr;
     std::vector<HookedSlot> g_hookedSlots;
     std::mutex g_hookedSlotsMutex;
+    bool g_codeDetoursInstalled = false;
+    std::vector<void *> g_codeDetourTargets;
     void Log(const char *message);
 
     std::uint64_t QueryPerformanceFrequencyValue()
@@ -108,43 +125,6 @@ namespace
         auto previous = maximum.load(std::memory_order_relaxed);
         while (ticks > previous && !maximum.compare_exchange_weak(
             previous, ticks, std::memory_order_relaxed)) {}
-    }
-
-    void LogPresentDiagnostics(const char* label)
-    {
-        const auto frequency = QueryPerformanceFrequencyValue();
-        const auto overlaySamples = g_overlayCallbackSamples.exchange(
-            0, std::memory_order_relaxed);
-        const auto overlayTicks = g_overlayCallbackTicks.exchange(
-            0, std::memory_order_relaxed);
-        const auto overlayMaxTicks = g_overlayCallbackMaxTicks.exchange(
-            0, std::memory_order_relaxed);
-        const auto presentSamples = g_originalPresentSamples.exchange(
-            0, std::memory_order_relaxed);
-        const auto presentTicks = g_originalPresentTicks.exchange(
-            0, std::memory_order_relaxed);
-        const auto presentMaxTicks = g_originalPresentMaxTicks.exchange(
-            0, std::memory_order_relaxed);
-        const auto overlayAvgUs = overlaySamples
-            ? overlayTicks * 1000000ull / frequency / overlaySamples : 0;
-        const auto overlayMaxUs = overlayMaxTicks * 1000000ull / frequency;
-        const auto presentAvgUs = presentSamples
-            ? presentTicks * 1000000ull / frequency / presentSamples : 0;
-        const auto presentMaxUs = presentMaxTicks * 1000000ull / frequency;
-
-        char diagnostic[320]{};
-        sprintf_s(diagnostic, sizeof(diagnostic),
-            "%s: presents=%llu draws=%llu overlay_n=%llu overlay_us(avg/max)=%llu/%llu original_present_n=%llu original_present_us(avg/max)=%llu/%llu",
-            label,
-            static_cast<unsigned long long>(g_presentCount.load(std::memory_order_relaxed)),
-            static_cast<unsigned long long>(duluka::d3d9::GetDrawCount()),
-            static_cast<unsigned long long>(overlaySamples),
-            static_cast<unsigned long long>(overlayAvgUs),
-            static_cast<unsigned long long>(overlayMaxUs),
-            static_cast<unsigned long long>(presentSamples),
-            static_cast<unsigned long long>(presentAvgUs),
-            static_cast<unsigned long long>(presentMaxUs));
-        Log(diagnostic);
     }
 
     void Log(const char *message)
@@ -216,7 +196,8 @@ namespace
     HRESULT STDMETHODCALLTYPE HookReset(
         IDirect3DDevice9 *device, D3DPRESENT_PARAMETERS *parameters)
     {
-        duluka::d3d9::OnReset();
+        duluka::d3d9ex_mailbox::OnDeviceReset(device);
+        duluka::d3d9::OnReset(device);
         return g_originalReset(device, parameters);
     }
 
@@ -225,7 +206,8 @@ namespace
         D3DPRESENT_PARAMETERS *parameters,
         D3DDISPLAYMODEEX *fullscreenMode)
     {
-        duluka::d3d9::OnReset();
+        duluka::d3d9ex_mailbox::OnDeviceReset(device);
+        duluka::d3d9::OnReset(device);
         return g_originalResetEx(device, parameters, fullscreenMode);
     }
 
@@ -236,8 +218,7 @@ namespace
         HWND destinationWindow,
         const RGNDATA *dirtyRegion)
     {
-        const auto count = g_presentCount.fetch_add(
-            1, std::memory_order_relaxed) + 1;
+        g_presentCount.fetch_add(1, std::memory_order_relaxed);
         if (!ReShadeAddonDrawActive() &&
             osc_frame_bridge::IsGameOrNvidiaOverlayForeground(
                 GetCurrentProcessId()))
@@ -257,8 +238,8 @@ namespace
         QueryPerformanceCounter(&presentEnd);
         RecordDuration(presentStart, presentEnd, g_originalPresentTicks,
             g_originalPresentMaxTicks, g_originalPresentSamples);
-        if (count == 1 || count % 1200 == 0)
-            LogPresentDiagnostics("D3D9 Present diagnostics");
+        // Poll cumulative timing through the diagnostic export from a
+        // non-render thread. Never write logs while forwarding Present.
         return result;
     }
 
@@ -270,8 +251,7 @@ namespace
         const RGNDATA *dirtyRegion,
         DWORD flags)
     {
-        const auto count = g_presentCount.fetch_add(
-            1, std::memory_order_relaxed) + 1;
+        g_presentCount.fetch_add(1, std::memory_order_relaxed);
         if (!ReShadeAddonDrawActive() &&
             osc_frame_bridge::IsGameOrNvidiaOverlayForeground(
                 GetCurrentProcessId()))
@@ -291,17 +271,17 @@ namespace
         QueryPerformanceCounter(&presentEnd);
         RecordDuration(presentStart, presentEnd, g_originalPresentTicks,
             g_originalPresentMaxTicks, g_originalPresentSamples);
-        if (count == 1 || count % 1200 == 0)
-            LogPresentDiagnostics("D3D9Ex PresentEx diagnostics");
+        // Do not touch filesystem from the game's PresentEx callback.
         return result;
     }
 
+    #include "LateD3D9Detours.inc"
     bool InstallHookedSlot(void **slot, void *hook, void *&original)
     {
         std::lock_guard<std::mutex> lock(g_hookedSlotsMutex);
         void *current = *slot;
         if (current == hook)
-            return true;
+            return original != nullptr;
         if (!original)
             original = current;
         else if (current != original)
@@ -332,6 +312,34 @@ namespace
         return true;
     }
 
+    // Cooperative owners MUST unhook their real vtables before Release().
+    // A freed D3D9 object can invalidate the heap slot before DLL cleanup.
+    // Only restore exact slots we installed, and never overwrite another
+    // component's replacement hook.
+    bool RestoreOwnedSlot(void **slot, void *hook)
+    {
+        std::lock_guard<std::mutex> lock(g_hookedSlotsMutex);
+        const auto it = std::find_if(g_hookedSlots.begin(),
+            g_hookedSlots.end(), [slot, hook](const HookedSlot &entry) {
+                return entry.slot == slot && entry.hook == hook;
+            });
+        if (it == g_hookedSlots.end())
+            return false;
+        DWORD oldProtection = 0;
+        if (!VirtualProtect(slot, sizeof(void *), PAGE_EXECUTE_READWRITE,
+                &oldProtection))
+            return false;
+        void *actual = InterlockedCompareExchangePointer(
+            reinterpret_cast<PVOID volatile *>(slot), it->original, hook);
+        DWORD ignored = 0;
+        VirtualProtect(slot, sizeof(void *), oldProtection, &ignored);
+        FlushInstructionCache(GetCurrentProcess(), slot, sizeof(void *));
+        if (actual != hook)
+            return false;
+        g_hookedSlots.erase(it);
+        return true;
+    }
+
     bool PatchDevice(IDirect3DDevice9 *device, bool isEx)
     {
         if (!device)
@@ -357,19 +365,21 @@ namespace
                 reinterpret_cast<void *>(g_originalPresentEx);
             void *originalResetEx =
                 reinterpret_cast<void *>(g_originalResetEx);
-            const bool exInstalled = InstallHookedSlot(
+            const bool presentExInstalled = InstallHookedSlot(
                 &vtable[PresentExSlot],
-                reinterpret_cast<void *>(&HookPresentEx), originalPresentEx) &&
-                InstallHookedSlot(&vtable[ResetExSlot],
-                    reinterpret_cast<void *>(&HookResetEx), originalResetEx);
-            if (exInstalled)
-            {
+                reinterpret_cast<void *>(&HookPresentEx), originalPresentEx);
+            // Even if ResetEx hooking fails, PresentEx needs a valid
+            // forwarding target or the next PresentEx would dereference null.
+            if (presentExInstalled)
                 g_originalPresentEx =
                     reinterpret_cast<PresentExFunction>(originalPresentEx);
+            const bool resetExInstalled = InstallHookedSlot(
+                &vtable[ResetExSlot],
+                reinterpret_cast<void *>(&HookResetEx), originalResetEx);
+            if (resetExInstalled)
                 g_originalResetEx =
                     reinterpret_cast<ResetExFunction>(originalResetEx);
-            }
-            installed = installed && exInstalled;
+            installed = installed && presentExInstalled && resetExInstalled;
         }
         return installed;
     }
@@ -533,6 +543,17 @@ namespace
 
     bool InstallD3D9PresentHook()
     {
+        wchar_t overrideValue[4]{};
+        const bool forceLateAttach =
+            GetEnvironmentVariableW(L"DULUKA_D3D9_FORCE_LATE_ATTACH",
+                overrideValue, static_cast<DWORD>(std::size(overrideValue))) == 1 &&
+            overrideValue[0] == L'1';
+        if (forceLateAttach)
+        {
+            const bool installed = InstallLateD3D9CodeDetours();
+            g_hookInstalled.store(installed, std::memory_order_release);
+            return installed;
+        }
         HANDLE snapshot = CreateToolhelp32Snapshot(
             TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, GetCurrentProcessId());
         if (snapshot == INVALID_HANDLE_VALUE)
@@ -548,14 +569,19 @@ namespace
         {
             do
             {
+                // Never count our own D3D9 imports as a game factory hook.
+                // The late-attach helper itself imports Direct3DCreate9.
+                if (entry.hModule == g_module) continue;
                 patched += PatchModuleImports(entry.hModule);
             } while (Module32NextW(snapshot, &entry));
         }
         CloseHandle(snapshot);
         if (!patched)
         {
-            Log("No imported D3D9 factory functions were found to hook.");
-            return false;
+            Log("No imported D3D9 factory functions found; attempting code detours.");
+            const bool installed = InstallLateD3D9CodeDetours();
+            g_hookInstalled.store(installed, std::memory_order_release);
+            return installed;
         }
 
         g_hookInstalled.store(true, std::memory_order_release);
@@ -567,6 +593,18 @@ namespace
     {
         if (!g_hookInstalled.exchange(false, std::memory_order_acq_rel))
             return;
+        // Explicit detach requires the caller to quiesce device callbacks.
+        // Normal process exit skips cleanup with DllMain(reserved != nullptr).
+        if (g_codeDetoursInstalled)
+        {
+            for (void *target : g_codeDetourTargets)
+                MH_DisableHook(target);
+            for (void *target : g_codeDetourTargets)
+                MH_RemoveHook(target);
+            g_codeDetourTargets.clear();
+            g_codeDetoursInstalled = false;
+            MH_Uninitialize();
+        }
         std::lock_guard<std::mutex> lock(g_hookedSlotsMutex);
         for (auto it = g_hookedSlots.rbegin(); it != g_hookedSlots.rend(); ++it)
         {
@@ -609,7 +647,124 @@ void InitializeD3D9PresentHook(HMODULE module)
 void ShutdownD3D9PresentHook()
 {
     RemoveD3D9PresentHook();
+    duluka::d3d9ex_mailbox::Shutdown();
     duluka::d3d9::Shutdown();
+}
+
+// Optional cooperative late attachment. A trusted in-process owner that
+// already has a valid D3D9/9Ex device can register that exact device. Do not
+// infer arbitrary live device addresses from a temporary D3D9 instance:
+// Windows D3D9 implementations may allocate distinct per-instance vtables.
+// This is NOT automatic discovery of pre-existing game devices.
+extern "C" __declspec(dllexport) BOOL WINAPI NvOscAdapterRegisterD3D9Device(
+    IDirect3DDevice9 *device)
+{
+    if (!device || !g_hookInstalled.load(std::memory_order_acquire))
+        return FALSE;
+
+    IDirect3D9 *owner = nullptr;
+    if (FAILED(device->GetDirect3D(&owner)) || !owner)
+        return FALSE;
+    owner->Release();
+
+    IDirect3DDevice9Ex *deviceEx = nullptr;
+    const bool isEx = SUCCEEDED(device->QueryInterface(
+        __uuidof(IDirect3DDevice9Ex),
+        reinterpret_cast<void **>(&deviceEx))) && deviceEx;
+    if (deviceEx)
+        deviceEx->Release();
+
+    const bool installed = PatchDevice(device, isEx);
+    Log(installed
+        ? (isEx ? "Cooperative existing D3D9Ex device registered."
+                : "Cooperative existing D3D9 device registered.")
+        : "Cooperative D3D9 device registration failed.");
+    return installed ? TRUE : FALSE;
+}
+
+// Unregister before the owner releases its D3D9 device. The cooperating
+// caller must guarantee that no other thread is inside Present/Reset during
+// this operation; removing vtable pointers alone is not a quiescence protocol.
+extern "C" __declspec(dllexport) BOOL WINAPI NvOscAdapterUnregisterD3D9Device(
+    IDirect3DDevice9 *device)
+{
+    if (!device)
+        return FALSE;
+    auto vtable = *reinterpret_cast<void ***>(device);
+    const bool presentRestored = RestoreOwnedSlot(
+        &vtable[PresentSlot], reinterpret_cast<void *>(&HookPresent));
+    const bool resetRestored = RestoreOwnedSlot(
+        &vtable[ResetSlot], reinterpret_cast<void *>(&HookReset));
+    IDirect3DDevice9Ex *deviceEx = nullptr;
+    const bool isEx = SUCCEEDED(device->QueryInterface(
+        __uuidof(IDirect3DDevice9Ex),
+        reinterpret_cast<void **>(&deviceEx))) && deviceEx;
+    if (deviceEx)
+        deviceEx->Release();
+    bool exRestored = true;
+    if (isEx)
+    {
+        const bool p = RestoreOwnedSlot(
+            &vtable[PresentExSlot], reinterpret_cast<void *>(&HookPresentEx));
+        const bool r = RestoreOwnedSlot(
+            &vtable[ResetExSlot], reinterpret_cast<void *>(&HookResetEx));
+        exRestored = p && r;
+    }
+    const bool success = presentRestored && resetRestored && exRestored;
+    Log(success ? "Cooperative D3D9 device unregistered before release."
+                : "Cooperative D3D9 unregister incomplete or not owned.");
+    return success ? TRUE : FALSE;
+}
+
+// Opt-in mailbox Pump is deliberately explicit. Call from a trusted
+// game-device thread at a safe scheduling point, not from Present itself.
+// Host writes readyGeneration after its D3D11 GPU completion query.
+// By default the receiver is disabled and CPU Shared Memory remains active.
+extern "C" __declspec(dllexport) BOOL WINAPI NvOscAdapterPumpD3D9ExGpuMailbox(
+    IDirect3DDevice9Ex *device)
+{
+    return duluka::d3d9ex_mailbox::Pump(device) ? TRUE : FALSE;
+}
+
+// Optional D3D9Ex GPU frame input. A trusted same-process bridge can
+// pass a legacy, BGRA8 shared handle published by OSC Host in the future.
+// This intentionally does not change the OSC Host or current CPU bridge.
+extern "C" __declspec(dllexport) BOOL WINAPI NvOscAdapterBindD3D9ExGpuFrame(
+    IDirect3DDevice9Ex *device, HANDLE sharedHandle, std::uint32_t width,
+    std::uint32_t height, std::uint64_t frameNumber)
+{
+    return duluka::d3d9::BindExSharedGpuTexture(device, sharedHandle,
+        width, height, frameNumber) ? TRUE : FALSE;
+}
+
+extern "C" __declspec(dllexport) BOOL WINAPI NvOscAdapterUnbindD3D9ExGpuFrame(
+    IDirect3DDevice9Ex *device)
+{
+    return duluka::d3d9::UnbindExSharedGpuTexture(device) ? TRUE : FALSE;
+}
+
+// Two-phase, opt-in GPU handoff. Stage merely opens the next texture.
+// The caller must verify GPU writes have finished BEFORE Commit; Hook
+// never waits for that event in game Present or on this API.
+extern "C" __declspec(dllexport) BOOL WINAPI NvOscAdapterStageD3D9ExGpuFrame(
+    IDirect3DDevice9Ex *device, HANDLE sharedHandle, std::uint32_t width,
+    std::uint32_t height, std::uint64_t frameNumber)
+{
+    return duluka::d3d9::StageExSharedGpuTexture(device, sharedHandle,
+        width, height, frameNumber) ? TRUE : FALSE;
+}
+
+extern "C" __declspec(dllexport) BOOL WINAPI NvOscAdapterCommitD3D9ExGpuFrame(
+    IDirect3DDevice9Ex *device, std::uint64_t frameNumber)
+{
+    return duluka::d3d9::CommitExSharedGpuTexture(device, frameNumber)
+        ? TRUE : FALSE;
+}
+
+extern "C" __declspec(dllexport) BOOL WINAPI NvOscAdapterDiscardD3D9ExPendingGpuFrame(
+    IDirect3DDevice9Ex *device)
+{
+    return duluka::d3d9::DiscardExPendingGpuTexture(device) ? TRUE : FALSE;
 }
 
 extern "C" __declspec(dllexport) BOOL WINAPI NvOscAdapterRenderD3D9ForTest(
@@ -623,6 +778,53 @@ extern "C" __declspec(dllexport) BOOL WINAPI NvOscAdapterRenderD3D9ForTest(
     }
     return duluka::d3d9::GetDrawCount() > previousDrawCount
         ? TRUE : FALSE;
+}
+
+// Phase 0 read-only report: actual game device adapter and API.
+// Keep the existing ConsumerAdapterInfo v2 wire layout/renderApi=9 intact.
+extern "C" __declspec(dllexport) BOOL WINAPI NvOscAdapterGetD3D9AdapterStatus(
+    std::uint64_t *adapterLuid, BOOL *isD3D9Ex, BOOL *gpuFrameBound,
+    std::uint64_t *busyFrameSkips)
+{
+    if (!adapterLuid || !isD3D9Ex || !gpuFrameBound || !busyFrameSkips)
+        return FALSE;
+    bool ex = false, gpu = false;
+    duluka::d3d9::GetAdapterStatus(*adapterLuid, ex, gpu, *busyFrameSkips);
+    *isD3D9Ex = ex ? TRUE : FALSE;
+    *gpuFrameBound = gpu ? TRUE : FALSE;
+    return TRUE;
+}
+
+// Read-only, non-destructive timing counters. This function is intended
+// for out-of-band diagnostics: no logging, heap allocations or reset of
+// counters occurs in either D3D9 Present callback.
+extern "C" __declspec(dllexport) BOOL WINAPI NvOscAdapterGetD3D9TimingSnapshot(
+    duluka::diagnostics::D3D9TimingSnapshotV1 *output, DWORD outputBytes)
+{
+    using duluka::diagnostics::D3D9TimingSnapshotV1;
+    if (!output || outputBytes != sizeof(D3D9TimingSnapshotV1))
+        return FALSE;
+
+    D3D9TimingSnapshotV1 snapshot{};
+    snapshot.size = sizeof(snapshot);
+    snapshot.version = duluka::diagnostics::D3D9TimingVersion;
+    snapshot.performanceFrequency = QueryPerformanceFrequencyValue();
+    snapshot.presents = g_presentCount.load(std::memory_order_relaxed);
+    snapshot.draws = duluka::d3d9::GetDrawCount();
+    snapshot.overlaySamples = g_overlayCallbackSamples.load(
+        std::memory_order_relaxed);
+    snapshot.overlayTotalTicks = g_overlayCallbackTicks.load(
+        std::memory_order_relaxed);
+    snapshot.overlayMaxTicks = g_overlayCallbackMaxTicks.load(
+        std::memory_order_relaxed);
+    snapshot.gamePresentSamples = g_originalPresentSamples.load(
+        std::memory_order_relaxed);
+    snapshot.gamePresentTotalTicks = g_originalPresentTicks.load(
+        std::memory_order_relaxed);
+    snapshot.gamePresentMaxTicks = g_originalPresentMaxTicks.load(
+        std::memory_order_relaxed);
+    *output = snapshot;
+    return TRUE;
 }
 
 extern "C" __declspec(dllexport) BOOL WINAPI NvOscAdapterGetD3D9Status(

@@ -11,13 +11,42 @@
 #include <vector>
 
 #include "../include/osc_frame_bridge.h"
+#include "../include/d3d9_timing_diagnostics.h"
+#include "../include/d3d9_pipeline_timing_diagnostics.h"
 
 using GetD3D9Status = BOOL(WINAPI *)(std::uint64_t *, std::uint64_t *, BOOL *);
 using RenderD3D9ForTest = BOOL(WINAPI *)(IDirect3DDevice9 *);
+using GetD3D9AdapterStatus = BOOL(WINAPI *)(std::uint64_t *, BOOL *,
+    BOOL *, std::uint64_t *);
+using GetD3D9TimingSnapshot = BOOL(WINAPI *)(
+    duluka::diagnostics::D3D9TimingSnapshotV1 *, DWORD);
+using GetD3D9PipelineSnapshot = BOOL(WINAPI *)(
+    duluka::diagnostics::D3D9PipelineTimingSnapshotV1 *, DWORD);
 
 namespace
 {
     bool g_reshadeTest = false;
+    bool g_rendererOnly = false;
+    bool g_hookCounterOnly = false;
+    RenderD3D9ForTest g_renderForTest = nullptr;
+    GetD3D9AdapterStatus g_getAdapterStatus = nullptr;
+
+    bool VerifyRendererIdentity(bool expectedEx)
+    {
+        if (!g_getAdapterStatus)
+            return false;
+        std::uint64_t luid = 0, busySkips = 0;
+        BOOL isEx = FALSE, gpuBound = FALSE;
+        const bool ok = g_getAdapterStatus(&luid, &isEx, &gpuBound,
+            &busySkips) && luid != 0 && (isEx != FALSE) == expectedEx &&
+            gpuBound == FALSE;
+        if (!ok)
+            std::cerr << "D3D9 Phase-0 identity mismatch: luid="
+                      << luid << " isEx=" << isEx
+                      << " expectedEx=" << expectedEx
+                      << " gpuBound=" << gpuBound << "\n";
+        return ok;
+    }
     std::uint64_t g_expectedDraws = 0;
     constexpr wchar_t WindowClassName[] = L"DulukaNvOscAdapterD3D9SmokeTest";
     constexpr std::uint32_t FrameWidth = 640;
@@ -121,12 +150,16 @@ namespace
             while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE))
             { TranslateMessage(&message); DispatchMessageW(&message); }
             if (!ClearFrame(device)) return false;
-            if (FAILED(device->PresentEx(
-            nullptr, nullptr, nullptr, nullptr, 0))) return false;
+            if (g_rendererOnly)
+            {
+                if (!g_renderForTest || !g_renderForTest(device)) return false;
+            }
+            else if (FAILED(device->PresentEx(
+                nullptr, nullptr, nullptr, nullptr, 0))) return false;
             ++g_expectedDraws;
             if (g_reshadeTest) Sleep(16);
         }
-        return VerifyOutput(device);
+        return g_hookCounterOnly || VerifyOutput(device);
     }
 
     bool RenderAndVerify(IDirect3DDevice9 *device)
@@ -138,12 +171,16 @@ namespace
             while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE))
             { TranslateMessage(&message); DispatchMessageW(&message); }
             if (!ClearFrame(device)) return false;
-            if (FAILED(device->Present(
-            nullptr, nullptr, nullptr, nullptr))) return false;
+            if (g_rendererOnly)
+            {
+                if (!g_renderForTest || !g_renderForTest(device)) return false;
+            }
+            else if (FAILED(device->Present(
+                nullptr, nullptr, nullptr, nullptr))) return false;
             ++g_expectedDraws;
             if (g_reshadeTest) Sleep(16);
         }
-        return VerifyOutput(device);
+        return g_hookCounterOnly || VerifyOutput(device);
     }
 
     bool VerifyConsumerAdapterInfo()
@@ -179,13 +216,28 @@ namespace
 
 int wmain(int argc, wchar_t **argv)
 {
-    if (argc != 2 && !(argc == 3 && std::wcscmp(argv[2], L"--external-attach") == 0) &&
+    const bool externalCounterOnly = argc == 4 &&
+        std::wcscmp(argv[2], L"--external-attach") == 0 &&
+        std::wcscmp(argv[3], L"--hook-counter-only") == 0;
+    if (argc != 2 &&
+        !(argc == 3 && std::wcscmp(argv[2], L"--external-attach") == 0) &&
+        !(argc == 3 && std::wcscmp(argv[2], L"--renderer-only") == 0) &&
+        !(argc == 3 && std::wcscmp(argv[2], L"--hook-counter-only") == 0) &&
+        !externalCounterOnly &&
         !(argc == 4 && std::wcscmp(argv[2], L"--reshade") == 0))
     {
         std::cerr << "Usage: NVIDIA OSC Adapter D3D9 Smoke Test.exe <adapter-dll>\n";
         return 2;
     }
 
+    g_rendererOnly = argc == 3 &&
+        std::wcscmp(argv[2], L"--renderer-only") == 0;
+    g_hookCounterOnly = (argc == 3 &&
+        std::wcscmp(argv[2], L"--hook-counter-only") == 0) ||
+        externalCounterOnly;
+    const bool externalAttach = (argc == 3 &&
+        std::wcscmp(argv[2], L"--external-attach") == 0) ||
+        externalCounterOnly;
     wchar_t mappingName[128]{};
     if (FAILED(StringCchPrintfW(mappingName, std::size(mappingName),
             L"Local\\NVIDIAOSC.Frame.D3D9.Smoke.%lu", GetCurrentProcessId())) ||
@@ -224,9 +276,10 @@ int wmain(int argc, wchar_t **argv)
         return 5;
     }
 
+    // Model the OSC CEF GPU readback (Y-inverted relative to screen).
     std::vector<std::uint8_t> pixels(
         static_cast<std::size_t>(FramePitch) * FrameHeight, 0);
-    for (std::uint32_t y = 0; y < 8; ++y)
+    for (std::uint32_t y = FrameHeight - 8; y < FrameHeight; ++y)
         for (std::uint32_t x = 0; x < FrameWidth; ++x)
         {
             const std::size_t offset =
@@ -234,7 +287,7 @@ int wmain(int argc, wchar_t **argv)
             pixels[offset + 1] = 255;
             pixels[offset + 3] = 255;
         }
-    for (std::uint32_t y = FrameHeight - 8; y < FrameHeight; ++y)
+    for (std::uint32_t y = 0; y < 8; ++y)
         for (std::uint32_t x = 0; x < FrameWidth; ++x)
         {
             const std::size_t offset =
@@ -259,7 +312,10 @@ int wmain(int argc, wchar_t **argv)
     frame->height = FrameHeight;
     frame->rowPitch = FramePitch;
     frame->pixelBytes = static_cast<std::uint32_t>(pixels.size());
-    frame->frameNumber = 1;
+    // Counter-only testing deliberately advertises an invisible frame.
+    // It verifies the actual D3D9 Present interception without requiring
+    // foreground access or counting a renderer-only draw as a hooked frame.
+    frame->frameNumber = g_hookCounterOnly ? 0 : 1;
     std::memcpy(frame->pixels, pixels.data(), pixels.size());
     MemoryBarrier();
     InterlockedIncrement(&frame->sequence);
@@ -290,14 +346,15 @@ int wmain(int argc, wchar_t **argv)
     ShowWindow(window, SW_SHOW);
     UpdateWindow(window);
     HMODULE reshadeModule = nullptr;
-    g_reshadeTest = argc == 4;
+    g_reshadeTest = argc == 4 &&
+        std::wcscmp(argv[2], L"--reshade") == 0;
     if (g_reshadeTest)
     {
         reshadeModule = LoadLibraryW(argv[3]);
         if (!reshadeModule) { std::cerr << "Could not load ReShade: " << GetLastError() << "\n"; return 15; }
     }
     HMODULE hook = nullptr;
-    if (argc == 3)
+    if (externalAttach)
     {
         // The external x64 host must route to its x86 child and load this DLL.
         for (int attempt = 0; attempt < 1500 && !hook; ++attempt)
@@ -319,9 +376,17 @@ int wmain(int argc, wchar_t **argv)
     }
     auto getStatus = reinterpret_cast<GetD3D9Status>(
         GetProcAddress(hook, "NvOscAdapterGetD3D9Status"));
+    auto getTiming = reinterpret_cast<GetD3D9TimingSnapshot>(
+        GetProcAddress(hook, "NvOscAdapterGetD3D9TimingSnapshot"));
+    auto getPipeline = reinterpret_cast<GetD3D9PipelineSnapshot>(
+        GetProcAddress(hook, "NvOscAdapterGetD3D9PipelineSnapshot"));
     auto renderForTest = reinterpret_cast<RenderD3D9ForTest>(
         GetProcAddress(hook, "NvOscAdapterRenderD3D9ForTest"));
-    if (!getStatus || !renderForTest)
+    g_renderForTest = renderForTest;
+    g_getAdapterStatus = reinterpret_cast<GetD3D9AdapterStatus>(
+        GetProcAddress(hook, "NvOscAdapterGetD3D9AdapterStatus"));
+    if (!getStatus || !renderForTest || !g_getAdapterStatus || !getTiming ||
+        !getPipeline)
     {
         std::cerr << "D3D9 test exports are missing.\n";
         FreeLibrary(hook);
@@ -354,16 +419,19 @@ int wmain(int argc, wchar_t **argv)
 
     // External attachment starts another process; reacquire our test window
     // before asserting a foreground-only compositor draw.
-    SetForegroundWindow(window);
-    for (int attempt = 0; attempt < 100 && GetForegroundWindow() != window; ++attempt)
+    if (!g_rendererOnly && !g_hookCounterOnly)
     {
         SetForegroundWindow(window);
-        Sleep(10);
-    }
-    if (GetForegroundWindow() != window)
-    {
-        std::cerr << "DX9 test window could not become foreground.\n";
-        return 14;
+        for (int attempt = 0; attempt < 100 && GetForegroundWindow() != window; ++attempt)
+        {
+            SetForegroundWindow(window);
+            Sleep(10);
+        }
+        if (GetForegroundWindow() != window)
+        {
+            std::cerr << "DX9 test window could not become foreground.\n";
+            return 14;
+        }
     }
 
     D3DPRESENT_PARAMETERS parameters{};
@@ -405,7 +473,8 @@ int wmain(int argc, wchar_t **argv)
         return 11;
     }
     passed = RenderAndVerify(baseDevice) &&
-        VerifyConsumerAdapterInfo();
+        (g_hookCounterOnly ||
+            (VerifyConsumerAdapterInfo() && VerifyRendererIdentity(false)));
     if (passed)
     {
         result = baseDevice->Reset(&parameters);
@@ -438,18 +507,189 @@ int wmain(int argc, wchar_t **argv)
     }
     if (passed)
         passed = RenderAndVerify(device);
+    if (passed && !g_hookCounterOnly)
+        passed = VerifyRendererIdentity(true);
     if (passed)
     {
         result = device->ResetEx(&parameters, nullptr);
         passed = SUCCEEDED(result) && RenderAndVerify(device);
     }
+    if (g_rendererOnly && passed)
+    {
+        // Malformed producer metadata must never escape the mapping bounds.
+        // The D3D9 renderer must reject the draw rather than dereference
+        // (height-1)*rowPitch beyond the 64 MiB pixel buffer.
+        std::uint64_t beforeDraws = 0;
+        getStatus(&presentCount, &beforeDraws, &hookInstalled);
+        InterlockedIncrement(&frame->sequence);
+        frame->rowPitch = 0xFFFFFFFFu;
+        frame->frameNumber = 2;
+        MemoryBarrier();
+        InterlockedIncrement(&frame->sequence);
+        const BOOL badFrameDrew = g_renderForTest(device);
+        std::uint64_t afterDraws = 0;
+        getStatus(&presentCount, &afterDraws, &hookInstalled);
+        if (badFrameDrew || afterDraws != beforeDraws)
+        {
+            std::cerr << "Malformed D3D9 pitch was not rejected.\n";
+            passed = false;
+        }
+
+        // Recover from the malformed frame without a process restart.
+        InterlockedIncrement(&frame->sequence);
+        frame->rowPitch = FramePitch;
+        frame->frameNumber = 3;
+        MemoryBarrier();
+        InterlockedIncrement(&frame->sequence);
+        if (!ClearFrame(device) || !g_renderForTest(device) ||
+            !VerifyOutput(device))
+        {
+            std::cerr << "D3D9 renderer could not recover a valid frame.\n";
+            passed = false;
+        }
+        else
+        {
+            ++g_expectedDraws;
+        }
+    }
+    if (g_rendererOnly && passed)
+    {
+        // An in-flight producer update should not flash the UI invisible:
+        // keep the latest known-good texture without waiting for a write.
+        std::uint64_t beforeBusy = 0, afterBusy = 0;
+        getStatus(&presentCount, &beforeBusy, &hookInstalled);
+        if (!ClearFrame(device)) passed = false;
+        InterlockedIncrement(&frame->sequence);
+        const ULONGLONG startMs = GetTickCount64();
+        const BOOL incompleteDrew = g_renderForTest(device);
+        const ULONGLONG elapsedMs = GetTickCount64() - startMs;
+        InterlockedIncrement(&frame->sequence);
+        getStatus(&presentCount, &afterBusy, &hookInstalled);
+        if (!incompleteDrew || afterBusy != beforeBusy + 1 ||
+            elapsedMs > 250 || !VerifyOutput(device))
+        {
+            std::cerr << "D3D9 cached frame failed during writer collision: "
+                      << elapsedMs << " ms\n";
+            passed = false;
+        }
+        else
+        {
+            ++g_expectedDraws;
+        }
+
+        // A permanently incomplete write must not leave a zombie overlay.
+        if (passed)
+        {
+            if (!ClearFrame(device)) passed = false;
+            InterlockedIncrement(&frame->sequence);
+            Sleep(290);
+            std::uint64_t beforeExpired = 0, afterExpired = 0;
+            getStatus(&presentCount, &beforeExpired, &hookInstalled);
+            const BOOL expiredDrew = g_renderForTest(device);
+            getStatus(&presentCount, &afterExpired, &hookInstalled);
+            InterlockedIncrement(&frame->sequence);
+            if (expiredDrew || afterExpired != beforeExpired)
+            {
+                std::cerr << "Expired cached D3D9 frame remained visible.\n";
+                passed = false;
+            }
+        }
+    }
+    if (g_rendererOnly && passed)
+    {
+        // A hidden overlay may come back with the SAME published frame ID.
+        // The GPU texture must still be uploaded after visibility changed.
+        std::uint64_t beforeHidden = 0, afterHidden = 0;
+        getStatus(&presentCount, &beforeHidden, &hookInstalled);
+        InterlockedIncrement(&frame->sequence);
+        frame->frameNumber = 0;
+        MemoryBarrier();
+        InterlockedIncrement(&frame->sequence);
+        const BOOL hiddenDrew = g_renderForTest(device);
+        getStatus(&presentCount, &afterHidden, &hookInstalled);
+        if (hiddenDrew || afterHidden != beforeHidden)
+        {
+            std::cerr << "Hidden D3D9 frame unexpectedly rendered.\n";
+            passed = false;
+        }
+
+        // Change the opaque top marker from green to blue, but REUSE frame 3.
+        // A stale texture upload would still show the old green marker.
+        const std::size_t offset =
+            static_cast<std::size_t>(FrameHeight - 3) * FramePitch + (FrameWidth / 2) * 4;
+        InterlockedIncrement(&frame->sequence);
+        frame->pixels[offset + 0] = 255;
+        frame->pixels[offset + 1] = 0;
+        frame->pixels[offset + 2] = 0;
+        frame->pixels[offset + 3] = 255;
+        frame->frameNumber = 3;
+        MemoryBarrier();
+        InterlockedIncrement(&frame->sequence);
+        if (!ClearFrame(device) || !g_renderForTest(device) ||
+            !CheckPixel(device, FrameWidth / 2, 2,
+                "hidden-to-visible repeated frame ID", 0, 0, 255, 8))
+        {
+            std::cerr << "D3D9 repeated-ID frame was not reuploaded.\n";
+            passed = false;
+        }
+        else
+        {
+            ++g_expectedDraws;
+        }
+    }
     getStatus(&presentCount, &drawCount, &hookInstalled);
-    passed = passed && drawCount == g_expectedDraws && (g_reshadeTest || presentCount == 4);
+    // Polling diagnostics must be read-only; formerly this data was
+    // written synchronously to disk inside every 1,200th game Present.
+    duluka::diagnostics::D3D9TimingSnapshotV1 timing{}, second{};
+    const bool timingOK = getTiming(&timing, sizeof(timing)) &&
+        getTiming(&second, sizeof(second)) &&
+        !getTiming(nullptr, sizeof(timing)) &&
+        !getTiming(&second, sizeof(second) - 1) &&
+        timing.size == sizeof(timing) &&
+        timing.version == duluka::diagnostics::D3D9TimingVersion &&
+        timing.performanceFrequency != 0 &&
+        timing.presents == presentCount &&
+        second.presents == timing.presents &&
+        timing.draws == drawCount &&
+        timing.gamePresentSamples == presentCount &&
+        timing.gamePresentTotalTicks >= timing.gamePresentMaxTicks;
+    if (!timingOK)
+        std::cerr << "D3D9 non-blocking timing snapshot ABI/counters failed.\n";
+    passed = passed && timingOK;
+    duluka::diagnostics::D3D9PipelineTimingSnapshotV1 pipeline{}, again{};
+    const bool pipelineOK = getPipeline(&pipeline, sizeof(pipeline)) &&
+        getPipeline(&again, sizeof(again)) &&
+        !getPipeline(nullptr, sizeof(pipeline)) &&
+        !getPipeline(&again, sizeof(again) - 1) &&
+        pipeline.size == sizeof(pipeline) &&
+        pipeline.version == duluka::diagnostics::D3D9PipelineTimingVersion &&
+        pipeline.performanceFrequency != 0 &&
+        pipeline.compositionSamples >= drawCount &&
+        pipeline.compositionTotalTicks >= pipeline.compositionMaxTicks &&
+        pipeline.snapshotTotalTicks >= pipeline.snapshotMaxTicks &&
+        pipeline.uploadTotalTicks >= pipeline.uploadMaxTicks &&
+        pipeline.cpuDraws == drawCount &&
+        pipeline.gpuExDraws == 0 &&
+        (drawCount == 0 || (pipeline.snapshotSamples > 0 &&
+            pipeline.uploadAttempts > 0 && pipeline.uploadedBytes > 0 &&
+            pipeline.cpuFrameCopiedBytes > 0));
+    if (!pipelineOK)
+        std::cerr << "D3D9 pipeline diagnostics ABI/counters failed.\n";
+    passed = passed && pipelineOK;
+    const std::uint64_t expectedHookPresents =
+        g_rendererOnly ? 0ull : g_expectedDraws;
+    const std::uint64_t expectedRendererDraws =
+        g_hookCounterOnly ? 0ull : g_expectedDraws;
+    passed = passed && drawCount == expectedRendererDraws &&
+        (g_reshadeTest || presentCount == expectedHookPresents);
     if (!passed)
         std::cerr << "D3D9 smoke test failed; present=" << presentCount
                   << " draws=" << drawCount << "\n";
     else
-        std::cout << (g_reshadeTest ? "D3D9 ReShade shader-isolation test passed; present=" : "D3D9 smoke test passed; present=") << presentCount
+        std::cout << (g_reshadeTest ? "D3D9 ReShade shader-isolation test passed; present=" :
+                (g_rendererOnly ? "D3D9 renderer-only pixel/reset test passed; present=" :
+                    (g_hookCounterOnly ? "D3D9 Present hook counter-only test passed; present=" :
+                    "D3D9 smoke test passed; present="))) << presentCount
                   << " draws=" << drawCount << "\n";
 
     device->Release();

@@ -57,6 +57,7 @@
 #include "OscFramePublisher/OscD3D9FramePublisher/OscD3D9FramePublisher.h"
 #include "OscFramePublisher/OscD3D11FramePublisher/OscD3D11FramePublisher.h"
 #include "OscFramePublisher/Common/OscFrameUtilities.h"
+#include "OscFramePublisher/Common/OscHookTransportPolicy.h"
 #include "OscDesktopFrameQueue.h"
 #include "OscDesktopFps.h"
 #include "OscAtomicConfigFile.h"
@@ -92,6 +93,8 @@ struct OscConfig {
     osc::RendererChoice ui_renderer = osc::RendererChoice::Auto;
     osc::RendererChoice desktop_renderer = osc::RendererChoice::Auto;
     osc::RendererChoice bg_renderer = osc::RendererChoice::Auto;
+    // Phase 0: requested adapter only. Do not silently force CEF/Host onto it.
+    std::string gpu_adapter = "auto";
 };
 static OscConfig g_cfg;
 static std::wstring g_build_root;
@@ -101,6 +104,7 @@ static std::atomic<bool> g_config_save_pending{ false };
 static osc::RendererChoice g_desired_ui_renderer = osc::RendererChoice::Auto;
 static osc::RendererChoice g_desired_desktop_renderer = osc::RendererChoice::Auto;
 static osc::RendererChoice g_desired_bg_renderer = osc::RendererChoice::Auto;
+static std::string g_desired_gpu_adapter = "auto";
 static osc::RendererPolicy g_active_renderer_policy{ false, false, true };
 static std::atomic<bool> g_active_ui_gpu{ true };
 
@@ -223,6 +227,28 @@ static void LoadConfig() {
     readRenderer("uiRenderer", g_cfg.ui_renderer);
     readRenderer("desktopRenderer", g_cfg.desktop_renderer);
     readRenderer("bgRenderer", g_cfg.bg_renderer);
+    const auto requestedGpu = CfgStr(json, "gpuAdapter");
+    bool validGpuAdapter = requestedGpu == L"auto";
+    if (requestedGpu.size() == 17 && requestedGpu[8] == L':') {
+        validGpuAdapter = true;
+        for (size_t i = 0; i < requestedGpu.size(); ++i) {
+            const wchar_t c = requestedGpu[i];
+            if (i == 8) continue;
+            if (!((c >= L'0' && c <= L'9') ||
+                  (c >= L'A' && c <= L'F') ||
+                  (c >= L'a' && c <= L'f'))) {
+                validGpuAdapter = false;
+                break;
+            }
+        }
+    }
+    if (validGpuAdapter) {
+        g_cfg.gpu_adapter.clear();
+        // Only ASCII hex/colon or the literal "auto" is accepted.
+        for (wchar_t c : requestedGpu)
+            g_cfg.gpu_adapter.push_back(static_cast<char>(c));
+    }
+    g_desired_gpu_adapter = g_cfg.gpu_adapter;
     g_desired_ui_renderer = g_cfg.ui_renderer;
     g_desired_desktop_renderer = g_cfg.desktop_renderer;
     g_desired_bg_renderer = g_cfg.bg_renderer;
@@ -503,6 +529,10 @@ static void EnsureShownOnce();  // (นิยามอยู่หลัง show
 // → premultiply ด้วย pixel shader → วาดลง swapchain (alpha premultiplied)
 // → DComp ผูกกับหน้าต่างเดิม → DWM จัดการต่อ — CPU ~0
 static ID3D11Device* g_gpu_dev = nullptr;
+// Read-only GPU diagnostics. Never infer CEF's adapter solely from its PID:
+// a successful shared texture open only proves compositor compatibility.
+static std::atomic<ULONGLONG> g_last_cef_gpu_shared_tick{ 0 };
+static std::atomic<ULONGLONG> g_last_cef_cpu_paint_tick{ 0 };
 static ID3D11DeviceContext* g_gpu_ctx = nullptr;
 static IDXGISwapChain1* g_gpu_swap = nullptr;
 static HANDLE g_desktop_frame_latency_event = nullptr;
@@ -1150,6 +1180,7 @@ static OscPresentResult GpuComposite(uint64_t shared_handle, int w, int h,
         g_shared_handle_cached = shared_handle;
         Log("[gpu] shared texture cached handle=0x" + std::to_string((unsigned long long)shared_handle));
     }
+    g_last_cef_gpu_shared_tick.store(GetTickCount64(), std::memory_order_relaxed);
     // ★ วินิจฉัย: อ่านพิกเซลจริงจาก shared texture — เฉพาะ OSC_GPUDUMP=1
     //   [P2#7 Copilot] อ่านเป็น y*RowPitch + x*4 พร้อม bounds check (เดิมสลับแกน+อ่านเกิน)
     {
@@ -2351,14 +2382,116 @@ static void OscHandleFpsQueryOnUi(const std::string& req,
     }
 }
 
+// A GPU adapter LUID is a runtime identifier, not a permanent hardware ID.
+// If an adapter disappears after reboot/driver changes, leave selection pending
+// and fall back to Auto rather than bind to an unrelated adapter.
+static std::string OscGpuAdapterId(const LUID& luid) {
+    char value[24]{};
+    sprintf_s(value, "%08lX:%08lX",
+        static_cast<unsigned long>(luid.HighPart),
+        static_cast<unsigned long>(luid.LowPart));
+    return value;
+}
+
+static CefRefPtr<CefListValue> OscGpuAdapterChoices() {
+    auto list = CefListValue::Create();
+    auto automatic = CefDictionaryValue::Create();
+    automatic->SetString("id", "auto");
+    automatic->SetString("name", "Auto (Windows default)");
+    list->SetDictionary(0, automatic);
+
+    IDXGIFactory1* factory = nullptr;
+    if (FAILED(CreateDXGIFactory1(__uuidof(IDXGIFactory1),
+            reinterpret_cast<void**>(&factory))) || !factory)
+        return list;
+    for (UINT index = 0; index < 64; ++index) {
+        IDXGIAdapter1* adapter = nullptr;
+        if (factory->EnumAdapters1(index, &adapter) != S_OK || !adapter)
+            break;
+        DXGI_ADAPTER_DESC1 desc{};
+        if (SUCCEEDED(adapter->GetDesc1(&desc)) &&
+            !(desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)) {
+            const std::string adapterId = OscGpuAdapterId(desc.AdapterLuid);
+            std::wstring label(desc.Description);
+            // Duplicate display names are possible (two identical cards or
+            // several DXGI logical adapters from the same display driver).
+            label += L" [DXGI " + std::to_wstring(index) + L" | LUID ";
+            label.append(adapterId.begin(), adapterId.end());
+            label += L"]";
+            auto entry = CefDictionaryValue::Create();
+            entry->SetString("id", adapterId);
+            entry->SetString("name", label);
+            list->SetDictionary(list->GetSize(), entry);
+        }
+        adapter->Release();
+    }
+    factory->Release();
+    return list;
+}
+
+static bool OscGpuAdapterIsAvailable(const std::string& id,
+    CefRefPtr<CefListValue> choices) {
+    for (size_t i = 0; i < choices->GetSize(); ++i) {
+        auto entry = choices->GetDictionary(i);
+        if (entry && entry->GetString("id").ToString() == id)
+            return true;
+    }
+    return false;
+}
+
+// Read back the adapter that owns the compositor D3D11 device. This can
+// differ from the user's stored preference and the game's adapter.
+static std::string OscActiveCompositorGpuAdapter(std::wstring& name) {
+    name.clear();
+    if (!g_gpu_dev) return "";
+    IDXGIDevice* dxgi = nullptr;
+    if (FAILED(g_gpu_dev->QueryInterface(__uuidof(IDXGIDevice),
+            reinterpret_cast<void**>(&dxgi))) || !dxgi)
+        return "";
+    IDXGIAdapter* adapter = nullptr;
+    const HRESULT adapterResult = dxgi->GetAdapter(&adapter);
+    dxgi->Release();
+    if (FAILED(adapterResult) || !adapter) return "";
+    DXGI_ADAPTER_DESC desc{};
+    const HRESULT descResult = adapter->GetDesc(&desc);
+    adapter->Release();
+    if (FAILED(descResult)) return "";
+    name = desc.Description;
+    return OscGpuAdapterId(desc.AdapterLuid);
+}
+
+static const char* OscRecentCefFrameTransport() {
+    const ULONGLONG now = GetTickCount64();
+    const ULONGLONG gpu = g_last_cef_gpu_shared_tick.load(std::memory_order_relaxed);
+    const ULONGLONG cpu = g_last_cef_cpu_paint_tick.load(std::memory_order_relaxed);
+    if (gpu > cpu && gpu != 0 && now - gpu <= 5000)
+        return "gpu-shared-opened";
+    if (cpu != 0 && now - cpu <= 5000)
+        return "cpu-paint";
+    return "idle";
+}
+
 // Renderer preferences are persisted together. UI and Desktop selections take
 // effect on the next HOST boot; BG selects the particle canvas path at runtime.
+// Phase 0 GPU adapter preference is intentionally NOT applied to D3D/CEF yet.
 static std::string OscRendererStateOnUi() {
     CEF_REQUIRE_UI_THREAD();
     auto data = CefDictionaryValue::Create();
     data->SetString("ui", osc::RendererName(g_desired_ui_renderer));
     data->SetString("desktop", osc::RendererName(g_desired_desktop_renderer));
     data->SetString("background", osc::RendererName(g_desired_bg_renderer));
+    auto gpuAdapters = OscGpuAdapterChoices();
+    data->SetString("gpuAdapter", g_desired_gpu_adapter);
+    std::wstring activeGpuName;
+    const std::string activeGpuId = OscActiveCompositorGpuAdapter(activeGpuName);
+    data->SetString("activeGpuAdapter", activeGpuId);
+    data->SetString("activeGpuAdapterName", activeGpuName);
+    data->SetString("cefFrameTransport", OscRecentCefFrameTransport());
+    data->SetList("gpuAdapters", gpuAdapters);
+    data->SetBool("gpuAdapterAvailable",
+        OscGpuAdapterIsAvailable(g_desired_gpu_adapter, gpuAdapters));
+    // Explicitly disclose that adapter routing is not active in Phase 0.
+    data->SetBool("gpuAdapterPending", g_desired_gpu_adapter != "auto");
     data->SetString("activeUi", osc::RendererName(g_cfg.ui_renderer));
     data->SetString("activeDesktop", osc::RendererName(g_cfg.desktop_renderer));
     data->SetBool("restartRequired",
@@ -2372,10 +2505,11 @@ static std::string OscRendererStateOnUi() {
 class OscRenderersSavedTask : public CefTask {
 public:
     OscRenderersSavedTask(osc::RendererChoice ui, osc::RendererChoice desktop,
-        osc::RendererChoice background, bool saved, const std::string& error,
+        osc::RendererChoice background, const std::string& gpuAdapter,
+        bool saved, const std::string& error,
         const std::function<void(const std::string&)>& reply)
         : ui_(ui), desktop_(desktop), background_(background),
-          saved_(saved), error_(error), reply_(reply) {}
+          gpu_adapter_(gpuAdapter), saved_(saved), error_(error), reply_(reply) {}
     void Execute() override {
         CEF_REQUIRE_UI_THREAD();
         g_config_save_pending.store(false, std::memory_order_release);
@@ -2383,13 +2517,16 @@ public:
         g_desired_ui_renderer = ui_;
         g_desired_desktop_renderer = desktop_;
         g_desired_bg_renderer = background_;
+        g_desired_gpu_adapter = gpu_adapter_;
         Log(std::string("[renderer] saved UI=") + osc::RendererName(ui_) +
             " Desktop=" + osc::RendererName(desktop_) +
-            " BG=" + osc::RendererName(background_) + " (restart UI/Desktop)");
+            " BG=" + osc::RendererName(background_) +
+            " requested GPU=" + gpu_adapter_ + " (adapter preference pending; restart UI/Desktop)");
         reply_(OscRendererStateOnUi());
     }
 private:
     osc::RendererChoice ui_, desktop_, background_;
+    std::string gpu_adapter_;
     bool saved_;
     std::string error_;
     std::function<void(const std::string&)> reply_;
@@ -2400,9 +2537,10 @@ class OscSaveRenderersTask : public CefTask {
 public:
     OscSaveRenderersTask(const std::wstring& path, osc::RendererChoice ui,
         osc::RendererChoice desktop, osc::RendererChoice background,
+        const std::string& gpuAdapter,
         const std::function<void(const std::string&)>& reply)
         : path_(path), ui_(ui), desktop_(desktop),
-          background_(background), reply_(reply) {}
+          background_(background), gpu_adapter_(gpuAdapter), reply_(reply) {}
     void Execute() override {
         std::string contents, error;
         bool saved = false;
@@ -2416,7 +2554,8 @@ public:
                 auto target = window ? window : root;
                 if (!target->SetString("uiRenderer", osc::RendererName(ui_)) ||
                     !target->SetString("desktopRenderer", osc::RendererName(desktop_)) ||
-                    !target->SetString("bgRenderer", osc::RendererName(background_))) {
+                    !target->SetString("bgRenderer", osc::RendererName(background_)) ||
+                    !target->SetString("gpuAdapter", gpu_adapter_)) {
                     error = "Cannot update renderer configuration";
                 } else {
                     // Old top-level keys must not override the new window values
@@ -2425,6 +2564,7 @@ public:
                         if (root->HasKey("uiRenderer")) root->Remove("uiRenderer");
                         if (root->HasKey("desktopRenderer")) root->Remove("desktopRenderer");
                         if (root->HasKey("bgRenderer")) root->Remove("bgRenderer");
+                        if (root->HasKey("gpuAdapter")) root->Remove("gpuAdapter");
                     }
                     const auto updated = CefWriteJSON(value, JSON_WRITER_PRETTY_PRINT).ToString();
                     if (updated.empty()) error = "Cannot serialize OSC config";
@@ -2433,7 +2573,7 @@ public:
             }
         }
         if (!CefPostTask(TID_UI, new OscRenderersSavedTask(
-                ui_, desktop_, background_, saved, error, reply_))) {
+                ui_, desktop_, background_, gpu_adapter_, saved, error, reply_))) {
             g_config_save_pending.store(false, std::memory_order_release);
             reply_(OscFpsError("Cannot apply renderer setting: CEF UI unavailable"));
         }
@@ -2441,6 +2581,7 @@ public:
 private:
     std::wstring path_;
     osc::RendererChoice ui_, desktop_, background_;
+    std::string gpu_adapter_;
     std::function<void(const std::string&)> reply_;
     IMPLEMENT_REFCOUNTING(OscSaveRenderersTask);
 };
@@ -2467,14 +2608,94 @@ static void OscHandleRendererQueryOnUi(const std::string& req,
         !osc::ParseRendererChoice(request->GetString("background").ToString(), background)) {
         reply(OscFpsError("Renderer must be auto, gpu or cpu")); return;
     }
+    // Older UI clients may omit gpuAdapter; keep their existing preference.
+    std::string gpuAdapter = g_desired_gpu_adapter;
+    if (request->HasKey("gpuAdapter")) {
+        if (request->GetType("gpuAdapter") != VTYPE_STRING) {
+            reply(OscFpsError("Invalid GPU adapter identifier")); return;
+        }
+        gpuAdapter = request->GetString("gpuAdapter").ToString();
+    }
+    if (!OscGpuAdapterIsAvailable(gpuAdapter, OscGpuAdapterChoices())) {
+        reply(OscFpsError("Selected GPU adapter is not available")); return;
+    }
     if (g_config_save_pending.exchange(true, std::memory_order_acq_rel)) {
         reply(OscFpsError("Another OSC setting is already being saved")); return;
     }
     if (!CefPostTask(TID_FILE_USER_BLOCKING, new OscSaveRenderersTask(
-            g_osc_config_path, ui, desktop, background, reply))) {
+            g_osc_config_path, ui, desktop, background, gpuAdapter, reply))) {
         g_config_save_pending.store(false, std::memory_order_release);
         reply(OscFpsError("Cannot schedule renderer settings save"));
     }
+}
+
+// Hook transport policies: capabilities reflect implemented renderers, not
+// detection-only APIs. Keep this in Host appdata, never in shared Hook ABI.
+static std::string OscHookSavedMode(const osc::hook_transport::Api& api) {
+    StoreLoad();
+    const auto it = g_store.find(api.settingKey);
+    const std::string mode = it == g_store.end() ? "auto" : it->second;
+    return std::string(osc::hook_transport::SafeMode(api, mode));
+}
+static std::string OscHookTransportStateOnUi() {
+    CEF_REQUIRE_UI_THREAD();
+    auto root = CefDictionaryValue::Create();
+    auto apis = CefListValue::Create();
+    for (const auto& api : osc::hook_transport::Apis) {
+        auto entry = CefDictionaryValue::Create();
+        entry->SetString("id", api.id);
+        entry->SetString("mode", OscHookSavedMode(api));
+        entry->SetBool("implemented", api.rendererImplemented);
+        entry->SetBool("gpuAvailable", api.gpuModeAvailable);
+        entry->SetBool("cpuAvailable", api.cpuModeAvailable);
+        entry->SetString("normalRoute", api.route);
+        // Status is intentionally a route capability, not a false claim
+        // that an in-game receiver has already committed a frame.
+        entry->SetBool("verifiedActive", false);
+        apis->SetDictionary(apis->GetSize(), entry);
+    }
+    root->SetList("apis", apis);
+    auto value = CefValue::Create();
+    value->SetDictionary(root);
+    return CefWriteJSON(value, JSON_WRITER_DEFAULT).ToString();
+}
+static void OscHandleHookTransportQueryOnUi(const std::string& req,
+    const std::function<void(const std::string&)>& reply) {
+    CEF_REQUIRE_UI_THREAD();
+    auto value = CefParseJSON(req, JSON_PARSER_RFC);
+    if (!value || value->GetType() != VTYPE_DICTIONARY) {
+        reply(OscFpsError("Invalid Hook transport request")); return;
+    }
+    auto request = value->GetDictionary();
+    const auto command = request->GetString("command").ToString();
+    if (command == "QUERY_OSC_GET_HOOK_TRANSPORT") {
+        reply(OscHookTransportStateOnUi()); return;
+    }
+    if (command != "QUERY_OSC_SET_HOOK_TRANSPORT" ||
+        request->GetType("api") != VTYPE_STRING ||
+        request->GetType("mode") != VTYPE_STRING) {
+        reply(OscFpsError("Invalid Hook transport choice")); return;
+    }
+    const std::string name = request->GetString("api").ToString();
+    const std::string mode = request->GetString("mode").ToString();
+    const auto* api = osc::hook_transport::Find(name);
+    if (!api || !osc::hook_transport::Allowed(*api, mode) ||
+        !api->rendererImplemented) {
+        reply(OscFpsError("Hook transport is unavailable for this API")); return;
+    }
+    const auto original = OscHookSavedMode(*api);
+    if (mode != original) {
+        // Persistent native Host preference; CPU-only D3D9Ex takes effect
+        // immediately by withdrawing GPU preview on the publish worker.
+        g_store[api->settingKey] = mode;
+        StoreSaveAsync();
+        if (name == "d3d9ex") {
+            osc::d3d11_frame_publisher::SetD3D9ExCpuOnly(mode == "cpu");
+        }
+        Log("[hook-transport] " + name + " requested=" + mode +
+            " (only supported modes accepted; CPU fallback retained)");
+    }
+    reply(OscHookTransportStateOnUi());
 }
 
 class OscFpsQueryTask : public CefTask {
@@ -2486,6 +2707,9 @@ public:
         if (request_.find("QUERY_OSC_GET_RENDERERS") != std::string::npos ||
             request_.find("QUERY_OSC_SET_RENDERERS") != std::string::npos)
             OscHandleRendererQueryOnUi(request_, reply_);
+        else if (request_.find("QUERY_OSC_GET_HOOK_TRANSPORT") != std::string::npos ||
+                 request_.find("QUERY_OSC_SET_HOOK_TRANSPORT") != std::string::npos)
+            OscHandleHookTransportQueryOnUi(request_, reply_);
         else OscHandleFpsQueryOnUi(request_, reply_);
     }
 private:
@@ -2500,6 +2724,9 @@ static void OscHandleFpsQuery(const std::string& req,
         if (req.find("QUERY_OSC_GET_RENDERERS") != std::string::npos ||
             req.find("QUERY_OSC_SET_RENDERERS") != std::string::npos)
             OscHandleRendererQueryOnUi(req, reply);
+        else if (req.find("QUERY_OSC_GET_HOOK_TRANSPORT") != std::string::npos ||
+                 req.find("QUERY_OSC_SET_HOOK_TRANSPORT") != std::string::npos)
+            OscHandleHookTransportQueryOnUi(req, reply);
         else OscHandleFpsQueryOnUi(req, reply);
         return;
     }
@@ -2545,7 +2772,8 @@ static void HandleOscQuery(const std::string& req, bool persistent,
         Log(std::string("[cefQuery] ") + cmd + (persistent ? " (persistent)" : ""));
 
     if (cmd == "QUERY_OSC_GET_FPS" || cmd == "QUERY_OSC_SET_FPS" ||
-        cmd == "QUERY_OSC_GET_RENDERERS" || cmd == "QUERY_OSC_SET_RENDERERS") {
+        cmd == "QUERY_OSC_GET_RENDERERS" || cmd == "QUERY_OSC_SET_RENDERERS" ||
+        cmd == "QUERY_OSC_GET_HOOK_TRANSPORT" || cmd == "QUERY_OSC_SET_HOOK_TRANSPORT") {
         OscHandleFpsQuery(req, reply);
         return;
     }
@@ -2609,7 +2837,7 @@ static void HandleOscQuery(const std::string& req, bool persistent,
         return;
     }
     if (cmd == "QUERY_WIN_NODE_INFO") {
-        reply("{\"port\":59001,\"secret\":\"0CA906D2784F0D14E399874F5C5ED4A1\"}");
+        reply("{\"port\":59001,\"secret\":\"REDACTED_LEGACY_PAIRING_VALUE\"}");
         return;
     }
     if (cmd == "QUERY_LOAD_STRING_TABLE") {
@@ -2632,6 +2860,42 @@ static void HandleOscQuery(const std::string& req, bool persistent,
 
     if (cmd == "QUERY_OSC_GET_OPEN_STATE") {
         reply(g_ui_open_snapshot.load() ? "true" : "false");
+        return;
+    }
+
+    if (cmd == "QUERY_OSC_GET_HOOK_STATUS") {
+        // Read-only Host-side observation; never claim that a remote Hook
+        // device was initialized solely because a Consumer mapping exists.
+        const auto* consumer =
+            osc::d3d11_frame_publisher::GetConsumerAdapterInfo();
+        const bool valid = consumer &&
+            consumer->magic == osc_frame_bridge::ConsumerAdapterMagic &&
+            consumer->version == osc_frame_bridge::ConsumerAdapterVersion;
+        const LONG pid = valid
+            ? static_cast<LONG>(consumer->ownerProcessId) : 0;
+        const LONG api = valid
+            ? osc_frame_bridge::LoadConsumerRenderApi(*consumer) : 0;
+        const bool observed = pid > 0 && (api == 9 || api == 11);
+        bool alive = false;
+        if (observed) {
+            HANDLE process = OpenProcess(SYNCHRONIZE, FALSE,
+                static_cast<DWORD>(pid));
+            if (process) {
+                alive = WaitForSingleObject(process, 0) == WAIT_TIMEOUT;
+                CloseHandle(process);
+            }
+        }
+        const bool focused = g_game_focused.load(std::memory_order_acquire);
+        const bool overlayOpen = g_ui_open_snapshot.load(std::memory_order_acquire);
+        const std::string json = std::string("{\"hostMode\":\"") +
+            OscRenderStateName(g_render_state.load(std::memory_order_relaxed)) +
+            "\",\"consumerObserved\":" + (observed && alive ? "true" : "false") +
+            ",\"consumerApi\":" + std::to_string(observed && alive ? api : 0) +
+            ",\"gameFocused\":" + (focused ? "true" : "false") +
+            ",\"overlayOpen\":" + (overlayOpen ? "true" : "false") +
+            ",\"gpuSharedRequested\":" + (g_gpu_shared ? "true" : "false") +
+            ",\"gpuDeviceReady\":" + (g_gpu_ok ? "true" : "false") + "}";
+        reply(json);
         return;
     }
 
@@ -3123,6 +3387,7 @@ public:
         if (n < 3) Log("[paint] type=" + std::to_string((int)type) + " " + std::to_string(width) + "x" + std::to_string(height));
         n++;
         if (type != PET_VIEW) return;
+        g_last_cef_cpu_paint_tick.store(GetTickCount64(), std::memory_order_relaxed);
         static bool first = true;
         if (first) { first = false; Log("[paint] first VIEW frame " + std::to_string(width) + "x" + std::to_string(height)); }
         // fps meter: นับเฟรมเป็นหน้าต่าง 2 วิ (เงียบเมื่อหน้านิ่ง = ปกติของ OSR)
@@ -3225,13 +3490,31 @@ public:
         {
             std::lock_guard<std::mutex> lock(osc::d3d11_frame_publisher::Mutex());
             const auto compositeStartUs = OscPerfNowUs();
-            GpuComposite((uint64_t)(uintptr_t)shared_handle, frameW, frameH,
+            const auto compositeResult = GpuComposite(
+                (uint64_t)(uintptr_t)shared_handle, frameW, frameH,
                 effectiveDirtyRects);
             OscPerfRecordComposite(OscPerfNowUs() - compositeStartUs);
             if (hookMode && adapterOverlayVisible) {
-                const auto publishStartUs = OscPerfNowUs();
-                osc::d3d11_frame_publisher::PublishFrameLocked(g_shared_tex, effectiveDirtyRects);
-                OscPerfRecordPublish(OscPerfNowUs() - publishStartUs);
+                // Only actual CEF accelerated-view callbacks advance source
+                // serial. Idle timers, focus metadata and retry readbacks do not.
+                if (compositeResult != OscPresentResult::Failed)
+                    osc::d3d11_frame_publisher::MarkCefContentUpdatedLocked();
+                // CEF shared_handle is callback-scoped: copy GPU pixels into
+                // one of two Host-owned textures BEFORE returning to CEF.
+                // Never queue the raw CEF handle or wait on GPU completion.
+                if (compositeResult != OscPresentResult::Failed)
+                    osc::d3d11_frame_publisher::QueueD3D9ExGpuFrameLocked(
+                        g_shared_tex);
+                if (compositeResult != OscPresentResult::Failed) {
+                    const auto publishStartUs = OscPerfNowUs();
+                    osc::d3d11_frame_publisher::PublishFrameLocked(
+                        g_shared_tex, effectiveDirtyRects);
+                    OscPerfRecordPublish(OscPerfNowUs() - publishStartUs);
+                } else {
+                    // Do not publish a previous CEF surface as a new frame
+                    // after an unsuccessful accelerated-paint open.
+                    osc::d3d11_frame_publisher::SetForceFullReadbackLocked(true);
+                }
             } else if (hookMode) {
                 osc::d3d11_frame_publisher::SetForceFullReadbackLocked(true);
             }
@@ -4783,6 +5066,10 @@ public:
         //   (CEF เองเตือน: "Always execute asynchronously ... during app initialization")
         //   init ของ global browser context แข่งกัน → NOTREACHED ud2 ~25-50%
         StoreLoad();   // โหลดครั้งเดียวตอนบูต — READ หลังจากนี้เป็น memory-only
+        // Apply saved CPU-only policy before the first Host frame publish.
+        if (const auto* api = osc::hook_transport::Find("d3d9ex"))
+            osc::d3d11_frame_publisher::SetD3D9ExCpuOnly(
+                OscHookSavedMode(*api) == "cpu");
         CefPostDelayedTask(TID_UI, new CreateBrowserTask(), 400);
     }
     IMPLEMENT_REFCOUNTING(OscApp);

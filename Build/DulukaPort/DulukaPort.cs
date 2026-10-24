@@ -30,7 +30,18 @@ class DulukaPort {
   const string EVENT_NAME = @"Global\{1E6C4F0F-8ABF-4709-AAAD-0341CF2D44A7}";
   const string MAP_NAME = "{8BA1E16C-FC54-4595-9782-E370A5FBE8DA}";
   const string TOGGLE_URL = "http://127.0.0.1:59002/?hk=OpenShare";
-  const string NODE_JSON = "{\"port\":59001,\"secret\":\"0CA906D2784F0D14E399874F5C5ED4A1\"}";
+  // Compatibility helper: load the existing per-user NvNode init dynamically.
+  // Do not embed or print pairing credentials in source.
+  static string ReadLegacyNodeJson() {
+    string path = System.IO.Path.Combine(
+      Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+      @"NVIDIA Corporation\NvNode\nvnode-init-duluka.json");
+    if (!System.IO.File.Exists(path)) throw new InvalidOperationException("pairing_init_unavailable");
+    string data = System.IO.File.ReadAllText(path);
+    if (!data.Contains("\"port\"") || !data.Contains("\"secret\"") || data.Length > 4096)
+      throw new InvalidOperationException("pairing_init_invalid");
+    return data;
+  }
 
   static void Main() {
     IntPtr ev = CreateEventW(IntPtr.Zero, false, false, EVENT_NAME);
@@ -42,8 +53,8 @@ class DulukaPort {
       IntPtr view = MapViewOfFile(map, FILE_MAP_ALL, 0, 0, 4096);
       if (view != IntPtr.Zero) {
         byte[] buf = new byte[4096];
-        byte[] u16 = Encoding.ASCII.GetBytes(NODE_JSON);
-        byte[] a8 = Encoding.ASCII.GetBytes(NODE_JSON);
+        byte[] u16 = Encoding.ASCII.GetBytes(ReadLegacyNodeJson());
+        byte[] a8 = Encoding.ASCII.GetBytes(ReadLegacyNodeJson());
         Array.Copy(u16, 0, buf, 0, u16.Length);                       // ANSI JSON, null-terminated, at offset 0 (decoded from genuine node)
         
         Marshal.Copy(buf, 0, view, 4096);

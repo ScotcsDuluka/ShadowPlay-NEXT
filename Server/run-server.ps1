@@ -23,6 +23,9 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+if ($Public) {
+    throw 'Direct public HTTP is disabled for Duluka Account. Use start-public-tunnel.ps1 (Cloudflare HTTPS) instead.'
+}
 
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $project = Join-Path $here 'Duluka.Server\Duluka.Server.csproj'

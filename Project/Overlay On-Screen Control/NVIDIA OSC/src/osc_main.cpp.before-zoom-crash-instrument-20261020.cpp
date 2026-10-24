@@ -1,4 +1,4 @@
-﻿// osc_main.cpp — NVIDIA OSC (ของเรา): host C++ เหมือน NVIDIA Share.exe
+// osc_main.cpp — NVIDIA OSC (ของเรา): host C++ เหมือน NVIDIA Share.exe
 //
 // เฟส B+C: OSR (offscreen) + layered compositor per-pixel alpha + input forwarding
 // + page server :3000 + toggle :59003 + อ่าน NVIDIA Config\nvidia-osc.json — ใช้แทน CefSharp
@@ -1977,7 +1977,7 @@ static void HandleOscQuery(const std::string& req, bool persistent,
         return;
     }
     if (cmd == "QUERY_WIN_NODE_INFO") {
-        reply("{\"port\":59001,\"secret\":\"0CA906D2784F0D14E399874F5C5ED4A1\"}");
+        reply("{\"port\":59001,\"secret\":\"REDACTED_LEGACY_PAIRING_VALUE\"}");
         return;
     }
     if (cmd == "QUERY_LOAD_STRING_TABLE") {

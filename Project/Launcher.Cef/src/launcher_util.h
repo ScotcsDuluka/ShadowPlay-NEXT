@@ -46,6 +46,10 @@ void KillProcessByName(const wchar_t* name);
 // TerminateProcess only on instances of |name| running FROM |exe_path|
 // (exact image-path match, StartCefOverlay dedupe contract).
 void KillProcessFromPath(const wchar_t* name, const std::wstring& exe_path);
+// EXIT ALL only: exact path+name verification, bounded graceful window close,
+// then targeted force fallback. Never matches another vendor's installation.
+void StopOwnedProcessFromPath(const wchar_t* name,
+                              const std::wstring& exe_path);
 bool IsTcpPortOpen(unsigned port);
 bool WaitForTcpPort(unsigned port, unsigned timeout_ms);
 // One-shot loopback send to the NVIDIA API hub (:5001). Frame parity with
@@ -55,6 +59,9 @@ bool SendHubLine(const std::string& line);
 // the node broadcast WindowState and the genuine page opens). Minimal
 // HTTP/1.1 over raw TCP, SendHubLine plumbing class. Best effort.
 bool HttpPostLocal(unsigned port, const std::wstring& path);
+// HTTP 200 for a product-owned local service's static landing page, NOT
+// hardware/recording readiness. Bounded connect/send/response deadlines.
+bool HttpGetLocal(unsigned port, const std::wstring& path);
 
 // ── config.json (AppConfigShared.vb contract) ───────────────────────────
 bool ReadConfigBool(const wchar_t* section, const wchar_t* key,

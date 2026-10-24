@@ -89,6 +89,11 @@ Duluka/**/AppData/
 
 # Local secrets (never commit)
 Duluka/.server-secret
+# ShadowPlay NEXT pairing secrets are stored under per-user LocalAppData, never Git.
+**/pairing-current-user.dpapi
+**/pairing-current-user.dpapi.*
+**/*.pairing-secret
+**/nvcontainer.private.json
 
 # Node runtime (Backend)
 node_modules/

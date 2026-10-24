@@ -19,6 +19,31 @@
 
 #include "launcher_json.h"
 
+// Read-only package/process inventory. Process presence does not establish
+// recording readiness, game attachment, or rendered Hook output.
+struct LauncherModuleState {
+  explicit LauncherModuleState(bool track_process = false)
+      : process_tracking(track_process) {}
+
+  bool installed = false;
+  bool process_tracking = false;
+  bool running = false;
+};
+
+struct LauncherModuleStates {
+  LauncherModuleState capture{true};
+  LauncherModuleState graphics{true};
+  LauncherModuleState overlay{true};
+  LauncherModuleState node_api{true};
+  LauncherModuleState container{true};
+  LauncherModuleState adapter{true};
+  LauncherModuleState hook;
+  LauncherModuleState ansel;
+  LauncherModuleState helper{true};
+  LauncherModuleState ffmpeg;
+  LauncherModuleState config;
+};
+
 struct LauncherState {
   bool nv_api = false;        // "NVIDIA Backend" (TCP hub) running
   bool shadowplay = false;    // "NVIDIA ShadowPlay" running
@@ -29,6 +54,7 @@ struct LauncherState {
   bool cef_overlay = false;   // "NVIDIA Share" running (any lane)
   bool overlay_enabled = false;  // config Overlay.UseOverlayEnabled
   bool engine_overlay = false;   // config Overlay.EngineOverlayMode
+  LauncherModuleStates modules;
 
   std::string ToJson() const;
 };

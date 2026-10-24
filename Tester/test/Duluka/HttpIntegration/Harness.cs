@@ -60,19 +60,31 @@ internal sealed class ServerApp : IDisposable
     public static string RepoRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "Duluka", "Duluka.Server", "Duluka.Server.csproj")))
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "Server", "Duluka.Server", "Duluka.Server.csproj")))
             dir = dir.Parent!;
         return dir?.FullName ?? throw new InvalidOperationException("repo root not found from " + AppContext.BaseDirectory);
     }
 
     private static string ServerDll()
     {
+        // CI / live-server regression mode: reuse a prebuilt isolated output.
+        // Never build over a running production executable when explicitly
+        // pointed at a staging DLL. Production endpoints remain unmodified.
+        var isolatedDll = Environment.GetEnvironmentVariable("DULUKA_HTTP_TEST_SERVER_DLL");
+        if (!string.IsNullOrWhiteSpace(isolatedDll))
+        {
+            var full = Path.GetFullPath(isolatedDll);
+            if (!File.Exists(full))
+                throw new InvalidOperationException("DULUKA_HTTP_TEST_SERVER_DLL does not exist: " + full);
+            return full;
+        }
+
         lock (BuildLock)
         {
-            var dll = Path.Combine(RepoRoot(), "Duluka", "Duluka.Server", "bin", "Release", "net10.0", "Duluka.Server.dll");
+            var dll = Path.Combine(RepoRoot(), "Server", "Duluka.Server", "bin", "Release", "net10.0", "Duluka.Server.dll");
             if (!_serverBuilt || !File.Exists(dll))
             {
-                var csproj = Path.Combine(RepoRoot(), "Duluka", "Duluka.Server", "Duluka.Server.csproj");
+                var csproj = Path.Combine(RepoRoot(), "Server", "Duluka.Server", "Duluka.Server.csproj");
                 var psi = new ProcessStartInfo("dotnet", $"build \"{csproj}\" -c Release --nologo -v q")
                 {
                     RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false,

@@ -59,6 +59,8 @@ namespace
     std::atomic<std::uint64_t> g_reshadeCallbackCount{ 0 };
     std::atomic<std::uint64_t> g_lastBridgeFrameNumber{ 0 };
     std::atomic<std::uint64_t> g_overlayCacheCopyCount{ 0 };
+    std::atomic<std::uint64_t> g_backBufferRtvReuseCount{ 0 };
+    std::atomic<std::uint64_t> g_backBufferRtvCreateCount{ 0 };
     std::atomic<bool> g_bridgeConnected{ false };
     std::atomic<bool> g_overlayTextureReady{ false };
     std::atomic<long> g_lastOverlayError{ 0 };
@@ -688,9 +690,9 @@ namespace
 
         if (!g_overlayCacheValid || frameNumber != g_cachedFrameNumber)
         {
-            // Keep the game thread moving when a previous overlay frame is available.
-            // Retain the initial-frame wait; a busy producer otherwise uses the cache.
-            const DWORD mutexTimeoutMs = g_overlayCacheValid ? 0 : 2;
+            // Never wait on the producer's keyed mutex from the game thread.
+            // If the first frame is busy, skip it and continue original Present.
+            constexpr DWORD mutexTimeoutMs = 0;
             bool acquired = true;
             if (g_textureRelay)
             {
@@ -721,9 +723,33 @@ namespace
         if (!g_overlayCacheValid)
             return;
 
+        // Reuse the game's EXISTING bound backbuffer view when possible.
+        // Crucially, NEVER retain a RTV reference across Present: doing so
+        // without hooking ResizeBuffers prevents DXGI from resizing.
         ID3D11RenderTargetView *renderTarget = nullptr;
-        result = device->CreateRenderTargetView(
-            backBuffer, nullptr, &renderTarget);
+        g_renderContext->OMGetRenderTargets(1, &renderTarget, nullptr);
+        if (renderTarget)
+        {
+            ID3D11Resource *bound = nullptr;
+            renderTarget->GetResource(&bound);
+            const bool isBackBuffer =
+                bound == static_cast<ID3D11Resource *>(backBuffer);
+            if (bound) bound->Release();
+            if (!isBackBuffer)
+            {
+                renderTarget->Release();
+                renderTarget = nullptr;
+            }
+            else
+                g_backBufferRtvReuseCount.fetch_add(1, std::memory_order_relaxed);
+        }
+        if (!renderTarget)
+        {
+            result = device->CreateRenderTargetView(
+                backBuffer, nullptr, &renderTarget);
+            if (SUCCEEDED(result) && renderTarget)
+                g_backBufferRtvCreateCount.fetch_add(1, std::memory_order_relaxed);
+        }
         if (FAILED(result) || !renderTarget)
         {
             SetDiagnosticStage("backbuffer-target-failed", result);
@@ -855,23 +881,9 @@ namespace duluka::d3d11
         }
         D3D11_TEXTURE2D_DESC desc{};backBuffer->GetDesc(&desc);
         DrawOverlay(device,backBuffer,desc.Width,desc.Height);
-        const auto callbackCount=g_reshadeCallbackCount.fetch_add(1,std::memory_order_relaxed)+1;
-        static ULONGLONG lastDiagnosticTick=0;
-        const ULONGLONG now=GetTickCount64();
-        if(now-lastDiagnosticTick>=1000){
-            lastDiagnosticTick=now;char diagnostic[512]{};
-            sprintf_s(diagnostic,sizeof(diagnostic),
-                "[reshade] frame diagnostic: callbacks=%llu bridgeFrame=%llu cachedFrame=%llu cacheCopies=%llu draws=%llu stage=%s",
-                static_cast<unsigned long long>(callbackCount),
-                static_cast<unsigned long long>(g_lastBridgeFrameNumber.load(std::memory_order_relaxed)),
-                static_cast<unsigned long long>(g_cachedFrameNumber),
-                static_cast<unsigned long long>(g_overlayCacheCopyCount.load(std::memory_order_relaxed)),
-                static_cast<unsigned long long>(g_overlayDrawCount.load(std::memory_order_relaxed)),
-                g_diagnosticStage);
-            Log(diagnostic);
-        }
+        g_reshadeCallbackCount.fetch_add(1, std::memory_order_relaxed);
+        // Detailed counters are polled off the render thread via GetStatus().
     }
-
     RendererStatus GetStatus()
     {
         std::lock_guard<std::mutex> lock(g_renderMutex);
@@ -880,6 +892,8 @@ namespace duluka::d3d11
         s.reshadeCallbackCount=g_reshadeCallbackCount.load(std::memory_order_relaxed);
         s.lastBridgeFrameNumber=g_lastBridgeFrameNumber.load(std::memory_order_relaxed);
         s.cacheCopyCount=g_overlayCacheCopyCount.load(std::memory_order_relaxed);
+        s.backBufferRtvReuseCount=g_backBufferRtvReuseCount.load(std::memory_order_relaxed);
+        s.backBufferRtvCreateCount=g_backBufferRtvCreateCount.load(std::memory_order_relaxed);
         s.cachedFrameNumber=g_cachedFrameNumber;s.cacheValid=g_overlayCacheValid;
         s.bridgeConnected=g_bridgeConnected.load(std::memory_order_acquire);
         s.textureReady=g_overlayTextureReady.load(std::memory_order_acquire);

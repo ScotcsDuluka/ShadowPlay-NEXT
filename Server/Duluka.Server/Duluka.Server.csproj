@@ -25,6 +25,9 @@
     <!-- The /admin operator dashboard ships as a single embedded HTML file
          (no wwwroot, no static-file middleware, no external assets). -->
     <EmbeddedResource Include="Admin\admin.html" />
+    <EmbeddedResource Include="Portal\index.html" />
+    <EmbeddedResource Include="Portal\app.css" />
+    <EmbeddedResource Include="Portal\app.js" />
   </ItemGroup>
 
 </Project>

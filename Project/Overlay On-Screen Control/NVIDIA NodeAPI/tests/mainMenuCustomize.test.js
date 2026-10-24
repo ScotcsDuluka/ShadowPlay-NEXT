@@ -42,7 +42,7 @@ function nativeTemplate(){
 test('Settings keeps native actions and starts customization directly on the real Main-menu',()=>{
  const f=menu(),settings=f.tiles.Preferences;
  assert.equal(settings.name,'nv-settings-menu');assert.equal(typeof settings.click,'undefined');
- assert.deepEqual(Array.from(settings.state.Menu.items,item=>item.name),['Settings','Customize Main-menu','Whisper Mode','Overlay FPS','Renderer Mode']);
+ assert.deepEqual(Array.from(settings.state.Menu.items,item=>item.name),['Settings','Customize Main-menu','Whisper Mode','Overlay FPS','Renderer Mode','Hook Settings']);
  settings.state.Menu.items.find(item=>item.id==='settings').click();settings.state.Menu.items.find(item=>item.id==='customize-main-menu').click();
  assert.deepEqual(f.routes,['main.preferences']);assert.equal(f.editStarts(),1);assert.equal(settings.state.Menu.items.find(item=>item.id==='customize-main-menu').icon,'icon-share');
  assert.equal(f.tiles.Mic.state.On.items[0].click,f.micAction);assert.equal(f.tiles.Camera.state.Off.items[0].click,f.cameraAction);assert.equal(f.tiles.Gallery.click,f.galleryAction);
@@ -68,6 +68,17 @@ test('Renderer Mode opens from Settings and remains unique after synchronization
  for(let i=0;i<3;i++)f.synchronize();
  assert.equal(items.filter(x=>x.id==='renderer-mode').length,1);
 });
+test('Hook Settings stays in native Settings menu on resync',()=>{
+  const f=menu(),items=f.tiles.Preferences.state.Menu.items;
+  const item=items.find(x=>x.id==='hook-settings');
+  assert(item&&item.visible&&item.enabled);
+  assert.equal(item.icon,'icon-settings');
+  item.click();assert.deepEqual(f.routes,['main.osc-hook']);
+  for(let i=0;i<3;i++)f.synchronize();
+  assert.equal(f.tiles.Preferences.state.Menu.items,items);
+  assert.equal(items.filter(x=>x.id==='hook-settings').length,1);
+});
+
 test('missing Whisper Mode disables its submenu action',()=>{
  const f=menu();delete f.tiles.QuietMode2;f.synchronize();const item=f.tiles.Preferences.state.Menu.items.find(item=>item.id==='quiet-mode');
  assert.equal(item.visible,false);assert.equal(item.enabled,false);assert.doesNotThrow(()=>item.click());

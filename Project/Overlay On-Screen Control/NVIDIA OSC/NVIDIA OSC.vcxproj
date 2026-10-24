@@ -48,9 +48,11 @@
     <ClInclude Include="src\OscDesktopFps.h" />
     <ClInclude Include="src\OscAtomicConfigFile.h" />
     <ClCompile Include="src\OscFramePublisher\OscD3D9FramePublisher\OscD3D9FramePublisher.cpp" />
+    <ClCompile Include="src\OscFramePublisher\OscD3D9ExFramePublisher\OscD3D9ExFramePublisher.cpp" />
     <ClCompile Include="src\OscFramePublisher\Common\OscFrameUtilities.cpp" />
     <ClCompile Include="src\OscFramePublisher\OscD3D11FramePublisher\OscD3D11FramePublisher.cpp" />
     <ClInclude Include="src\OscFramePublisher\OscD3D9FramePublisher\OscD3D9FramePublisher.h" />
+    <ClInclude Include="src\OscFramePublisher\OscD3D9ExFramePublisher\OscD3D9ExFramePublisher.h" />
     <ClInclude Include="src\OscFramePublisher\Common\OscFrameUtilities.h" />
     <ClInclude Include="src\OscFramePublisher\OscD3D11FramePublisher\OscD3D11FramePublisher.h" />
     <ResourceCompile Include="app.rc" />

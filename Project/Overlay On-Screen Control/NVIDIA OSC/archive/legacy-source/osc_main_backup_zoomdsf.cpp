@@ -860,7 +860,7 @@ static void HandleOscQuery(const std::string& req, bool persistent,
         return;
     }
     if (cmd == "QUERY_WIN_NODE_INFO") {
-        reply("{\"port\":59001,\"secret\":\"0CA906D2784F0D14E399874F5C5ED4A1\"}");
+        reply("{\"port\":59001,\"secret\":\"REDACTED_LEGACY_PAIRING_VALUE\"}");
         return;
     }
     if (cmd == "QUERY_LOAD_STRING_TABLE") {

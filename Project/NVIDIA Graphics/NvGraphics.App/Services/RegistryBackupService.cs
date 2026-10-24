@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.Win32;
 
 namespace NvGraphics.Services;
@@ -46,9 +48,12 @@ public sealed class RegistryBackupService
             Reason = reason
         };
         Directory.CreateDirectory(BackupDirectory);
+        // Bounded, collision-resistant name; no raw executable paths in filenames.
         string file = Path.Combine(BackupDirectory,
-            $"{DateTime.UtcNow:yyyyMMdd-HHmmss-fff}-{Sanitize(valueName)}.json");
-        File.WriteAllText(file, JsonSerializer.Serialize(record, new JsonSerializerOptions { WriteIndented = true }));
+            $"{DateTime.UtcNow:yyyyMMdd-HHmmss-fffffff}-{Guid.NewGuid():N}-{Sanitize(valueName)}.json");
+        // CreateNew prevents overwriting a backup even if multiple processes race.
+        using (var stream = new FileStream(file, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            JsonSerializer.Serialize(stream, record, new JsonSerializerOptions { WriteIndented = true });
         return record;
     }
 
@@ -89,6 +94,13 @@ public sealed class RegistryBackupService
         _ => value.ToString()
     };
 
-    private static string Sanitize(string name) =>
-        string.Concat(name.Select(c => char.IsLetterOrDigit(c) ? c : '_'));
+    private static string Sanitize(string name)
+    {
+        name ??= "";
+        var prefix = new string(name.Take(36).Select(c =>
+            (c is >= 'A' and <= 'Z') || (c is >= 'a' and <= 'z') ||
+            (c is >= '0' and <= '9') ? c : '_').ToArray());
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(name)))[..12];
+        return prefix + "-" + hash;
+    }
 }

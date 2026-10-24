@@ -6,7 +6,13 @@ const source=fs.readFileSync(path.join(__dirname,'../osc/mods/osc-renderer.js'),
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
 function response(options,state) {
   options.onSuccess(JSON.stringify(Object.assign(
-    {ui:'auto',desktop:'gpu',background:'cpu',restartRequired:false},state||{})));
+    {ui:'auto',desktop:'gpu',background:'cpu',gpuAdapter:'auto',
+      gpuAdapters:[{id:'auto',name:'Auto (Windows default)'},
+        {id:'00000000:00000001',name:'Intel UHD Graphics'},
+        {id:'00000000:00000002',name:'NVIDIA GeForce'}],
+      gpuAdapterAvailable:true,activeGpuAdapter:'00000000:00000001',
+      activeGpuAdapterName:'NVIDIA GeForce GTX 1080 Ti',
+      cefFrameTransport:'gpu-shared-opened',restartRequired:false},state||{})));
 }
 function fixture(handler) {
   const states={},controllers={},requests=[],routes=[],listeners=[],changes=[];
@@ -33,6 +39,16 @@ test('loads native renderer preferences and exposes separate NVIDIA select field
   const template=f.states['main.osc-renderer'].template;
   assert.match(template,/md-select/);assert.match(template,/ng-repeat="part in rendererSettings.parts/);
   assert.equal(f.controller.parts.length,3);
+  assert.equal(f.controller.gpuAdapterSupported,true);
+  assert.equal(f.controller.gpuAdapters.length,3);
+  assert.equal(f.controller.anyGpu(),true);
+  assert.equal(f.controller.activeGpuDisplay,
+    'NVIDIA GeForce GTX 1080 Ti (00000000:00000001)');
+  assert.equal(f.controller.cefFrameTransport,'gpu-shared-opened');
+  assert.match(template,/osc-gpu-adapter-preference/);
+  assert.match(template,/oscRendererAdapterPhase0/);
+  assert.match(template,/oscRendererActiveGpu/);
+  assert.match(template,/oscRendererCefShared/);
   assert.deepEqual(f.changes,['cpu']);
   f.controller.back();assert.deepEqual(f.routes,['main.main-menu']);
 });
@@ -45,7 +61,7 @@ test('saves all selections atomically and marks restart for UI/display',async()=
   f.controller.values.ui='cpu';f.controller.values.background='gpu';
   const promise=f.controller.save();f.controller.save();
   assert.equal(f.requests.length,2);
-  assert.deepEqual(f.requests[1],{command:'QUERY_OSC_SET_RENDERERS',ui:'cpu',desktop:'gpu',background:'gpu'});
+  assert.deepEqual(f.requests[1],{command:'QUERY_OSC_SET_RENDERERS',ui:'cpu',desktop:'gpu',background:'gpu',gpuAdapter:'auto'});
   response(complete,{ui:'cpu',desktop:'gpu',background:'gpu',restartRequired:true});
   await promise;
   assert.equal(f.controller.busy,false);assert.equal(f.controller.saved,true);
@@ -77,6 +93,35 @@ test('rejects bad native values and ignores callbacks after destroy',async()=>{
   const pending=f.controller.save();f.listeners[0]();response(next);
   await pending;assert.equal(f.controller.saved,false);
 });
+test('GPU adapter preference saves through Host, and an unavailable adapter is rejected',async()=>{
+  const f=fixture((request,opts)=>response(opts,request.command==='QUERY_OSC_SET_RENDERERS'
+    ? {ui:request.ui,desktop:request.desktop,background:request.background,
+       gpuAdapter:request.gpuAdapter} : {}));
+  await flush();
+  f.controller.gpuAdapter='00000000:00000002';
+  await f.controller.save();
+  assert.equal(f.requests[1].gpuAdapter,'00000000:00000002');
+  assert.equal(f.controller.gpuAdapter,'00000000:00000002');
+  assert.equal(f.controller.saved,true);
+  f.controller.gpuAdapter='unavailable';
+  f.controller.save();
+  assert.equal(f.requests.length,2);
+  assert.equal(f.controller.gpuAdapter,'00000000:00000002');
+  assert(f.controller.error);
+});
+
+test('legacy Host response does not advertise GPU selection as working',async()=>{
+  const f=fixture((request,opts)=>{
+    opts.onSuccess(JSON.stringify({ui:'auto',desktop:'gpu',background:'cpu'}));
+  });
+  await flush();
+  assert.equal(f.controller.loaded,true);
+  assert.equal(f.controller.gpuAdapterSupported,false);
+  assert.equal(f.controller.gpuAdapter,'auto');
+  assert.equal(f.controller.activeGpuDisplay,'');
+  assert.equal(f.controller.cefFrameTransport,'');
+});
+
 test('duplicate module load is idempotent',async()=>{
   const f=fixture((req,opts)=>response(opts));await flush();
   f.window.angular.module=()=>{throw new Error('double-registration');};

@@ -15,6 +15,18 @@
     '<md-select class="osc-select resolution-fps-select" ng-model="rendererSettings.values[part.key]" ng-change="rendererSettings.save()" ng-disabled="!rendererSettings.loaded || rendererSettings.busy" aria-label="{{part.fallback}}" hover-focus>',
     '<md-option md-ink-ripple="false" ng-repeat="choice in rendererSettings.choices track by choice.key" ng-value="choice.key" hover-focus><span translate="{{choice.label}}">{{choice.fallback}}</span></md-option>',
     '</md-select></md-input-container></div>',
+    '<div ng-if="rendererSettings.anyGpu()" class="osc-gpu-adapter-preference">',
+    '<md-input-container><label translate="l10n.oscRendererAdapterLabel">Preferred GPU Adapter (Phase 0)</label>',
+    '<md-select class="osc-select resolution-fps-select" ng-model="rendererSettings.gpuAdapter" ng-change="rendererSettings.save()" ng-disabled="!rendererSettings.loaded || rendererSettings.busy || !rendererSettings.gpuAdapterSupported" aria-label="Preferred GPU Adapter" hover-focus>',
+    '<md-option md-ink-ripple="false" ng-repeat="adapter in rendererSettings.gpuAdapters track by adapter.id" ng-value="adapter.id" hover-focus><span ng-if="adapter.id === rendererSettings.autoAdapter" translate="l10n.oscRendererAuto">Auto</span><span ng-if="adapter.id !== rendererSettings.autoAdapter">{{adapter.name}}</span></md-option>',
+    '</md-select></md-input-container>',
+    '<p class="preferences-instructional-text" translate="l10n.oscRendererAdapterPhase0">The GPU choice is saved as a Phase 0 preference. The Host and CEF still use Windows GPU selection until cross-GPU transfer is validated.</p>',
+    '<p class="preferences-instructional-text" ng-if="rendererSettings.activeGpuDisplay"><span translate="l10n.oscRendererActiveGpu">Active Host compositor GPU:</span> {{rendererSettings.activeGpuDisplay}}</p>',
+    '<p class="preferences-instructional-text" ng-if="rendererSettings.cefFrameTransport === \'gpu-shared-opened\'" translate="l10n.oscRendererCefShared">CEF shared GPU frame opened successfully on Host.</p>',
+    '<p class="preferences-instructional-text" ng-if="rendererSettings.cefFrameTransport === \'cpu-paint\'" translate="l10n.oscRendererCefCpu">CEF is providing CPU paint frames.</p>',
+    '<p class="preferences-instructional-text" ng-if="rendererSettings.cefFrameTransport === \'idle\'" translate="l10n.oscRendererCefIdle">No recent CEF frame to verify GPU compatibility.</p>',
+    '<p class="preferences-instructional-text" ng-if="!rendererSettings.gpuAdapterAvailable" translate="l10n.oscRendererAdapterMissing">The saved GPU is unavailable. Select Auto or another adapter.</p>',
+    '</div>',
     '<p class="preferences-instructional-text" translate="l10n.oscRendererBackgroundInfo">Background GPU uses WebGL particles when supported; CPU uses Canvas 2D. Both share the main CEF compositor.</p>',
     '<p ng-if="rendererSettings.restartRequired" role="status" translate="l10n.oscRendererRestart">Restart OSC to apply UI and Overlay Display changes.</p>',
     '<p ng-if="rendererSettings.saved && !rendererSettings.busy && !rendererSettings.error" role="status" translate="l10n.oscRendererSaved">Settings saved.</p>',
@@ -47,6 +59,14 @@
         {key:'cpu', label:'l10n.oscRendererCpu', fallback:'CPU'}
       ];
       vm.values = {ui:'auto', background:'auto', desktop:'auto'};
+      vm.gpuAdapter = 'auto';
+      vm.autoAdapter = 'auto';
+      vm.gpuAdapters = [{id:'auto',name:'Auto (Windows default)'}];
+      vm.gpuAdapterSupported = false;
+      vm.gpuAdapterAvailable = true;
+      vm.activeGpuDisplay = '';
+      vm.cefFrameTransport = '';
+      vm.anyGpu = function () {return vm.values.ui === 'gpu' || vm.values.desktop === 'gpu';};
       vm.loaded = false; vm.busy = false; vm.error = ''; vm.saved = false;
       vm.restartRequired = false;
       $scope.$on('$destroy', function () { disposed = true; });
@@ -63,6 +83,7 @@
           var request = {command:command};
           if (values) {
             request.ui=values.ui; request.desktop=values.desktop; request.background=values.background;
+            request.gpuAdapter=values.gpuAdapter;
           }
           try {
             window.cefQuery({
@@ -80,8 +101,19 @@
         });
       }
       function accept(data) {
-        persisted={ui:data.ui, desktop:data.desktop, background:data.background};
+        var gpuAdapter = typeof data.gpuAdapter === 'string' ? data.gpuAdapter : 'auto';
+        persisted={ui:data.ui, desktop:data.desktop, background:data.background, gpuAdapter:gpuAdapter};
         vm.values={ui:data.ui, desktop:data.desktop, background:data.background};
+        vm.gpuAdapters=Array.isArray(data.gpuAdapters) ? data.gpuAdapters.filter(function (item) {
+          return item && typeof item.id === 'string' && typeof item.name === 'string';
+        }) : [{id:'auto',name:'Auto (Windows default)'}];
+        vm.gpuAdapterSupported=Array.isArray(data.gpuAdapters) && vm.gpuAdapters.length > 0;
+        vm.gpuAdapterAvailable=data.gpuAdapterAvailable !== false;
+        vm.gpuAdapter=gpuAdapter;
+        var activeGpuId = typeof data.activeGpuAdapter === 'string' ? data.activeGpuAdapter : '';
+        var activeGpuName = typeof data.activeGpuAdapterName === 'string' ? data.activeGpuAdapterName : '';
+        vm.activeGpuDisplay = activeGpuName ? activeGpuName + (activeGpuId ? ' (' + activeGpuId + ')' : '') : activeGpuId;
+        vm.cefFrameTransport = typeof data.cefFrameTransport === 'string' ? data.cefFrameTransport : '';
         vm.restartRequired=!!data.restartRequired;
         if (window.__dulukaOscBackground && typeof window.__dulukaOscBackground.setRenderer === 'function')
           window.__dulukaOscBackground.setRenderer(data.background);
@@ -96,13 +128,21 @@
       };
       vm.save=function () {
         if (!vm.loaded || vm.busy || disposed) return;
-        if(!valid(vm.values)) {vm.values=persisted;vm.error='l10n.oscRendererSaveFailed';return;}
-        if (JSON.stringify(vm.values) === JSON.stringify(persisted)) return;
+        if(!valid(vm.values) || (vm.gpuAdapterSupported &&
+            !vm.gpuAdapters.some(function (item) {return item.id === vm.gpuAdapter;}))) {
+          vm.values={ui:persisted.ui, desktop:persisted.desktop, background:persisted.background};
+          vm.gpuAdapter=persisted.gpuAdapter;
+          vm.error='l10n.oscRendererSaveFailed';return;
+        }
+        var next={ui:vm.values.ui, desktop:vm.values.desktop,
+          background:vm.values.background, gpuAdapter:vm.gpuAdapter};
+        if (JSON.stringify(next) === JSON.stringify(persisted)) return;
         vm.busy=true;vm.error='';vm.saved=false;
-        return query('QUERY_OSC_SET_RENDERERS',vm.values).then(function (data) {
+        return query('QUERY_OSC_SET_RENDERERS',next).then(function (data) {
           if(disposed)return;accept(data);vm.saved=true;
         },function () {
           if(disposed)return;vm.values={ui:persisted.ui, desktop:persisted.desktop, background:persisted.background};
+          vm.gpuAdapter=persisted.gpuAdapter;
           vm.error='l10n.oscRendererSaveFailed';
         }).finally(function () {if(!disposed)vm.busy=false;});
       };

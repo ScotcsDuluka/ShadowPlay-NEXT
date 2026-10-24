@@ -243,6 +243,15 @@ Partial Public Class UI_Engine
                                                         Dim up As Boolean = _rest.WaitForBackend(TimeSpan.FromSeconds(10))
                                                         DebugLog(If(up, "[REST] NvNode backend ready -- live capture poller starting",
                                                                        "[REST] NvNode backend unavailable -- poller keeps retrying (standalone rule)"))
+                                                        ' NvCapture is the actual session owner. After Container restarts
+                                                        ' a worker, NodeAPI's legacy /Record/Running memory can retain
+                                                        ' the previous process's Recording=true even while Capture is idle.
+                                                        ' Reconcile the initial idle state before polling new requests;
+                                                        ' never overwrite a genuinely active Capture session.
+                                                        If up AndAlso Not RestRecording() Then
+                                                            _rest.ConfirmActual(False)
+                                                            DebugLog("[REST] startup actual=Idle reconciliation sent")
+                                                        End If
                                                     Catch
                                                         DebugLog("[REST] boot probe error -- poller keeps retrying")
                                                     End Try
@@ -347,7 +356,15 @@ Partial Public Class UI_Engine
             End Select
             DebugLog($"[REST] actual route started: {route.Kind}, capture={route.CaptureApi}, encoder={route.Encoder}")
             _rest.ConfirmRecordStarted()
-            DebugLog("[REST] confirmed actual=Recording -- backend pushes to osc page")
+            ' The session may have failed between the task check above and
+            ' this network POST. Reconcile immediately instead of leaving a
+            ' stale Recording=true in the legacy backend.
+            If Not RestRecording() Then
+                _rest.ConfirmRecordStopped()
+                DebugLog("[REST] immediate session finish after start; actual=Idle")
+            Else
+                DebugLog("[REST] confirmed actual=Recording -- backend pushes to osc page")
+            End If
         Catch ex As Exception
             DebugLog("[REST] confirm start FAILED: " & ex.Message)
         End Try
@@ -360,9 +377,12 @@ Partial Public Class UI_Engine
 
     Private Async Sub StopRestRecording()
         Try
+            ' Even a just-completed task belongs to the session watcher.
+            Dim nativeStop As Boolean = _recordingTask IsNot Nothing
             If _nvRecording Then
                 HandleNvidiaRecordStop("")
             ElseIf _recordingTask IsNot Nothing AndAlso Not _recordingTask.IsCompleted Then
+                nativeStop = True
                 Await HandleRecordingStop("")
             ElseIf _legacyCaptureEngine IsNot Nothing AndAlso
                    _legacyCaptureEngine.IsRecordingLifecycleActive Then
@@ -370,8 +390,12 @@ Partial Public Class UI_Engine
             Else
                 DebugLog("[REST] no active capture session -- confirming Idle")
             End If
-            _rest.ConfirmRecordStopped()
-            DebugLog("[REST] confirmed actual=Idle -- backend pushes to osc page")
+            ' Native session-end watcher alone publishes the verified result.
+            ' Publishing generic false here first could suppress the genuine
+            ' saved event because the UI event bus only reacts to state edges.
+            If Not nativeStop Then _rest.ConfirmRecordStopped()
+            DebugLog("[REST] stop requested; native result owned by completion watcher=" &
+                nativeStop.ToString())
         Catch ex As Exception
             DebugLog("[REST] confirm stop FAILED: " & ex.Message)
         End Try

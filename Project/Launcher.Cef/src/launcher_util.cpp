@@ -7,6 +7,7 @@
 #include <ws2tcpip.h>
 
 #include "launcher_util.h"
+#include "launcher_shutdown_policy.h"
 
 #include <stdio.h>
 #include <tlhelp32.h>
@@ -15,6 +16,7 @@
 #include <fstream>
 #include <algorithm>
 #include <sstream>
+#include <vector>
 
 namespace launcherutil {
 
@@ -321,6 +323,87 @@ void KillProcessFromPath(const wchar_t* name, const std::wstring& exe_path) {
   CloseHandle(snap);
 }
 
+// EXIT ALL only: ask matched GUI windows to close, then wait with a hard
+// deadline and escalate on the SAME opened process handle. The simulator
+// tests in tests/ never instantiate this Win32 adapter.
+class Win32ShutdownBackend {
+ public:
+  using Process = HANDLE;
+
+  std::vector<Process> OpenCandidates(const wchar_t* name) {
+    std::vector<Process> found;
+    const std::wstring with_ext = std::wstring(name) + L".exe";
+    HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (snap == INVALID_HANDLE_VALUE) return found;
+    PROCESSENTRY32W entry = {};
+    entry.dwSize = sizeof(entry);
+    if (Process32FirstW(snap, &entry)) {
+      do {
+        if (_wcsicmp(entry.szExeFile, name) != 0 &&
+            _wcsicmp(entry.szExeFile, with_ext.c_str()) != 0)
+          continue;
+        if (entry.th32ProcessID == GetCurrentProcessId()) continue;
+        HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION |
+                                         PROCESS_TERMINATE | SYNCHRONIZE,
+                                     FALSE, entry.th32ProcessID);
+        if (process) found.push_back(process);
+        else LogLine("exit-all: could not open " + WideToUtf8(name) +
+                     " pid=" + std::to_string(entry.th32ProcessID));
+      } while (Process32NextW(snap, &entry));
+    }
+    CloseHandle(snap);
+    return found;
+  }
+
+  bool MatchesImagePath(Process process, const std::wstring& full_path) {
+    wchar_t image[32768];
+    DWORD length = static_cast<DWORD>(sizeof(image) / sizeof(image[0]));
+    return QueryFullProcessImageNameW(process, 0, image, &length) &&
+           _wcsicmp(image, full_path.c_str()) == 0;
+  }
+
+  bool WaitExited(Process process, unsigned milliseconds) {
+    return WaitForSingleObject(process, milliseconds) == WAIT_OBJECT_0;
+  }
+
+  bool RequestGracefulExit(Process process) {
+    struct WindowContext { DWORD pid; bool requested; };
+    WindowContext ctx = {GetProcessId(process), false};
+    EnumWindows([](HWND hwnd, LPARAM userdata) -> BOOL {
+      auto* context = reinterpret_cast<WindowContext*>(userdata);
+      DWORD owner = 0;
+      GetWindowThreadProcessId(hwnd, &owner);
+      // Do not send WM_CLOSE to unrelated apps or to child/owned windows.
+      if (owner == context->pid && GetWindow(hwnd, GW_OWNER) == NULL &&
+          PostMessageW(hwnd, WM_CLOSE, 0, 0))
+        context->requested = true;
+      return TRUE;
+    }, reinterpret_cast<LPARAM>(&ctx));
+    return ctx.requested;
+  }
+
+  bool ForceTerminate(Process process) {
+    return TerminateProcess(process, 1) != 0;
+  }
+
+  void Close(Process process) { CloseHandle(process); }
+};
+
+void StopOwnedProcessFromPath(const wchar_t* name,
+                              const std::wstring& exe_path) {
+  Win32ShutdownBackend backend;
+  const auto summary = launcher_shutdown::StopExactPath(
+      backend, name, exe_path, 1500, 1500);
+  if (summary.matched || summary.failed) {
+    LogLine("exit-all: " + WideToUtf8(exe_path) +
+            " matched=" + std::to_string(summary.matched) +
+            " graceful=" + std::to_string(summary.graceful) +
+            " forced=" + std::to_string(summary.forced) +
+            " already-exited=" + std::to_string(summary.already_exited) +
+            " failed=" + std::to_string(summary.failed));
+  }
+}
+
 // Loopback connect with a hard deadline. A plain blocking connect can
 // stall the caller (including the CEF UI thread) while a local endpoint is
 // half-open or the network stack is unhealthy.
@@ -444,7 +527,8 @@ bool SendHubLine(const std::string& line) {
   return ok;
 }
 
-bool HttpPostLocal(unsigned port, const std::wstring& path) {
+static bool HttpRequestLocal(unsigned port, const std::wstring& path,
+                             bool post) {
   WSADATA wsa;
   if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) return false;
   bool ok = false;
@@ -460,10 +544,13 @@ bool HttpPostLocal(unsigned port, const std::wstring& path) {
                sizeof(io_timeout_ms));
 
     if (ConnectLoopbackSocket(s, port, 300)) {
-      std::string req = "POST " + WideToUtf8(path) +
+      std::string req = std::string(post ? "POST " : "GET ") +
+                        WideToUtf8(path) +
                         " HTTP/1.1\r\nHost: 127.0.0.1\r\n"
-                        "Content-Type: application/json\r\n"
-                        "Content-Length: 2\r\nConnection: close\r\n\r\n{}";
+                        "Connection: close\r\n";
+      if (post) req += "Content-Type: application/json\r\n"
+                       "Content-Length: 2\r\n";
+      req += post ? "\r\n{}" : "\r\n";
       int sent = 0;
       const int request_size = static_cast<int>(req.size());
       while (sent < request_size) {
@@ -503,9 +590,18 @@ bool HttpPostLocal(unsigned port, const std::wstring& path) {
     closesocket(s);
   }
   WSACleanup();
-  LogLine("loopback POST " + WideToUtf8(path) + " -> " +
-          (ok ? "ok" : "failed"));
+  if (post)
+    LogLine("loopback POST " + WideToUtf8(path) + " -> " +
+            (ok ? "ok" : "failed"));
   return ok;
+}
+
+bool HttpPostLocal(unsigned port, const std::wstring& path) {
+  return HttpRequestLocal(port, path, true);
+}
+
+bool HttpGetLocal(unsigned port, const std::wstring& path) {
+  return HttpRequestLocal(port, path, false);
 }
 
 static std::wstring ConfigPath() {

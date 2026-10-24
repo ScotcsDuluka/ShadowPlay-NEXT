@@ -10,7 +10,7 @@ namespace NvGraphics;
 /// A registry preference is never reported as proof that the game runs on that GPU;
 /// runtime verification is a separate status ("Runtime not verified").
 /// </summary>
-public sealed class NvGraphicsForm : Form
+public sealed partial class NvGraphicsForm : Form
 {
     private static readonly HttpClient ReadyClient = new(new SocketsHttpHandler { UseProxy = false })
     {
@@ -18,6 +18,7 @@ public sealed class NvGraphicsForm : Form
     };
     private readonly int _controlApiPort;
     private readonly bool _startHidden;
+    private bool _uiSmokeOnly;
     private System.Windows.Forms.Timer _readyTimer;
     private int _readyReportInFlight;
     private readonly GpuDiscoveryService _discovery = new();
@@ -32,6 +33,13 @@ public sealed class NvGraphicsForm : Form
     private GameProfileStoreData _data = new();
     private GpuTelemetrySnapshot _lastSnapshot;
     private System.Threading.Timer _inventoryTimer;
+    private System.Windows.Forms.Timer _windowsRefreshTimer;
+    private int _telemetryInFlight;
+    private bool _loadingGpuChoice;
+    private bool _gpuChoiceDirty;
+    private string _selectedWindowsBaseline;
+    private string _selectedWindowsBaselinePath;
+    private DateTime _profileStoreLastWriteUtc;
 
     private ListView _adapterList;
     private ListView _gameList;
@@ -63,11 +71,14 @@ public sealed class NvGraphicsForm : Form
         }
         Load += (_, _) =>
         {
+            if (_uiSmokeOnly) return;
             ReloadAll();
             StartInventoryPublisher();
+            StartWindowsPreferenceRefresh();
         };
         Shown += (_, _) =>
         {
+            if (_uiSmokeOnly) return;
             if (_startHidden)
             {
                 Hide();
@@ -79,8 +90,14 @@ public sealed class NvGraphicsForm : Form
         {
             _readyTimer?.Dispose();
             _inventoryTimer?.Dispose();
+            _windowsRefreshTimer?.Dispose();
         };
     }
+
+    // Dedicated UI smoke mode: real window painting without touching GPU/Registry
+    // or claiming a second NvGraphics readiness PID to the Container.
+    public NvGraphicsForm(int controlApiPort, bool startHidden, bool uiSmokeOnly)
+        : this(controlApiPort, startHidden) => _uiSmokeOnly = uiSmokeOnly;
 
     private void StartReadinessHeartbeat()
     {
@@ -120,124 +137,17 @@ public sealed class NvGraphicsForm : Form
         }
     }
 
-    private void BuildUi()
-    {
-        Text = "NvGraphics — per-game GPU preferences";
-        StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(1000, 640);
-        MinimumSize = new Size(860, 540);
-
-        var adaptersGroup = new GroupBox { Text = "Detected adapters", Location = new Point(12, 12), Size = new Size(960, 210) };
-        _adapterList = new ListView
-        {
-            Location = new Point(10, 20),
-            Size = new Size(940, 150),
-            View = View.Details,
-            FullRowSelect = true
-        };
-        _adapterList.Columns.Add("Adapter", 250);
-        _adapterList.Columns.Add("Adapter ID (PnP)", 210);
-        _adapterList.Columns.Add("PCI bus", 150);
-        _adapterList.Columns.Add("Driver", 100);
-        _adapterList.Columns.Add("Status", 70);
-        _adapterList.Columns.Add("Util %", 50);
-        _adapterList.Columns.Add("VRAM (MiB)", 90);
-        _adapterList.Columns.Add("DXGI LUID", 150);
-        adaptersGroup.Controls.Add(_adapterList);
-        _refreshTelemetryButton = new Button { Text = "Refresh telemetry", Location = new Point(10, 176), Width = 130 };
-        _refreshTelemetryButton.Click += (_, _) => RefreshTelemetry();
-        adaptersGroup.Controls.Add(_refreshTelemetryButton);
-        var telemetryNote = new Label
-        {
-            Text = "Utilization/VRAM require nvidia-smi; blank when unavailable.",
-            Location = new Point(150, 180),
-            AutoSize = true,
-            ForeColor = Color.DimGray
-        };
-        adaptersGroup.Controls.Add(telemetryNote);
-
-        var gamesGroup = new GroupBox { Text = "Game profiles", Location = new Point(12, 228), Size = new Size(960, 180) };
-        _gameList = new ListView
-        {
-            Location = new Point(10, 20),
-            Size = new Size(940, 120),
-            View = View.Details,
-            FullRowSelect = true,
-            HideSelection = false
-        };
-        _gameList.Columns.Add("Name", 160);
-        _gameList.Columns.Add("Executable", 340);
-        _gameList.Columns.Add("Selected GPU", 210);
-        _gameList.Columns.Add("Preference status", 240);
-        _gameList.SelectedIndexChanged += (_, _) => ShowSelectedProfile();
-        gamesGroup.Controls.Add(_gameList);
-
-        var detailGroup = new GroupBox { Text = "Profile detail", Location = new Point(12, 414), Size = new Size(960, 170) };
-        int y = 26;
-        Label L(string t) => new() { Text = t, AutoSize = true, Location = new Point(10, y + 3) };
-        detailGroup.Controls.Add(L("Name:"));
-        _nameBox = new TextBox { Location = new Point(80, y), Width = 300 }; detailGroup.Controls.Add(_nameBox);
-        detailGroup.Controls.Add(new Label { Text = "GPU:", AutoSize = true, Location = new Point(400, y + 3) });
-        _gpuCombo = new ComboBox { Location = new Point(440, y), Width = 300, DropDownStyle = ComboBoxStyle.DropDownList };
-        detailGroup.Controls.Add(_gpuCombo);
-
-        y += 34;
-        detailGroup.Controls.Add(L("Executable:"));
-        _pathBox = new TextBox { Location = new Point(80, y), Width = 660, ReadOnly = true }; detailGroup.Controls.Add(_pathBox);
-        _browseButton = new Button { Text = "Browse...", Location = new Point(750, y - 1), Width = 80 };
-        _browseButton.Click += (_, _) => BrowseForExecutable();
-        detailGroup.Controls.Add(_browseButton);
-        _addRunningGameButton = new Button
-        {
-            Text = "Add running game",
-            Location = new Point(836, y - 1),
-            Width = 112
-        };
-        _addRunningGameButton.Click += (_, _) => AddRunningGameToProfiles();
-        detailGroup.Controls.Add(_addRunningGameButton);
-
-        y += 36;
-        _addUpdateButton = new Button { Text = "Add / Update profile", Location = new Point(80, y), Width = 140 };
-        _addUpdateButton.Click += (_, _) => AddOrUpdateProfile();
-        detailGroup.Controls.Add(_addUpdateButton);
-        _applyButton = new Button { Text = "Apply preference", Location = new Point(230, y), Width = 120 };
-        _applyButton.Click += (_, _) => ApplyPreference();
-        detailGroup.Controls.Add(_applyButton);
-        _removeEntryButton = new Button { Text = "Remove Windows entry", Location = new Point(358, y), Width = 150 };
-        _removeEntryButton.Click += (_, _) => RemoveWindowsEntry();
-        detailGroup.Controls.Add(_removeEntryButton);
-        _removeButton = new Button { Text = "Remove profile", Location = new Point(516, y), Width = 110 };
-        _removeButton.Click += (_, _) => RemoveProfile();
-        detailGroup.Controls.Add(_removeButton);
-        _restoreButton = new Button { Text = "Restore last backup", Location = new Point(634, y), Width = 130 };
-        _restoreButton.Click += (_, _) => RestoreLastBackup();
-        detailGroup.Controls.Add(_restoreButton);
-
-        y += 38;
-        _saveButton = new Button { Text = "Save profiles", Location = new Point(80, y), Width = 110 };
-        _saveButton.Click += (_, _) => SaveProfiles();
-        detailGroup.Controls.Add(_saveButton);
-        _reloadButton = new Button { Text = "Reload all", Location = new Point(198, y), Width = 90 };
-        _reloadButton.Click += (_, _) => ReloadAll();
-        detailGroup.Controls.Add(_reloadButton);
-        _statusLabel = new Label
-        {
-            Text = "Ready.",
-            Location = new Point(12, 592),
-            Size = new Size(960, 40),
-            ForeColor = Color.Black
-        };
-
-        Controls.Add(adaptersGroup);
-        Controls.Add(gamesGroup);
-        Controls.Add(detailGroup);
-        Controls.Add(_statusLabel);
-    }
+    private void BuildUi() => BuildGraphicsSettingsUi();
 
     // ---------- data loading ----------
 
     private void ReloadAll()
     {
+        // Refresh is not an implicit Cancel: retain the in-progress GPU choice.
+        var editingPath = SelectedProfile()?.ExePath;
+        var pendingChoice = _gpuChoiceDirty ? SelectedGraphicsChoice() : null;
+        var pendingRaw = _selectedWindowsBaseline;
+        var pendingPath = _selectedWindowsBaselinePath;
         try
         {
             _adapters = _discovery.DiscoverAdapters();
@@ -259,16 +169,45 @@ public sealed class NvGraphicsForm : Form
         }
 
         ReloadWindowsApps();
+        _profileStoreLastWriteUtc = StoreLastWriteUtc();
 
-        var comboItems = new List<string> { "(system default)"        };
-        comboItems.AddRange(_adapters.Where(a => a.AdapterId != null).Select(a => a.ToString()));
         _gpuCombo.Items.Clear();
-        _gpuCombo.Items.AddRange(comboItems.ToArray());
-        _gpuCombo.SelectedIndex = 0;
+        _gpuCombo.Items.Add(new GraphicsChoice("Let Windows decide", WindowsPolicy: 0));
+        _gpuCombo.Items.Add(new GraphicsChoice("Power saving (Windows)", WindowsPolicy: 1));
+        _gpuCombo.Items.Add(new GraphicsChoice("High performance (Windows)", WindowsPolicy: 2));
+        foreach (var adapter in _adapters.Where(a => !string.IsNullOrEmpty(a.AdapterId)))
+            _gpuCombo.Items.Add(new GraphicsChoice(
+                "Specific GPU: " + adapter.DisplayName + "  [" + (adapter.PciBusId ?? adapter.AdapterId) + "]",
+                AdapterId: adapter.AdapterId));
+        _loadingGpuChoice = true;
+        try { _gpuCombo.SelectedIndex = 0; }
+        finally { _loadingGpuChoice = false; }
 
+        // The list rebuilds against Windows (source of truth), then restores
+        // only a pending selection for the same app without altering its baseline.
+        _gpuChoiceDirty = false;
         RefreshAdapterList();
         SyncProfileRegistryStatus();
         RefreshGameList();
+        if (pendingChoice is not null &&
+            string.Equals(editingPath, SelectedProfile()?.ExePath, StringComparison.OrdinalIgnoreCase))
+        {
+            var rebound = _gpuCombo.Items.Cast<GraphicsChoice>().FirstOrDefault(item =>
+                string.Equals(item.AdapterId, pendingChoice.AdapterId, StringComparison.OrdinalIgnoreCase) &&
+                item.WindowsPolicy == pendingChoice.WindowsPolicy);
+            if (rebound is not null)
+            {
+                _loadingGpuChoice = true;
+                try { _gpuCombo.SelectedItem = rebound; }
+                finally { _loadingGpuChoice = false; }
+                _gpuChoiceDirty = true;
+                _selectedWindowsBaseline = pendingRaw;
+                _selectedWindowsBaselinePath = pendingPath;
+                _applyButton.Enabled = true;
+                SetStatus("Refresh complete; your unsaved GPU choice is preserved.");
+            }
+            else SetStatus("Previously chosen adapter is unavailable; review before saving.", true);
+        }
         RefreshTelemetry();
     }
 
@@ -294,12 +233,23 @@ public sealed class NvGraphicsForm : Form
         _adapterList.EndUpdate();
     }
 
-    private void RefreshTelemetry()
+    private async void RefreshTelemetry()
     {
-        _lastSnapshot = _telemetry.Sample();
-        if (_lastSnapshot is null)
-            SetStatus($"Telemetry unavailable: {_telemetry.LastError}", error: false);
-        RefreshAdapterList();
+        if (Interlocked.Exchange(ref _telemetryInFlight, 1) != 0) return;
+        try
+        {
+            var snapshot = await Task.Run(() => _telemetry.Sample());
+            if (IsDisposed || !IsHandleCreated) return;
+            _lastSnapshot = snapshot;
+            RefreshAdapterList();
+            if (snapshot is null)
+                SetStatus("Telemetry unavailable: " + _telemetry.LastError);
+        }
+        catch (Exception ex)
+        {
+            if (!IsDisposed) SetStatus("Telemetry failed: " + ex.Message, error: true);
+        }
+        finally { Interlocked.Exchange(ref _telemetryInFlight, 0); }
     }
 
     private void ReloadWindowsApps()
@@ -315,6 +265,44 @@ public sealed class NvGraphicsForm : Form
             _windowsApps = Array.Empty<RegistryValueEntry>();
             SetStatus($"Could not read Windows Graphics apps: {ex.Message}", error: true);
         }
+    }
+
+    private DateTime StoreLastWriteUtc() =>
+        File.Exists(_store.StorePath) ? File.GetLastWriteTimeUtc(_store.StorePath) : DateTime.MinValue;
+
+    private void StartWindowsPreferenceRefresh()
+    {
+        if (_windowsRefreshTimer is not null) return;
+        _windowsRefreshTimer = new System.Windows.Forms.Timer { Interval = 7000 };
+        _windowsRefreshTimer.Tick += (_, _) =>
+        {
+            if (!Visible || IsDisposed || _gameList is null) return;
+            try
+            {
+                var latest = _preferences.ListPreferences()
+                    .Where(e => IsWindowsGraphicsApp(e.Name)).ToArray();
+                var before = _windowsApps.OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase)
+                    .Select(e => e.Name + "\0" + (e.Value as string ?? ""));
+                var after = latest.OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase)
+                    .Select(e => e.Name + "\0" + (e.Value as string ?? ""));
+                var windowsChanged = !before.SequenceEqual(after, StringComparer.Ordinal);
+                var diskStamp = StoreLastWriteUtc();
+                var profilesChanged = diskStamp != _profileStoreLastWriteUtc;
+                if (!windowsChanged && !profilesChanged) return;
+                if (profilesChanged)
+                {
+                    _data = _store.Load();
+                    _profileStoreLastWriteUtc = diskStamp;
+                }
+                _windowsApps = latest;
+                SyncProfileRegistryStatus();
+                RefreshGameList();
+                if (_gpuChoiceDirty)
+                    SetStatus("Unsaved choice preserved; external settings changed. Save will recheck Windows.");
+            }
+            catch (Exception ex) { SetStatus("Auto-refresh failed: " + ex.Message, true); }
+        };
+        _windowsRefreshTimer.Start();
     }
 
     private static bool IsWindowsGraphicsApp(string name) =>
@@ -342,87 +330,139 @@ public sealed class NvGraphicsForm : Form
                     windowsId, StringComparison.OrdinalIgnoreCase))?.AdapterId;
     }
 
-    /// <summary>Reconciles each profile's stored status with the live registry value.</summary>
+    /// <summary>Windows Registry is authoritative; local profiles only provide extra metadata.</summary>
     private void SyncProfileRegistryStatus()
     {
         foreach (var p in _data.Profiles)
         {
-            string value;
-            try { value = _preferences.FindValue(p.ExePath); }
+            try
+            {
+                var raw = _preferences.FindValue(p.ExePath);
+                if (raw is null)
+                {
+                    p.Status = PreferenceStatus.Configured;
+                    p.StatusMessage = "Saved locally; Windows is using its default graphics selection.";
+                    continue;
+                }
+                var specific = WindowsGpuPreferenceService.ParseSpecificAdapter(raw);
+                var policy = WindowsGpuPreferenceService.ParseWindowsGpuPolicy(raw);
+                p.SelectedAdapterId = AdapterIdForWindowsPreference(raw);
+                p.LastAppliedAdapterId = specific;
+                p.Status = PreferenceStatus.Applied;
+                p.StatusMessage = specific is not null
+                    ? "Windows Graphics uses " + ProfileAdapterMessage(specific)
+                    : policy.HasValue ? "Windows Graphics policy = " +
+                        (policy == 0 ? "Let Windows decide" : policy == 1 ? "Power saving" : "High performance")
+                    : "Windows Graphics entry exists; GPU selection is not recognized.";
+            }
             catch (Exception ex)
             {
                 p.Status = PreferenceStatus.Error;
-                p.StatusMessage = $"Could not read Windows GPU preference: {ex.Message}";
-                continue;
-            }
-            var applied = value is null ? null : WindowsGpuPreferenceService.ParseSpecificAdapter(value);
-            var expected = WindowsGpuPreferenceService.ToWindowsAdapterId(p.SelectedAdapterId);
-            if (applied is null)
-            {
-                p.Status = PreferenceStatus.Configured;
-                p.StatusMessage = "Preference configured — not present in Windows registry." +
-                    (p.LastAppliedUtc is null ? "" : $" (last applied {p.LastAppliedUtc:u} to adapter {p.LastAppliedAdapterId})");
-            }
-            else
-            {
-                p.Status = PreferenceStatus.Applied;
-                p.LastAppliedAdapterId = applied;
-                p.LastAppliedUtc = p.LastAppliedUtc ?? DateTime.UtcNow;
-                bool matches = string.Equals(applied, expected, StringComparison.OrdinalIgnoreCase);
-                p.StatusMessage = $"Windows GPU preference verified " +
-                    $"({(matches ? "matches selection" : $"holds {applied}, selection is {expected}")}).";
+                p.StatusMessage = "Could not read Windows Graphics preference: " + ex.Message;
             }
         }
     }
 
+    private string WindowsPreferenceLabel(string raw)
+    {
+        if (raw is null) return "Let Windows decide (not configured)";
+        var id = WindowsGpuPreferenceService.ParseSpecificAdapter(raw);
+        if (!string.IsNullOrWhiteSpace(id))
+        {
+            var adapter = _adapters.FirstOrDefault(a => string.Equals(
+                WindowsGpuPreferenceService.ToWindowsAdapterId(a.AdapterId),
+                id, StringComparison.OrdinalIgnoreCase));
+            return adapter is null ? "Specific GPU (not detected): " + id
+                                   : "Specific GPU: " + adapter.DisplayName +
+                                     " [" + (adapter.PciBusId ?? id) + "]";
+        }
+        var mode = WindowsGpuPreferenceService.ParseWindowsGpuPolicy(raw);
+        return mode switch
+        {
+            0 => "Let Windows decide",
+            1 => "Power saving (Windows)",
+            2 => "High performance (Windows)",
+            _ => "Windows setting (unrecognized GPU policy)"
+        };
+    }
+
     private void RefreshGameList()
     {
+        if (_gameList is null) return;
+        var selectedPath = SelectedProfile()?.ExePath;
+        var query = _searchBox?.Text?.Trim() ?? "";
+        var pendingChoice = _gpuChoiceDirty ? SelectedGraphicsChoice() : null;
+        var pendingBaseline = _selectedWindowsBaseline;
+        var pendingBaselinePath = _selectedWindowsBaselinePath;
+        var windows = _windowsApps.ToDictionary(entry => entry.Name,
+            entry => entry.Value as string ?? "", StringComparer.OrdinalIgnoreCase);
         _windowsOnlyPaths.Clear();
         _gameList.BeginUpdate();
-        _gameList.Items.Clear();
-        foreach (var p in _data.Profiles)
+        try
         {
-            var item = new ListViewItem(p.Name);
-            item.SubItems.Add(p.ExePath);
-            item.SubItems.Add(p.SelectedAdapterId ?? "(system default)");
-            item.SubItems.Add(StatusText(p));
-            item.Tag = p;
-            _gameList.Items.Add(item);
-        }
-        foreach (var entry in _windowsApps)
-        {
-            if (_data.Profiles.Any(profile =>
-                    string.Equals(profile.ExePath, entry.Name, StringComparison.OrdinalIgnoreCase)))
-                continue;
-
-            var value = entry.Value as string ?? "";
-            var windowsAdapterId = WindowsGpuPreferenceService.ParseSpecificAdapter(value);
-            var profile = new GameProfile
+            _gameList.Items.Clear();
+            foreach (var p in _data.Profiles.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase))
             {
-                Name = WindowsAppDisplayName(entry.Name),
-                ExePath = entry.Name,
-                SelectedAdapterId = AdapterIdForWindowsPreference(value),
-                LastAppliedAdapterId = windowsAdapterId,
-                Status = string.IsNullOrEmpty(windowsAdapterId)
-                    ? PreferenceStatus.Configured
-                    : PreferenceStatus.Applied,
-                StatusMessage = string.IsNullOrEmpty(windowsAdapterId)
-                    ? "Windows Graphics app — no specific adapter is currently selected."
-                    : ProfileAdapterMessage(windowsAdapterId)
-            };
-            _windowsOnlyPaths.Add(profile.ExePath);
-            var item = new ListViewItem(profile.Name);
-            item.SubItems.Add(profile.ExePath);
-            item.SubItems.Add(profile.SelectedAdapterId is null
-                ? "(system default)"
-                : _adapters.FirstOrDefault(adapter => adapter.AdapterId == profile.SelectedAdapterId)?.DisplayName
-                    ?? profile.SelectedAdapterId);
-            item.SubItems.Add(StatusText(profile));
-            item.Tag = profile;
-            _gameList.Items.Add(item);
+                if (!SearchMatches(query, p.Name, p.ExePath)) continue;
+                var inWindows = windows.TryGetValue(p.ExePath, out var raw);
+                var item = new ListViewItem(p.Name);
+                item.SubItems.Add(WindowsPreferenceLabel(inWindows ? raw : null));
+                item.SubItems.Add(inWindows ? "Windows + local" : "Local (pending)");
+                item.SubItems.Add(p.ExePath);
+                item.ToolTipText = p.StatusMessage;
+                item.Tag = p;
+                _gameList.Items.Add(item);
+            }
+            foreach (var entry in _windowsApps.OrderBy(e => WindowsAppDisplayName(e.Name),
+                         StringComparer.OrdinalIgnoreCase))
+            {
+                if (_data.Profiles.Any(p => string.Equals(p.ExePath, entry.Name, StringComparison.OrdinalIgnoreCase)))
+                    continue;
+                var name = WindowsAppDisplayName(entry.Name);
+                if (!SearchMatches(query, name, entry.Name)) continue;
+                var raw = entry.Value as string ?? "";
+                var specific = WindowsGpuPreferenceService.ParseSpecificAdapter(raw);
+                var profile = new GameProfile
+                {
+                    Name = name, ExePath = entry.Name,
+                    SelectedAdapterId = AdapterIdForWindowsPreference(raw),
+                    LastAppliedAdapterId = specific,
+                    Status = PreferenceStatus.Applied,
+                    StatusMessage = "Imported from Windows Graphics settings (not saved as local profile)."
+                };
+                _windowsOnlyPaths.Add(profile.ExePath);
+                var item = new ListViewItem(name);
+                item.SubItems.Add(WindowsPreferenceLabel(raw));
+                item.SubItems.Add("Windows");
+                item.SubItems.Add(entry.Name);
+                item.Tag = profile;
+                _gameList.Items.Add(item);
+            }
+            if (!string.IsNullOrWhiteSpace(selectedPath))
+            {
+                foreach (ListViewItem item in _gameList.Items)
+                {
+                    if (item.Tag is GameProfile p && string.Equals(
+                        p.ExePath, selectedPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        item.Selected = true;
+                        break;
+                    }
+                }
+            }
         }
-        _gameList.EndUpdate();
-
+        finally { _gameList.EndUpdate(); }
+        if (pendingChoice is not null && string.Equals(
+                selectedPath, SelectedProfile()?.ExePath, StringComparison.OrdinalIgnoreCase))
+        {
+            _loadingGpuChoice = true;
+            try { _gpuCombo.SelectedItem = pendingChoice; }
+            finally { _loadingGpuChoice = false; }
+            _gpuChoiceDirty = true;
+            _selectedWindowsBaseline = pendingBaseline;
+            _selectedWindowsBaselinePath = pendingBaselinePath;
+            _applyButton.Enabled = true;
+        }
     }
 
     private string ProfileAdapterMessage(string windowsAdapterId)
@@ -452,18 +492,61 @@ public sealed class NvGraphicsForm : Form
         var p = SelectedProfile();
         _removeButton.Enabled = p is not null && !_windowsOnlyPaths.Contains(p.ExePath);
         _applyButton.Enabled = p is not null;
-        _removeEntryButton.Enabled = p is not null;
-        if (p is null) return;
+        _removeEntryButton.Enabled = p is not null &&
+            _windowsApps.Any(e => string.Equals(e.Name, p.ExePath, StringComparison.OrdinalIgnoreCase));
+        _addUpdateButton.Enabled = p is not null && IsWindowsGraphicsApp(p.ExePath);
+        if (p is null)
+        {
+            _gpuChoiceDirty = false;
+            _selectedWindowsBaselinePath = null;
+            _selectedWindowsBaseline = null;
+            _selectionHint.Text = "Select an app above, or browse for an executable.";
+            _nameBox.Text = "";
+            _pathBox.Text = "";
+            _gpuCombo.SelectedIndex = 0;
+            return;
+        }
+        _selectionHint.Text = _windowsOnlyPaths.Contains(p.ExePath)
+            ? "This app comes directly from Windows Graphics settings."
+            : "Windows GPU settings take precedence over local profile metadata.";
         _nameBox.Text = p.Name;
         _pathBox.Text = p.ExePath;
-        int idx = 0;
-        for (int i = 1; i < _gpuCombo.Items.Count; i++)
+
+        var hasRegistry = _windowsApps.FirstOrDefault(e =>
+            string.Equals(e.Name, p.ExePath, StringComparison.OrdinalIgnoreCase));
+        var raw = hasRegistry?.Value as string;
+        _selectedWindowsBaseline = raw;
+        _selectedWindowsBaselinePath = p.ExePath;
+        _gpuChoiceDirty = false;
+        var adapterId = raw is null ? p.SelectedAdapterId : AdapterIdForWindowsPreference(raw);
+        var mode = raw is null ? 0 : WindowsGpuPreferenceService.ParseWindowsGpuPolicy(raw);
+        var selected = 0;
+        for (var i = 0; i < _gpuCombo.Items.Count; i++)
         {
-            var comboText = (string)_gpuCombo.Items[i];
-            var adapter = _adapters.FirstOrDefault(a => a.ToString() == comboText);
-            if (adapter?.AdapterId == p.SelectedAdapterId) { idx = i; break; }
+            if (_gpuCombo.Items[i] is not GraphicsChoice choice) continue;
+            if (adapterId is not null &&
+                string.Equals(choice.AdapterId, adapterId, StringComparison.OrdinalIgnoreCase))
+            {
+                selected = i;
+                break;
+            }
+            if (adapterId is null && choice.AdapterId is null &&
+                choice.WindowsPolicy == (mode ?? 0))
+            {
+                selected = i;
+                break;
+            }
         }
-        _gpuCombo.SelectedIndex = idx;
+        // Never silently replace a Windows preference referencing an undetected GPU.
+        var unknownSpecificAdapter = raw is not null &&
+            !string.IsNullOrWhiteSpace(WindowsGpuPreferenceService.ParseSpecificAdapter(raw)) &&
+            adapterId is null;
+        _loadingGpuChoice = true;
+        try { _gpuCombo.SelectedIndex = unknownSpecificAdapter ? -1 : selected; }
+        finally { _loadingGpuChoice = false; }
+        _applyButton.Enabled = !unknownSpecificAdapter;
+        if (unknownSpecificAdapter)
+            _selectionHint.Text = "Windows references an unavailable GPU. Select a detected GPU to change it.";
         SetStatus(p.StatusMessage);
     }
 
@@ -472,8 +555,20 @@ public sealed class NvGraphicsForm : Form
         using var dlg = new OpenFileDialog { Filter = "Executable (*.exe)|*.exe" };
         if (dlg.ShowDialog(this) != DialogResult.OK) return;
         _pathBox.Text = dlg.FileName;
-        if (string.IsNullOrWhiteSpace(_nameBox.Text))
-            _nameBox.Text = Path.GetFileNameWithoutExtension(dlg.FileName);
+        _nameBox.Text = Path.GetFileNameWithoutExtension(dlg.FileName);
+        _gpuCombo.SelectedIndex = 0;
+        // Staging a local entry is not a Windows preference write.
+        AddOrUpdateProfile();
+        _searchBox.Clear();
+        RefreshGameList();
+        foreach (ListViewItem item in _gameList.Items)
+            if (item.Tag is GameProfile profile &&
+                string.Equals(profile.ExePath, dlg.FileName, StringComparison.OrdinalIgnoreCase))
+            {
+                item.Selected = true;
+                item.EnsureVisible();
+                break;
+            }
     }
 
     private void AddRunningGameToProfiles()
@@ -592,15 +687,18 @@ public sealed class NvGraphicsForm : Form
             Status = PreferenceStatus.Configured,
             StatusMessage = "Added from the running-game list. GPU preference has not been changed."
         };
-        _data.Profiles.Add(profile);
-        if (!SaveProfiles())
+        if (!UpdateLocalProfiles(latest =>
         {
-            _data.Profiles.Remove(profile);
+            if (latest.Profiles.Any(p => string.Equals(p.ExePath,
+                profile.ExePath, StringComparison.OrdinalIgnoreCase)))
+                return false;
+            latest.Profiles.Add(profile);
+            return true;
+        }))
             return;
-        }
-        RefreshGameList();
         _gameList.Items.Cast<ListViewItem>()
-            .FirstOrDefault(item => ReferenceEquals(item.Tag, profile))?.Selected = true;
+            .FirstOrDefault(item => item.Tag is GameProfile p &&
+                string.Equals(p.ExePath, profile.ExePath, StringComparison.OrdinalIgnoreCase))?.Selected = true;
         _nameBox.Text = profile.Name;
         _pathBox.Text = profile.ExePath;
         _gpuCombo.SelectedIndex = 0;
@@ -614,45 +712,64 @@ public sealed class NvGraphicsForm : Form
         { return path ?? ""; }
     }
 
+    private bool UpdateLocalProfiles(Func<GameProfileStoreData, bool> edit)
+    {
+        try
+        {
+            _data = _store.Update(edit);
+            _profileStoreLastWriteUtc = StoreLastWriteUtc();
+            SyncProfileRegistryStatus();
+            RefreshGameList();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            SetStatus("Could not update local profiles: " + ex.Message, true);
+            return false;
+        }
+    }
+
     private void AddOrUpdateProfile()
     {
         string exe = _pathBox.Text.Trim();
-        if (exe.Length == 0 || !Path.IsPathRooted(exe))
+        if (exe.Length == 0 || !IsWindowsGraphicsApp(exe))
         {
             SetStatus("Browse for an executable (full absolute path) first.", error: true);
             return;
         }
-        string adapterId = null;
-        if (_gpuCombo.SelectedIndex > 0)
-        {
-            var comboText = (string)_gpuCombo.SelectedItem;
-            adapterId = _adapters.First(a => a.ToString() == comboText).AdapterId;
-        }
+        // The selector is a pending choice. Saving a local profile never writes Windows.
+        var adapterId = SelectedGraphicsChoice()?.AdapterId;
         string name = string.IsNullOrWhiteSpace(_nameBox.Text) ? Path.GetFileNameWithoutExtension(exe) : _nameBox.Text.Trim();
 
-        var existing = _data.Profiles.FirstOrDefault(
-            p => string.Equals(p.ExePath, exe, StringComparison.OrdinalIgnoreCase));
-        if (existing is null)
+        if (UpdateLocalProfiles(latest =>
         {
-            _data.Profiles.Add(new GameProfile { Name = name, ExePath = exe, SelectedAdapterId = adapterId });
-        }
-        else
-        {
-            existing.Name = name;
-            existing.SelectedAdapterId = adapterId;
-        }
-        SaveProfiles();
-        RefreshGameList();
+            var existing = latest.Profiles.FirstOrDefault(
+                p => string.Equals(p.ExePath, exe, StringComparison.OrdinalIgnoreCase));
+            if (existing is null)
+                latest.Profiles.Add(new GameProfile { Name = name, ExePath = exe, SelectedAdapterId = adapterId });
+            else
+            {
+                existing.Name = name;
+                existing.SelectedAdapterId = adapterId;
+            }
+            return true;
+        }))
+            SetStatus("Local profile updated without overwriting other modules.");
     }
 
     private void RemoveProfile()
     {
         if (_gameList.SelectedItems.Count == 0) return;
         var p = (GameProfile)_gameList.SelectedItems[0].Tag;
-        _data.Profiles.Remove(p);
-        SaveProfiles();
-        RefreshGameList();
-        SetStatus($"Removed profile '{p.Name}' (Windows registry entry untouched).");
+        if (MessageBox.Show(this, "Forget the local profile for " + p.Name +
+                "? The Windows Graphics preference will NOT be modified.",
+                "Forget local profile", MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+            return;
+        if (UpdateLocalProfiles(latest => latest.Profiles.RemoveAll(
+                row => string.Equals(row.ExePath, p.ExePath,
+                    StringComparison.OrdinalIgnoreCase)) > 0))
+            SetStatus($"Removed profile '{p.Name}' (Windows registry entry untouched).");
     }
 
     private bool SaveProfiles()
@@ -660,6 +777,7 @@ public sealed class NvGraphicsForm : Form
         try
         {
             _store.Save(_data);
+            _profileStoreLastWriteUtc = StoreLastWriteUtc();
             SetStatus($"Profiles saved to {_store.StorePath}.");
             return true;
         }
@@ -678,78 +796,168 @@ public sealed class NvGraphicsForm : Form
     private void ApplyPreference()
     {
         var p = SelectedProfile();
-        if (p is null) { SetStatus("Select a game profile first.", error: true); return; }
-        if (p.SelectedAdapterId is null)
+        var choice = SelectedGraphicsChoice();
+        if (p is null || choice is null)
         {
-            SetStatus("Profile has no GPU selected; pick an adapter before applying.", error: true);
+            SetStatus("Select an app and a graphics preference first.", error: true);
             return;
         }
-        var result = _preferences.ApplyPreference(p.ExePath, p.SelectedAdapterId);
-        if (result.Success)
+        if (choice.AdapterId is null && choice.WindowsPolicy is null)
         {
-            p.Status = PreferenceStatus.Applied;
-            p.LastAppliedAdapterId = WindowsGpuPreferenceService.ToWindowsAdapterId(p.SelectedAdapterId);
-            p.LastAppliedUtc = DateTime.UtcNow;
-            p.StatusMessage = result.Message + " Windows GPU preference verified.";
-            PublishPreferenceApplied(p);
+            SetStatus("Invalid GPU choice.", error: true);
+            return;
         }
-        else
+        // Detect external Windows Settings edits before writing a pending selection.
+        try
         {
-            p.Status = PreferenceStatus.Error;
-            p.StatusMessage = result.Message;
+            var current = _preferences.FindValue(p.ExePath);
+            if (!string.Equals(_selectedWindowsBaselinePath, p.ExePath,
+                    StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(current, _selectedWindowsBaseline, StringComparison.Ordinal))
+            {
+                SetStatus("Windows Graphics changed this app externally. Refresh and review before saving.", true);
+                return;
+            }
         }
-        SaveProfiles();
+        catch (Exception ex)
+        {
+            SetStatus("Cannot verify current Windows setting: " + ex.Message, true);
+            return;
+        }
+        // A single Save applies the selector straight to Windows, with a backup and read-back.
+        var result = choice.AdapterId is not null
+            ? _preferences.ApplyPreference(p.ExePath, choice.AdapterId)
+            : _preferences.ApplyWindowsPolicy(p.ExePath, choice.WindowsPolicy.Value);
+        if (!result.Success)
+        {
+            SetStatus(result.Message, error: true);
+            return;
+        }
+
+        var local = _data.Profiles.FirstOrDefault(profile => string.Equals(
+            profile.ExePath, p.ExePath, StringComparison.OrdinalIgnoreCase));
+        var localSaved = local is null || UpdateLocalProfiles(latest =>
+        {
+            var current = latest.Profiles.FirstOrDefault(x =>
+                string.Equals(x.ExePath, p.ExePath, StringComparison.OrdinalIgnoreCase));
+            if (current is null) return false;
+            current.SelectedAdapterId = choice.AdapterId;
+            current.LastAppliedAdapterId = WindowsGpuPreferenceService.ParseSpecificAdapter(result.VerifiedValue);
+            current.LastAppliedUtc = DateTime.UtcNow;
+            current.Status = PreferenceStatus.Applied;
+            current.StatusMessage = result.Message;
+            return true;
+        });
+        // Always publish a successfully verified Windows write even if local profile sync failed.
+        // Report the value Windows actually verified, not a previously cached profile.
+        // Windows-only apps don't have an on-disk profile.
+        p.SelectedAdapterId = choice.AdapterId;
+        p.LastAppliedAdapterId = WindowsGpuPreferenceService.ParseSpecificAdapter(result.VerifiedValue);
+        PublishPreferenceApplied(p, result.VerifiedValue);
+        _gpuChoiceDirty = false;
         ReloadWindowsApps();
         SyncProfileRegistryStatus();
         RefreshGameList();
-        SetStatus(p.StatusMessage, error: !result.Success);
+        SetStatus("Saved and verified in Windows Graphics: " + choice.Label +
+            ". Restart the affected game to use the new preference." +
+            (localSaved ? "" : " Local profile sync failed; refresh and retry."), !localSaved);
     }
 
     private void RemoveWindowsEntry()
     {
         var p = SelectedProfile();
-        if (p is null) { SetStatus("Select a game profile first.", error: true); return; }
-        var result = _preferences.RemoveEntry(p.ExePath);
-        if (result.Success)
+        if (p is null) return;
+        if (MessageBox.Show(this, "Reset the Windows Graphics entry for " + p.Name +
+                "? Only GPU-selection overrides will be cleared; other graphics options stay intact.",
+                "Reset Windows Graphics preference", MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+            return;
+        var result = _preferences.ResetGpuSelection(p.ExePath);
+        if (!result.Success) { SetStatus(result.Message, true); return; }
+        _gpuChoiceDirty = false;
+        ReloadWindowsApps();
+        SyncProfileRegistryStatus();
+        RefreshGameList();
+        UpdateLocalProfiles(latest =>
         {
-            SyncProfileRegistryStatus();
-            ReloadWindowsApps();
-            SaveProfiles();
-            RefreshGameList();
-            PublishSystemDefault(p);
-        }
-        SetStatus(result.Message, error: !result.Success);
+            var local = latest.Profiles.FirstOrDefault(x => string.Equals(
+                x.ExePath, p.ExePath, StringComparison.OrdinalIgnoreCase));
+            if (local is null) return false;
+            local.SelectedAdapterId = null;
+            local.LastAppliedAdapterId = null;
+            local.Status = PreferenceStatus.Configured;
+            local.StatusMessage = "Windows uses its default GPU selection.";
+            return true;
+        });
+        PublishSystemDefault(p);
+        SetStatus("Windows GPU selection reset for " + p.Name + "; other graphics options preserved.");
     }
 
     private void RestoreLastBackup()
     {
-        var latest = _backups.ListBackups().FirstOrDefault();
-        if (latest is null) { SetStatus("No registry backups recorded yet.", error: true); return; }
+        var selected = SelectedProfile();
+        var latest = _backups.ListBackups().FirstOrDefault(record =>
+            selected is null || string.Equals(record.ValueName, selected.ExePath,
+                StringComparison.OrdinalIgnoreCase));
+        if (latest is null)
+        {
+            SetStatus("No matching registry backup was found.", error: true);
+            return;
+        }
+        if (MessageBox.Show(this, "Restore the previous Windows Graphics preference for " +
+                latest.ValueName + "?", "Restore GPU preference",
+                MessageBoxButtons.YesNo, MessageBoxIcon.Question,
+                MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+            return;
         var result = _preferences.RestoreBackup(latest);
-        SyncProfileRegistryStatus();
-        RefreshGameList();
-        SetStatus($"{result.Message} (backup from {latest.TimestampUtc:u}, reason: {latest.Reason})",
-            error: !result.Success);
+        if (result.Success)
+        {
+            string restored;
+            try { restored = _preferences.FindValue(latest.ValueName); }
+            catch (Exception ex)
+            {
+                SetStatus("Restore succeeded but read-back failed: " + ex.Message, true);
+                return;
+            }
+            var restoredProfile = selected ?? new GameProfile
+            {
+                ExePath = latest.ValueName,
+                Name = WindowsAppDisplayName(latest.ValueName)
+            };
+            _gpuChoiceDirty = false;
+            ReloadWindowsApps();
+            SyncProfileRegistryStatus();
+            RefreshGameList();
+            // Publish only the verified restored Windows value, never a stale profile.
+            if (restored is null) PublishSystemDefault(restoredProfile);
+            else PublishPreferenceApplied(restoredProfile, restored);
+        }
+        SetStatus(result.Message, error: !result.Success);
     }
 
     private readonly GpuStatePublisher _gpuPublisher = new();
 
     /// <summary>Preference-applied event (separate from runtime results): reports the
     /// verified registry write only — never claims the game runs on that GPU.</summary>
-    private async void PublishPreferenceApplied(GameProfile profile)
+    private async void PublishPreferenceApplied(GameProfile profile, string verifiedValue)
     {
         try
         {
+            var windowsId = WindowsGpuPreferenceService.ParseSpecificAdapter(verifiedValue);
+            var policy = WindowsGpuPreferenceService.ParseWindowsGpuPolicy(verifiedValue);
             var adapter = _adapters.FirstOrDefault(a =>
-                a.AdapterId == profile.SelectedAdapterId);
+                string.Equals(WindowsGpuPreferenceService.ToWindowsAdapterId(a.AdapterId),
+                    windowsId, StringComparison.OrdinalIgnoreCase));
             var payload = new GpuPreferencePayload
             {
                 SchemaVersion = GpuPreferenceContract.CurrentSchemaVersion,
                 EventId = Guid.NewGuid().ToString("N"),
                 ExePath = profile.ExePath,
                 DisplayName = profile.Name,
-                AdapterId = WindowsGpuPreferenceService.ToWindowsAdapterId(profile.SelectedAdapterId),
-                AdapterName = adapter?.DisplayName ?? profile.SelectedAdapterId,
+                IsSystemDefault = string.IsNullOrWhiteSpace(windowsId),
+                WindowsGpuPolicy = string.IsNullOrWhiteSpace(windowsId) ? policy : null,
+                AdapterId = windowsId ?? "",
+                AdapterName = adapter?.DisplayName ?? "",
                 AppliedUtc = DateTimeOffset.UtcNow
             };
             var publish = await _gpuPublisher.PublishPreferenceAsync(payload).ConfigureAwait(true);

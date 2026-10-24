@@ -1,7 +1,7 @@
 # Read-only Adapter Host checks: NO DLL injection, NO game launched.
 param([switch]$X64Only)
 $ErrorActionPreference = 'Stop'
-$root = Split-Path -Parent $PSScriptRoot
+$root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $logPath = Join-Path $env:LOCALAPPDATA 'NVIDIA\OSC Adapter\Logs\adapter-host.log'
 $me = [Diagnostics.Process]::GetCurrentProcess()
 $selfExe = $me.MainModule.FileName

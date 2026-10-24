@@ -2,12 +2,28 @@
 [CmdletBinding()]
 param(
     [switch]$RunSmoke,
+    [switch]$ConfirmPrivacyCleared,
+    [switch]$ConfirmAudioDisabled,
     [int]$Port = 59477,
     [int]$Seconds = 3,
     [ValidateSet('FFmpeg', 'Duluka')]
     [string]$Engine = 'FFmpeg'
 )
 $ErrorActionPreference = 'Stop'
+# Record modes, including FFmpeg/gdigrab, read ACTUAL desktop pixels.
+# Only explicit double confirmation can cross this boundary.
+# The default prepare-only mode is safe and does not start a worker.
+if ($RunSmoke) {
+    if (-not $ConfirmPrivacyCleared) {
+        throw 'LIVE_CAPTURE_REFUSED: use -ConfirmPrivacyCleared only after placing a neutral, privacy-cleared test scene on the selected display'
+    }
+    if (-not $ConfirmAudioDisabled) {
+        throw 'LIVE_CAPTURE_REFUSED: use -ConfirmAudioDisabled only after confirming both system audio and microphone capture are off'
+    }
+    if ($Seconds -lt 2 -or $Seconds -gt 15) {
+        throw 'LIVE_CAPTURE_REFUSED: -Seconds must be between 2 and 15 for a bounded test'
+    }
+}
 
 # Only run source builds in the feature worktree, never an installed Stable EXE.
 $capture = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
@@ -16,7 +32,9 @@ $bin = Join-Path $capture 'bin\Release\net10.0-windows10.0.26100.0'
 $exe = Join-Path $bin 'NvCapture.exe'
 $ffmpeg = Join-Path $project 'FFmpeg\ffmpeg.exe'
 $probe = Join-Path $project 'FFmpeg\ffprobe.exe'
-$root = Join-Path $capture 'bin\Release\IsolatedCaptureRoot'
+# Per-port isolated root prevents simultaneous tests from rewriting one
+# another's config or claiming another test worker's output files.
+$root = Join-Path $capture ('bin\Release\IsolatedCaptureRoot-' + $Port)
 $marker = Join-Path $root '.shadowplay-capture-isolated'
 $records = Join-Path $root 'Records'
 if ($Port -lt 59100 -or $Port -gt 59999) { throw 'Only isolated REST ports 59100-59999 are allowed.' }
@@ -28,15 +46,17 @@ if ((Test-Path -LiteralPath $root) -and -not (Test-Path -LiteralPath $marker)) {
 # Refuse to rewrite configuration while another test worker owns the port.
 $existing = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
 if ($existing) { throw "Test port $Port already belongs to process $($existing[0].OwningProcess)" }
-# Do not run an additional DXGI/NVENC recording while Stable is recording.
-if ($RunSmoke -and $Engine -eq 'Duluka') {
+# Both FFmpeg/gdigrab and Duluka/native use real desktop pixels.
+# Fail CLOSED if production health is unavailable or not verifiably idle.
+if ($RunSmoke) {
     try {
         $stable = Invoke-RestMethod -Uri 'http://127.0.0.1:59077/health' -TimeoutSec 3
-        if ($stable.recording) { throw 'Stable NvCapture is recording; refusing concurrent Native GPU capture' }
+    } catch {
+        throw 'LIVE_CAPTURE_REFUSED: production NvCapture health unavailable'
     }
-    catch {
-        if ($_.Exception.Message -match 'Stable NvCapture is recording') { throw }
-        Write-Host 'Stable health unavailable; proceeding with isolated port only.'
+    if ($stable.ok -ne $true -or $stable.ready -ne $true -or
+        $stable.recording -ne $false) {
+        throw 'LIVE_CAPTURE_REFUSED: production capture is not verifiably idle'
     }
 }
 New-Item -ItemType Directory -Force -Path (Join-Path $root 'Config'), $records | Out-Null

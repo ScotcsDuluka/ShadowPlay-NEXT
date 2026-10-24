@@ -20,6 +20,25 @@
   }
   i18n.apply();
 
+  // Chromium 73 lacks :focus-visible. Only show the outline when the
+  // navigation method is keyboard, not after every mouse click.
+  if (document.addEventListener && document.body && document.body.classList) {
+    document.addEventListener('keydown', function (event) {
+      var k = event.key;
+      if (k === 'Tab' || k === 'Enter' || k === ' ' || k === 'Spacebar' ||
+          k === 'ArrowUp' || k === 'ArrowDown' ||
+          k === 'ArrowLeft' || k === 'ArrowRight') {
+        document.body.classList.add('keyboard-nav');
+      }
+    }, true);
+    document.addEventListener('mousedown', function () {
+      document.body.classList.remove('keyboard-nav');
+    }, true);
+    document.addEventListener('touchstart', function () {
+      document.body.classList.remove('keyboard-nav');
+    }, true);
+  }
+
   // ── RPC bridge ──────────────────────────────────────────────────────
   var bridgeUp = typeof window.cefQuery === 'function';
   var bridgeTag = $('bridgeState');
@@ -149,11 +168,53 @@
     if (stateEl) setText(stateEl, label);
   }
 
+  // Product modules are reported by the host. DLLs/configuration can be
+  // installed without being a standalone process or an active game session.
+  var moduleIds = ['Capture', 'Graphics', 'Overlay', 'NodeApi', 'Container',
+    'Adapter', 'Hook', 'Ansel', 'Helper', 'Ffmpeg', 'Config'];
+  function renderModules(modules) {
+    for (var mi = 0; mi < moduleIds.length; mi++) {
+      var id = moduleIds[mi];
+      var info = modules && modules[id];
+      var key = 'moduleWaiting';
+      var stateClass = 'unknown';
+      if (info && typeof info.installed === 'boolean') {
+        if (!info.installed) {
+          key = 'moduleMissing';
+          stateClass = 'missing';
+        } else if (info.processTracking === false) {
+          key = 'moduleInstalled';
+          stateClass = 'installed';
+        } else if (info.processTracking === true && typeof info.running === 'boolean') {
+          key = info.running ? 'running' : 'stopped';
+          stateClass = info.running ? 'running' : 'stopped';
+        }
+      }
+      var stateNode = $('moduleState' + id);
+      if (stateNode) {
+        setText(stateNode, key);
+        stateNode.className = 'module-state ' + stateClass;
+      }
+      var availability = $('moduleAvailability' + id);
+      if (availability) setText(availability,
+        info && typeof info.installed === 'boolean'
+          ? (info.installed ? 'moduleInstalled' : 'moduleMissing') : 'moduleWaiting');
+      var navState = $('navState' + id);
+      if (navState) {
+        navState.className = 'nav-module-state ' + stateClass;
+        navState.setAttribute('title', tr(key));
+      }
+    }
+  }
+
   // ── Render ──────────────────────────────────────────────────────────
   var latestState = null;
   function render(s) {
     if (!s) return;
     latestState = s;
+    window.__quickState = s;
+    if (typeof window.onQuickLauncherState === 'function') window.onQuickLauncherState(s);
+    renderModules(s.modules);
 
     // OVERLAY API: running+ready -> RUNNING, running only -> LOADING,
     // else STOPPED (Main.vb IF_APP_Tick contract).
@@ -179,6 +240,44 @@
     if (el.chipEngine) el.chipEngine.className = 'lane-chip' + (lanes.container ? ' on' : '');
     if (el.chipCef) el.chipCef.className = 'lane-chip' + (lanes.cefOverlay ? ' on' : '');
     if (el.chipHub) el.chipHub.className = 'lane-chip' + ((s.nvApi && s.nvApi.running) ? ' on' : '');
+    // Dashboard health: connected launcher lanes only. Do not claim that
+    // recording, game injection or GPU routing are ready based on these dots.
+    var controllerOn = !!lanes.container;
+    var presenterOn = !!lanes.cefOverlay;
+    var apiOn = !!(s.nvApi && s.nvApi.running);
+    var healthOk = !!(s.overlayApi && s.overlayApi.running && s.overlayApi.ready);
+    var sysKey = healthOk ? 'systemOnline' : 'systemPartial';
+    var labels = ['headerHealth', 'sidebarHealth', 'systemHealth'];
+    for (var ix = 0; ix < labels.length; ix++) {
+      var stateNode = $(labels[ix]);
+      if (stateNode) {
+        setText(stateNode, sysKey);
+        stateNode.classList.toggle('on', healthOk);
+        stateNode.classList.toggle('off', !healthOk);
+      }
+    }
+    var led = $('sidebarLed');
+    if (led) {
+      led.classList.toggle('on', healthOk);
+      led.classList.toggle('off', !healthOk);
+    }
+    var indicators = [
+      ['signalController', controllerOn, el.chipEngine],
+      ['signalPresenter', presenterOn, el.chipCef],
+      ['signalApi', apiOn, el.chipHub]
+    ];
+    for (var si = 0; si < indicators.length; si++) {
+      var icon = $(indicators[si][0]);
+      if (icon) icon.className = 'signal-icon' + (indicators[si][1] ? ' on' : '');
+      if (indicators[si][2]) setText(indicators[si][2], indicators[si][1] ? 'running' : 'stopped');
+    }
+    var engineText = $('overviewEngine');
+    if (engineText) engineText.textContent = tr(s.engineOverlay ? 'selectedCef' : 'selectedWinform');
+    var checkedAt = $('signalTimestamp');
+    if (checkedAt) {
+      checkedAt.removeAttribute('data-i18n');
+      checkedAt.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
 
     syncToggle(el.tglOverlay, s.overlayEnabled);
     syncMode(!!s.engineOverlay);
@@ -290,6 +389,44 @@
   });
   activateByKeyboard(el.lblCef, function () { this.click(); });
   activateByKeyboard(el.tglEngine, function () { this.click(); });
+
+  // Command Center sidebar: local view changes only, never service RPC.
+  // Capture/Graphics are informational until native route contracts exist.
+  var viewIds = ['Overview', 'Capture', 'Graphics', 'Overlay', 'NodeApi',
+    'Container', 'Adapter', 'Hook', 'Ansel', 'Helper', 'Ffmpeg', 'Services', 'Settings'];
+  function showView(name) {
+    for (var i = 0; i < viewIds.length; i++) {
+      var active = viewIds[i] === name;
+      var panel = $('view' + viewIds[i]);
+      var button = $('nav' + viewIds[i]);
+      if (panel) panel.classList.toggle('active', active);
+      if (button) {
+        button.classList.toggle('active', active);
+        if (active) button.setAttribute('aria-current', 'page');
+        else button.removeAttribute('aria-current');
+      }
+    }
+    var content = $('contentScroll');
+    if (content) content.scrollTop = 0;
+  }
+  for (var vi = 0; vi < viewIds.length; vi++) {
+    (function (name) {
+      on($('nav' + name), 'click', function () { showView(name); });
+    })(viewIds[vi]);
+  }
+  on($('btnJumpServices'), 'click', function () { showView('Services'); });
+  on($('btnGotoCapture'), 'click', function () { showView('Capture'); });
+  on($('btnGotoGraphics'), 'click', function () { showView('Graphics'); });
+  on($('btnGotoSettings'), 'click', function () { showView('Settings'); });
+  on($('btnCaptureOverlay'), 'click', function () {
+    // Exactly the same CEF RPC path as the Overview OPEN OVERLAY button.
+    if (el.btnOpenOverlay && typeof el.btnOpenOverlay.click === 'function')
+      el.btnOpenOverlay.click();
+  });
+  on($('btnModuleOverlay'), 'click', function () {
+    if (el.btnOpenOverlay && typeof el.btnOpenOverlay.click === 'function')
+      el.btnOpenOverlay.click();
+  });
 
   // ── Buttons ─────────────────────────────────────────────────────────
   // OPEN OVERLAY feedback: never read back the mutated label (a fast

@@ -210,6 +210,19 @@ Partial Public Class UI_Engine
                 Return $"{{""ok"":true,""engine"":""NvCapture"",""ready"":{_engineReady.ToString().ToLowerInvariant()},""recording"":{RestRecording().ToString().ToLowerInvariant()}}}"
             End If
 
+            ' Hardware verification is explicit: GET never performs GPU work.
+            ' Test source is one synthetic color frame; no screen or file capture.
+            If path = "/encoders/verify" AndAlso method = "POST" Then
+                If RestRecording() Then Return "{""started"":false,""reason"":""recording_active""}"
+                Dim probeSettings As CaptureSettings = CaptureSettings.Load(_configPath)
+                Dim advertised = FFmpegRuntimeProbe.CachedOrStart(probeSettings.FFmpegPath)
+                If Not advertised.BinaryRunnable Then
+                    Return JsonSerializer.Serialize(New With {.started = False, .reason = "ffmpeg_probe_not_ready"})
+                End If
+                Dim outcome As String = FFmpegNvencVerification.Start(probeSettings.FFmpegPath, advertised.Encoders)
+                Return JsonSerializer.Serialize(New With {.started = outcome = "started", .reason = outcome})
+            End If
+
             ' Report both requested route and actual session owner. A codec
             ' is never advertised as active just because a config selected it.
             If path = "/engines" AndAlso method = "GET" Then
@@ -240,6 +253,7 @@ Partial Public Class UI_Engine
                         .captureApis = ffmpeg.CaptureApis,
                         .encoders = ffmpeg.Encoders,
                         .reason = ffmpeg.Reason,
+                        .nvencSyntheticValidation = FFmpegNvencVerification.Snapshot(ffmpegSettings.FFmpegPath),
                         .hardwareEncoderVerified = False
                     },
                     .recording = RestRecording(),

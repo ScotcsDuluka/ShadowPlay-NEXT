@@ -559,20 +559,9 @@ function fallbackRecentFiles(count, callback) {
             callback(new Error('Gallery recording path is unavailable'));
             return;
         }
-        readMediaFiles(paths.videos, function (scanError, files) {
-            if (scanError) {
-                callback(scanError);
-                return;
-            }
-            var limit = parseInt(count, 10);
-            if (!isFinite(limit) || limit < 0) limit = 0;
-            limit = Math.min(limit, 100);
-            callback(null, {
-                files: files.slice(0, limit).map(function (file) {
-                    return file.filename;
-                })
-            });
-        });
+        // Recordings may live under Videos/Captures, Videos/NVIDIA, or
+        // per-game subfolders. Use a bounded scanner, never symlink traversal.
+        require('./shims/gallery-recent-scanner.js').recent(paths.videos, count, callback);
     }
 
     try {
@@ -670,7 +659,8 @@ function fallbackFileMetadata(options, callback) {
             } else {
                 metadata.thumbnail = thumbnail;
             }
-            callback(null, metadata);
+            require('./shims/gallery-media-metadata.js').enrich(metadata, filename, stats,
+                isVideo ? findFfmpegPath() : null, callback);
         });
     });
 }
@@ -1019,25 +1009,12 @@ function RegisterExpressEndpoints(app, logger) {
 
     //! Removes videos from the fs/gallery.
     app.post('/Gallery/v.1.0/Remove', function (req, res) {
-        function doReply(err, data) {
-            if (err) {
-                replyWithError(res, err);
-            }
-            else {
-                res.writeHead(200);
-                res.end(JSON.stringify(data));
-            }
-        }
-
-        getJSONDataAndDo(req, res, function (content) {
-            try {
-                api.GalleryRemove(doReply, content);
-            }
-            catch (err) {
-                replyWithError(res, err);
-                console.error(err);
-            }
-        })
+        // The standalone native shim does not delete files. Do not claim
+        // success for a destructive operation that was never performed.
+        res.status(501).json({
+            type: 'Error', codeText: 'GALLERY_DELETE_UNAVAILABLE',
+            message: 'Safe Gallery deletion is not implemented; no file was deleted'
+        });
     });
 
     //! Gets metadata about a screenshot/video.
@@ -1109,25 +1086,18 @@ function RegisterExpressEndpoints(app, logger) {
     });
 
     app.post('/Gallery/v.1.0/GetImageFileDimensions', function (req, res) {
-        function doReply(err, data) {
-            if (err) {
-                replyWithError(res, err);
-            }
-            else {
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify(data));
-            }
-        }
-
         getJSONDataAndDo(req, res, function (content) {
-            try {
-                api.GalleryGetImageDimensions(doReply, content);
-            }
-            catch (err) {
-                replyWithError(res, err);
-                console.error(err);
-            }
-        })
+            require('./shims/gallery-image-dimensions.js').read(content,
+                function (error, size) {
+                    if (error) {
+                        res.status(error.statusCode || 500).json({
+                            type: 'Error', codeText: error.codeText || 'GALLERY_IMAGE_READ_FAILED'
+                        });
+                        return;
+                    }
+                    res.status(200).json(size);
+                });
+        });
     });
 
     app.post('/Gallery/v.1.0/TranscodeMediaFile', function (req, res) {
@@ -1231,25 +1201,20 @@ function RegisterExpressEndpoints(app, logger) {
 
     //! Copies an NV file to another location
     app.post('/Gallery/v.1.0/CopyFile', function (req, res) {
-        function doReply(err, data) {
-            if (err) {
-                replyWithError(res, err);
-            }
-            else {
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify(data));
-            }
-        }
-
         getJSONDataAndDo(req, res, function (content) {
-            try {
-                api.GalleryCopyFile(doReply, content);
-            }
-            catch (err) {
-                replyWithError(res, err);
-                console.error(err);
-            }
-        })
+            // No shim-based fake success. Copy only verified Gallery media,
+            // and never overwrite an existing destination.
+            require('./shims/gallery-copy-file.js').copy(
+                content, resolveRecordingMedia, function (error, result) {
+                    if (error) {
+                        res.status(error.statusCode || 500).json({
+                            type: 'Error', codeText: error.codeText || 'GALLERY_COPY_FAILED'
+                        });
+                        return;
+                    }
+                    res.status(200).json(result);
+                });
+        });
     });
 
     // Check if a directory is writable

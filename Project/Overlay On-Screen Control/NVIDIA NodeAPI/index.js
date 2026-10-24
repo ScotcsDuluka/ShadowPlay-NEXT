@@ -25,6 +25,7 @@ nvUtil.ClaimSingleInstance();
 
 var fs = require('fs');
 var path = require('path');
+var localGpuRequestGuard = require('./localGpuRequestGuard.js');
 var containerTestMode = false;
 var containerControlApiPort = 59012;
 var captureRuntimeEnabled = false;
@@ -204,6 +205,13 @@ logger.info('fast-boot ready');
 
 logger.info('Loading ExpressJS dependency...');
 var app = require('./node_modules/express/index.js')();
+// Enforce local Host/Origin/Referer checks before all static and API routes.
+// Leave NVIDIA's legacy cookie mode unchanged for OSC/CEF compatibility.
+var localApiSecurity = require('./localApiSecurity.js');
+app.use(localApiSecurity.httpMiddleware);
+// ReShade Manager: guided official setup and read-only game inspection.
+// Never copies game DLLs or launches an installer from an HTTP endpoint.
+require('./shims/reshade-installer-route.js').mount(app);
 
 // GPU runtime and Game Watcher event validation for the loopback ContainerEvents lane.
 var gpuRuntimeValidation = require('./gpuRuntimeValidation.js');
@@ -238,6 +246,8 @@ app.get('/mods/list', function (req, res) {
             'overlays.css': true,
             'preferences.css': true,
             'privacy-control.css': true,
+            'reshade-manager.css': true,
+            'reshade-manager.js': true,
             'providers.css': true,
             'notifications.css': true,
             'video-capture-options.css': true,
@@ -278,6 +288,7 @@ logger.info('Creating HTTP server...');
 var httpServer = http.createServer(app);
 
     // NvContainer owns hotkey dispatch; it publishes the resulting OSC event here.
+    var containerHotkeyEvents = require('./shims/container-hotkey-event.js');
     app.post('/Backend/v.1.0/ContainerEvents', function (req, res) {
         var remote = req.socket && req.socket.remoteAddress;
         if (remote !== '127.0.0.1' && remote !== '::1' && remote !== '::ffff:127.0.0.1') {
@@ -300,12 +311,21 @@ var httpServer = http.createServer(app);
                     return;
                 }
                 var delivered = 0;
+                var nativeToggles = [];
                 payload.events.forEach(function (event) {
                     if (!event || !event.data) return;
                     if (event.name === '/ShadowPlay/v.1.0/Hotkey' &&
                         typeof event.data.hotkeyId === 'string') {
-                        io.emit(event.name, event.data);
-                        delivered++;
+                        // The native HWND is the visibility owner, even when CEF
+                        // is still at #/base. Do not also emit WindowState:
+                        // the OSC Host will update the CEF route on its own.
+                        var routed = containerHotkeyEvents.normalizeContainerHotkeyEvent(event);
+                        if (routed.name === '/ShadowPlay/v.1.0/WindowState') {
+                            nativeToggles.push(containerHotkeyEvents.toggleNativeOsc());
+                        } else {
+                            io.emit(routed.name, routed.data);
+                            delivered++;
+                        }
                         return;
                     }
                     if (event.name === '/Duluka/v1/GpuRuntimeState') {
@@ -341,9 +361,18 @@ var httpServer = http.createServer(app);
                     io.emit(event.name, event.data);
                     delivered++;
                 });
-                res.writeHead(delivered === payload.events.length ? 200 : 400,
-                    { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ delivered: delivered }));
+                Promise.all(nativeToggles).then(function (results) {
+                    results.forEach(function (ok) { if (ok) delivered++; });
+                    var allAccepted = delivered === payload.events.length;
+                    res.writeHead(allAccepted ? 200 : 503,
+                        { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ delivered: delivered,
+                        nativeToggleAttempts: results.length,
+                        nativeToggleFailures: results.filter(function (ok) { return !ok; }).length }));
+                }).catch(function () {
+                    res.writeHead(503, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'OSC native toggle unavailable' }));
+                });
             } catch (e) {
                 res.writeHead(400, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: 'invalid JSON' }));
@@ -354,10 +383,9 @@ var httpServer = http.createServer(app);
     // Restart remains loopback-only and requires explicit user confirmation.
     // Bound the upstream wait so a non-responsive NvContainer cannot leave CEF pending forever.
     app.post('/Duluka/v1/gpu/restart', function (req, res) {
-        var remote = req.socket && req.socket.remoteAddress;
-        if (remote !== '127.0.0.1' && remote !== '::1' && remote !== '::ffff:127.0.0.1') {
+        if (!localGpuRequestGuard.authorize(req)) {
             res.writeHead(403, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'loopback only' }));
+            res.end(JSON.stringify({ error: 'GPU request must originate from the local NodeAPI origin' }));
             return;
         }
 
@@ -442,10 +470,9 @@ var httpServer = http.createServer(app);
     });
 
     function proxyGpuProfileRequest(req, res, upstreamPath, method, timeoutMs) {
-        var remote = req.socket && req.socket.remoteAddress;
-        if (remote !== '127.0.0.1' && remote !== '::1' && remote !== '::ffff:127.0.0.1') {
+        if (!localGpuRequestGuard.authorize(req)) {
             res.writeHead(403, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'loopback only' }));
+            res.end(JSON.stringify({ error: 'GPU request must originate from the local NodeAPI origin' }));
             return;
         }
 
@@ -612,7 +639,7 @@ var httpServer = http.createServer(app);
                 }
             } catch (e) { reply = 'PARSE ERR ' + e.message + ' body=' + body.slice(0, 60); }
             res.header('Content-Type', 'application/json');
-            res.header('Access-Control-Allow-Origin', '*');
+            // Local same-origin OSC bridge: never opt into wildcard CORS.
             res.end(reply);
         });
     });
@@ -621,6 +648,8 @@ logger.info('HTTP ready');
 
 logger.info('Loading Socket.IO dependency...');
 var io = require('./node_modules/socket.io/lib/index.js')(httpServer);
+// Engine.IO handles websocket/polling itself, outside Express middleware.
+io.eio.allowRequest = localApiSecurity.socketAllowRequest;
 logger.info('Socket.IO ready');
 
 logger.info('Loading "on-finished" dependency...');
@@ -638,9 +667,8 @@ const securityCookie = nvUtil.GenerateRandom(16);
 var nextRequestId = 1;
 
 app.use(function (req, res, next) {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET,POST');
-    res.header('Access-Control-Allow-Headers', 'X_LOCAL_SECURITY_COOKIE, Content-Type, Content-Length');
+    // HTTP origin policy is enforced before routing by localApiSecurity.
+    // Same-origin requests do not need CORS response headers.
 
     if (req.method !== 'OPTIONS' && securityCheckEnabled && req.headers.x_local_security_cookie != securityCookie) {
         logger.error('Rejecting request with invalid security cookie: ' + req.method + ' ' + req.originalUrl);
@@ -661,6 +689,8 @@ app.use(function (req, res, next) {
 
 // Read-only multi-engine capability bridge. No OSC UI dependency or recording commands.
 require('./shims/capture-engine-status.js')(app);
+require('./shims/capture-capabilities.js')(app);
+require('./shims/capture-runtime-status.js')(app);
 
 // route-floor: OSC API route facade with persisted settings and runtime state.
 require('./shims/route-floor.js')(app, io);

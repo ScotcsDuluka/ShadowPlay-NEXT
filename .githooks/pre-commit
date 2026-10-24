@@ -1,0 +1,3 @@
+#!/bin/sh
+repo="$(git rev-parse --show-toplevel)" || exit 1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$repo/Scripts/Test-PairingSecrets.ps1" || exit 1

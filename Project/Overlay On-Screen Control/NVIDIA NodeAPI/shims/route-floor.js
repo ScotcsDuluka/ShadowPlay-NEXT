@@ -335,6 +335,8 @@ function requestContainer(method, route, body, callback) {
 }
 
 const state = require('./osc-runtime-state.js');
+const recordNotificationPolicy = require('./record-notification-policy.js');
+const recordRuntimeTruth = require('./record-runtime-truth.js');
 state.desktopCapture = !!loadSettings().desktopCapture;
 
 function requiredBoolean(body, key) {
@@ -422,6 +424,28 @@ module.exports = function routeFloor(app, io) {
   function emitCapture(name, data) {
     if (!io) return;
     try { io.emit(name, data); } catch (e) {}
+  }
+
+  // Read-through legacy Record status: worker state from Container is the
+  // authority, not the last Actual() POST cached in this NodeAPI process.
+  // On communication failure return UNKNOWN (503), never fake a saved toast.
+  function readWorkerRecordTruth(res, done) {
+    requestContainer('GET', '/v1/capture/status', undefined, function (err, body) {
+      if (err) {
+        return res.status(503).json({ type: 'Error', codeText: 'CAPTURE_TRUTH_UNAVAILABLE' });
+      }
+      const result = recordRuntimeTruth.interpretWorkerStatus(body);
+      if (!result.verified) {
+        return res.status(503).json({ type: 'Error', codeText: result.reason });
+      }
+      const wasRunning = state.recordRunning;
+      state.recordRunning = result.recording;
+      if (wasRunning !== result.recording) {
+        recordNotificationPolicy.actualEvents(wasRunning, { running: result.recording })
+          .forEach(function (event) { emitCapture(event.name, event.data); });
+      }
+      done(result.recording);
+    });
   }
 
   app.use(function (req, res, next) {
@@ -536,33 +560,6 @@ module.exports = function routeFloor(app, io) {
         });
         return;
       }
-      if (p === '/DulukaCapture/v.1.0/status') {
-        if (process.env.NV_CAPTURE_RUNTIME_ENABLED !== '1') {
-          return G({ enabled: false, ready: false, recording: false });
-        }
-        const port = Number(process.env.NV_CAPTURE_RUNTIME_API_PORT) || 59077;
-        const request = http.get({ hostname: '127.0.0.1', port: port, path: '/health', timeout: 2000 }, function (response) {
-          let raw = '';
-          response.setEncoding('utf8');
-          response.on('data', function (chunk) { raw += chunk; });
-          response.on('end', function () {
-            let status;
-            try { status = JSON.parse(raw); }
-            catch (e) {
-              return res.status(502).json({ enabled: true, ready: false, recording: false,
-                codeText: 'CAPTURE_RUNTIME_INVALID_RESPONSE' });
-            }
-            status.enabled = true;
-            res.status(response.statusCode === 200 ? 200 : 503).json(status);
-          });
-        });
-        request.on('timeout', function () { request.destroy(new Error('NvCapture health timed out')); });
-        request.on('error', function () {
-          if (!res.headersSent) res.status(503).json({ enabled: true, ready: false, recording: false,
-            codeText: 'CAPTURE_RUNTIME_UNAVAILABLE' });
-        });
-        return;
-      }
       if (p === '/ShadowPlay/v.1.0/OSC/MainView') {
         readBody(req, function (body) {
           if (!body || typeof body !== 'object' || Array.isArray(body)) {
@@ -586,13 +583,17 @@ module.exports = function routeFloor(app, io) {
             return;
           }
           if (hasRecordState) {
-            const changed = state.recordRunning !== body.running;
+            const previous = state.recordRunning;
             state.recordRunning = body.running;
-            // Engine-confirmed actual state is authoritative over the requested state.
-            if (changed) {
-              emitCapture('/ShadowPlay/v.1.0/Record/Enable', { status: body.running });
-              emitCapture('/ShadowPlay/v.1.0/Record/Running', { running: body.running });
-            }
+            // Actual session ended: cancel any pending desired Start edge.
+            // Otherwise /Duluka/State becomes "Starting" after a failed
+            // session, and the capture poller can restart recording on its own.
+            if (body.running === false) state.recordEnabled = false;
+            // Never emit "Recording saved" for an unsuccessful or unknown
+            // session ending. A Boolean transition alone proves no file.
+            recordNotificationPolicy.actualEvents(previous, body).forEach(function (event) {
+              emitCapture(event.name, event.data);
+            });
           }
           if (hasIrState) {
             const changed = state.irRunning !== body.irRunning;
@@ -621,7 +622,11 @@ module.exports = function routeFloor(app, io) {
           }
           const changed = state.recordEnabled !== enabled;
           state.recordEnabled = enabled;
-          if (changed) emitCapture('/ShadowPlay/v.1.0/Record/Enable', { status: enabled });
+          // A desired-state toggle is NOT proof a recording started or saved.
+          // Wait for Capture's actual result before publishing a notification.
+          if (changed) recordNotificationPolicy.desiredEvents().forEach(function (event) {
+            emitCapture(event.name, event.data);
+          });
           res.status(200).json({ status: enabled });
         });
         return;
@@ -969,10 +974,10 @@ module.exports = function routeFloor(app, io) {
         }
       }
       if (p === '/ShadowPlay/v.1.0/Capture/State') {
-        if (state.recordRunning) return G({ captureMode: 0, recordingState: 1 });
-        if (state.irRunning) return G({ captureMode: 1, recordingState: 1 });
-        if (state.broadcastRunning) return G({ captureMode: 2, recordingState: 1 });
-        return G({ captureMode: 0, recordingState: 0 });
+        return readWorkerRecordTruth(res, function (running) {
+          return G(recordRuntimeTruth.legacyCaptureView(
+            running, state.irRunning, state.broadcastRunning));
+        });
       }
       if (p === '/ShadowPlay/v.1.0/Capture/PIDMode') return G({ valid: true });
       if (p.indexOf('/ShadowPlay/v.1.0/Capture/ProcessInfo') === 0) return G({});
@@ -981,7 +986,9 @@ module.exports = function routeFloor(app, io) {
       if (p.indexOf('/ShadowPlay/v.1.0/DesktopCapture/Support/Reason') === 0) return G({ support: true, unsupportReason: '' });
 
       if (p === '/ShadowPlay/v.1.0/Record/Enable') return G({ status: state.recordEnabled });
-      if (p === '/ShadowPlay/v.1.0/Record/Running') return G({ running: state.recordRunning });
+      if (p === '/ShadowPlay/v.1.0/Record/Running') {
+        return readWorkerRecordTruth(res, function (running) { return G({ running: running }); });
+      }
       if (p === '/ShadowPlay/v.1.0/Record/Settings') return G(settingsShape('record'));
       if (p === '/ShadowPlay/v.1.0/Record/Concurrency/Broadcast') return G({ supported: false });
       if (p === '/ShadowPlay/v.1.0/Record/Concurrency/Gamestream') return G({ supported: false });

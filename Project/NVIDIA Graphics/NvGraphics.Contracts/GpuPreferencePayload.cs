@@ -22,6 +22,9 @@ public sealed class GpuPreferencePayload
     public string AdapterName { get; set; } = "";
     /// <summary>True when the per-app GPU override was removed and Windows uses its default.</summary>
     public bool IsSystemDefault { get; set; }
+    /// <summary>Optional Windows policy: 0=auto, 1=power saving, 2=high performance.
+    /// When present no fixed physical GPU is forced. Compatible with schema v1.</summary>
+    public int? WindowsGpuPolicy { get; set; }
     public DateTimeOffset AppliedUtc { get; set; }
 }
 
@@ -69,6 +72,10 @@ public static class GpuPreferencePayloadValidator
         { error = "adapterId is required unless isSystemDefault is true"; httpStatus = 400; return false; }
         if ((payload.AdapterName?.Length ?? 0) > 256 || (payload.DisplayName?.Length ?? 0) > 128)
         { error = "name fields too long"; httpStatus = 400; return false; }
+        if (payload.WindowsGpuPolicy.HasValue &&
+            (payload.WindowsGpuPolicy.Value < 0 || payload.WindowsGpuPolicy.Value > 2 ||
+             !payload.IsSystemDefault || !string.IsNullOrWhiteSpace(payload.AdapterId)))
+        { error = "invalid windowsGpuPolicy or conflicting adapterId"; httpStatus = 400; return false; }
         if (payload.AppliedUtc == default)
         { error = "appliedUtc is required"; httpStatus = 400; return false; }
 
