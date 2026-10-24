@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#090b08"><meta name="description" content="ShadowPlay NEXT CBT1 — Closed Beta Tester Application">
+<title>CBT1 Application | ShadowPlay NEXT</title>
+<style>
+:root{color-scheme:dark;font-family:Inter,system-ui,Arial,sans-serif;background:#090b08;color:#f4f7f0}
+*{box-sizing:border-box}body{margin:0;min-height:100svh;background:radial-gradient(ellipse at 77% 2%,#283d0d 0,transparent 43%),#090b08}
+a{color:#9fe128}.wrap{max-width:900px;margin:auto;padding:34px 24px 88px}
+header{display:flex;align-items:center;justify-content:space-between;gap:20px;border-bottom:1px solid #32442a;padding:9px 0 27px}
+.brand{font-weight:900;letter-spacing:.14em;font-size:1rem}.brand b{color:#76b900}
+.back{font-size:.83rem;text-decoration:none;color:#d6ddd1}.eyebrow{color:#a9e550;font-size:.77rem;letter-spacing:.3em;font-weight:800;margin-top:74px}
+h1{font-size:clamp(3.6rem,10vw,7.3rem);line-height:.94;margin:20px 0 24px;letter-spacing:-.06em;font-weight:900}
+h1 em{font-style:normal;color:#76b900}.lead{max-width:650px;line-height:1.75;color:#b0b9aa;margin-bottom:38px}
+.card{border:1px solid #3a4d31;background:linear-gradient(140deg,#141b10,#0d100d);padding:clamp(22px,4vw,38px);box-shadow:0 16px 60px #0005}
+.card h2{margin:0 0 10px;letter-spacing:.05em}.caption{font-size:.9rem;color:#adb9a4;line-height:1.7}
+.status{margin:19px 0;padding:13px 16px;background:#1d2416;border-left:4px solid #76b900;color:#d5ecc3;font-size:.9rem}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:21px}
+label{display:block;color:#edf4e7;font-size:.87rem;font-weight:700;margin-top:17px}
+input,select,textarea{display:block;width:100%;margin-top:9px;padding:15px;border:1px solid #45543e;background:#10160e;color:white;font:inherit;border-radius:0;outline-offset:3px;outline-color:#76b900}
+input:focus,select:focus,textarea:focus{border-color:#76b900}
+textarea{resize:vertical;min-height:105px}
+.check{display:flex;gap:13px;align-items:flex-start;line-height:1.7;font-size:.85rem;color:#c7d0c0;font-weight:400}
+.check input{width:18px;height:18px;flex:none;margin:5px 0 0;accent-color:#76b900}
+button{width:100%;background:#76b900;color:#121a08;padding:17px;margin-top:23px;border:0;font:900 1rem inherit;font-weight:900;letter-spacing:.12em;cursor:pointer}
+button:disabled{background:#374332;color:#a9b7a3;cursor:not-allowed}
+footer{margin-top:27px;font-size:.78rem;color:#798672;line-height:1.6}
+#message{min-height:1.5rem;line-height:1.6}
+.honey{position:absolute;left:-9999px}
+@media(max-width:650px){.grid{grid-template-columns:1fr;gap:0}.eyebrow{margin-top:45px}.wrap{padding-inline:16px}}
+</style>
+</head>
+<body>
+<main class="wrap">
+<header><div class="brand">SHADOWPLAY <b>NEXT</b></div><a class="back" href="./">← BACK TO PROJECT</a></header>
+<div class="eyebrow">CLOSED BETA TEST // ROUND 01</div>
+<h1>JOIN THE<br><em>CBT1.</em></h1>
+<p class="lead">สมัครเป็นผู้ทดสอบ ShadowPlay NEXT รุ่น Closed Beta 1 เพื่อช่วยทดสอบ Overlay, Capture, GPU Profiles และความเข้ากันได้กับเกมจริง การสมัครไม่ได้รับประกันว่าจะได้รับสิทธิ์เข้าทดสอบ</p>
+<section class="card" aria-labelledby="formHeading">
+<h2 id="formHeading">TESTER APPLICATION</h2>
+<p class="caption">กรอกเฉพาะข้อมูลที่จำเป็นต่อการคัดเลือก ไม่ต้องส่งชื่อจริง รหัสผ่าน หมายเลขเครื่อง หรือข้อมูลฮาร์ดแวร์ที่ระบุตัวเครื่องได้</p>
+<div id="status" class="status" role="status">Checking registration availability…</div>
+<form id="application" novalidate>
+<div class="grid">
+<label>ชื่อที่ใช้เรียก / Alias *<input name="alias" maxlength="40" autocomplete="nickname" required placeholder="Tester name"></label>
+<label>อีเมลสำหรับติดต่อ *<input name="email" type="email" maxlength="254" autocomplete="email" required placeholder="you@example.com"></label>
+<label>Windows *<select name="windowsVersion" required><option value="">เลือกระบบ</option><option>Windows 10</option><option>Windows 11</option></select></label>
+<label>Graphics *<select name="gpuVendor" required><option value="">เลือก GPU</option><option>NVIDIA</option><option>AMD</option><option>Intel</option><option>Mixed</option><option>Other</option></select></label>
+<label>สนใจทดสอบ *<select name="testingFocus" required><option value="">เลือกหัวข้อ</option><option>Overlay</option><option>Capture</option><option>GPU Profiles</option><option>DX9 Hook</option><option>UI</option><option>General</option></select></label>
+</div>
+<label>ข้อมูลเพิ่มเติม (ไม่บังคับ)<textarea name="notes" maxlength="500" placeholder="เกมที่สนใจทดสอบ หรือประสบการณ์ทดสอบ (ไม่ต้องใส่ข้อมูลส่วนตัว)"></textarea></label>
+<div class="honey" aria-hidden="true"><label>Website<input name="website" tabindex="-1" autocomplete="off"></label></div>
+<label class="check"><input name="consent" type="checkbox" required><span>ยินยอมให้ทีม ShadowPlay NEXT ใช้อีเมลและข้อมูลที่กรอกเพื่อพิจารณาใบสมัครและติดต่อเรื่อง CBT1 เท่านั้น สามารถขอให้ลบข้อมูลได้ผ่านช่องทางโครงการ</span></label>
+<button id="submit" type="submit" disabled>REGISTRATION UNAVAILABLE</button>
+<p id="message" role="status" aria-live="polite"></p>
+</form>
+</section>
+<footer>SHADOWPLAY NEXT · COMMUNITY PROJECT · Not affiliated with NVIDIA Corporation · <a href="https://discord.gg/v5qUGVD3jZ">Discord</a></footer>
+</main>
+<script>
+(() => {
+  "use strict";
+  // Public HTTPS API origin must be provided by the deployment operator.
+  // Do not embed API tokens or private server URLs here.
+  const API_BASE = "";
+  const form = document.querySelector("#application");
+  const status = document.querySelector("#status");
+  const button = document.querySelector("#submit");
+  const message = document.querySelector("#message");
+  const api = API_BASE.replace(/\/+$/, "");
+  async function check() {
+    if (!api || !api.startsWith("https://")) {
+      status.textContent = "CBT1 applications are not open yet. Server connection pending.";
+      return;
+    }
+    try {
+      const response = await fetch(api + "/v1/cbt1/status", {cache:"no-store"});
+      if (!response.ok) throw Error("Unavailable");
+      const data = await response.json();
+      if (data.ok && data.accepting === true) {
+        status.textContent = "APPLICATIONS OPEN · CBT1";
+        button.disabled = false;
+        button.textContent = "APPLY FOR CBT1 →";
+      } else status.textContent = "CBT1 applications are currently closed.";
+    } catch { status.textContent = "Registration server unavailable. Try again later."; }
+  }
+  form.addEventListener("submit", async e => {
+    e.preventDefault();
+    if (button.disabled || !form.reportValidity()) return;
+    button.disabled = true;
+    message.textContent = "Sending application…";
+    const values = Object.fromEntries(new FormData(form));
+    values.consent = form.elements.consent.checked;
+    try {
+      const response = await fetch(api + "/v1/cbt1/apply", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body:JSON.stringify(values)
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok) throw Error(result.message || "Submission failed");
+      message.textContent = "ได้รับข้อมูลใบสมัครแล้ว ✅ ทีมงานจะติดต่อหากได้รับเลือก";
+      form.reset();
+    } catch {
+      message.textContent = "ส่งใบสมัครไม่สำเร็จ ข้อมูลยังไม่ถูกยืนยัน กรุณาลองใหม่ภายหลัง";
+    } finally { button.disabled = false; }
+  });
+  check();
+})();
+</script>
+</body></html>
