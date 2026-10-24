@@ -117,6 +117,7 @@
       return selected ? selected.label : '';
     };
     panelScope.onCaptureEngineChange = function () {
+      if (!panelScope.captureSettingsReady) return;
       if (panelScope.captureUi.engineMode !== 'FFmpeg' &&
           panelScope.captureUi.engineMode !== 'Duluka') return;
       if (!state) state = defaultSettings();
@@ -126,6 +127,7 @@
       save();
     };
     panelScope.onCaptureApiChange = function () {
+      if (!panelScope.captureSettingsReady) return;
       if (!state) state = defaultSettings();
       if (!apiChoices(state.engineMode).some(function (choice) {
         return choice.value === panelScope.captureUi.apiCapture;
@@ -134,6 +136,7 @@
       save();
     };
     panelScope.onEncoderChange = function () {
+      if (!panelScope.captureSettingsReady) return;
       if (!state) state = defaultSettings();
       state.quality = 'Custom';
       state.encoder = panelScope.captureUi.encoder;
@@ -142,6 +145,7 @@
       save();
     };
     panelScope.onPresetChange = function () {
+      if (!panelScope.captureSettingsReady) return;
       if (!state) state = defaultSettings();
       var preset = Number(panelScope.captureUi.encoderPreset);
       if (!panelScope.capturePresetChoices.some(function (choice) {
@@ -152,6 +156,7 @@
       save();
     };
     panelScope.onCursorChange = function () {
+      if (!panelScope.captureSettingsReady) return;
       if (!state) state = defaultSettings();
       state.captureCursor = Boolean(panelScope.captureUi.captureCursor);
       save();
@@ -204,7 +209,10 @@
   }
 
   function save() {
-    if (!state) state = defaultSettings();
+    // Never turn a temporary GET failure into an accidental POST of
+    // guessed/default capture settings.
+    if (!panelScope || !panelScope.captureSettingsReady) return Promise.resolve(false);
+    if (!state) return Promise.resolve(false);
     statusNode.textContent = 'Saving…';
     return fetchWithTimeout(endpoint, {
       method: 'POST',
@@ -225,6 +233,7 @@
       }
       return response.json();
     }).then(function (saved) {
+      if (!usableCaptureSettings(saved)) throw new Error('Invalid capture settings response');
       state = saved;
       statusNode.classList.remove('highlights-item-disabled');
       statusNode.textContent = 'Saved';
@@ -251,12 +260,30 @@
     };
   }
 
+  function usableCaptureSettings(value) {
+    return !!value && typeof value === 'object' &&
+      (value.engineMode === 'FFmpeg' || value.engineMode === 'Duluka') &&
+      apiChoices(value.engineMode).some(function (choice) {
+        return !choice.disabled && choice.value === value.apiCapture;
+      }) &&
+      encoderChoices.some(function (choice) { return choice[0] === value.encoder; }) &&
+      Number.isInteger(value.encoderPreset) && value.encoderPreset >= 1 &&
+      value.encoderPreset <= 7 && typeof value.captureCursor === 'boolean' &&
+      Number.isFinite(value.fps) && value.fps > 0 &&
+      Number.isFinite(value.bitrateKbps) && value.bitrateKbps > 0 &&
+      typeof value.useNativeResolution === 'boolean' &&
+      Number.isFinite(value.width) && value.width > 0 &&
+      Number.isFinite(value.height) && value.height > 0;
+  }
+
   function setUnavailableSettings(error) {
+    // Keep controls locked on loading failure; defaults are only a visual
+    // placeholder, never a confirmed state that may be persisted.
     if (!state) state = defaultSettings();
-    if (panelScope) panelScope.captureSettingsReady = true;
+    if (panelScope) panelScope.captureSettingsReady = false;
     render();
     statusNode.classList.add('highlights-item-disabled');
-    statusNode.textContent = 'Settings unavailable; changes may not save (' +
+    statusNode.textContent = 'Capture settings unavailable. Select Reload to retry (' +
       (error && error.message ? error.message : 'unknown error') + ')';
   }
 
@@ -414,12 +441,16 @@
 
   function refreshCaptureRuntimeStatus() {
     if (!runtimeStatusNode || !videoPage()) return;
-    fetchWithTimeout('/DulukaCapture/v.1.0/status', {}, 2500).then(function (response) {
+    return fetchWithTimeout('/DulukaCapture/v.1.0/status', {}, 2500).then(function (response) {
       return response.json().then(function (body) {
         return { statusCode: response.status, body: body };
       });
     }).then(function (result) {
       var body = result.body || {};
+      if (result.statusCode !== 200 || typeof body.enabled !== 'boolean' ||
+          typeof body.ready !== 'boolean' || typeof body.recording !== 'boolean') {
+        throw new Error('Capture runtime status invalid or unavailable');
+      }
       runtimeStatusNode.classList.remove('nv-video-engine-error');
       if (!body.enabled) runtimeStatusNode.textContent = 'Capture runtime: disabled';
       else if (body.ready) runtimeStatusNode.textContent = 'Capture runtime: ready · ' +
@@ -476,19 +507,23 @@
     reloadButton.className = 'md-raised md-primary nv-video-engine-action';
     reloadButton.textContent = 'Reload';
     reloadButton.addEventListener('click', function () {
+      // A reload is a new read-only request; while pending, no edited state
+      // may be saved. On failure leave controls disabled and offer retry.
+      panelScope.captureSettingsReady = false;
+      schedulePanelDigest();
       statusNode.textContent = 'Loading…';
       fetchWithTimeout(endpoint).then(function (response) {
         if (!response.ok) throw new Error('Unable to load capture settings (' + response.status + ')');
         return response.json();
       }).then(function (settings) {
+        if (!usableCaptureSettings(settings)) throw new Error('Invalid capture settings response');
         state = settings;
         panelScope.captureSettingsReady = true;
         render();
         statusNode.classList.remove('highlights-item-disabled');
         statusNode.textContent = 'Ready';
       }).catch(function (error) {
-        statusNode.textContent = error.message;
-        statusNode.classList.add('highlights-item-disabled');
+        setUnavailableSettings(error);
       });
     });
     var copyButton = document.createElement('md-button');
@@ -590,6 +625,7 @@
       }
       return response.json();
     }).then(function (settings) {
+      if (!usableCaptureSettings(settings)) throw new Error('Invalid capture settings response');
       state = settings;
       panelScope.captureSettingsReady = true;
       render();
