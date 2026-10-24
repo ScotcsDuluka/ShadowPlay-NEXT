@@ -27,8 +27,41 @@ internal static class Program
         DiskHeadroomOverrideBytes = 0
     };
 
-    static int Main()
+    static int Main(string[] args)
     {
+        if (args.Length == 1 &&
+            string.Equals(args[0], "--dxgi-only", StringComparison.Ordinal))
+        {
+            var adapters = DxgiInventory.Collect(Console.WriteLine);
+            var nvidia = Array.FindAll(adapters, a => a.VendorId == 0x10DEu);
+            Check(nvidia.Length > 0, "DXGI metadata exposes NVIDIA adapter");
+            Check(adapters.Length >= nvidia.Length, "enumeration within available adapters");
+            // Both Ddagrab and NVENC currently pick the first NVIDIA DXGI
+            // adapter, NOT the first one with an attached display.
+            var chosen = nvidia[0];
+            var luidUsable = chosen.LuidLow != 0 || chosen.LuidHigh != 0;
+            Check(luidUsable, "first NVIDIA adapter has an identifiable LUID");
+            // DdagrabBackend currently selects the first NVIDIA adapter
+            // and the first output attached to desktop. A detached-only
+            // adapter cannot be certified, even if it has a valid LUID.
+            Check(chosen.AttachedCount > 0,
+                  "first NVIDIA adapter owns an attached desktop output");
+            Check(chosen.FirstAttachedIndex >= 0,
+                  "selected output index is physically present and attached");
+            if (!chosen.FirstAttachedIsPrimary)
+                Console.WriteLine("DXGI_CAUTION current first-attached selection is NOT Windows primary screen");
+            else
+                Check(chosen.PrimaryAttachedCount == 1,
+                      "selected first attached output is unique primary at origin");
+            Console.WriteLine($"DXGI_METADATA_ONLY_PASS total_adapters={adapters.Length} " +
+                              $"nvidia={nvidia.Length} " +
+                              $"capture_expected_adapter={chosen.Index} " +
+                              $"capture_attached_outputs={chosen.AttachedCount} " +
+                              $"first_output={chosen.FirstAttachedIndex} " +
+                              $"first_output_primary={chosen.FirstAttachedIsPrimary} " +
+                              "screen_pixels_read=false video_devices_initialized=false");
+            return 0;
+        }
         string output = Path.Combine(Path.GetTempPath(),
             "Phase7A-DoesNotCreate-" + Guid.NewGuid().ToString("N") + ".mp4");
         var logger = new EngineLogger("Phase7A-HardwareReadiness",
