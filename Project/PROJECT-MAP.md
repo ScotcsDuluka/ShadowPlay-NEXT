@@ -12,7 +12,8 @@
 | `Overlay On-Screen Control/NVIDIA NodeAPI/NVIDIA Web Helper/` | Host ของ Node/API backend |
 | `NVIDIA Container/NVIDIA ShadowPlay Helper/` | Helper/Hotkey component; staged alongside the Container runtime |
 | `NVIDIA Adapter/OSC Adapter/Duluka Hook/` | Hook Adapter ฝั่งเกม, native D3D hook/renderers และ host ที่โหลด Hook |
-| `NVIDIA Adapter/Ansel Adapter/` | ReShade add-on สำหรับ Game Filter, render-thread commands และ named-pipe readback ไป OSC; ดู `README.md` ในโมดูล |
+| `NVIDIA Adapter/Ansel Adapter/` | ชั้น **{Adapter} Ansel** — จุดรวมสัญญาเชื่อมต่อ Hook, ReShade Engine, Named Pipe, NodeAPI และ OSC; ดู `README.md` |
+| `NVIDIA Adapter/Ansel Adapter/ReShade Ansel/` | **{Engine}: ReShade Ansel** — D3D11 ReShade runtime, INI presets, shader session, named-pipe server; source/binaries built from this nested engine. Adapter entry point and contract: `NVIDIA Adapter/Ansel Adapter/README.md`. |
 | `NVIDIA Capture/` | Source ของระบบ Capture และ engine ต่าง ๆ |
 | `NVIDIA Container/` | Controller/runtime service และ game/runtime integration |
 | `NVIDIA Graphics/` | GPU inventory, game profiles และ GPU telemetry/management |

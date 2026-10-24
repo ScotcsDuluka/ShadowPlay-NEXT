@@ -128,7 +128,7 @@ $activeProjects = @(
     @{ Path = 'Overlay On-Screen Control\NVIDIA OSC\NVIDIA OSC.vcxproj'; Platform = 'x64' },
     @{ Path = 'NVIDIA Adapter\OSC Adapter\Duluka Hook\NVIDIA OSC Adapter.vcxproj'; Platform = 'x64' },
     @{ Path = 'NVIDIA Adapter\OSC Adapter\Duluka Hook\NVIDIA OSC Adapter.vcxproj'; Platform = 'Win32' },
-    @{ Path = 'NVIDIA Adapter\Ansel Adapter\NVIDIA Ansel Adapter.vcxproj'; Platform = 'x64' },
+    @{ Path = 'NVIDIA Adapter\Ansel Adapter\ReShade Ansel\NVIDIA Ansel Adapter.vcxproj'; Platform = 'x64' },
     @{ Path = 'NVIDIA Adapter\OSC Adapter\Duluka Hook\NVIDIA OSC Adapter Host.csproj'; Platform = 'x64' },
     @{ Path = 'NVIDIA Adapter\OSC Adapter\Duluka Hook\NVIDIA OSC Adapter Host.csproj'; Platform = 'x86' },
     @{ Path = 'Overlay On-Screen Control\NVIDIA NodeAPI\NVIDIA Web Helper\NVIDIA Web Helper.vbproj'; Platform = 'x64' },
@@ -250,7 +250,7 @@ $adapterX86HostOutput = Join-Path $adapterSource (
 Copy-RuntimeFiles $adapterX86HostOutput $adapterX86Output
 Copy-FileSafe (Join-Path $adapterSource 'bin\Win32\Release\NVIDIA OSC Adapter Hook.dll') (Join-Path $adapterX86Output 'NVIDIA OSC Adapter Hook.dll')
 Copy-FileSafe $adapterNativeDll (Join-Path $adapterOutput (Split-Path -Leaf $adapterNativeDll))
-Copy-FileSafe (Join-Path $ProjectRoot 'NVIDIA Adapter\Ansel Adapter\bin\x64\Release\NVIDIA Ansel Adapter.dll') (Join-Path $adapterOutput 'NVIDIA Ansel Adapter.dll')
+Copy-FileSafe (Join-Path $ProjectRoot 'NVIDIA Adapter\Ansel Adapter\ReShade Ansel\bin\x64\Release\NVIDIA Ansel Adapter.dll') (Join-Path $adapterOutput 'NVIDIA Ansel Adapter.dll')
 
 # Launcher host/UI slot; CEF runtime is shared from the OSC slot below.
 $launcherOutput = Join-Path $ProjectRoot 'Launcher.Cef\bin\x64\Release'

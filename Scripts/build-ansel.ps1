@@ -5,9 +5,10 @@ $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer
 $installation = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
 if (-not $installation) { throw 'Visual Studio C++ tools are required.' }
 $buildExe = Join-Path $installation 'MSBuild\Current\Bin\MSBuild.exe'
-$anselRoot = Join-Path $repoRoot 'Project\NVIDIA Adapter\Ansel Adapter'
+$anselAdapterRoot = Join-Path $repoRoot 'Project\NVIDIA Adapter\Ansel Adapter'
+$anselEngineRoot = Join-Path $anselAdapterRoot 'ReShade Ansel'
 $hookRoot = Join-Path $repoRoot 'Project\NVIDIA Adapter\OSC Adapter\Duluka Hook'
-foreach ($projectFile in @((Join-Path $anselRoot 'NVIDIA Ansel Adapter.vcxproj'), (Join-Path $hookRoot 'NVIDIA OSC Adapter.vcxproj'), (Join-Path $hookRoot 'NVIDIA OSC Adapter Host.csproj'), (Join-Path $anselRoot 'tests\Ansel Session Tests.vcxproj'))) {
+foreach ($projectFile in @((Join-Path $anselEngineRoot 'NVIDIA Ansel Adapter.vcxproj'), (Join-Path $hookRoot 'NVIDIA OSC Adapter.vcxproj'), (Join-Path $hookRoot 'NVIDIA OSC Adapter Host.csproj'), (Join-Path $anselEngineRoot 'tests\Ansel Session Tests.vcxproj'))) {
     if ([IO.Path]::GetExtension($projectFile) -eq '.csproj') {
         & $buildExe $projectFile /t:Restore /p:Configuration=Release /p:Platform=x64 /m:1 /nr:false /v:minimal /nologo
         if ($LASTEXITCODE -ne 0) { throw "Restore failed: $projectFile" }
@@ -15,7 +16,7 @@ foreach ($projectFile in @((Join-Path $anselRoot 'NVIDIA Ansel Adapter.vcxproj')
     & $buildExe $projectFile /p:Configuration=Release /p:Platform=x64 /m:1 /nr:false /v:minimal /nologo
     if ($LASTEXITCODE -ne 0) { throw "Build failed: $projectFile" }
 }
-& (Join-Path $anselRoot 'tests\bin\x64\Release\Ansel Session Tests.exe')
+& (Join-Path $anselEngineRoot 'tests\bin\x64\Release\Ansel Session Tests.exe')
 if ($LASTEXITCODE -ne 0) { throw 'Native Ansel tests failed.' }
 & node (Join-Path $repoRoot 'Project\Overlay On-Screen Control\NVIDIA NodeAPI\tests\gameFilter.test.js')
 if ($LASTEXITCODE -ne 0) { throw 'OSC Game Filter integration tests failed.' }
@@ -33,11 +34,11 @@ if ($Stage) {
     $activeAdapterRelative = if ($activeFolder.TrimEnd('\') -eq $runtimeBoundary.TrimEnd('\')) { '.' } else { $activeFolder.Substring($runtimeBoundary.Length) }
     $backupRoot = Join-Path $repoRoot ('Build\DeploymentBackups\ansel-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
     $files = @(
-        @{ Source = (Join-Path $anselRoot 'bin\x64\Release\NVIDIA Ansel Adapter.dll'); Relative = 'NVIDIA Adapter\NVIDIA Ansel Adapter.dll' },
+        @{ Source = (Join-Path $anselEngineRoot 'bin\x64\Release\NVIDIA Ansel Adapter.dll'); Relative = 'NVIDIA Adapter\NVIDIA Ansel Adapter.dll' },
         @{ Source = (Join-Path $hookRoot 'bin\x64\Release\NVIDIA OSC Adapter Hook.dll'); Relative = 'NVIDIA Adapter\NVIDIA OSC Adapter Hook.dll' }
     )
     if ($activeAdapterRelative -ne 'NVIDIA Adapter') {
-        $files += @{ Source = (Join-Path $anselRoot 'bin\x64\Release\NVIDIA Ansel Adapter.dll'); Relative = (Join-Path $activeAdapterRelative 'NVIDIA Ansel Adapter.dll') }
+        $files += @{ Source = (Join-Path $anselEngineRoot 'bin\x64\Release\NVIDIA Ansel Adapter.dll'); Relative = (Join-Path $activeAdapterRelative 'NVIDIA Ansel Adapter.dll') }
         $files += @{ Source = (Join-Path $hookRoot 'bin\x64\Release\NVIDIA OSC Adapter Hook.dll'); Relative = (Join-Path $activeAdapterRelative 'NVIDIA OSC Adapter Hook.dll') }
     }
     foreach ($name in @('ansel-client.js', 'game-filter-route.js', 'route-floor.js', 'performance-route.js')) {

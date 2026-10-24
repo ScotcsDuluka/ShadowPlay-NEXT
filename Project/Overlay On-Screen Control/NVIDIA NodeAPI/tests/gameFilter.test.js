@@ -10,7 +10,7 @@ const mount = require('../shims/game-filter-route');
 const { AnselClient } = require('../shims/ansel-client');
 
 async function main() {
-  const executable = path.resolve(__dirname, '../../../NVIDIA Adapter/Ansel Adapter/tests/bin/x64/Release/Ansel Session Tests.exe');
+  const executable = path.resolve(__dirname, '../../../NVIDIA Adapter/Ansel Adapter/ReShade Ansel/tests/bin/x64/Release/Ansel Session Tests.exe');
   const child = spawn(executable, ['--serve'], { windowsHide: true, stdio: ['ignore','pipe','pipe'] });
   let server, route;
   try {
