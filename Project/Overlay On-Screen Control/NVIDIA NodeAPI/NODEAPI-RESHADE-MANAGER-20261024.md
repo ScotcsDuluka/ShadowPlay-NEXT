@@ -46,3 +46,18 @@
 - Official ReShade Setup was **not launched or run**: user must explicitly confirm and run it; no game files were changed by the assistant.
 - UI uses manual absolute game executable path entry; no native file picker or Game Watcher chooser is included yet.
 - Does not modify `NVIDIA Adapter\Ansel Adapter\ReShade Ansel`; coordinate only engine compatibility in later scoped work. Game Filter engine/presets are intentionally paused.
+
+## Follow-up 2026-10-24 21:37 (OSC Manager safety / CEF acceptance)
+
+- Found a Setup safety race: successful game inspection previously enabled the official-website action before Installer/Info verified the guided contract.
+- osc/mods/reshade-manager.js now requires schemaVersion=1, mode=guided, nativeInstall=false, nativeUninstall=false, and officialUrl=https://reshade.me/ before enabling Setup. It starts fail-closed on every opening.
+- infoVersion invalidates stale Info responses after Back / Reopen, preventing a delayed previous-open response from authorizing the current opening.
+- New DOM/Angular stub tests in tests/reshadeManagerContract.test.js verify: safe contract pending, contract rejected, new opening reauthorization, stale response, and API failure.
+- Focused regression: **10/10 PASS** (reshadeManager.test.js + reshadeManagerContract.test.js). node --check PASS.
+- Deployed only the new OSC ReShade Manager JS to the running Build folder (no game DLL changes, no Hook/Container/NodeAPI process restart).
+- Runtime JS SHA-256: 835BDA0FA9563BBB172B395FAA440F5353D021F6D5253B8A264E60E7C1760D35.
+- Backup: C:\My Project\NVIDIA-Shadowplay\Build\NodeAPI-ReShadeManagerBackup-20261024-213728\reshade-manager.js.
+- Live Health, Installer/Info, and updated JS: HTTP 200.
+- **CEF visual/click acceptance remains NOT VERIFIED**: OSC process exists, but Windows desktop screenshots did not display the OSC overlay; an isolated headless Chrome snapshot could not be created. No claim of working real CEF click-through is made.
+- The existing CEF renderer may retain the old JS until OSC page reload; avoid restarting the active OSC without coordination. Test Settings > Game filter > Open ReShade Manager and return/verify interactions after a normal reopen.
+- Official ReShade Setup was never launched; no installation/update/uninstall performed and no game files modified.

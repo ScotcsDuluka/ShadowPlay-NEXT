@@ -95,6 +95,8 @@
       manager.hidden = true;
       state.open = false;
       state.token++;
+      state.infoVersion++;
+      state.contractReady = false;
       state.busy = false;
       refresh();
     }, false);
@@ -183,14 +185,16 @@
     footer.appendChild(error);
     manager.appendChild(footer);
 
-    var state = {open:false, busy:false, inspected:null, inspectedPath:'', token:0};
+    var state = {open:false, busy:false, inspected:null, inspectedPath:'', token:0,
+      infoVersion:0, contractReady:false};
     function digest() {
       if (!scope.$$destroyed) scope.$evalAsync();
     }
     function refresh() {
       inspectButton.disabled = state.busy;
       verifyButton.disabled = state.busy || !state.inspected;
-      launch.disabled = state.busy || !state.inspected || !view.confirmed ||
+      // Fail closed until this particular opening verifies the safe guided-setup contract.
+      launch.disabled = state.busy || !state.contractReady || !state.inspected || !view.confirmed ||
         state.inspectedPath !== gameInput.value.trim() ||
         state.inspected.gameRunning === 'possible';
       digest();
@@ -310,24 +314,32 @@
       open: function () {
         if (!document.documentElement.contains(settings) || scope.$$destroyed) return false;
         state.open = true;
+        state.contractReady = false;
+        var thisOpening = ++state.infoVersion;
         manager.hidden = false;
         settings.classList.add('nv-reshade-open');
         error.textContent = '';
-        progress.textContent = 'Enter the game path to begin read-only inspection.';
+        progress.textContent = 'Checking official Setup safety contract...';
         refresh();
         fetchJson(base + '/Info').then(function (body) {
-          if (!state.open) return;
-          if (body.schemaVersion !== 1 || body.nativeInstall !== false) {
+          if (!state.open || thisOpening !== state.infoVersion) return;
+          if (body.schemaVersion !== 1 || body.mode !== 'guided' ||
+              body.nativeInstall !== false || body.nativeUninstall !== false ||
+              body.officialUrl !== official) {
             error.textContent = 'The official Setup safety contract could not be verified.';
-            state.inspected = null;
-            refresh();
+            state.contractReady = false;
+          } else {
+            state.contractReady = true;
+            progress.textContent = state.inspected ?
+              'Inspection complete. Review evidence before using official Setup.' :
+              'Enter the game path to begin read-only inspection.';
           }
+          refresh();
         }).catch(function () {
-          if (state.open) {
-            error.textContent = 'Could not connect to the ReShade installer API.';
-            state.inspected = null;
-            refresh();
-          }
+          if (!state.open || thisOpening !== state.infoVersion) return;
+          error.textContent = 'Could not connect to the ReShade installer API.';
+          state.contractReady = false;
+          refresh();
         });
         return true;
       }
