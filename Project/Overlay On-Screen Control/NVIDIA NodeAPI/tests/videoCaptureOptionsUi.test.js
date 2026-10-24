@@ -189,8 +189,8 @@ test('NVIDIA Container catalog allows only wired routes, not nine speculative co
   h.hooks.syncCodecs();
   assert.deepEqual(Array.from(view.scope.captureEncoderChoices, x => x.value),
     ['NVENC_H264']);
-  assert.match(view.scope.captureCodecStatus, /routing policy is not verified/);
-  assert.match(view.scope.captureCodecStatus, /not guaranteed/);
+  assert.match(view.scope.captureCodecStatus, /routing policy unverified/);
+  assert.match(view.scope.captureCodecStatus, /H.264 NVENC only/);
   assert.equal(view.scope.captureEncoderChoices.some(x => /Intel|AMD|AV1/.test(x.label)), false);
 });
 
@@ -316,4 +316,38 @@ test('changing capture display posts exact selected LUID plus output index', asy
   assert.equal(view.scope.captureUi.displayKey, '8:111:2');
   assert.match(view.scope.captureDisplayStatus, /restart\/rebuild/i);
   assert.equal(h.requests.filter(x => x.options && x.options.method === 'POST').length, 1);
+});
+
+test('FFmpeg receives NVIDIA H264/HEVC and Intel QSV only when Capture reports codec IDs', () => {
+  const h = startHarness();
+  const view = h.hooks.prime();
+  const catalog = containerCatalog();
+  catalog.workerTruthAvailable = true;
+  catalog.providers[1].capabilityVerified = true; // valid FFmpeg binary probe
+  catalog.providers[1].hardwareVerified = false; // not a GPU encode test
+  catalog.providers[1].encoders = [
+    'h264_nvenc', 'hevc_nvenc', 'h264_qsv', 'hevc_qsv', 'libx264'
+  ];
+  const parsed = h.hooks.parseCatalog(catalog);
+  assert.deepEqual(Array.from(parsed.routes.FFmpeg),
+    ['NVENC_H264', 'NVENC_HEVC', 'QuickSync_H264', 'QuickSync_HEVC', 'LibX264']);
+  assert.equal(parsed.binaryVerified, true);
+  assert.equal(parsed.hardwareVerified, false);
+  h.hooks.setCatalog(parsed);
+  h.hooks.setState(goodSettings());
+  h.hooks.syncCodecs();
+  assert.deepEqual(Array.from(view.scope.captureEncoderChoices, x => x.value),
+    ['NVENC_H264', 'NVENC_HEVC', 'QuickSync_H264', 'QuickSync_HEVC', 'LibX264']);
+  assert.match(view.scope.captureCodecStatus, /Intel QSV requires an available Intel GPU/);
+  assert.equal(h.requests.length, 0);
+});
+
+test('the Codec helper renders AFTER both selects, never under the select underline', () => {
+  const css = fs.readFileSync(path.join(__dirname, '../osc/mods/video-capture-options.css'), 'utf8');
+  assert.match(source, /encoderFields\.appendChild\(preset\.wrap\);\s*advanced\.appendChild\(previewPanel\);\s*advanced\.appendChild\(encoderFields\);\s*advancedSection\.appendChild\(advanced\);\s*advancedSection\.appendChild\(codecStatus\);/);
+  const noteRule = css.match(/#nv-video-capture-options \.nv-video-engine-codec-note\s*\{([^}]*)\}/);
+  assert.ok(noteRule, 'specific CSS rule for helper note');
+  assert.match(noteRule[1], /position:\s*static/);
+  assert.match(noteRule[1], /margin:\s*14px 0 8px/);
+  assert.doesNotMatch(noteRule[1], /margin:\s*-/);
 });

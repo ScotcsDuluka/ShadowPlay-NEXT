@@ -5,7 +5,7 @@
   var catalogEndpoint = '/DulukaCapture/v.1.0/engines';
   var panelId = 'nv-video-capture-options';
   var panelStackId = 'nv-video-capture-panels';
-  var panelVersion = '68';
+  var panelVersion = '69';
   var state = null;
   var statusNode = null;
   var captureFields = [];
@@ -45,7 +45,14 @@
   // legacy encoder keys. These aliases DO NOT certify hardware runtime.
   var catalogEncoderAliases = {
     h264_nvenc: 'NVENC_H264',
-    libx264: 'LibX264'
+    hevc_nvenc: 'NVENC_HEVC',
+    av1_nvenc: 'NVENC_AV1',
+    h264_qsv: 'QuickSync_H264',
+    hevc_qsv: 'QuickSync_HEVC',
+    h264_amf: 'AMF_H264',
+    hevc_amf: 'AMF_HEVC',
+    libx264: 'LibX264',
+    libx265: 'LibX265'
   };
   function parseEncoderCatalog(body) {
     if (!body || body.schemaVersion !== 1 || body.readOnly !== true ||
@@ -67,7 +74,16 @@
       });
       if (!mapping[engine].length) throw new Error('No known codec route for ' + engine);
     });
-    return { routes: mapping, policyValid: body.policyValid === true };
+    return {
+      routes: mapping,
+      policyValid: body.policyValid === true,
+      binaryVerified: body.providers.some(function (item) {
+        return item && item.id === 'FFmpeg' && item.capabilityVerified === true;
+      }),
+      hardwareVerified: body.providers.some(function (item) {
+        return item && item.id === 'FFmpeg' && item.hardwareVerified === true;
+      })
+    };
   }
   function allowedEncoders(engine) {
     return encoderCatalog && encoderCatalog.routes[engine] ?
@@ -94,10 +110,14 @@
     panelScope.captureCodecStatus = !encoderCatalog ?
       'Codec routes unavailable — reload to retry.' :
       (available.indexOf(state.encoder) < 0 ?
-        'Saved codec is not in the selected engine route. Choose a supported codec.' :
-        'Codec routes from NVIDIA Container; hardware readiness is not guaranteed.') +
+        'Saved codec unavailable in the selected engine; select another codec.' :
+        state.engineMode === 'Duluka' ?
+          'Duluka Native: H.264 NVENC only.' :
+          (encoderCatalog.hardwareVerified ?
+            'FFmpeg hardware readiness reported by Capture.' :
+            'FFmpeg codec list ≠ GPU support. Intel QSV requires an available Intel GPU.')) +
       (encoderCatalog && !encoderCatalog.policyValid ?
-        ' Container routing policy is not verified.' : '');
+        ' Capture routing policy unverified.' : '');
     schedulePanelDigest();
   }
   function readCaptureSettingsAndCatalog() {
@@ -756,11 +776,14 @@
     codecStatus.className = 'nv-video-engine-codec-note';
     codecStatus.setAttribute('role', 'status');
     codecStatus.textContent = '{{captureCodecStatus}}';
-    encoderFields.appendChild(codecStatus);
+    // Helper text MUST be outside the md-select/encoder field stack.
+    // The earlier placement with negative margin overlaid the green
+    // Material select border and Encoder preset label in CEF.
     encoderFields.appendChild(preset.wrap);
     advanced.appendChild(previewPanel);
     advanced.appendChild(encoderFields);
     advancedSection.appendChild(advanced);
+    advancedSection.appendChild(codecStatus);
     panel.appendChild(displaySection);
     panel.appendChild(advancedSection);
 

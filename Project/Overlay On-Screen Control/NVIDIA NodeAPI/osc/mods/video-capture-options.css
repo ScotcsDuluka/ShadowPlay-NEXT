@@ -175,13 +175,31 @@
   margin: 0;
 }
 
-/* Keep the native md-select and its NVIDIA dimensions; explain codec
-   routing separately instead of filling the dropdown with fake choices. */
+/* This helper is a full-width ROW, never an absolute caption inside
+   Angular Material's md-select field. Its old -6px margin overlapped
+   the green selection underline and the following Encoder preset. */
 #nv-video-capture-options .nv-video-engine-codec-note {
-  margin: -6px 0 0;
+  position: static;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  min-height: 18px;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  clear: both;
+  margin: 14px 0 8px;
+  padding: 0;
   color: #aab0b2;
-  font: 10px/1.45 "Segoe UI", sans-serif;
+  font: 10px/1.5 "Segoe UI", sans-serif;
+  white-space: normal;
   overflow-wrap: anywhere;
+}
+
+/* Keep a measured gap below native md-select even if Angular Material
+   modifies its own inline margin and line-height while focused. */
+#nv-video-capture-options .nv-video-engine-advanced-fields > .nv-video-engine-field {
+  margin-bottom: 8px;
 }
 
 #nv-video-capture-options .nv-video-engine-footer {
