@@ -72,6 +72,12 @@ bool InstallLateD3D9CodeDetours()
             reinterpret_cast<void **>(&g_originalReset));
         if (vtableEx)
         {
+            if (g_exEndScenePumpPreview.load(std::memory_order_acquire))
+            {
+                create(vtableEx[EndSceneSlot],
+                    reinterpret_cast<void *>(&HookEndScene),
+                    reinterpret_cast<void **>(&g_originalEndScene));
+            }
             create(vtableEx[PresentExSlot],
                 reinterpret_cast<void *>(&HookPresentEx),
                 reinterpret_cast<void **>(&g_originalPresentEx));
@@ -105,6 +111,7 @@ bool InstallLateD3D9CodeDetours()
         if (initialize == MH_OK) MH_Uninitialize();
         g_originalPresent = nullptr;
         g_originalReset = nullptr;
+        g_originalEndScene = nullptr;
         g_originalPresentEx = nullptr;
         g_originalResetEx = nullptr;
     }

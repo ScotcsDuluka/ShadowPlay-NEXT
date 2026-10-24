@@ -50,6 +50,7 @@ namespace
         IDirect3DDevice9 *, const RECT *, const RECT *, HWND, const RGNDATA *);
     using ResetFunction = HRESULT(STDMETHODCALLTYPE *)(
         IDirect3DDevice9 *, D3DPRESENT_PARAMETERS *);
+    using EndSceneFunction = HRESULT(STDMETHODCALLTYPE *)(IDirect3DDevice9 *);
     using PresentExFunction = HRESULT(STDMETHODCALLTYPE *)(
         IDirect3DDevice9Ex *, const RECT *, const RECT *, HWND,
         const RGNDATA *, DWORD);
@@ -66,6 +67,7 @@ namespace
         D3DPRESENT_PARAMETERS *, D3DDISPLAYMODEEX *, IDirect3DDevice9Ex **);
 
     constexpr std::size_t PresentSlot = 17;
+    constexpr std::size_t EndSceneSlot = 42;
     constexpr std::size_t ResetSlot = 16;
     constexpr std::size_t PresentExSlot = 121;
     constexpr std::size_t ResetExSlot = 132;
@@ -80,6 +82,10 @@ namespace
     };
 
     std::atomic<bool> g_hookInstalled{ false };
+    // Explicit preview only. Never enable for ordinary D3D9 or default games.
+    std::atomic<bool> g_exEndScenePumpPreview{ false };
+    std::atomic<std::uint64_t> g_exEndSceneCalls{ 0 };
+    std::atomic<std::uint64_t> g_exEndSceneCommits{ 0 };
     std::atomic<std::uint64_t> g_presentCount{ 0 };
     std::atomic<std::uint64_t> g_overlayCallbackTicks{ 0 };
     std::atomic<std::uint64_t> g_overlayCallbackMaxTicks{ 0 };
@@ -90,6 +96,7 @@ namespace
 
     PresentFunction g_originalPresent = nullptr;
     ResetFunction g_originalReset = nullptr;
+    EndSceneFunction g_originalEndScene = nullptr;
     PresentExFunction g_originalPresentEx = nullptr;
     ResetExFunction g_originalResetEx = nullptr;
     HMODULE g_module = nullptr;
@@ -192,6 +199,30 @@ namespace
 
 
 
+
+    // On the real D3D9Ex game device's owning graphics thread, AFTER
+    // EndScene returns. This avoids polling the GPU mailbox in Present.
+    // The optional code detour may also see classic DX9 devices if the
+    // implementation shares its method: QueryInterface rejects those.
+    HRESULT STDMETHODCALLTYPE HookEndScene(IDirect3DDevice9 *device)
+    {
+        const auto original = g_originalEndScene;
+        if (!original)
+            return D3DERR_INVALIDCALL;
+        const HRESULT result = original(device);
+        if (!SUCCEEDED(result) || !device)
+            return result;
+        IDirect3DDevice9Ex *ex = nullptr;
+        if (SUCCEEDED(device->QueryInterface(__uuidof(IDirect3DDevice9Ex),
+                reinterpret_cast<void **>(&ex))) && ex)
+        {
+            g_exEndSceneCalls.fetch_add(1, std::memory_order_relaxed);
+            if (duluka::d3d9ex_mailbox::Pump(ex))
+                g_exEndSceneCommits.fetch_add(1, std::memory_order_relaxed);
+            ex->Release();
+        }
+        return result;
+    }
 
     HRESULT STDMETHODCALLTYPE HookReset(
         IDirect3DDevice9 *device, D3DPRESENT_PARAMETERS *parameters)
@@ -543,6 +574,19 @@ namespace
 
     bool InstallD3D9PresentHook()
     {
+        // Two independent opt-ins: never install extra graphics callbacks
+        // merely because the settings UI selected GPU.
+        char receiver[8]{}, endScene[8]{};
+        const bool preview =
+            GetEnvironmentVariableA(
+                "NVIDIA_OSC_ADAPTER_D3D9EX_MAILBOX_RECEIVER_PREVIEW",
+                receiver, sizeof(receiver)) == 1 && receiver[0] == '1' &&
+            GetEnvironmentVariableA(
+                "NVIDIA_OSC_ADAPTER_D3D9EX_ENDSCENE_AUTO_PUMP_PREVIEW",
+                endScene, sizeof(endScene)) == 1 && endScene[0] == '1';
+        g_exEndScenePumpPreview.store(preview, std::memory_order_release);
+        if (preview)
+            Log("D3D9Ex EndScene GPU mailbox Pump PREVIEW requested.");
         wchar_t overrideValue[4]{};
         const bool forceLateAttach =
             GetEnvironmentVariableW(L"DULUKA_D3D9_FORCE_LATE_ATTACH",
@@ -626,6 +670,7 @@ namespace
         g_originalCreateDeviceEx = nullptr;
         g_originalPresent = nullptr;
         g_originalReset = nullptr;
+        g_originalEndScene = nullptr;
         g_originalPresentEx = nullptr;
         g_originalResetEx = nullptr;
         duluka::d3d9::OnReset();
@@ -792,6 +837,23 @@ extern "C" __declspec(dllexport) BOOL WINAPI NvOscAdapterGetD3D9AdapterStatus(
     duluka::d3d9::GetAdapterStatus(*adapterLuid, ex, gpu, *busyFrameSkips);
     *isD3D9Ex = ex ? TRUE : FALSE;
     *gpuFrameBound = gpu ? TRUE : FALSE;
+    return TRUE;
+}
+
+// Read-only status for the optional D3D9Ex EndScene GPU receiver.
+// A Pump callback is not proof that the frame appeared on the monitor.
+#if defined(_M_IX86)
+#pragma comment(linker, "/EXPORT:NvOscAdapterGetD3D9ExAutoPumpStatus=_NvOscAdapterGetD3D9ExAutoPumpStatus@12")
+#endif
+extern "C" __declspec(dllexport) BOOL WINAPI NvOscAdapterGetD3D9ExAutoPumpStatus(
+    BOOL *enabled, std::uint64_t *calls, std::uint64_t *commits)
+{
+    if (!enabled || !calls || !commits)
+        return FALSE;
+    *enabled = g_exEndScenePumpPreview.load(std::memory_order_acquire)
+        ? TRUE : FALSE;
+    *calls = g_exEndSceneCalls.load(std::memory_order_relaxed);
+    *commits = g_exEndSceneCommits.load(std::memory_order_relaxed);
     return TRUE;
 }
 

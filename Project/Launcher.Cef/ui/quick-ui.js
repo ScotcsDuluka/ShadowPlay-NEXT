@@ -196,6 +196,7 @@
   var oldLanguageHook = window.onLauncherLanguageChanged;
   window.onLauncherLanguageChanged = function () {
     if (typeof oldLanguageHook === 'function') oldLanguageHook();
+    selectModule(window.__quickModuleTarget || 'Container');
     if (lastState) paint(lastState);
   };
 })(window, document);

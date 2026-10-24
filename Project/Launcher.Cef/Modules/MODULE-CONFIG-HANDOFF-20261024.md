@@ -3,6 +3,16 @@
 Project: `C:\My Project\NVIDIA-Shadowplay` on `Stable`
 Owner: `Project\Launcher.Cef\ui`
 
+## Magisk-style cards — latest update
+- Launcher now has **three primary destinations**: ShadowPlay, Core Modules, and Add-ons. There is **no separate Config navigation item**.
+- Each of the 11 Core modules has a Magisk-inspired card: icon, name, built-in metadata (no invented version), real runtime status from Launcher inventory, description, and bottom Settings action.
+- Selecting Settings on a card opens the detail page already targeted at that module; its title includes the module name. Back returns to Core Modules.
+- The module layout List/Grid picker sits above the cards, not on an unrelated Config page.
+- The per-module appearance profile manager remains on the detail page and still affects the selected card, **not the Launcher background**.
+- UI text uses EN/TH i18n keys. The cards never claim to switch off modules that lack a verified host API.
+- Deployment verified via `build_test/Launcher ModuleLayout_Test/LIVE-VERIFIED.json` against the live Launcher localhost server; 11 cards, three navigation tabs, zero Add-ons; source and Build SHA-256 aligned. The latest source CSS additionally corrects description inset priority over legacy generic `.quick-module p`.
+- A screenshot of the updated live Core page before the last description-alignment adjustment is stored at `build_test/Launcher ModuleLayout_Test/launcher-magisk-live.png`. A safe attempt at a post-adjustment screenshot was refused by Windows because the Launcher was not foreground; no unintended click occurred.
+
 ## Scope delivered
 - The visible quick-mode Launcher shell now has 4 destinations: ShadowPlay, **Core Modules**, **Config Module**, and **Add-ons**.
 - **All 11 built-in modules belong in Core**, not Add-ons: NVIDIA Container, On-Screen Control, NVIDIA NodeAPI, NVIDIA Capture, NVIDIA Graphics, ShadowPlay Helper, OSC Adapter, Duluka Hook, Ansel Adapter, FFmpeg, NVIDIA Config.

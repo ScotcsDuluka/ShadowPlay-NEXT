@@ -277,7 +277,7 @@ int HostProducer(const wchar_t* mapName, bool crashAfterFirst=false,
 
 int Consumer(const wchar_t* hookDll, const wchar_t* producerExe,
     bool actualHostPublisher=false, bool simulateRestart=false,
-    bool gpuSource=false) {
+    bool gpuSource=false, bool automaticExPump=false) {
     const DWORD self=GetCurrentProcessId();
     wchar_t name[128]{};
     swprintf_s(name,L"Local\\NVIDIAOSC.Frame.D3D9Ex.MailboxTest.%lu",self);
@@ -311,6 +311,18 @@ int Consumer(const wchar_t* hookDll, const wchar_t* producerExe,
         D3DDEVTYPE_HAL,window,D3DCREATE_SOFTWARE_VERTEXPROCESSING,
         &pp,nullptr,&game);
     if(FAILED(hr)||!game)return 33;
+    if(!automaticExPump) {
+        // Existing manual IPC regressions prove the new hook is default-off.
+        SetEnvironmentVariableA(
+            "NVIDIA_OSC_ADAPTER_D3D9EX_ENDSCENE_AUTO_PUMP_PREVIEW",nullptr);
+    }
+    if(automaticExPump) {
+        // Only this owned fixture enables the EndScene GPU receiver.
+        // Production/game processes retain default-off behavior.
+        SetEnvironmentVariableW(L"DULUKA_D3D9_FORCE_LATE_ATTACH",L"1");
+        SetEnvironmentVariableA(
+            "NVIDIA_OSC_ADAPTER_D3D9EX_ENDSCENE_AUTO_PUMP_PREVIEW","1");
+    }
     HMODULE hook=LoadLibraryW(hookDll);
     if(!hook)return 34;
     using PumpFn=BOOL(WINAPI *)(IDirect3DDevice9Ex*);
@@ -323,6 +335,37 @@ int Consumer(const wchar_t* hookDll, const wchar_t* producerExe,
     auto unbind=reinterpret_cast<UnbindFn>(GetProcAddress(
         hook,"NvOscAdapterUnbindD3D9ExGpuFrame"));
     if(!pump||!render||!unbind)return 35;
+    using AutoStatusFn=BOOL(WINAPI *)(BOOL*,std::uint64_t*,std::uint64_t*);
+    using HookStatusFn=BOOL(WINAPI *)(std::uint64_t*,std::uint64_t*,BOOL*);
+    auto autoStatus=reinterpret_cast<AutoStatusFn>(GetProcAddress(
+        hook,"NvOscAdapterGetD3D9ExAutoPumpStatus"));
+    if(automaticExPump) {
+        auto hookStatus=reinterpret_cast<HookStatusFn>(GetProcAddress(
+            hook,"NvOscAdapterGetD3D9Status"));
+        const bool ready=hookStatus && autoStatus && WaitUntil([&](){
+            std::uint64_t presents=0,draws=0,calls=0,commits=0;
+            BOOL hooked=FALSE,enabled=FALSE;
+            return hookStatus(&presents,&draws,&hooked) && hooked &&
+                autoStatus(&enabled,&calls,&commits) && enabled;
+        },5000);
+        if(!ready){
+            std::cerr<<"D3D9Ex EndScene preview detour did not initialize\n";
+            return 75;
+        }
+        SetEnvironmentVariableW(L"DULUKA_D3D9_FORCE_LATE_ATTACH",nullptr);
+    }
+    if(!automaticExPump && autoStatus) {
+        BOOL enabled=TRUE;
+        std::uint64_t calls=1,commits=1;
+        if(!autoStatus(&enabled,&calls,&commits) || enabled || calls || commits)
+            return 77; // no EndScene interception without BOTH preview flags
+    }
+    auto devicePump=[&]()->bool {
+        if(!automaticExPump) return !!pump(game);
+        // Real D3D9Ex device owner-thread scene boundary, not Present.
+        return SUCCEEDED(game->BeginScene()) &&
+            SUCCEEDED(game->EndScene());
+    };
     wchar_t executable[MAX_PATH]{};
     if(!GetModuleFileNameW(nullptr,executable,MAX_PATH))return 36;
     std::wstring cmd=L"\""+std::wstring(producerExe)+
@@ -364,7 +407,7 @@ int Consumer(const wchar_t* hookDll, const wchar_t* producerExe,
         bool arrived=false, observedUnready=actualHostPublisher;
         bool observedWrongLuid=actualHostPublisher;
         while(GetTickCount64()<deadline) {
-            pump(game); // same owner device thread, explicitly outside Present
+            devicePump(); // same device thread; auto mode uses EndScene, never explicit Pump
             if(!actualHostPublisher && expected==2 && !observedWrongLuid &&
                 R64(&wire->generation)==2 &&
                 R64(&wire->targetAdapterLuid)!=correctLuid &&
@@ -425,7 +468,7 @@ int Consumer(const wchar_t* hookDll, const wchar_t* producerExe,
                 hook,"NvOscAdapterGetD3D9AdapterStatus"));
             if(!status) result=71;
             else if(!WaitUntil([&](){
-                pump(game); // retirement occurs on legal game device thread
+                devicePump(); // retirement on legal game thread, auto = EndScene
                 std::uint64_t luid=0,skipped=0;
                 BOOL isEx=FALSE,bound=TRUE;
                 return status(&luid,&isEx,&bound,&skipped) && !bound &&
@@ -451,9 +494,17 @@ int Consumer(const wchar_t* hookDll, const wchar_t* producerExe,
         }
     }
     if(result==0){
-        if(!WaitUntil([&](){pump(game);
+        if(!WaitUntil([&](){devicePump();
             return R64(&wire->generation)==0 &&
                 R64(&wire->releasedGeneration)>=2;}))result=43;
+    }
+    if(result==0 && automaticExPump) {
+        std::uint64_t calls=0,commits=0;
+        BOOL enabled=FALSE;
+        if(!autoStatus(&enabled,&calls,&commits) || !enabled ||
+            calls < 2 || commits < 2) result=76;
+        else std::cout<<"DX9EX_ENDSCENE_GPU_AUTOPUMP_PASS calls="
+            <<calls<<" commits="<<commits<<"\n";
     }
     if(result==0){
         DWORD childExit=STILL_ACTIVE;
@@ -491,6 +542,10 @@ int wmain(int argc,wchar_t** argv){
         return Consumer(argv[1],argv[2],true);
     if(argc==4 && wcscmp(argv[3],L"--gpu-source")==0)
         return Consumer(argv[1],argv[2],true,false,true);
+    if(argc==4 && wcscmp(argv[3],L"--gpu-auto")==0)
+        return Consumer(argv[1],argv[2],true,false,true,true);
+    if(argc==4 && wcscmp(argv[3],L"--gpu-auto-recovery")==0)
+        return Consumer(argv[1],argv[2],true,true,false,true);
     if(argc==4 && wcscmp(argv[3],L"--recovery")==0)
         return Consumer(argv[1],argv[2],true,true);
     if(argc==3)return Consumer(argv[1],argv[2]);

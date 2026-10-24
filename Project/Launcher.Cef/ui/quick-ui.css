@@ -157,3 +157,77 @@
  .quick-config-toolbar button { margin-top: 10px; }
  .quick-config-state { margin-top: 10px; }
 }
+
+/* v2 Magisk-style modules: visually grouped card with native inventory badge
+   (never an implied toggle) and an explicit per-module Settings action.
+   Standard CSS supported by the actual Chromium/CEF 73 presenter. */
+.quick-core-toolbar { display:flex; align-items:center; flex-wrap:wrap;
+  justify-content:space-between; min-height:47px; margin:-2px 0 16px; padding:0 12px;
+  border:1px solid #303c31; background:#171d18; }
+.quick-core-count { color:#b6c7b0; font-size:12px; font-weight:600; margin-right:auto; }
+.quick-core-toolbar label { color:#9daea0; margin:0 11px; font-size:11px; }
+.quick-core-toolbar select { min-width:168px; height:30px; background:#202b20;
+  border:1px solid #4c6845; color:#e5ebdf; padding:0 7px; font-size:11px; }
+.quick-module-grid { grid-template-columns:minmax(0,1fr); grid-gap:13px; }
+.quick-module { display:block; min-height:0; padding:0; overflow:hidden; border:1px solid #374c36;
+  border-left:3px solid #76b900; background:linear-gradient(115deg,#1c281d,#181e19);
+  transition:border-color .15s, background-color .15s; }
+.quick-module:hover { border-color:#709858; }
+.quick-module-head { display:flex; align-items:center; min-width:0; padding:17px 18px 8px; }
+.quick-module-head .quick-module-icon { flex:0 0 42px; width:42px; height:42px; line-height:40px;
+  font-size:26px; text-align:center; color:#b4e58a; background:rgba(92,150,46,.10);
+  border:1px solid rgba(118,185,0,.23); margin-right:13px; }
+.quick-module-head .quick-module-copy { flex:1 1 auto; min-width:0; padding-right:9px; }
+.quick-module-head .quick-module-copy strong { font:700 17px var(--display); color:#f1f6ec;
+  white-space:normal; line-height:1.35; }
+.quick-module-meta { display:block; font-size:11px; color:#b0bfab; margin-top:4px; }
+.quick-module-head .quick-module-state { margin:0 0 0 8px; font-size:11px; padding:5px 9px;
+  background:rgba(12,17,13,.7); border:1px solid #455a42; color:#bbc8b4;
+  max-width:33%; white-space:normal; text-align:center; }
+.quick-module-head .quick-module-state.running { color:#b9e688; border-color:#76b900; }
+.quick-module-head .quick-module-state.installed { color:#d2e1c6; border-color:#577250; }
+.quick-module-head .quick-module-state.missing { color:#f6c795; border-color:#b98947; }
+.quick-module-description { display:block; color:#b9c6b5; font-size:12px; line-height:1.6;
+  min-height:30px; margin:7px 20px 16px 73px; padding:0; }
+.quick-module-bottom { display:flex; align-items:center; justify-content:space-between;
+  min-height:50px; border-top:1px solid rgba(153,190,127,.13);
+  background:rgba(10,15,10,.34); padding:7px 17px; }
+.quick-module-category { color:#9ab987; font-family:var(--display); letter-spacing:.7px; font-size:10px; }
+.quick-module-bottom .quick-config-open { min-width:120px; min-height:34px;
+  padding:0 19px; font:700 11px var(--display); background:#2f4926;
+  border:1px solid #5b8b3f; color:#e2f4d8; }
+.quick-module-bottom .quick-config-open:hover { background:#446832; border-color:#90ce62; }
+.quick-module-grid.compact { grid-template-columns:repeat(2,minmax(0,1fr)); grid-gap:11px; }
+.quick-module-grid.compact .quick-module { display:block; min-height:0; }
+.quick-module-grid.compact .quick-module-head { padding:13px 11px 6px; }
+.quick-module-grid.compact .quick-module-head .quick-module-icon { flex-basis:33px; width:33px; height:33px;
+  line-height:31px; font-size:21px; margin-right:10px; }
+.quick-module-grid.compact .quick-module-head .quick-module-copy { min-width:0; }
+.quick-module-grid.compact .quick-module-head .quick-module-copy strong { font-size:13px; }
+.quick-module-grid.compact .quick-module-head .quick-module-state { font-size:10px; padding:4px; }
+.quick-module-grid.compact .quick-module-description { margin:8px 12px 13px; min-height:35px; }
+.quick-module-grid.compact .quick-module-bottom { padding:7px 12px; }
+.quick-module-grid.compact .quick-module-bottom .quick-config-open { min-width:100px; margin:0; }
+.quick-config-return { display:flex; align-items:center; justify-content:space-between;
+  border-bottom:1px solid #354630; padding:0 0 14px; margin:0 0 16px; }
+.quick-back-button { min-height:36px; padding:0 14px; background:#243421; color:#dcecd1;
+  border:1px solid #567548; font:700 11px var(--display); }
+.quick-back-button:hover { background:#37532c; }
+.quick-config-return .quick-config-state { margin-left:15px; }
+@media (max-width:1050px) {
+ .quick-module-grid.compact { grid-template-columns:minmax(0,1fr); }
+}
+@media (max-width:810px) {
+ .quick-module-head { padding:12px 11px 6px; }
+ .quick-module-head .quick-module-copy strong { font-size:14px; }
+ .quick-module-description { margin:6px 12px 13px; }
+ .quick-module-bottom { padding:7px 11px; }
+}
+
+/* Keep descriptions aligned with the module name; override the old generic
+   .quick-module p rule (higher selector specificity than the v2 class). */
+.quick-module > p.quick-module-description { display:block; margin:8px 20px 18px 73px;
+  color:#b9c6b5; font-size:12px; line-height:1.55; min-height:27px; }
+@media (max-width:810px) {
+ .quick-module > p.quick-module-description { margin:8px 12px 13px; }
+}

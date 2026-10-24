@@ -247,3 +247,35 @@ Off-tailnet HTTPS GET verification passed from HUAWEI-MateBook (Tailscale
 not installed): root=200, app.js=200, CBT1 status=200, admin=404,
 unauthenticated account/me=401. Full off-tailnet signup/login remains
 untested; isolated local signup/login/CBT1/logout integration passes.
+
+
+## Local Admin Dashboard — separate localhost port
+
+The PublicApi builds intentionally respond HTTP 404 for `/admin` on ports 5115
+(Cloudflare origin) and 5116 (Tailscale staging). **Do not remove that rule.**
+
+A dedicated local dashboard process runs at `http://127.0.0.1:5117/admin`.
+It is never connected to either public tunnel, and its middleware requires a
+literal localhost Host header, loopback remote address, and exact local bind.
+Only `/admin*` and `/healthz*` are reachable in `LocalAdmin:Enabled` mode.
+The admin browser API still requires `X-Admin-Request: 1`; no CORS policy
+applies to admin routes. The same original SQLite account DB is explicitly
+used; operators should be aware that admin actions can change or delete real
+accounts.
+
+Quick shortcuts: double-click `Server\Local-Admin.cmd` to start/open;
+double-click `Server\Local-Admin-Stop.cmd` to stop. The underlying script is
+`Server\start-local-admin.ps1`, with `-CheckOnly`, `-NoOpen`, and `-Stop`.
+The disposable security check is `Server\verify-local-admin.ps1`; it must be
+run when the local admin instance is stopped because it uses port 5117.
+
+**Important Git state on Oct 24:** another in-progress merge introduced conflict
+markers into `Program.cs` and `CBT1/Cbt1Registration.cs`. To avoid modifying
+the unfinished merge, the currently working AdminLocal executable was built
+from a temporary conflict-resolved snapshot (Program.cs HEAD side and
+CBT1 imports remote side). The conflicted working-tree source has NOT been
+resolved or staged by this Admin task. Before rebuilding the canonical project,
+resolve both Git conflicts while keeping LocalAdmin middleware, the restricted
+`app.UseCors()` call, and the public-admin 404 guard. Do not build the
+canonical project until source is conflict-free. The current AdminLocal binary
+is operational and was independently smoke-tested.

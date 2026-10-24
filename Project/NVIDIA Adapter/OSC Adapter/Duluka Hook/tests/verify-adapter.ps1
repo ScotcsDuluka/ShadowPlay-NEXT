@@ -114,6 +114,25 @@ foreach($arch in @('x64','Win32')) {
 }
 & $x86Mailbox $x86MailboxHook $x64Publisher '--gpu-source'
 Check-Exit "ACTUAL Host DX9Ex GPU-to-GPU CopyResource x64 to x86 game Hook pixels/ACK"
+# Experimental EndScene auto-Pump: a real D3D9Ex game device receives the
+# real Host GPU source without calling Pump from the fixture, and without
+# ever polling from Present. All preview flags are set only inside tests.
+foreach($arch in @('x64','Win32')) {
+    $mailboxExe = Join-Path $PSScriptRoot "bin\$arch\Release\NVIDIA OSC Adapter D3D9Ex Mailbox IPC Test.exe"
+    $mailboxHook = Join-Path $hookRoot "bin\$arch\Release\NVIDIA OSC Adapter Hook.dll"
+    & $mailboxExe $mailboxHook $mailboxExe '--gpu-auto'
+    Check-Exit "DX9Ex $arch isolated EndScene auto-Pump real Host GPU texture pixels/ACK"
+}
+& $x86Mailbox $x86MailboxHook $x64Publisher '--gpu-auto'
+Check-Exit "DX9Ex x64 producer to x86 EndScene auto-Pump GPU pixels/ACK"
+foreach($arch in @('x64','Win32')) {
+    $mailboxExe = Join-Path $PSScriptRoot "bin\$arch\Release\NVIDIA OSC Adapter D3D9Ex Mailbox IPC Test.exe"
+    $mailboxHook = Join-Path $hookRoot "bin\$arch\Release\NVIDIA OSC Adapter Hook.dll"
+    & $mailboxExe $mailboxHook $mailboxExe '--gpu-auto-recovery'
+    Check-Exit "DX9Ex $arch EndScene auto-Pump Host crash/reconnect and Release ACK"
+}
+& $x86Mailbox $x86MailboxHook $x64Publisher '--gpu-auto-recovery'
+Check-Exit "DX9Ex x64 producer to x86 EndScene auto-Pump Host crash/reconnect"
 & (Join-Path $PSScriptRoot 'verify-dx9-cross-bitness.ps1')
 if(-not $?) {throw 'DX9 x64 Host -> x86 target adapter test failed'}
 Write-Host 'PASS DX9 x64 Host -> x86 target attachment and Present'

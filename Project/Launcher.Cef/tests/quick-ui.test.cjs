@@ -50,11 +50,13 @@ function createHarness(state) {
   return {nodes,powerCard,win,get oldPowerClicks(){return oldPowerClicks;},
     get oldOverlayClicks(){return oldOverlayClicks;}};
 }
-test('four-tab shell keeps native controls and adds Config Module',()=>{
-  for (const tab of ['Power','Core','Config','Addons']) {
+test('three primary tabs with per-card Config detail and native controls',()=>{
+  for (const tab of ['Power','Core','Addons']) {
     assert.match(html,new RegExp('id="quickNav'+tab+'"'));
     assert.match(html,new RegExp('id="quickPage'+tab+'"'));
   }
+  assert.doesNotMatch(html,/id="quickNavConfig"/);
+  assert.match(html,/id="quickPageConfig"/);
   assert.match(html,/<body class="quick-mode">/);
   assert.match(css,/\.quick-mode \.workspace \{ display: none; \}/);
   assert.match(html,/id="tglOverlay"/);
@@ -64,7 +66,7 @@ test('four-tab shell keeps native controls and adds Config Module',()=>{
 test('navigation only changes view and retains the native appearance manager',()=>{
   const h=createHarness();
   assert.equal(h.nodes.quickAppearanceSlot.children[0],h.nodes.appearanceSettings);
-  for(const tab of ['Core','Config','Addons','Power']) {
+  for(const tab of ['Core','Addons','Power']) {
     h.nodes['quickNav'+tab].click();
     assert.equal(h.nodes['quickPage'+tab].classList.contains('active'),true);
     assert.equal(h.nodes['quickNav'+tab].getAttribute('aria-current'),'page');
@@ -106,17 +108,27 @@ test('Magisk-style directory has all 11 core modules and no placeholder add-ons'
   assert.deepEqual(ids,['Container','Overlay','NodeApi','Capture','Graphics','Helper',
     'Adapter','Hook','Ansel','Ffmpeg','Config']);
   assert.equal((core.match(/data-config-module="/g)||[]).length,11);
+  assert.equal((core.match(/class="quick-module-bottom"/g)||[]).length,11);
+  assert.equal((core.match(/class="quick-module-meta"/g)||[]).length,11);
+  assert.equal((core.match(/class="quick-module-head"/g)||[]).length,11);
+  assert.doesNotMatch(core,/role="switch"/);
+  assert.match(core,/id="quickModuleLayout"/);
   assert.doesNotMatch(addons,/data-module="/);
   assert.match(addons,/id="quickPageAddons"/);
   assert.match(addons,/data-i18n="quickAddonEmpty"/);
   assert.match(css,/\.quick-module-grid \{ display: grid; grid-template-columns: minmax\(0,1fr\)/);
+  // The old generic `.quick-module p` style must not flatten the description's inset.
+  assert.match(css,/\.quick-module\s*>\s*p\.quick-module-description\s*\{[^}]*margin:\s*8px 20px 18px 73px/);
+  assert.match(css,/\.quick-module-bottom\s*\{[^}]*border-top:/);
 });
 test('core config action opens the selected module, never calls native service RPC',()=>{
   const h=createHarness({modules:{Config:{installed:true,processTracking:false}}});
   assert.ok(h.win.ShadowPlayModuleUI.openConfig('Hook')===undefined);
   assert.equal(h.win.ShadowPlayModuleUI.selectedModule(),'Hook');
   assert.equal(h.nodes.quickPageConfig.classList.contains('active'),true);
-  assert.equal(h.nodes.quickConfigTarget.value,'Hook');
+  assert.equal(h.nodes.quickConfigTitle.textContent,'quickConfigure · Duluka Hook');
+  assert.equal(h.nodes.quickNavCore.classList.contains('active'),true);
+  assert.equal(h.nodes.quickNavAddons.classList.contains('active'),false);
   assert.equal(h.nodes.quickConfigName.textContent,'Duluka Hook');
   h.win.ShadowPlayModuleUI.openConfig('../bad');
   assert.equal(h.win.ShadowPlayModuleUI.selectedModule(),'Hook');
