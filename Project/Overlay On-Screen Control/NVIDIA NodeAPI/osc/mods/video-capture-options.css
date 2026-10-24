@@ -3,31 +3,48 @@
   width: 100%;
   min-width: 0;
   margin: 0;
-  padding: 12px 0 18px;
+  padding: 4px 0 6px;
   background: #262b2f;
   color: #fff;
   font-family: "Segoe UI", sans-serif;
 }
 
 #nv-video-capture-options .nv-video-engine-section {
-  margin: 0 0 22px;
+  margin: 0 0 6px;
+}
+
+/* Compact vertical layout: all Capture controls stay on ONE Settings
+   screen at the standard 960px CEF overlay height; no nested scrollbar. */
+#nv-video-capture-options .nv-video-engine-section > .nv-video-engine-field {
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+}
+
+#nv-video-capture-options .nv-video-engine-section > .nv-video-engine-field .customize-header-text {
+  min-height: 15px;
+}
+
+#nv-video-capture-options .nv-video-engine-section > .nv-video-engine-codec-note {
+  min-height: 15px;
+  margin: 2px 0 0;
 }
 
 #nv-video-capture-options .nv-video-engine-section-heading {
   display: flex;
   align-items: center;
-  height: 67px;
-  margin: 0;
+  height: 34px;
+  margin: 0 0 3px;
   color: #fff;
-  font: 18px "Segoe UI Semibold", "Segoe UI", sans-serif;
+  font: 15px/34px "Segoe UI Semibold", "Segoe UI", sans-serif;
 }
 
 #nv-video-capture-options .nv-video-engine-chevron {
   display: inline-block;
-  width: 61px;
-  flex: 0 0 61px;
+  width: 44px;
+  flex: 0 0 44px;
   color: #fff;
-  font: 50px/67px nvgcshare, sans-serif;
+  font: 34px/34px nvgcshare, sans-serif;
 }
 
 .nv-video-engine-row {
@@ -47,7 +64,7 @@
   flex: 1 1 22%;
   min-width: 190px;
   max-width: none;
-  margin: 10px 6px;
+  margin: 5px 6px;
 }
 
 .nv-video-engine-field .customize-header-text {
@@ -112,7 +129,7 @@
   min-width: 0;
   min-height: 0;
   flex-direction: column;
-  padding: 10px 12px;
+  padding: 6px 10px;
   box-sizing: border-box;
   background: #212326;
 }
@@ -123,7 +140,7 @@
   min-width: 0;
   flex: 1 1 auto;
   flex-direction: column;
-  gap: 8px;
+  gap: 3px;
   box-sizing: border-box;
 }
 
@@ -146,7 +163,7 @@
   gap: 8px;
   min-width: 0;
   margin-top: auto;
-  padding-top: 8px;
+  padding-top: 4px;
 }
 
 #nv-video-capture-options .nv-video-engine-action {
@@ -154,9 +171,9 @@
   min-width: 96px;
   flex: 0 1 128px;
   width: auto;
-  min-height: 34px;
+  min-height: 29px;
   margin: 0;
-  padding: 0 12px;
+  padding: 0 10px;
   text-transform: none;
 }
 
@@ -164,8 +181,8 @@
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 14px;
-  padding-top: 2px;
+  gap: 5px;
+  padding-top: 0;
 }
 
 #nv-video-capture-options .nv-video-engine-advanced-fields .nv-video-engine-field {
@@ -188,7 +205,7 @@
   box-sizing: border-box;
   flex: 0 0 auto;
   clear: both;
-  margin: 14px 0 8px;
+  margin: 4px 0 2px;
   padding: 0;
   color: #aab0b2;
   font: 10px/1.5 "Segoe UI", sans-serif;
@@ -199,15 +216,15 @@
 /* Keep a measured gap below native md-select even if Angular Material
    modifies its own inline margin and line-height while focused. */
 #nv-video-capture-options .nv-video-engine-advanced-fields > .nv-video-engine-field {
-  margin-bottom: 8px;
+  margin-bottom: 1px;
 }
 
 #nv-video-capture-options .nv-video-engine-footer {
   display: flex;
   align-items: center;
-  gap: 24px;
-  min-height: 42px;
-  margin: 18px 0 0;
+  gap: 12px;
+  min-height: 32px;
+  margin: 5px 0 0;
 }
 
 #nv-video-capture-options .nv-video-engine-cursor-label {

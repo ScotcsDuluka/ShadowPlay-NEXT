@@ -348,6 +348,27 @@ test('the Codec helper renders AFTER both selects, never under the select underl
   const noteRule = css.match(/#nv-video-capture-options \.nv-video-engine-codec-note\s*\{([^}]*)\}/);
   assert.ok(noteRule, 'specific CSS rule for helper note');
   assert.match(noteRule[1], /position:\s*static/);
-  assert.match(noteRule[1], /margin:\s*14px 0 8px/);
+  assert.match(noteRule[1], /margin:\s*4px 0 2px/);
   assert.doesNotMatch(noteRule[1], /margin:\s*-/);
+});
+
+test('Video Settings uses compact static sections, not a nested scrollbar', () => {
+  const css = fs.readFileSync(
+    path.join(__dirname, '../osc/mods/video-capture-options.css'), 'utf8');
+  function block(selector) {
+    const start = css.indexOf(selector + ' {');
+    assert.ok(start >= 0, 'missing ' + selector);
+    return css.slice(start, css.indexOf('}', start));
+  }
+  const section = block('#nv-video-capture-options .nv-video-engine-section');
+  const heading = block('#nv-video-capture-options .nv-video-engine-section-heading');
+  const footer = block('#nv-video-capture-options .nv-video-engine-footer');
+  const advancedFields = block('#nv-video-capture-options .nv-video-engine-advanced-fields');
+  assert.match(section, /margin:\s*0 0 6px/);
+  assert.match(heading, /height:\s*34px/);
+  assert.match(footer, /margin:\s*5px 0 0/);
+  assert.match(advancedFields, /gap:\s*5px/);
+  assert.match(css, /\.nv-video-engine-section > \.nv-video-engine-field\s*\{[^}]*gap:\s*3px/);
+  assert.doesNotMatch(css, /overflow-y:\s*(auto|scroll)/);
+  assert.doesNotMatch(css, /max-height:\s*[0-9].*overflow/);
 });
