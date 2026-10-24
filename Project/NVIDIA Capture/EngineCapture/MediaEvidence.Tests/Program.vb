@@ -52,6 +52,38 @@ Module Program
             """format"":{""duration"":""N/A""}}")
         Check("Unknown FFprobe durations are not fabricated", Not unknown.Verified AndAlso
               Not unknown.DurationSec.HasValue)
+        ' Phase 6E: a faststart MP4 keeps its moov-advertised duration
+        ' even after most mdat packets are missing from disk.
+        Dim completePackets = "{""format"":{""duration"":""3.0""},""streams"":[" &
+            "{""codec_type"":""video"",""start_time"":""0"",""duration"":""3.0""," &
+            """nb_frames"":""90"",""nb_read_packets"":""90""}]}"
+        Dim readAll = CaptureMediaInspector.ParseProbeJson(
+            completePackets, requirePacketValidation:=True)
+        Check("Complete video packet count accepted",
+              readAll.Verified AndAlso readAll.PacketCountChecked AndAlso
+              readAll.VideoFramesDeclared.HasValue AndAlso
+              readAll.VideoPacketsRead.HasValue AndAlso
+              readAll.VideoFramesDeclared.Value = 90 AndAlso
+              readAll.VideoPacketsRead.Value = 90)
+        Dim truncatedPackets = completePackets.Replace(
+            """nb_read_packets"":""90""", """nb_read_packets"":""10""")
+        Dim insufficient = CaptureMediaInspector.ParseProbeJson(
+            truncatedPackets, requirePacketValidation:=True)
+        Check("Truncated video packet count rejects metadata-only success",
+              Not insufficient.Verified AndAlso insufficient.Reason = "video_packet_count_mismatch")
+        Dim unknownFrames = completePackets.Replace(
+            """nb_frames"":""90""", """nb_frames"":""N/A""")
+        Dim unavailable = CaptureMediaInspector.ParseProbeJson(
+            unknownFrames, requirePacketValidation:=True)
+        Check("Unknown declared frame total refuses false verification",
+              Not unavailable.Verified AndAlso unavailable.Reason = "video_frame_total_unavailable")
+        Dim missingCount = completePackets.Replace(
+            """nb_read_packets"":""90""", """nb_read_packets"":""N/A""")
+        Dim missingPackets = CaptureMediaInspector.ParseProbeJson(
+            missingCount, requirePacketValidation:=True)
+        Check("Missing actual packet count refuses false verification",
+              Not missingPackets.Verified AndAlso missingPackets.Reason = "video_packet_scan_unavailable")
+
         Dim noPath = CaptureMediaInspector.Inspect("C:\no-media-exists-" &
             Guid.NewGuid().ToString() & ".mp4", "")
         Check("Missing MP4 path refuses verified", Not noPath.Verified AndAlso

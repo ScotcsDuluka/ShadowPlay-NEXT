@@ -127,6 +127,29 @@ Module Program
                   evidence.DurationSec.Value < 11.0, tag & " duration and early stop bounded")
             Check(File.Exists(output) AndAlso (New FileInfo(output)).Length > 10000,
                   tag & " real MP4 payload")
+            If tag = "normal-stop-1" Then
+                ' A faststart MP4 retains complete moov metadata after its
+                ' video payload is truncated. Metadata-only ffprobe claims
+                ' the original 3s duration; the production Inspector must
+                ' reject the missing packet data rather than say Verified.
+                Dim complete = File.ReadAllBytes(output)
+                For Each percent In New Integer() {90, 65, 35, 12}
+                    Dim truncated = OutputPath(root, "truncated-" & percent)
+                    Dim length = CInt(Math.Floor(complete.Length * CDbl(percent) / 100.0))
+                    Dim bytes(length - 1) As Byte
+                    Array.Copy(complete, bytes, length)
+                    File.WriteAllBytes(truncated, bytes)
+                    Dim broken = CaptureMediaInspector.Inspect(truncated, ffprobe)
+                    Check(Not broken.Verified AndAlso
+                          broken.Reason = "video_packet_count_mismatch",
+                          "truncated " & percent & "% MP4 rejected by actual packet scan")
+                    Check(broken.PacketCountChecked AndAlso
+                          broken.VideoPacketsRead.HasValue AndAlso
+                          broken.VideoFramesDeclared.HasValue AndAlso
+                          broken.VideoPacketsRead.Value < broken.VideoFramesDeclared.Value,
+                          "truncated " & percent & "% packet evidence accounts for missing frames")
+                Next
+            End If
         End Using
     End Sub
 
