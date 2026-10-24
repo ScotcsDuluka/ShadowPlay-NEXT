@@ -2,9 +2,10 @@
   'use strict';
 
   var endpoint = '/DulukaCapture/v.1.0/settings';
+  var catalogEndpoint = '/DulukaCapture/v.1.0/engines';
   var panelId = 'nv-video-capture-options';
   var panelStackId = 'nv-video-capture-panels';
-  var panelVersion = '66';
+  var panelVersion = '67';
   var state = null;
   var statusNode = null;
   var captureFields = [];
@@ -13,6 +14,7 @@
   var runtimeStatusNode = null;
   var runtimeStatusTimer = null;
   var encoderNames = {};
+  var encoderCatalog = null;
   var panelScope = null;
   var injector = null;
   var presetChoices = {
@@ -37,6 +39,89 @@
     ['LibX264', 'Software x264'],
     ['LibX265', 'Software x265']
   ];
+  // Container publishes route/catalog identifiers, while OSC settings use
+  // legacy encoder keys. These aliases DO NOT certify hardware runtime.
+  var catalogEncoderAliases = {
+    h264_nvenc: 'NVENC_H264',
+    libx264: 'LibX264'
+  };
+  function parseEncoderCatalog(body) {
+    if (!body || body.schemaVersion !== 1 || body.readOnly !== true ||
+        !Array.isArray(body.providers)) {
+      throw new Error('Invalid NVIDIA Container capture catalog');
+    }
+    var mapping = {};
+    ['Duluka', 'FFmpeg'].forEach(function (engine) {
+      var provider = body.providers.filter(function (item) {
+        return item && item.id === engine && item.routeWired === true &&
+          Array.isArray(item.encoders);
+      })[0];
+      if (!provider) throw new Error('Capture route unavailable: ' + engine);
+      mapping[engine] = provider.encoders.map(function (id) {
+        return catalogEncoderAliases[id] || id;
+      }).filter(function (id, index, list) {
+        return encoderChoices.some(function (choice) { return choice[0] === id; }) &&
+          list.indexOf(id) === index;
+      });
+      if (!mapping[engine].length) throw new Error('No known codec route for ' + engine);
+    });
+    return { routes: mapping, policyValid: body.policyValid === true };
+  }
+  function allowedEncoders(engine) {
+    return encoderCatalog && encoderCatalog.routes[engine] ?
+      encoderCatalog.routes[engine].slice() : [];
+  }
+  function syncEncoderControls() {
+    if (!panelScope || !state) return;
+    var available = allowedEncoders(state.engineMode);
+    var choices = encoderChoices.filter(function (choice) {
+      return available.indexOf(choice[0]) >= 0;
+    }).map(function (choice) {
+      return { value: choice[0], label: choice[1], disabled: false };
+    });
+    if (encoderCatalog && available.indexOf(state.encoder) < 0) {
+      // Preserve the actual persisted encoder in the visible UI; never
+      // silently rewrite it to NVENC_H264 during GET/read-only rendering.
+      choices.push({ value: state.encoder,
+        label: (encoderNames[state.encoder] || state.encoder) +
+          ' (saved; unsupported for ' + state.engineMode + ')',
+        disabled: true });
+    }
+    panelScope.captureEncoderChoices = choices;
+    panelScope.captureUi.encoder = state.encoder;
+    panelScope.captureCodecStatus = !encoderCatalog ?
+      'Codec routes unavailable — reload to retry.' :
+      (available.indexOf(state.encoder) < 0 ?
+        'Saved codec is not in the selected engine route. Choose a supported codec.' :
+        'Codec routes from NVIDIA Container; hardware readiness is not guaranteed.') +
+      (encoderCatalog && !encoderCatalog.policyValid ?
+        ' Container routing policy is not verified.' : '');
+    schedulePanelDigest();
+  }
+  function readCaptureSettingsAndCatalog() {
+    // Both responses must be valid before the UI can mutate persisted
+    // recording settings. A missing catalog must not restore 9 guessed codecs.
+    return Promise.all([
+      fetchWithTimeout(endpoint, {}, 12000).then(function (response) {
+        if (!response.ok) throw new Error('Unable to load capture settings (' + response.status + ')');
+        return response.json();
+      }),
+      fetchWithTimeout(catalogEndpoint, {}, 3500).then(function (response) {
+        if (!response.ok) throw new Error('Unable to load codec routes (' + response.status + ')');
+        return response.json();
+      })
+    ]).then(function (responses) {
+      if (!usableCaptureSettings(responses[0])) {
+        throw new Error('Invalid capture settings response');
+      }
+      var verifiedCatalog = parseEncoderCatalog(responses[1]);
+      // Apply together only after both requests passed validation.
+      encoderCatalog = verifiedCatalog;
+      state = responses[0];
+      panelScope.captureSettingsReady = true;
+      render();
+    });
+  }
   function videoPage() {
     return /#\/base\/preferences\/video(?:[/?]|$)/.test(window.location.hash);
   }
@@ -106,9 +191,10 @@
       { value: 'Duluka', label: 'Duluka Capture' }
     ];
     panelScope.captureApiChoices = apiChoices('FFmpeg');
-    panelScope.captureEncoderChoices = encoderChoices.map(function (choice) {
-      return { value: choice[0], label: choice[1] };
-    });
+    // Unknown catalog = no selectable codecs. Never infer installed
+    // hardware support from the hardcoded display-name dictionary.
+    panelScope.captureEncoderChoices = [];
+    panelScope.captureCodecStatus = 'Loading encoder routes from NVIDIA Container…';
     panelScope.capturePresetChoices = [];
     panelScope.captureSelectedLabel = function (value, choices) {
       var selected = (choices || []).filter(function (choice) {
@@ -123,7 +209,17 @@
       if (!state) state = defaultSettings();
       state.engineMode = panelScope.captureUi.engineMode;
       state.apiCapture = apiChoices(state.engineMode)[0].value;
+      var allowed = allowedEncoders(state.engineMode);
+      if (!allowed.length) return;
+      if (allowed.indexOf(state.encoder) < 0) {
+        // This is an explicit Engine change; choose its supported route.
+        // Never silently alter an unsupported SAVED value on page load.
+        state.encoder = allowed[0];
+        state.encoderPreset = 4;
+      }
       syncCaptureControls();
+      syncEncoderControls();
+      presetOptions();
       save();
     };
     panelScope.onCaptureApiChange = function () {
@@ -136,8 +232,8 @@
       save();
     };
     panelScope.onEncoderChange = function () {
-      if (!panelScope.captureSettingsReady) return;
-      if (!state) state = defaultSettings();
+      if (!panelScope.captureSettingsReady || !state ||
+          allowedEncoders(state.engineMode).indexOf(panelScope.captureUi.encoder) < 0) return;
       state.quality = 'Custom';
       state.encoder = panelScope.captureUi.encoder;
       presetOptions();
@@ -209,10 +305,16 @@
   }
 
   function save() {
-    // Never turn a temporary GET failure into an accidental POST of
-    // guessed/default capture settings.
-    if (!panelScope || !panelScope.captureSettingsReady) return Promise.resolve(false);
-    if (!state) return Promise.resolve(false);
+    // Never POST guessed settings or a codec not listed by the active
+    // Container route (e.g. Intel/AMD entries on a Duluka-only machine).
+    if (!panelScope || !panelScope.captureSettingsReady || !state) {
+      return Promise.resolve(false);
+    }
+    if (allowedEncoders(state.engineMode).indexOf(state.encoder) < 0) {
+      statusNode.classList.add('highlights-item-disabled');
+      statusNode.textContent = 'Choose a codec available for this Capture engine before saving.';
+      return Promise.resolve(false);
+    }
     statusNode.textContent = 'Saving…';
     return fetchWithTimeout(endpoint, {
       method: 'POST',
@@ -414,7 +516,7 @@
   function render() {
     if (!state || !panelScope) return;
     syncCaptureControls();
-    panelScope.captureUi.encoder = state.encoder;
+    syncEncoderControls();
     panelScope.captureUi.captureCursor = Boolean(state.captureCursor);
     presetOptions();
     var selectedPreset = panelScope.capturePresetChoices.filter(function (choice) {
@@ -507,24 +609,14 @@
     reloadButton.className = 'md-raised md-primary nv-video-engine-action';
     reloadButton.textContent = 'Reload';
     reloadButton.addEventListener('click', function () {
-      // A reload is a new read-only request; while pending, no edited state
-      // may be saved. On failure leave controls disabled and offer retry.
+      // Reload both persisted settings and the read-only Container catalog.
       panelScope.captureSettingsReady = false;
       schedulePanelDigest();
       statusNode.textContent = 'Loading…';
-      fetchWithTimeout(endpoint).then(function (response) {
-        if (!response.ok) throw new Error('Unable to load capture settings (' + response.status + ')');
-        return response.json();
-      }).then(function (settings) {
-        if (!usableCaptureSettings(settings)) throw new Error('Invalid capture settings response');
-        state = settings;
-        panelScope.captureSettingsReady = true;
-        render();
+      readCaptureSettingsAndCatalog().then(function () {
         statusNode.classList.remove('highlights-item-disabled');
         statusNode.textContent = 'Ready';
-      }).catch(function (error) {
-        setUnavailableSettings(error);
-      });
+      }).catch(setUnavailableSettings);
     });
     var copyButton = document.createElement('md-button');
     copyButton.setAttribute('type', 'button');
@@ -553,6 +645,11 @@
     var encoderFields = document.createElement('div');
     encoderFields.className = 'nv-video-engine-advanced-fields';
     encoderFields.appendChild(encoder.wrap);
+    var codecStatus = document.createElement('p');
+    codecStatus.className = 'nv-video-engine-codec-note';
+    codecStatus.setAttribute('role', 'status');
+    codecStatus.textContent = '{{captureCodecStatus}}';
+    encoderFields.appendChild(codecStatus);
     encoderFields.appendChild(preset.wrap);
     advanced.appendChild(previewPanel);
     advanced.appendChild(encoderFields);
@@ -610,30 +707,10 @@
     refreshCaptureRuntimeStatus();
     runtimeStatusTimer = window.setInterval(refreshCaptureRuntimeStatus, 5000);
     statusNode.textContent = 'Loading…';
-    fetchWithTimeout(endpoint).then(function (response) {
-      if (!response.ok) {
-        return response.text().then(function (body) {
-          var error = null;
-          try {
-            error = body ? JSON.parse(body) : null;
-          } catch (parseError) {
-            error = null;
-          }
-          throw new Error((error && error.message) ||
-            'Unable to load capture settings (' + response.status + ')');
-        });
-      }
-      return response.json();
-    }).then(function (settings) {
-      if (!usableCaptureSettings(settings)) throw new Error('Invalid capture settings response');
-      state = settings;
-      panelScope.captureSettingsReady = true;
-      render();
+    readCaptureSettingsAndCatalog().then(function () {
       statusNode.classList.remove('highlights-item-disabled');
       statusNode.textContent = 'Ready';
-    }).catch(function (error) {
-      setUnavailableSettings(error);
-    });
+    }).catch(setUnavailableSettings);
   }
 
   var attempts = 0;

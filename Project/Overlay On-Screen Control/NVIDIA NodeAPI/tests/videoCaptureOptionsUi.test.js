@@ -32,6 +32,11 @@ const exposed = source.replace(ending, `
     state: function () { return state; },
     setState: function (value) { state = value; },
     valid: usableCaptureSettings,
+    parseCatalog: parseEncoderCatalog,
+    allowed: allowedEncoders,
+    setCatalog: function (catalog) { encoderCatalog = catalog; },
+    syncCodecs: syncEncoderControls,
+    loadSettingsAndCatalog: readCaptureSettingsAndCatalog,
     save: save,
     refreshStatus: refreshCaptureRuntimeStatus
   };
@@ -73,6 +78,21 @@ function startHarness() {
     respond(fn) { nextResponse = fn; }
   };
 }
+function containerCatalog() {
+  return {
+    schemaVersion: 1,
+    readOnly: true,
+    policyValid: false,
+    captureRuntimeReady: true,
+    providers: [
+      { id: 'Duluka', routeWired: true, runtimeReady: false,
+        encoders: ['NVENC_H264'] },
+      { id: 'FFmpeg', routeWired: true, runtimeReady: false,
+        encoders: ['h264_nvenc', 'libx264'] },
+      { id: 'OBS', routeWired: false, encoders: ['obs_managed'] }
+    ]
+  };
+}
 function goodSettings() {
   return {
     engineMode: 'FFmpeg', apiCapture: 'gdigrab', quality: 'Custom',
@@ -87,6 +107,8 @@ test('GET failure locks all capture options instead of silently persisting fallb
   const view = h.hooks.prime();
   h.hooks.fail(new Error('Backend offline'));
   assert.equal(view.scope.captureSettingsReady, false);
+  assert.equal(view.scope.captureEncoderChoices.length, 0,
+    'Unfetched catalog must not label a guessed default as saved/usable');
   assert.match(view.status.textContent, /Reload to retry/);
   assert.match(view.status.textContent, /Backend offline/);
   const unchanged = JSON.stringify(h.hooks.state());
@@ -109,6 +131,7 @@ test('only complete supported capture settings become editable and can be saved'
   assert.equal(h.hooks.valid({ ...settings, encoder: 'unexpected' }), false);
   assert.equal(h.hooks.valid({ ...settings, engineMode: 'Duluka', apiCapture: 'gdigrab' }), false);
   assert.equal(h.hooks.valid({ ...settings, width: null }), false);
+  h.hooks.setCatalog(h.hooks.parseCatalog(containerCatalog()));
   h.hooks.setState(settings);
   view.scope.captureSettingsReady = true;
   h.respond(async () => ({ ok: true, status: 200, json: async () => goodSettings() }));
@@ -123,6 +146,7 @@ test('only complete supported capture settings become editable and can be saved'
 test('a malformed save response is not presented as Saved', async () => {
   const h = startHarness();
   const view = h.hooks.prime();
+  h.hooks.setCatalog(h.hooks.parseCatalog(containerCatalog()));
   h.hooks.setState(goodSettings());
   view.scope.captureSettingsReady = true;
   h.respond(async () => ({ ok: true, status: 200, json: async () => ({}) }));
@@ -149,4 +173,87 @@ test('runtime status 200 with verified fields continues rendering Ready/Recordin
   await h.hooks.refreshStatus();
   assert.match(view.runtime.textContent, /Recording/);
   assert.equal(view.runtime.classList.values.has('nv-video-engine-error'), false);
+});
+
+test('NVIDIA Container catalog allows only wired routes, not nine speculative codecs', () => {
+  const h = startHarness();
+  const view = h.hooks.prime();
+  const catalog = h.hooks.parseCatalog(containerCatalog());
+  assert.deepEqual(Array.from(catalog.routes.Duluka), ['NVENC_H264']);
+  assert.deepEqual(Array.from(catalog.routes.FFmpeg), ['NVENC_H264', 'LibX264']);
+  h.hooks.setCatalog(catalog);
+  h.hooks.setState({ ...goodSettings(), engineMode: 'Duluka',
+    apiCapture: 'dxgi_desktop_duplication' });
+  h.hooks.syncCodecs();
+  assert.deepEqual(Array.from(view.scope.captureEncoderChoices, x => x.value),
+    ['NVENC_H264']);
+  assert.match(view.scope.captureCodecStatus, /routing policy is not verified/);
+  assert.match(view.scope.captureCodecStatus, /not guaranteed/);
+  assert.equal(view.scope.captureEncoderChoices.some(x => /Intel|AMD|AV1/.test(x.label)), false);
+});
+
+test('saved unsupported codec remains visible and cannot be silently POSTed', async () => {
+  const h = startHarness();
+  const view = h.hooks.prime();
+  h.hooks.setCatalog(h.hooks.parseCatalog(containerCatalog()));
+  h.hooks.setState({ ...goodSettings(), engineMode: 'Duluka',
+    apiCapture: 'dxgi_desktop_duplication', encoder: 'NVENC_HEVC' });
+  view.scope.captureSettingsReady = true;
+  h.hooks.syncCodecs();
+  assert.equal(h.hooks.state().encoder, 'NVENC_HEVC');
+  assert.equal(view.scope.captureEncoderChoices.length, 2);
+  assert.equal(view.scope.captureEncoderChoices[1].disabled, true);
+  assert.match(view.scope.captureEncoderChoices[1].label, /saved; unsupported/);
+  assert.equal(await h.hooks.save(), false);
+  assert.equal(h.requests.length, 0);
+  assert.match(view.status.textContent, /Choose a codec available/);
+  view.scope.captureUi.encoder = 'NVENC_H264';
+  view.scope.onEncoderChange();
+  await Promise.resolve();
+  assert.equal(h.hooks.state().encoder, 'NVENC_H264');
+  assert.equal(h.requests.length, 1);
+  assert.equal(JSON.parse(h.requests[0].options.body).encoder, 'NVENC_H264');
+});
+
+test('catalog unavailable blocks edits and does not silently enable hardcoded fallback', async () => {
+  const h = startHarness();
+  const view = h.hooks.prime();
+  h.respond(url => Promise.resolve(url.endsWith('/engines') ?
+    { ok: false, status: 503 } :
+    { ok: true, status: 200, json: async () => goodSettings() }));
+  await assert.rejects(h.hooks.loadSettingsAndCatalog(), /codec routes/);
+  assert.equal(view.scope.captureSettingsReady, false);
+  assert.equal(view.scope.captureEncoderChoices.length, 0);
+  assert.equal(await h.hooks.save(), false);
+  assert.deepEqual(h.requests.map(x => x.url).sort(),
+    ['/DulukaCapture/v.1.0/engines', '/DulukaCapture/v.1.0/settings'].sort());
+  assert.equal(h.requests.some(x => x.options && x.options.method === 'POST'), false);
+});
+
+test('successful settings plus Container catalog allows only catalog-selected choices', async () => {
+  const h = startHarness();
+  const view = h.hooks.prime();
+  h.respond(url => Promise.resolve({
+    ok: true, status: 200,
+    json: async () => url.endsWith('/engines') ? containerCatalog() : goodSettings()
+  }));
+  await h.hooks.loadSettingsAndCatalog();
+  assert.equal(view.scope.captureSettingsReady, true);
+  assert.deepEqual(Array.from(view.scope.captureEncoderChoices, x => x.value),
+    ['NVENC_H264', 'LibX264']);
+  assert.equal(h.hooks.state().encoder, 'NVENC_H264');
+  assert.equal(h.requests.every(x => !x.options || x.options.method !== 'POST'), true);
+});
+
+test('invalid Container schema/unsupported route fails closed rather than claiming encoder availability', () => {
+  const h = startHarness();
+  assert.throws(() => h.hooks.parseCatalog({ providers: [] }), /Invalid/);
+  assert.throws(() => h.hooks.parseCatalog({
+    ...containerCatalog(), providers: [{ id: 'Duluka', routeWired: true,
+      encoders: ['codec_that_is_not_registered'] }, ...containerCatalog().providers.slice(1)]
+  }), /No known codec route for Duluka/);
+  assert.throws(() => h.hooks.parseCatalog({
+    ...containerCatalog(), providers: [{ id: 'Duluka', routeWired: false,
+      encoders: ['NVENC_H264'] }, ...containerCatalog().providers.slice(1)]
+  }), /Capture route unavailable/);
 });

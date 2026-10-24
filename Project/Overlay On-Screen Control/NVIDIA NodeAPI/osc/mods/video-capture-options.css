@@ -175,6 +175,15 @@
   margin: 0;
 }
 
+/* Keep the native md-select and its NVIDIA dimensions; explain codec
+   routing separately instead of filling the dropdown with fake choices. */
+#nv-video-capture-options .nv-video-engine-codec-note {
+  margin: -6px 0 0;
+  color: #aab0b2;
+  font: 10px/1.45 "Segoe UI", sans-serif;
+  overflow-wrap: anywhere;
+}
+
 #nv-video-capture-options .nv-video-engine-footer {
   display: flex;
   align-items: center;
