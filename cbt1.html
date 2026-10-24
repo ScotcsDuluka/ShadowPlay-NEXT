@@ -1,111 +1,309 @@
 <!doctype html>
 <html lang="th">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#090b08"><meta name="description" content="ShadowPlay NEXT CBT1 — Closed Beta Tester Application">
-<title>CBT1 Application | ShadowPlay NEXT</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b0f0a">
+<meta name="description" content="ShadowPlay NEXT CBT1 registration and tester account access">
+<title>CBT1 · Tester Access — ShadowPlay NEXT</title>
 <style>
-:root{color-scheme:dark;font-family:Inter,system-ui,Arial,sans-serif;background:#090b08;color:#f4f7f0}
-*{box-sizing:border-box}body{margin:0;min-height:100svh;background:radial-gradient(ellipse at 77% 2%,#283d0d 0,transparent 43%),#090b08}
-a{color:#9fe128}.wrap{max-width:900px;margin:auto;padding:34px 24px 88px}
-header{display:flex;align-items:center;justify-content:space-between;gap:20px;border-bottom:1px solid #32442a;padding:9px 0 27px}
-.brand{font-weight:900;letter-spacing:.14em;font-size:1rem}.brand b{color:#76b900}
-.back{font-size:.83rem;text-decoration:none;color:#d6ddd1}.eyebrow{color:#a9e550;font-size:.77rem;letter-spacing:.3em;font-weight:800;margin-top:74px}
-h1{font-size:clamp(3.6rem,10vw,7.3rem);line-height:.94;margin:20px 0 24px;letter-spacing:-.06em;font-weight:900}
-h1 em{font-style:normal;color:#76b900}.lead{max-width:650px;line-height:1.75;color:#b0b9aa;margin-bottom:38px}
-.card{border:1px solid #3a4d31;background:linear-gradient(140deg,#141b10,#0d100d);padding:clamp(22px,4vw,38px);box-shadow:0 16px 60px #0005}
-.card h2{margin:0 0 10px;letter-spacing:.05em}.caption{font-size:.9rem;color:#adb9a4;line-height:1.7}
-.status{margin:19px 0;padding:13px 16px;background:#1d2416;border-left:4px solid #76b900;color:#d5ecc3;font-size:.9rem}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:21px}
-label{display:block;color:#edf4e7;font-size:.87rem;font-weight:700;margin-top:17px}
-input,select,textarea{display:block;width:100%;margin-top:9px;padding:15px;border:1px solid #45543e;background:#10160e;color:white;font:inherit;border-radius:0;outline-offset:3px;outline-color:#76b900}
-input:focus,select:focus,textarea:focus{border-color:#76b900}
-textarea{resize:vertical;min-height:105px}
-.check{display:flex;gap:13px;align-items:flex-start;line-height:1.7;font-size:.85rem;color:#c7d0c0;font-weight:400}
-.check input{width:18px;height:18px;flex:none;margin:5px 0 0;accent-color:#76b900}
-button{width:100%;background:#76b900;color:#121a08;padding:17px;margin-top:23px;border:0;font:900 1rem inherit;font-weight:900;letter-spacing:.12em;cursor:pointer}
-button:disabled{background:#374332;color:#a9b7a3;cursor:not-allowed}
-footer{margin-top:27px;font-size:.78rem;color:#798672;line-height:1.6}
-#message{min-height:1.5rem;line-height:1.6}
-.honey{position:absolute;left:-9999px}
-@media(max-width:650px){.grid{grid-template-columns:1fr;gap:0}.eyebrow{margin-top:45px}.wrap{padding-inline:16px}}
+:root{font-family:Inter,Segoe UI,system-ui,sans-serif;color-scheme:dark;background:#090c08;color:#e9efe5}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;min-height:100svh;background:radial-gradient(ellipse at 80% -10%,#1e3510,transparent 46%),#090c08}
+button,input,select,textarea{font:inherit}button{cursor:pointer;border-radius:0}button:disabled{cursor:not-allowed;opacity:.52}
+a{color:#a7db5f}.shell{max-width:1120px;margin:auto;padding:0 26px}
+.topbar{background:#0e140d;border-bottom:1px solid #314025}
+.top-inner{min-height:75px;display:flex;justify-content:space-between;gap:18px;align-items:center}
+.brand{font-size:1.04rem;letter-spacing:.11em;font-weight:900;color:white;text-decoration:none}
+.brand span{color:#76b900}.nav-link{color:#d7e0d0;font-size:.82rem;text-decoration:none}.nav-link:hover{color:#9ee643}
+.status-dot{display:inline-block;width:8px;height:8px;background:#76b900;margin-right:8px;vertical-align:middle}
+.hero{padding:82px 0 38px;border-bottom:1px solid #23341d}
+.micro{color:#88ca35;font-size:.7rem;font-weight:900;letter-spacing:.24em;text-transform:uppercase}
+h1{font-size:clamp(2.9rem,7vw,5.7rem);line-height:.97;letter-spacing:-.055em;font-weight:900;margin:21px 0 20px}
+h1 strong{color:#76b900}.intro{color:#b2bdae;line-height:1.75;max-width:685px;margin:0 0 30px}
+.hero-meta{display:flex;flex-wrap:wrap;gap:13px}.chip{padding:9px 12px;border:1px solid #38522d;color:#cbd8c3;font-size:.72rem;font-weight:700;letter-spacing:.08em}
+.chip.green{color:#90dc35;border-color:#76b900}
+.layout{display:grid;grid-template-columns:minmax(240px,.8fr) minmax(0,1.2fr);gap:36px;padding:48px 0 84px}
+.aside h2{font-size:1.3rem;letter-spacing:-.025em;margin:0 0 16px}
+.aside p{color:#9fab98;line-height:1.8;font-size:.87rem;margin:0 0 18px}
+.steps{list-style:none;padding:0;margin:27px 0;border-top:1px solid #273522}
+.steps li{padding:17px 0;display:flex;gap:15px;border-bottom:1px solid #273522;align-items:flex-start}
+.steps b{color:#8bc735;font-size:.79rem}.steps span{font-size:.86rem;color:#d0dacf;line-height:1.5}
+.note{margin-top:24px;border-left:3px solid #76b900;padding:12px 15px;background:#141c11;color:#b6c9a6;font-size:.8rem;line-height:1.7}
+.panel{background:linear-gradient(145deg,#152013,#0d120c);border:1px solid #34502a;box-shadow:0 18px 58px #0006}
+.panel-head{border-bottom:1px solid #2b4025;padding:26px 30px;display:flex;gap:18px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.panel-head h2{margin:0;font-size:1.1rem;letter-spacing:.05em}
+.panel-head small{color:#93ae84;font-size:.71rem;letter-spacing:.12em}
+.panel-body{padding:28px 30px 32px}
+.availability{display:flex;align-items:flex-start;gap:12px;background:#1a2715;border:1px solid #3a592b;padding:15px;color:#c9dfbc;font-size:.82rem;line-height:1.55;margin-bottom:28px}
+.availability:before{content:"";width:9px;height:9px;background:#78b900;flex:none;margin-top:5px}
+.auth-tabs{display:grid;grid-template-columns:repeat(2,1fr);border-bottom:1px solid #3a4c32;margin-bottom:26px}
+.tab{background:transparent;color:#99ad8e;border:0;padding:15px 10px;font-size:.82rem;font-weight:900;letter-spacing:.09em;border-bottom:3px solid transparent}
+.tab[aria-selected=true]{color:white;border-bottom-color:#76b900}
+label.field{display:block;font-size:.8rem;font-weight:700;color:#e3edde;margin-bottom:19px}
+.field input,.field textarea,.field select{display:block;width:100%;margin-top:9px;padding:13px 14px;border:1px solid #41543a;border-radius:0;background:#0b120a;color:#f6fff1;outline-offset:2px;min-height:46px}
+.field input:focus,.field textarea:focus,.field select:focus{border-color:#8eca40;outline-color:#76b900}
+.field textarea{resize:vertical;min-height:94px}
+.caption{font-size:.75rem;color:#9fad96;line-height:1.65;margin:-5px 0 23px}
+.action{display:block;width:100%;padding:16px;border:1px solid #76b900;background:#76b900;color:#0e1808;font-weight:900;letter-spacing:.09em;font-size:.87rem}
+.action.secondary{background:transparent;color:#c0e59f;border-color:#48663b}
+.action:hover:not(:disabled){filter:brightness(1.14)}
+.feedback{min-height:24px;margin:14px 0 0;color:#d5e9c3;line-height:1.55;font-size:.8rem}
+.feedback.error{color:#f2a79b}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+.check{display:flex;align-items:flex-start;gap:12px;color:#b1c4aa;font-size:.8rem;line-height:1.7;margin:14px 0}
+.check input{margin:5px 0 0;accent-color:#76b900;flex:none;width:17px;height:17px}
+.view[hidden],.field[hidden],section[hidden],div[hidden],p[hidden]{display:none!important}
+.identity{padding:16px;border:1px solid #476a31;background:#1c2b17;color:#c0e5a0;margin-bottom:20px}
+.identity b{font-size:1.12rem;color:white}.identity small{display:block;margin-top:5px;color:#94b686}
+.identity button{margin-top:13px;background:transparent;border:1px solid #607655;color:#deeacc;padding:7px 12px;font-size:.75rem}
+.decision{border:1px solid #4a613a;background:#111b10;padding:20px;line-height:1.8}
+.decision strong{display:block;color:#a8e657;letter-spacing:.06em}
+footer{border-top:1px solid #263522;padding:26px 0 42px;color:#889b80;font-size:.75rem;line-height:1.8}
+.honeypot{position:absolute;left:-9999px;visibility:hidden}
+@media(max-width:800px){.layout{grid-template-columns:1fr;gap:24px}.hero{padding-top:55px}.aside{max-width:100%}}
+@media(max-width:540px){.shell{padding-inline:16px}.grid{grid-template-columns:1fr}.panel-head{padding:21px 18px}.panel-body{padding:22px 18px 27px}.brand{font-size:.83rem}h1{font-size:2.9rem}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 </style>
+<script src="./cbt1-config.js" defer></script>
 </head>
 <body>
-<main class="wrap">
-<header><div class="brand">SHADOWPLAY <b>NEXT</b></div><a class="back" href="./">← BACK TO PROJECT</a></header>
-<div class="eyebrow">CLOSED BETA TEST // ROUND 01</div>
-<h1>JOIN THE<br><em>CBT1.</em></h1>
-<p class="lead">สมัครเป็นผู้ทดสอบ ShadowPlay NEXT รุ่น Closed Beta 1 เพื่อช่วยทดสอบ Overlay, Capture, GPU Profiles และความเข้ากันได้กับเกมจริง การสมัครไม่ได้รับประกันว่าจะได้รับสิทธิ์เข้าทดสอบ</p>
-<section class="card" aria-labelledby="formHeading">
-<h2 id="formHeading">TESTER APPLICATION</h2>
-<p class="caption">กรอกเฉพาะข้อมูลที่จำเป็นต่อการคัดเลือก ไม่ต้องส่งชื่อจริง รหัสผ่าน หมายเลขเครื่อง หรือข้อมูลฮาร์ดแวร์ที่ระบุตัวเครื่องได้</p>
-<div id="status" class="status" role="status">Checking registration availability…</div>
-<form id="application" novalidate>
-<div class="grid">
-<label>ชื่อที่ใช้เรียก / Alias *<input name="alias" maxlength="40" autocomplete="nickname" required placeholder="Tester name"></label>
-<label>อีเมลสำหรับติดต่อ *<input name="email" type="email" maxlength="254" autocomplete="email" required placeholder="you@example.com"></label>
-<label>Windows *<select name="windowsVersion" required><option value="">เลือกระบบ</option><option>Windows 10</option><option>Windows 11</option></select></label>
-<label>Graphics *<select name="gpuVendor" required><option value="">เลือก GPU</option><option>NVIDIA</option><option>AMD</option><option>Intel</option><option>Mixed</option><option>Other</option></select></label>
-<label>สนใจทดสอบ *<select name="testingFocus" required><option value="">เลือกหัวข้อ</option><option>Overlay</option><option>Capture</option><option>GPU Profiles</option><option>DX9 Hook</option><option>UI</option><option>General</option></select></label>
+<header class="topbar"><div class="shell top-inner">
+<a class="brand" href="./">SHADOWPLAY <span>NEXT</span></a>
+<a class="nav-link" href="./">← PROJECT HOME</a>
+</div></header>
+<main>
+<div class="hero"><div class="shell">
+<div class="micro"><span class="status-dot"></span>SHADOWPLAY NEXT / EARLY ACCESS PROGRAM</div>
+<h1>CLOSED BETA<br><strong>TEST 01.</strong></h1>
+<p class="intro">เข้าร่วมทดสอบ ShadowPlay NEXT กับทีมพัฒนา ต้องสร้างบัญชี Duluka ด้วย <b>Username</b> ก่อนสมัคร CBT1 การสมัครเป็นเพียงการขอเข้าร่วม ไม่ใช่การได้รับสิทธิ์ทดสอบโดยอัตโนมัติ</p>
+<div class="hero-meta"><span class="chip green">CBT1 · LIMITED ACCESS</span><span class="chip">WINDOWS 10 / 11</span><span class="chip">ACCOUNT REQUIRED</span></div>
+</div></div>
+<div class="shell layout">
+<aside class="aside">
+<h2>HOW TO PARTICIPATE</h2>
+<p>สมัครบัญชีหรือเข้าสู่ระบบด้วย Username แล้วกรอกข้อมูลสำหรับคัดเลือกผู้ทดสอบจากเครื่อง Windows ของคุณ</p>
+<ol class="steps">
+<li><b>01</b><span>สร้างบัญชี Duluka หรือ Login ด้วย Username ที่มีอยู่</span></li>
+<li><b>02</b><span>กรอกอีเมลและรายละเอียดเครื่องเพื่อสมัคร CBT1</span></li>
+<li><b>03</b><span>เช็กสถานะ Pending / Approved / Waitlist / Rejected จากบัญชีของคุณ</span></li>
+</ol>
+<div class="note">ไม่มีการขอรหัสผ่าน Steam, Discord หรือข้อมูลระบุตัวเครื่อง ผู้สมัครที่ผ่านการอนุมัติจะได้รับข้อมูลเพิ่มเติมจากทีมงานเท่านั้น ไม่ใช่สิทธิ์ดาวน์โหลดอัตโนมัติ</div>
+</aside>
+<div class="panel" id="mainPanel">
+<div class="panel-head"><h2>TESTER PORTAL</h2><small>SECURE ACCOUNT ACCESS</small></div>
+<div class="panel-body">
+<div id="availability" class="availability" role="status">กำลังตรวจสอบสถานะ CBT1…</div>
+<section id="authView" class="view" aria-label="Account login">
+<div class="auth-tabs" role="tablist" aria-label="Account action">
+<button id="loginTab" class="tab" type="button" role="tab" aria-selected="true">LOGIN</button>
+<button id="registerTab" class="tab" type="button" role="tab" aria-selected="false">CREATE ACCOUNT</button>
 </div>
-<label>ข้อมูลเพิ่มเติม (ไม่บังคับ)<textarea name="notes" maxlength="500" placeholder="เกมที่สนใจทดสอบ หรือประสบการณ์ทดสอบ (ไม่ต้องใส่ข้อมูลส่วนตัว)"></textarea></label>
-<div class="honey" aria-hidden="true"><label>Website<input name="website" tabindex="-1" autocomplete="off"></label></div>
-<label class="check"><input name="consent" type="checkbox" required><span>ยินยอมให้ทีม ShadowPlay NEXT ใช้อีเมลและข้อมูลที่กรอกเพื่อพิจารณาใบสมัครและติดต่อเรื่อง CBT1 เท่านั้น สามารถขอให้ลบข้อมูลได้ผ่านช่องทางโครงการ</span></label>
-<button id="submit" type="submit" disabled>REGISTRATION UNAVAILABLE</button>
-<p id="message" role="status" aria-live="polite"></p>
+<form id="authForm">
+<label class="field">Username <input name="username" required minlength="3" maxlength="32" pattern="[A-Za-z0-9._-]{3,32}" autocomplete="username" placeholder="3–32 characters"></label>
+<label class="field">Password <input name="password" type="password" required minlength="8" maxlength="128" autocomplete="current-password" placeholder="อย่างน้อย 8 ตัวอักษร"></label>
+<label id="confirmField" class="field" hidden>Confirm password <input name="confirmPassword" type="password" minlength="8" maxlength="128" autocomplete="new-password" placeholder="พิมพ์รหัสผ่านอีกครั้ง"></label>
+<p class="caption" id="authInfo">ใช้บัญชี Duluka เดิมได้เลย หากยังไม่มีบัญชีให้เลือก Create Account</p>
+<button id="authSubmit" class="action" type="submit" disabled>LOGIN UNAVAILABLE</button>
+<p class="feedback" id="authMessage" role="status" aria-live="polite"></p>
 </form>
 </section>
-<footer>SHADOWPLAY NEXT · COMMUNITY PROJECT · Not affiliated with NVIDIA Corporation · <a href="https://discord.gg/v5qUGVD3jZ">Discord</a></footer>
+<section id="accountView" class="view" aria-label="My tester account" hidden>
+<div class="identity"><b id="signedUsername"></b><small>Signed in · Duluka Account</small><button type="button" id="logout">LOGOUT</button></div>
+<div id="decision" class="decision" hidden>
+<strong id="decisionLabel"></strong><span id="decisionInfo"></span>
+</div>
+<form id="applicationForm" hidden>
+<div class="grid">
+<label class="field">Tester alias *<input name="alias" required maxlength="40" placeholder="ชื่อที่ให้ทีมงานเรียก"></label>
+<label class="field">Email *<input name="email" type="email" maxlength="254" required autocomplete="email" placeholder="name@example.com"></label>
+<label class="field">Windows *<select name="windowsVersion" required><option value="">เลือกรุ่น</option><option>Windows 10</option><option>Windows 11</option></select></label>
+<label class="field">Graphics *<select name="gpuVendor" required><option value="">เลือก GPU</option><option>NVIDIA</option><option>AMD</option><option>Intel</option><option>Mixed</option><option>Other</option></select></label>
+<label class="field">Testing focus *<select name="testingFocus" required><option value="">เลือกด้านที่สนใจ</option><option>Overlay</option><option>Capture</option><option>GPU Profiles</option><option>DX9 Hook</option><option>UI</option><option>General</option></select></label>
+</div>
+<label class="field">Additional notes <textarea name="notes" maxlength="500" placeholder="เกมที่สนใจทดสอบ หรือประสบการณ์ที่เกี่ยวข้อง (ไม่บังคับ)"></textarea></label>
+<div class="honeypot" aria-hidden="true"><input name="website" tabindex="-1" autocomplete="off"></div>
+<label class="check"><input name="consent" type="checkbox" required><span>ยินยอมให้ทีมพัฒนาใช้ Username, อีเมล และข้อมูลใบสมัครเพื่อคัดเลือกและติดต่อเกี่ยวกับ CBT1 เท่านั้น สามารถขอให้ลบใบสมัครผ่านช่องทางโครงการได้</span></label>
+<button class="action" id="applySubmit" type="submit">SUBMIT APPLICATION →</button>
+<p class="feedback" id="applyMessage" role="status" aria-live="polite"></p>
+</form>
+</section>
+</div></div>
+</div>
 </main>
+<footer><div class="shell">SHADOWPLAY NEXT · Independent community project · Not affiliated with NVIDIA Corporation · <a href="https://discord.gg/v5qUGVD3jZ" rel="noopener noreferrer">Community Discord</a></div></footer>
 <script>
 (() => {
-  "use strict";
-  // Public HTTPS API origin must be provided by the deployment operator.
-  // Do not embed API tokens or private server URLs here.
-  const API_BASE = "";
-  const form = document.querySelector("#application");
-  const status = document.querySelector("#status");
-  const button = document.querySelector("#submit");
-  const message = document.querySelector("#message");
-  const api = API_BASE.replace(/\/+$/, "");
-  async function check() {
-    if (!api || !api.startsWith("https://")) {
-      status.textContent = "CBT1 applications are not open yet. Server connection pending.";
-      return;
-    }
-    try {
-      const response = await fetch(api + "/v1/cbt1/status", {cache:"no-store"});
-      if (!response.ok) throw Error("Unavailable");
-      const data = await response.json();
-      if (data.ok && data.accepting === true) {
-        status.textContent = "APPLICATIONS OPEN · CBT1";
-        button.disabled = false;
-        button.textContent = "APPLY FOR CBT1 →";
-      } else status.textContent = "CBT1 applications are currently closed.";
-    } catch { status.textContent = "Registration server unavailable. Try again later."; }
+"use strict";
+const $ = selector => document.querySelector(selector);
+const url = String(window.CBT1_CONFIG?.apiBase ?? "").replace(/\/+$/, "");
+const apiReady = url.startsWith("https://");
+let serverReady = false, accepting = false, token = "", username = "", mode = "login";
+const application = $("#applicationForm");
+const authForm = $("#authForm");
+const availability = $("#availability");
+function showMessage(node, text, error = false) {
+  node.textContent = text;
+  node.classList.toggle("error", error);
+}
+function setMode(next) {
+  mode = next;
+  const register = mode === "register";
+  $("#loginTab").setAttribute("aria-selected", String(!register));
+  $("#registerTab").setAttribute("aria-selected", String(register));
+  $("#confirmField").hidden = !register;
+  authForm.elements.confirmPassword.required = register;
+  authForm.elements.password.autocomplete = register ? "new-password" : "current-password";
+  $("#authInfo").textContent = register
+    ? "Username 3–32 ตัวอักษร (a–z, 0–9, . _ -) และ Password อย่างน้อย 8 ตัวอักษร"
+    : "ใช้บัญชี Duluka เดิมได้เลย หากยังไม่มีบัญชีให้เลือก Create Account";
+  $("#authSubmit").textContent = serverReady ? (register ? "CREATE ACCOUNT →" : "LOGIN →") : "LOGIN UNAVAILABLE";
+  showMessage($("#authMessage"), "");
+}
+$("#loginTab").addEventListener("click", () => setMode("login"));
+$("#registerTab").addEventListener("click", () => setMode("register"));
+async function request(path, options = {}) {
+  const headers = {"Accept":"application/json",...(options.body ? {"Content-Type":"application/json"} : {}),...options.headers};
+  if (token) headers.Authorization = "Bearer " + token;
+  const response = await fetch(url + path, {...options,headers,cache:"no-store",credentials:"omit"});
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || !result.ok) {
+    const err = Error(result.message || "Request failed (" + response.status + ")");
+    err.status = response.status;
+    err.code = result.errorCode || "";
+    throw err;
   }
-  form.addEventListener("submit", async e => {
-    e.preventDefault();
-    if (button.disabled || !form.reportValidity()) return;
-    button.disabled = true;
-    message.textContent = "Sending application…";
-    const values = Object.fromEntries(new FormData(form));
-    values.consent = form.elements.consent.checked;
-    try {
-      const response = await fetch(api + "/v1/cbt1/apply", {
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body:JSON.stringify(values)
-      });
-      const result = await response.json();
-      if (!response.ok || !result.ok) throw Error(result.message || "Submission failed");
-      message.textContent = "ได้รับข้อมูลใบสมัครแล้ว ✅ ทีมงานจะติดต่อหากได้รับเลือก";
-      form.reset();
-    } catch {
-      message.textContent = "ส่งใบสมัครไม่สำเร็จ ข้อมูลยังไม่ถูกยืนยัน กรุณาลองใหม่ภายหลัง";
-    } finally { button.disabled = false; }
-  });
-  check();
+  return result;
+}
+function newDeviceKey() {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+}
+function deviceKeyFor(name) {
+  const id = "duluka_cbt1_device_" + name.toLowerCase();
+  try {
+    const stored = sessionStorage.getItem(id);
+    if (stored) return stored;
+    const created = newDeviceKey();
+    sessionStorage.setItem(id, created);
+    return created;
+  } catch { return newDeviceKey(); }
+}
+async function checkStatus() {
+  if (!apiReady) {
+    availability.textContent = "CBT1 ยังไม่เปิดให้สมัครหรือเข้าสู่ระบบ · ยังไม่ได้ตั้งค่า HTTPS API";
+    return;
+  }
+  try {
+    const data = await request("/v1/cbt1/status");
+    serverReady = true;
+    accepting = data.accepting === true;
+    availability.textContent = accepting
+      ? "CBT1 APPLICATIONS OPEN · สมัครบัญชีและส่งใบสมัครได้แล้ว"
+      : "CBT1 APPLICATIONS CLOSED · สามารถ Login เพื่อดูข้อมูลที่เคยสมัครได้";
+    $("#authSubmit").disabled = false;
+    setMode(mode);
+  } catch {
+    availability.textContent = "ระบบบัญชียังไม่พร้อมใช้งาน กรุณากลับมาใหม่ภายหลัง";
+  }
+}
+async function renderMine() {
+  const data = await request("/v1/cbt1/me");
+  $("#authView").hidden = true;
+  $("#accountView").hidden = false;
+  username = data.username;
+  $("#signedUsername").textContent = "@" + username;
+  if (data.application) {
+    application.hidden = true;
+    $("#decision").hidden = false;
+    const status = data.application.decision || "pending";
+    $("#decisionLabel").textContent = "APPLICATION · " + status.toUpperCase();
+    $("#decisionInfo").textContent = status === "approved"
+      ? "ได้รับการอนุมัติเข้าร่วม CBT1 แล้ว รอคำแนะนำจากทีมงานก่อนเข้าทดสอบ"
+      : status === "pending" ? "ทีมงานได้รับใบสมัครแล้ว และกำลังพิจารณา"
+      : status === "waitlist" ? "ใบสมัครอยู่ในรายชื่อสำรอง"
+      : "ใบสมัครรอบนี้ไม่ได้รับการคัดเลือก";
+  } else {
+    $("#decision").hidden = false;
+    $("#decisionLabel").textContent = accepting ? "APPLICATION · NOT SUBMITTED" : "APPLICATIONS CLOSED";
+    $("#decisionInfo").textContent = accepting
+      ? "กรอกข้อมูลด้านล่างเพื่อสมัครเป็นผู้ทดสอบ CBT1"
+      : "ยังไม่เปิดรับใบสมัครใหม่ในขณะนี้";
+    application.hidden = !accepting;
+    application.elements.alias.value ||= username;
+  }
+}
+authForm.addEventListener("submit", async event => {
+  event.preventDefault();
+  if (!serverReady || !authForm.reportValidity()) return;
+  const name = authForm.elements.username.value.trim();
+  const password = authForm.elements.password.value;
+  if (mode === "register" && password !== authForm.elements.confirmPassword.value) {
+    showMessage($("#authMessage"), "รหัสผ่านทั้งสองช่องไม่ตรงกัน", true); return;
+  }
+  const submit = $("#authSubmit");
+  submit.disabled = true;
+  showMessage($("#authMessage"), "Authenticating…");
+  try {
+    const body = {
+      username:name, password,
+      deviceKey:deviceKeyFor(name),
+      deviceName:"ShadowPlay NEXT CBT1 Browser"
+    };
+    const data = await request("/v1/auth/" + (mode === "register" ? "register" : "login"), {
+      method:"POST",body:JSON.stringify(body)
+    });
+    if (!data.resource?.sessionToken) throw Error("Missing session token");
+    token = data.resource.sessionToken; // Memory only: never localStorage or URL.
+    password.length; // Credentials are not stored after this request.
+    authForm.reset();
+    await renderMine();
+  } catch (err) {
+    if (token) { token = ""; $("#accountView").hidden = true; $("#authView").hidden = false; }
+    const known = {
+      "conflict.username_taken":"Username นี้ถูกใช้แล้ว",
+      "invalid_credentials":"Username หรือ Password ไม่ถูกต้อง",
+      "invalid_password":"รูปแบบรหัสผ่านไม่ถูกต้อง",
+      "invalid_username":"ชื่อผู้ใช้ไม่ถูกต้อง",
+      "conflict.link_conflict":"อุปกรณ์นี้ถูกผูกกับบัญชีอื่น ลองใช้ Browser session ใหม่"
+    };
+    showMessage($("#authMessage"), known[err.code] || err.message || "เข้าสู่ระบบไม่สำเร็จ", true);
+  } finally {submit.disabled = false;}
+});
+$("#logout").addEventListener("click", async () => {
+  const old = token;
+  token = "";
+  username = "";
+  $("#accountView").hidden = true;
+  $("#authView").hidden = false;
+  application.hidden = true;
+  authForm.reset();
+  setMode("login");
+  if (old) {
+    try { await fetch(url + "/v1/auth/session/revoke", {
+      method:"POST",headers:{Authorization:"Bearer " + old},credentials:"omit",cache:"no-store"
+    }); } catch { /* local session already cleared; server TTL still applies */ }
+  }
+});
+application.addEventListener("submit", async event => {
+  event.preventDefault();
+  if (!accepting || !token || !application.reportValidity()) return;
+  const submit = $("#applySubmit");
+  submit.disabled = true;
+  showMessage($("#applyMessage"), "Submitting…");
+  try {
+    const values = Object.fromEntries(new FormData(application));
+    values.consent = application.elements.consent.checked;
+    await request("/v1/cbt1/apply", {method:"POST", body:JSON.stringify(values)});
+    showMessage($("#applyMessage"), "ได้รับใบสมัครแล้ว");
+    await renderMine();
+  } catch (err) {
+    showMessage($("#applyMessage"), err.status === 401
+      ? "Session หมดอายุ กรุณา Logout แล้ว Login ใหม่"
+      : (err.message || "ส่งข้อมูลไม่สำเร็จ"), true);
+  } finally {submit.disabled = false;}
+});
+checkStatus();
 })();
 </script>
 </body></html>
