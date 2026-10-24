@@ -1,5 +1,6 @@
 Imports System
 Imports System.IO
+Imports System.Diagnostics
 
 Module Program
     Private _passed As Integer
@@ -17,6 +18,22 @@ Module Program
         "{""codec_type"":""audio"",""codec_name"":""aac"",""start_time"":""0.221000"",""duration"":""2.780000"",""channels"":1}]}"
 
     Sub Main(args As String())
+        If args.Length = 3 AndAlso
+           String.Equals(args(0), "--perf-only", StringComparison.Ordinal) Then
+            ' Measure the REAL production inspector from inside the managed
+            ' process; omit dotnet build, startup and other unit-test time.
+            Dim clock = Stopwatch.StartNew()
+            Dim result = CaptureMediaInspector.Inspect(args(2), args(1))
+            clock.Stop()
+            If Not result.Verified OrElse Not result.PacketCountChecked OrElse
+               Not result.VideoPacketsRead.HasValue OrElse
+               Not result.VideoFramesDeclared.HasValue OrElse
+               result.VideoPacketsRead.Value <> result.VideoFramesDeclared.Value Then
+                Throw New Exception("MEDIA_INSPECT_FAIL: " & result.Reason)
+            End If
+            Console.WriteLine($"MEDIA_INSPECT_PASS scan_ms={clock.ElapsedMilliseconds} video_packets={result.VideoPacketsRead.Value} bytes={(New FileInfo(args(2))).Length}")
+            Exit Sub
+        End If
         Dim parsed = CaptureMediaInspector.ParseProbeJson(TwoAudio)
         Check("Two audio streams detected", parsed.Verified AndAlso parsed.AudioStreams = 2)
         Check("Audio codecs reported", parsed.AudioCodecs.Length = 2 AndAlso
