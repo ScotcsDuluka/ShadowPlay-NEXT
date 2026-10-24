@@ -89,7 +89,7 @@ There is **no registration form linked here yet**. An application page will be l
 | **OSC / Native Host** | CEF + Angular interface, native Host integration, NVIDIA-style controls, route/input lifecycle | **Implemented / testing** |
 | **Freestyle V5** | Drag-and-drop Main-menu Groups and Controls, Small / Side / Big layouts, Auto-Fill, Undo / Done / Cancel, native `md-menu` and `md-select` | **Implemented / testing** |
 | **OSC Motion** | Original-style transitions, preflight layout positioning, native lifecycle integration | **Implemented; open/close QA ongoing** |
-| **Game Profiles / GPU preferences** | Per-application executable profiles, names, GPU adapter selection and Windows Graphics preference controls via the NVIDIA Graphics backend; optional Freestyle V5 native Control | **User-reported manual multi-GPU laptop check passed: separate GPUs were detected and could be selected; wider save/apply and game-rendering verification pending** |
+| **Game Profiles / GPU preferences** | Per-application executable profiles, names, GPU adapter selection and Windows Graphics preference controls via the NVIDIA Graphics backend; optional Freestyle V5 native Control | **Developer-reported end-to-end laptop test passed: distinct GPUs detected, selection applied, game rendered on the chosen GPU, and preference persisted after restart** |
 | **ApplicationOntology game catalog** | Separate Cloudflare Pages catalog/identity API from `C:\\My Project\\nv-ontology-pages`: supported executable names, matching, render-API hints and update notifications | **Public API ready: v1.2.7 / 6 entries, checked 2026-10-24; name matches are not verified identities** |
 | **Game Filter** | ReShade effects/preset integration and OSC control surface | **Experimental integration** |
 | **DirectX Adapter / Hook** | D3D9/D3D9Ex and DXGI/D3D11 renderer paths, shared-frame transport work | **Experimental; per-API gates** |
@@ -177,7 +177,7 @@ Some examples from subsystem-specific validation records:
 | Freestyle V5 Node regression — **2026-10-23** | **135 passed / 0 failed** in the selected suite | Public release readiness |
 | Real OSC CEF combined checks — **2026-10-23** | **18 / 18** previously passed | All future runtime builds |
 | Later OSC CEF source preview — **2026-10-23** | 12 native controls observed; closed/idle state checked | A successful Native Host open transition |
-| Game Profiles multi-GPU laptop check — **user report, 2026-10-24** | Distinct GPUs were detected and could be selected separately on a second Windows laptop | Persistence across restarts or proof of which GPU a game rendered on |
+| Game Profiles multi-GPU laptop check — **developer report, 2026-10-24** | Distinct GPUs detected and selectable; developer confirmed that the game rendered on the chosen GPU and the saved setting persisted after restart | Independent reproduction, all games/drivers/GPUs or performance guarantees |
 | D3D11 Hook smoke — **2026-10-22** | **9 Presents / 6 composed frames** in the recorded test | General game compatibility |
 | DX9 interactive smoke — **2026-10-22** | Foreground automation blocked that run | A passing real-game DX9 test |
 

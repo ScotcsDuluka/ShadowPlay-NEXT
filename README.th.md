@@ -91,7 +91,7 @@
 | **OSC / Native Host** | หน้าตา CEF + Angular, เชื่อม Native Host, NVIDIA Controls และวงจร Route/Input | **พัฒนาแล้ว / กำลังทดสอบ** |
 | **Freestyle V5** | ลากจัด Main-menu, Group/Control, Block แบบ Small / Side / Big, Auto-Fill, Undo / Done / Cancel พร้อม `md-menu` และ `md-select` จริง | **พัฒนาแล้ว / กำลังทดสอบ** |
 | **OSC Motion** | Transition, การจัดตำแหน่งล่วงหน้า และการทำงานร่วมกับวงจร Native OSC | **พัฒนาแล้ว / ยังตรวจ Open-Close** |
-| **Game Profiles / GPU Preferences** | จัดการโปรไฟล์รายแอปจากไฟล์ `.exe`, ตั้งชื่อ, เลือก GPU Adapter และกำหนด Windows Graphics Preferences ผ่าน NVIDIA Graphics Backend พร้อม Control เสริมใน Freestyle V5 | **ผู้พัฒนารายงานว่าทดลองกับโน้ตบุ๊กที่มีหลาย GPU แล้ว: ตรวจพบการ์ดแยกกันและเลือกแยกได้จริง; ยังต้องตรวจ Save/Apply ในหลายเครื่องและ GPU ที่เกมใช้เรนเดอร์จริง** |
+| **Game Profiles / GPU Preferences** | จัดการโปรไฟล์รายแอปจากไฟล์ `.exe`, ตั้งชื่อ, เลือก GPU Adapter และกำหนด Windows Graphics Preferences ผ่าน NVIDIA Graphics Backend พร้อม Control เสริมใน Freestyle V5 | **ผู้พัฒนาทดสอบบนโน้ตบุ๊กจริง: พบ GPU แยกกัน เลือกการ์ดได้ เกมเรนเดอร์ผ่าน GPU ที่เลือกจริง และค่าที่บันทึกยังอยู่หลัง Restart** |
 | **ApplicationOntology / ฐานข้อมูลเกม** | API แค็ตตาล็อกเกมแยกบน Cloudflare Pages จาก `C:\\My Project\\nv-ontology-pages`: ระบุชื่อไฟล์เกม, ตรวจจับเบื้องต้น, คำใบ้ Graphics API และแจ้งอัปเดตแค็ตตาล็อก | **Public API พร้อม: v1.2.7 / 6 เกม (ตรวจ 24 ต.ค. 2569); จับคู่ชื่อไฟล์ไม่เท่ากับยืนยันตัวตน** |
 | **Game Filter** | การเชื่อม ReShade Effect/Preset กับหน้า OSC | **ทดลอง / ยังตรวจการเชื่อมจริง** |
 | **DirectX Adapter / Hook** | เส้นทาง D3D9/D3D9Ex และ DXGI/D3D11 พร้อมการส่งเฟรมแบบแชร์ | **ทดลอง / มีเกณฑ์ทดสอบแยกตาม API** |
@@ -181,7 +181,7 @@ Adapter มีโค้ดรองรับเส้นทาง D3D9/D3D9Ex �
 | Freestyle V5 Node Regression — **23 ต.ค. 2569** | **135 ผ่าน / 0 ไม่ผ่าน** ในชุดที่เลือก | NEXT พร้อมเป็น Public Release |
 | OSC CEF Combined — **23 ต.ค. 2569** | **18 / 18 ผ่าน** ในรอบที่บันทึก | Runtime ใหม่ทุก Build จะผ่านเหมือนกัน |
 | OSC CEF Source Preview รอบถัดมา — **23 ต.ค. 2569** | พบ Native Controls ครบ 12 และตรวจ Closed/Idle แล้ว | การเปิด Native Host สำเร็จตลอดวงจร |
-| ทดสอบ Game Profiles บนโน้ตบุ๊กหลาย GPU — **ผู้พัฒนารายงาน 24 ต.ค. 2569** | พบ GPU แยกกันและสามารถเลือกการ์ดแยกได้จริงบนเครื่องที่สอง | โปรไฟล์คงอยู่หลัง Restart หรือเกมเรนเดอร์ด้วย GPU ที่เลือกจริงทุกกรณี |
+| ทดสอบ Game Profiles บนโน้ตบุ๊กหลาย GPU — **ผู้พัฒนารายงาน 24 ต.ค. 2569** | พบ GPU แยกกัน เลือกการ์ดได้ เกมเรนเดอร์ผ่าน GPU ที่เลือกจริง และบันทึกค่าไว้ได้หลัง Restart | ยังไม่ได้ยืนยันซ้ำอย่างอิสระหรือกับเกมและ GPU ทุกประเภท |
 | D3D11 Hook Smoke — **22 ต.ค. 2569** | **9 Presents / 6 Composed Frames** | ใช้งานได้กับทุกเกม |
 | DX9 Interactive Smoke — **22 ต.ค. 2569** | เครื่องมือทดสอบติดข้อจำกัด Foreground Window | ผ่านการทดสอบ DX9 กับเกมจริง |
 
