@@ -56,8 +56,17 @@
     }
     function animated(){return visible&&current.mode==='website'&&current.opacity>0&&current.motion&&!(reduced&&reduced.matches)&&!document.hidden;}
     function tick(now){frame=null;if(!animated())return;if(!lastTime||now-lastTime>=32){var delta=lastTime?Math.min(3,(now-lastTime)/16.667)*current.speed:1;lastTime=now;draw(delta);}frame=window.requestAnimationFrame(tick);}
+    function gameOverlayRoute(hash){
+      // The native Game Filter (mods), Photo Mode and Performance editors
+      // overlay the live game. Never paint the Main-menu backdrop over them,
+      // even if a Settings preview flag was left active during navigation.
+      return /^#\/(?:base\/)?(?:mods|nvcamera|octoolmenu)(?:\/|\?|$)/i.test(hash||'');
+    }
     function update(){
-      visible=document.documentElement.hasAttribute('data-osc-bg-preview')||!!(window.location.hash&&window.location.hash!=='#/base'&&window.location.hash!=='#/base/');
+      var hash=window.location.hash||'';
+      visible=!gameOverlayRoute(hash)&&(
+        document.documentElement.hasAttribute('data-osc-bg-preview')||
+        !!(hash&&hash!=='#/base'&&hash!=='#/base/'));
       var website=visible&&current.mode==='website';
       // Both Classic and Website must paint the same fixed full-viewport
       // surface. The native .nv-osc content begins below the top bar and

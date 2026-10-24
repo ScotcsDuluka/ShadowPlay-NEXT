@@ -251,6 +251,33 @@ test('the closed OSC route has no visible background and schedules no animation'
   assert.equal(f.frames.size, 0);
 });
 
+test('game-overlay editor routes do not bring the opaque menu background over the live game', () => {
+  const f = renderer({ hash: '#/base/main-menu' });
+  assert.equal(f.root.style.display, 'block');
+  assert.equal(f.frames.size, 1);
+
+  // Game Filter / Photo Mode / Performance draw above a game frame, not a
+  // fullscreen Main-menu backdrop. Both native and nested hash variants
+  // must suspend the background immediately when navigation changes.
+  for (const route of ['#/mods', '#/base/mods', '#/nvcamera', '#/base/nvcamera',
+    '#/octoolmenu', '#/base/octoolmenu']) {
+    f.navigate(route);
+    assert.equal(f.root.style.display, 'none', route);
+    assert.equal(f.frames.size, 0, route + ' must cancel the particle loop');
+    assert.equal(f.html.classList.contains('nv-osc-bg-website'), false, route);
+    assert.equal(f.html.classList.contains('nv-osc-bg-classic'), false, route);
+    f.navigate('#/base/main-menu');
+    assert.equal(f.root.style.display, 'block', 'menu background should return');
+    assert.equal(f.frames.size, 1, 'animation should restart only for the menu');
+  }
+
+  f.html.setAttribute('data-osc-bg-preview', '');
+  f.navigate('#/mods');
+  assert.equal(f.root.style.display, 'none', 'stale preview must not cover the game editor');
+  f.navigate('#/base/preferences');
+  assert.equal(f.root.style.display, 'block', 'Settings background stays available');
+});
+
 test('opening the menu uses 50% opacity and maintains a single animation loop', () => {
   const f = renderer();
   f.navigate('#/base/main-menu');
