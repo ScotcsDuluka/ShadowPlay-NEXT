@@ -26,6 +26,16 @@ builder.Configuration.AddEnvironmentVariables(prefix: "DULUKA_");
 
 // Public API is opt-in; only a loopback proxy may feed it.
 var publicApiMode = builder.Configuration.GetValue<bool>("PublicApi:Enabled");
+var localAdminMode = builder.Configuration.GetValue<bool>("LocalAdmin:Enabled");
+if (localAdminMode)
+{
+    // A dedicated local dashboard process shares the chosen SQLite DB but
+    // NEVER binds a network-facing interface or serves public account routes.
+    if (publicApiMode || !string.Equals(builder.Configuration["Urls"],
+        "http://127.0.0.1:5117", StringComparison.OrdinalIgnoreCase))
+        throw new InvalidOperationException(
+            "LocalAdmin mode requires PublicApi disabled and Urls=http://127.0.0.1:5117.");
+}
 var publicProxy = (builder.Configuration["PublicApi:Proxy"] ?? "cloudflare").Trim().ToLowerInvariant();
 var publicHostname = (builder.Configuration["PublicApi:Hostname"] ?? "").Trim().TrimEnd('.');
 if (publicApiMode && publicProxy is not ("cloudflare" or "tailscale"))
@@ -121,6 +131,34 @@ builder.Services.AddSingleton(adminLogs);
 builder.Logging.AddProvider(new AdminLogBufferProvider(adminLogs));
 
 var app = builder.Build();
+if (localAdminMode)
+{
+    app.Use(async (ctx, next) =>
+    {
+        // Host validation also blocks DNS-rebinding requests from remote sites.
+        var host = ctx.Request.Host;
+        if (!IPAddress.IsLoopback(ctx.Connection.RemoteIpAddress ?? IPAddress.None)
+            || !string.Equals(host.Host, "127.0.0.1", StringComparison.OrdinalIgnoreCase)
+            || host.Port != 5117)
+        {
+            ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return;
+        }
+
+        // Local Admin instance exposes only its dashboard and health checks.
+        if (!ctx.Request.Path.StartsWithSegments("/admin", StringComparison.OrdinalIgnoreCase)
+            && !ctx.Request.Path.StartsWithSegments("/healthz", StringComparison.OrdinalIgnoreCase))
+        {
+            ctx.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+
+        ctx.Response.Headers.CacheControl = "no-store";
+        ctx.Response.Headers["X-Frame-Options"] = "DENY";
+        ctx.Response.Headers["X-Content-Type-Options"] = "nosniff";
+        await next();
+    });
+}
 if (publicApiMode)
 {
     // Public surface: HTTPS Tailscale/Cloudflare -> trusted loopback proxy.
@@ -170,7 +208,8 @@ if (publicApiMode)
     });
 }
 if (publicApiMode) app.MapPortal();
-app.UseCors("cbt1-web");
+// Only /v1/cbt1 endpoints opt into CORS. Never grant browser CORS to /admin.
+app.UseCors();
 app.UseRateLimiter();
 app.MapCbt1();
 

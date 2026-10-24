@@ -5,7 +5,8 @@
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
   var i18n = window.LauncherI18n;
-  var tabs = ['Power','Core','Config','Addons'];
+  var tabs = ['Power','Core','Addons'];
+  var pages = ['Power','Core','Config','Addons'];
   var modules = [
     ['Container','NVIDIA Container'],['Overlay','On-Screen Control'],
     ['NodeApi','NVIDIA NodeAPI'],['Capture','NVIDIA Capture'],
@@ -35,10 +36,13 @@
     return '';
   }
   function show(tab) {
-    for (var i = 0; i < tabs.length; i++) {
-      var name = tabs[i], active = name === tab;
-      var page = $('quickPage' + name), button = $('quickNav' + name);
-      if (page) page.classList.toggle('active', active);
+    for (var i = 0; i < pages.length; i++) {
+      var page = $('quickPage' + pages[i]);
+      if (page) page.classList.toggle('active', pages[i] === tab);
+    }
+    for (var j = 0; j < tabs.length; j++) {
+      var name = tabs[j], active = name === tab || (tab === 'Config' && name === 'Core');
+      var button = $('quickNav' + name);
       if (button) {
         button.classList.toggle('active', active);
         if (active) button.setAttribute('aria-current', 'page');
@@ -53,7 +57,7 @@
       if (button) button.addEventListener('click', function () { show(name); });
     })(tabs[t]);
   }
-  // The native appearance manager is reused INSIDE Config Module.
+  // The native appearance manager is reused INSIDE each module's detail page.
   // Never place visual profiles in Add-ons: there are no extra runtime modules.
   var appearance = $('appearanceSettings'), slot = $('quickAppearanceSlot');
   if (appearance && slot) slot.appendChild(appearance);
@@ -108,6 +112,11 @@
     if (target) target.value = id;
     var name = $('quickConfigName');
     if (name) name.textContent = valid[id];
+    var heading = $('quickConfigTitle');
+    if (heading) {
+      heading.removeAttribute('data-i18n');
+      heading.textContent = tr('quickConfigure') + ' · ' + valid[id];
+    }
     paintConfigStatus();
     if (typeof window.__onModuleAppearanceTargetChanged === 'function')
       window.__onModuleAppearanceTargetChanged();
