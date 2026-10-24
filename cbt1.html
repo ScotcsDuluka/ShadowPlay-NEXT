@@ -64,7 +64,7 @@ footer{border-top:1px solid #263522;padding:26px 0 42px;color:#889b80;font-size:
 @media(max-width:540px){.shell{padding-inline:16px}.grid{grid-template-columns:1fr}.panel-head{padding:21px 18px}.panel-body{padding:22px 18px 27px}.brand{font-size:.83rem}h1{font-size:2.9rem}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 </style>
-<script src="./cbt1-config.js" defer></script>
+<script src="./cbt1-config.js"></script>
 </head>
 <body>
 <header class="topbar"><div class="shell top-inner">
@@ -255,7 +255,6 @@ authForm.addEventListener("submit", async event => {
     });
     if (!data.resource?.sessionToken) throw Error("Missing session token");
     token = data.resource.sessionToken; // Memory only: never localStorage or URL.
-    password.length; // Credentials are not stored after this request.
     authForm.reset();
     await renderMine();
   } catch (err) {
