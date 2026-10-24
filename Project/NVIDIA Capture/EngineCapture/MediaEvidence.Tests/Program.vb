@@ -18,6 +18,35 @@ Module Program
         "{""codec_type"":""audio"",""codec_name"":""aac"",""start_time"":""0.221000"",""duration"":""2.780000"",""channels"":1}]}"
 
     Sub Main(args As String())
+        If args.Length = 5 AndAlso
+           String.Equals(args(0), "--decode-only", StringComparison.Ordinal) Then
+            Dim normal = CaptureMediaInspector.Inspect(args(3), args(1))
+            Check("Structural packet scanner accepts full container",
+                  normal.Verified AndAlso normal.PacketCountChecked AndAlso
+                  Not normal.VideoDecodeChecked)
+            Dim deep = CaptureMediaInspector.InspectWithVideoDecode(
+                args(3), args(1), args(2))
+            Select Case args(4)
+                Case "valid"
+                    Check("Healthy video fully decodes",
+                          deep.Verified AndAlso deep.VideoDecodeChecked AndAlso
+                          deep.VideoDecodeVerified)
+                Case "corrupt"
+                    Check("Full decode rejects equal-packet-count corrupt video",
+                          Not deep.Verified AndAlso deep.VideoDecodeChecked AndAlso
+                          Not deep.VideoDecodeVerified AndAlso
+                          deep.Reason = "video_decode_failed")
+                Case "missing-tool"
+                    Check("Missing decoder fails closed instead of assuming clean video",
+                          Not deep.Verified AndAlso Not deep.VideoDecodeVerified AndAlso
+                          deep.Reason = "ffmpeg_decode_tool_missing")
+                Case Else
+                    Throw New ArgumentException("Expected valid, corrupt or missing-tool")
+            End Select
+            Console.WriteLine("VIDEO_DECODE_PROBE_PASS checks=" & _passed &
+                              " type=" & args(4))
+            Exit Sub
+        End If
         If args.Length = 3 AndAlso
            String.Equals(args(0), "--perf-only", StringComparison.Ordinal) Then
             ' Measure the REAL production inspector from inside the managed

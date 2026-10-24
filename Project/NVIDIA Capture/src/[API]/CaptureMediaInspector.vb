@@ -27,6 +27,9 @@ Public NotInheritable Class CaptureMediaInspector
         ''' <summary>Video frames advertised in the MP4 track table, when present.</summary>
         Public Property VideoFramesDeclared As Long?
         Public Property PacketCountChecked As Boolean
+        ''' <summary>Only set when the optional full video decoder was invoked.</summary>
+        Public Property VideoDecodeChecked As Boolean
+        Public Property VideoDecodeVerified As Boolean
         Public Property DurationSec As Double?
         Public Property VideoStartSec As Double?
         Public Property FirstAudioStartSec As Double?
@@ -225,6 +228,74 @@ Public NotInheritable Class CaptureMediaInspector
             End Using
         Catch ex As Exception
             Return New Evidence With {.Reason = "ffprobe_error_" & ex.GetType().Name}
+        End Try
+    End Function
+
+    ''' <summary>
+    ''' Optional full video bitstream decode, for manual/deep verification.
+    ''' This intentionally is NOT called by production Inspect/REST: decoding
+    ''' hours of video on the recording-stop request would block the UI.
+    ''' Returns a failed Evidence on timeout/decoder error; never modifies media.
+    ''' </summary>
+    Public Shared Function InspectWithVideoDecode(filePath As String,
+                                                  ffprobePath As String,
+                                                  ffmpegPath As String) As Evidence
+        Dim result = Inspect(filePath, ffprobePath)
+        If Not result.Verified Then Return result
+        If String.IsNullOrWhiteSpace(ffmpegPath) OrElse Not File.Exists(ffmpegPath) Then
+            result.Verified = False
+            result.Reason = "ffmpeg_decode_tool_missing"
+            Return result
+        End If
+        Try
+            Dim psi As New ProcessStartInfo(ffmpegPath) With {
+                .UseShellExecute = False,
+                .CreateNoWindow = True,
+                .RedirectStandardOutput = True,
+                .RedirectStandardError = True,
+                .RedirectStandardInput = False
+            }
+            ' -nostdin avoids accidentally consuming user keystrokes.
+            ' -xerror stops on the first video bitstream decoding error.
+            ' -f null sends decoded frames nowhere (no files, no playback).
+            For Each arg In {"-nostdin", "-hide_banner", "-loglevel", "error",
+                             "-xerror", "-i", filePath,
+                             "-map", "0:v:0", "-an", "-f", "null", "-"}
+                psi.ArgumentList.Add(arg)
+            Next
+            Using proc = Process.Start(psi)
+                If proc Is Nothing Then
+                    result.Verified = False
+                    result.Reason = "ffmpeg_decode_spawn_failed"
+                    Return result
+                End If
+                result.VideoDecodeChecked = True
+                Dim errors = proc.StandardError.ReadToEndAsync()
+                Dim output = proc.StandardOutput.ReadToEndAsync()
+                If Not proc.WaitForExit(15000) Then
+                    Try
+                        proc.Kill(True)
+                        proc.WaitForExit(2000)
+                    Catch
+                    End Try
+                    result.Verified = False
+                    result.Reason = "ffmpeg_decode_timeout"
+                    Return result
+                End If
+                Dim errorText = errors.GetAwaiter().GetResult()
+                output.GetAwaiter().GetResult()
+                If proc.ExitCode <> 0 OrElse errorText.Length > 0 Then
+                    result.Verified = False
+                    result.Reason = "video_decode_failed"
+                    Return result
+                End If
+                result.VideoDecodeVerified = True
+                Return result
+            End Using
+        Catch ex As Exception
+            result.Verified = False
+            result.Reason = "ffmpeg_decode_error_" & ex.GetType().Name
+            Return result
         End Try
     End Function
 End Class
