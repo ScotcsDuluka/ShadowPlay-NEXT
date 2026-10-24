@@ -29,11 +29,19 @@ Partial Public Class LegacyCaptureEngine
 
         sb.Append("-hide_banner -loglevel info ")
 
+        ' A saved Capture display is owned by NvCapture, not OSC/Container.
+        ' Fail closed if the same DXGI monitor identity has disappeared.
+        Dim selectedDisplay As CaptureDisplayCatalog.Display = Nothing
+        If IO.File.Exists(CaptureDisplayCatalog.SelectionPath(AppLayout.Dir)) Then
+            selectedDisplay = CaptureDisplayCatalog.Resolve(
+                AppLayout.Dir, CaptureDisplayCatalog.Enumerate())
+        End If
+        Dim outputIndex As Integer = If(selectedDisplay Is Nothing, 0, selectedDisplay.OutputIndex)
         Dim videoFilter As String = ""
 
         Select Case _settings.CaptureMethod.ToLower()
             Case "ddagrab"
-                sb.Append("-f lavfi -i ""ddagrab=output_idx=0:framerate=" & fpsStr & """ ")
+                sb.Append("-f lavfi -i ""ddagrab=output_idx=" & outputIndex.ToString() & ":framerate=" & fpsStr & """ ")
                 Select Case hwType
                     Case HwDeviceType.IntelQSV
                         ' hwmap=derive_device=qsv fails on Intel iGPU (MFX session -9
@@ -50,10 +58,21 @@ Partial Public Class LegacyCaptureEngine
                 End Select
 
             Case "gdigrab"
-                sb.Append("-f gdigrab -framerate " & fpsStr & " -i desktop ")
+                If selectedDisplay IsNot Nothing Then
+                    sb.Append("-f gdigrab -framerate " & fpsStr &
+                        " -offset_x " & selectedDisplay.Left.ToString() &
+                        " -offset_y " & selectedDisplay.Top.ToString() &
+                        " -video_size " & selectedDisplay.Width.ToString() & "x" &
+                        selectedDisplay.Height.ToString() & " -i desktop ")
+                Else
+                    sb.Append("-f gdigrab -framerate " & fpsStr & " -i desktop ")
+                End If
                 videoFilter = ""
 
             Case "gfxcapture"
+                If selectedDisplay IsNot Nothing Then
+                    Throw New InvalidOperationException("gfxcapture_monitor_mapping_unverified")
+                End If
                 sb.Append("-f lavfi -i ""gfxcapture=monitor_idx=0:max_framerate=" & fpsStr & """ ")
                 Select Case hwType
                     Case HwDeviceType.IntelQSV

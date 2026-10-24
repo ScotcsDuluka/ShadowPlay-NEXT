@@ -5,7 +5,7 @@
   var catalogEndpoint = '/DulukaCapture/v.1.0/engines';
   var panelId = 'nv-video-capture-options';
   var panelStackId = 'nv-video-capture-panels';
-  var panelVersion = '67';
+  var panelVersion = '68';
   var state = null;
   var statusNode = null;
   var captureFields = [];
@@ -15,6 +15,8 @@
   var runtimeStatusTimer = null;
   var encoderNames = {};
   var encoderCatalog = null;
+  var displayRecords = [];
+  var displayStatusNode = null;
   var panelScope = null;
   var injector = null;
   var presetChoices = {
@@ -179,6 +181,59 @@
     }
   }
 
+  function captureDisplayKey(display) {
+    return String(display.AdapterLuidHigh) + ':' +
+      String(display.AdapterLuidLow) + ':' + String(display.OutputIndex);
+  }
+
+  function refreshCaptureDisplays() {
+    if (!panelScope) return Promise.resolve(false);
+    panelScope.captureDisplayReady = false;
+    panelScope.captureDisplayStatus = 'Reading displays from NVIDIA Capture…';
+    schedulePanelDigest();
+    return fetchWithTimeout('/DulukaCapture/v.1.0/displays', {}, 3500)
+      .then(function (response) {
+        if (!response.ok) throw new Error('Display gateway unavailable (' + response.status + ')');
+        return response.json();
+      }).then(function (body) {
+        if (!body || body.schemaVersion !== 1 || !Array.isArray(body.displays) ||
+            body.selectionValid !== true || !body.selected) {
+          throw new Error('Selected display unavailable');
+        }
+        displayRecords = body.displays.filter(function (display) {
+          return display && Number.isInteger(display.OutputIndex) &&
+            Number.isInteger(display.AdapterLuidHigh) &&
+            Number.isInteger(display.AdapterLuidLow) &&
+            display.Width > 0 && display.Height > 0;
+        });
+        var selected = displayRecords.filter(function (d) {
+          return captureDisplayKey(d) === captureDisplayKey(body.selected);
+        })[0];
+        if (!selected || !displayRecords.length) {
+          throw new Error('Saved display is disconnected');
+        }
+        panelScope.captureDisplayChoices = displayRecords.map(function (display) {
+          return { value: captureDisplayKey(display),
+            label: display.Label || ('Display ' + (display.OutputIndex + 1) +
+              ' — ' + display.Width + '×' + display.Height) };
+        });
+        panelScope.captureUi.displayKey = captureDisplayKey(selected);
+        panelScope.captureDisplayReady = !body.recording;
+        panelScope.captureDisplayStatus = body.recording ?
+          'Display selection locked while recording.' :
+          'Primary Capture display for Record / Replay / Screenshot. Changes apply after engine rebuild.';
+        schedulePanelDigest();
+        return true;
+      }).catch(function (err) {
+        panelScope.captureDisplayReady = false;
+        panelScope.captureDisplayChoices = [];
+        displayRecords = [];
+        panelScope.captureDisplayStatus = 'Capture displays unavailable — ' + err.message;
+        schedulePanelDigest();
+        return false;
+      });
+  }
+
   function createPanelScope() {
     injector = window.angular.element(document.documentElement).injector();
     if (!injector) return null;
@@ -186,6 +241,9 @@
     panelScope = injector.get('$rootScope').$new();
     panelScope.captureUi = {};
     panelScope.captureSettingsReady = false;
+    panelScope.captureDisplayReady = false;
+    panelScope.captureDisplayChoices = [];
+    panelScope.captureDisplayStatus = 'Checking available displays…';
     panelScope.captureEngineChoices = [
       { value: 'FFmpeg', label: 'FFmpeg Capture' },
       { value: 'Duluka', label: 'Duluka Capture' }
@@ -250,6 +308,41 @@
       state.quality = 'Custom';
       state.encoderPreset = preset;
       save();
+    };
+    panelScope.onCaptureDisplayChange = function () {
+      if (!panelScope.captureDisplayReady) return;
+      var desired = displayRecords.filter(function (d) {
+        return captureDisplayKey(d) === panelScope.captureUi.displayKey;
+      })[0];
+      if (!desired) return;
+      panelScope.captureDisplayReady = false;
+      panelScope.captureDisplayStatus = 'Saving Capture display…';
+      schedulePanelDigest();
+      return fetchWithTimeout('/DulukaCapture/v.1.0/display/select', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmed: true, outputIndex: desired.OutputIndex,
+          adapterLuidLow: desired.AdapterLuidLow,
+          adapterLuidHigh: desired.AdapterLuidHigh })
+      }, 5500).then(function (response) {
+        if (!response.ok) throw new Error('Display selection gateway unavailable');
+        return response.json();
+      }).then(function (result) {
+        if (!result || result.saved !== true || result.effectiveNow !== false) {
+          throw new Error('Capture display change was not confirmed');
+        }
+        return refreshCaptureDisplays().then(function (loaded) {
+          if (loaded) {
+            panelScope.captureDisplayStatus =
+              'Display saved. Restart/rebuild Capture Engine to use it for Record / Replay / Screenshot.';
+            schedulePanelDigest();
+          }
+        });
+      }).catch(function (error) {
+        return refreshCaptureDisplays().then(function () {
+          panelScope.captureDisplayStatus = 'Display not saved: ' + error.message;
+          schedulePanelDigest();
+        });
+      });
     };
     panelScope.onCursorChange = function () {
       if (!panelScope.captureSettingsReady) return;
@@ -590,6 +683,19 @@
       'onPresetChange()'
     );
 
+    var displaySection = makeSection('Display Capture:');
+    var displaySelect = makeSelect(
+      'nv-video-capture-display', 'Primary Capture display',
+      'captureUi.displayKey', 'captureDisplayChoices', 'onCaptureDisplayChange()'
+    );
+    displaySelect.select.setAttribute('ng-disabled', '!captureDisplayReady');
+    displaySection.appendChild(displaySelect.wrap);
+    displayStatusNode = document.createElement('p');
+    displayStatusNode.className = 'nv-video-engine-codec-note';
+    displayStatusNode.setAttribute('role', 'status');
+    displayStatusNode.textContent = '{{captureDisplayStatus}}';
+    displaySection.appendChild(displayStatusNode);
+
     var advancedSection = makeSection('Advanced:');
     var advanced = document.createElement('div');
     advanced.className = 'nv-video-engine-advanced';
@@ -613,6 +719,7 @@
       panelScope.captureSettingsReady = false;
       schedulePanelDigest();
       statusNode.textContent = 'Loading…';
+      refreshCaptureDisplays();
       readCaptureSettingsAndCatalog().then(function () {
         statusNode.classList.remove('highlights-item-disabled');
         statusNode.textContent = 'Ready';
@@ -654,6 +761,7 @@
     advanced.appendChild(previewPanel);
     advanced.appendChild(encoderFields);
     advancedSection.appendChild(advanced);
+    panel.appendChild(displaySection);
     panel.appendChild(advancedSection);
 
     var footer = document.createElement('div');
@@ -705,6 +813,7 @@
     document.getElementById(panelId).setAttribute('data-nv-ui-version', panelVersion);
     if (runtimeStatusTimer) window.clearInterval(runtimeStatusTimer);
     refreshCaptureRuntimeStatus();
+    refreshCaptureDisplays();
     runtimeStatusTimer = window.setInterval(refreshCaptureRuntimeStatus, 5000);
     statusNode.textContent = 'Loading…';
     readCaptureSettingsAndCatalog().then(function () {

@@ -36,6 +36,15 @@ Imports DulukaEngine.Diagnostics
 
 Partial Public Class UI_Engine
 
+    ' A persisted display is honored only when the GPU engine initializes
+    ' or rebuilds. Never switch an active session to another physical screen.
+    Private Shared Sub ApplySavedCaptureDisplay(startup As EngineStartupConfig)
+        If Not IO.File.Exists(CaptureDisplayCatalog.SelectionPath(AppLayout.Dir)) Then Return
+        Dim selected = CaptureDisplayCatalog.Resolve(
+            AppLayout.Dir, CaptureDisplayCatalog.Enumerate())
+        startup.CaptureOutputIndex = selected.OutputIndex
+    End Sub
+
     ' ─── RecordingEngine (Phase 12b) ─────────────────────────────────
     Private _recordingEngine As RecordingEngine
     Private _recordingTask As Task(Of SessionResult)
@@ -132,6 +141,7 @@ Partial Public Class UI_Engine
                          ' the engine default and maps FPS independently.
                          Dim startup As EngineStartupConfig =
                              NextRecordingConfig.MapStartupConfig(settingsSnapshot)
+                         ApplySavedCaptureDisplay(startup)
 
                          If settingsSnapshot IsNot Nothing AndAlso
                             Not String.Equals(OverlayConfig.MapEncoderToInternal(settingsSnapshot.Encoder),
@@ -206,6 +216,7 @@ Partial Public Class UI_Engine
         Dim fresh As CaptureSettings = CaptureSettings.Load(_configPath)
         SyncWithOverlayConfig(fresh)
         Dim startup As EngineStartupConfig = NextRecordingConfig.MapStartupConfig(fresh)
+                         ApplySavedCaptureDisplay(startup)
         Dim previousEngine As RecordingEngine = _recordingEngine
 
         Task.Run(Sub()

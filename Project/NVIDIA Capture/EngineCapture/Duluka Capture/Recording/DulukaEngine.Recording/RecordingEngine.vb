@@ -102,6 +102,7 @@ Namespace DulukaEngine.Recording
                 _capture = New DdagrabBackend(_logger)
                 ' OWNER (2026-09-25): cursor composition switch.
                 DirectCast(_capture, DulukaEngine.Video.Backends.Ddagrab.DdagrabBackend).CaptureCursor = startup.CaptureCursor
+                DirectCast(_capture, DulukaEngine.Video.Backends.Ddagrab.DdagrabBackend).RequestedOutputIndex = startup.CaptureOutputIndex
                 Dim ctx As New BackendContext(_logger)
                 _capture.Initialize(ctx)
                 _logger.Info($"RecordingEngine: DdagrabBackend initialized — {_capture.OutputWidth}x{_capture.OutputHeight} @ {_capture.OutputRefreshRate}Hz")

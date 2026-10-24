@@ -57,4 +57,10 @@ module.exports = function registerCaptureEngineStatus(app, options) {
     request.on('timeout', function () { request.destroy(new Error('Capture catalog timeout')); });
     request.on('error', function () { fail('NvContainer capture catalog is unavailable'); });
   });
+
+  // Same existing NodeAPI registration point, no edits to the shared
+  // index.js (which is concurrently owned by another agent).
+  if (typeof app.post === 'function') {
+    require('./capture-display-routing')(app, options);
+  }
 };

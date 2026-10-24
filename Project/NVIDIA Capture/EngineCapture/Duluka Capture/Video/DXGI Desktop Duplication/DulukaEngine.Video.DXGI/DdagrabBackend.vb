@@ -206,6 +206,27 @@ Namespace DulukaEngine.Video.Backends.Ddagrab
             End Set
         End Property
 
+        Private _requestedOutputIndex As Integer = -1
+
+        ''' <summary>
+        ''' DXGI output index ON THE FIRST NVIDIA ADAPTER (not a Windows
+        ''' Screen.AllScreens index). -1 preserves first-attached behavior.
+        ''' Must be set before Initialize. An explicitly chosen output is
+        ''' NEVER silently replaced when it becomes disconnected.
+        ''' </summary>
+        Public Property RequestedOutputIndex As Integer
+            Get
+                Return _requestedOutputIndex
+            End Get
+            Set(value As Integer)
+                If value < -1 Then Throw New ArgumentOutOfRangeException(NameOf(value))
+                If _state <> DdagrabBackendState.Created Then
+                    Throw New InvalidOperationException("capture_display_change_requires_rebuild")
+                End If
+                _requestedOutputIndex = value
+            End Set
+        End Property
+
         Public Sub New(Optional logger As EngineLogger = Nothing)
             _logger = If(logger, New EngineLogger("DdagrabBackend"))
         End Sub
@@ -311,6 +332,21 @@ Namespace DulukaEngine.Video.Backends.Ddagrab
                     Dim candidate As IDXGIOutput = Nothing
                     If Not _adapter.EnumOutputs(CUInt(scanIdx), candidate).Success Then Exit Do
                     Dim attached As Boolean = candidate.Description.AttachedToDesktop
+                    If _requestedOutputIndex >= 0 Then
+                        If scanIdx = _requestedOutputIndex Then
+                            If Not attached Then
+                                candidate.Dispose()
+                                Throw New VideoBackendRuntimeException(
+                                    "capture_display_disconnected: selected DXGI output is not attached")
+                            End If
+                            out_ = candidate
+                            outIdx = scanIdx
+                            Exit Do
+                        End If
+                        candidate.Dispose()
+                        scanIdx += 1
+                        Continue Do
+                    End If
                     If out_ Is Nothing Then
                         out_ = candidate          ' keep ownership of the first
                         outIdx = scanIdx

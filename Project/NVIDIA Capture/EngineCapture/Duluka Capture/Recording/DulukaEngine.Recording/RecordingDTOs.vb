@@ -171,6 +171,9 @@ Namespace DulukaEngine.Recording
         Public Property CodecKey As String = "NVENC_H264"
         ' OWNER (2026-09-25): cursor composition switch (DdagrabBackend).
         Public Property CaptureCursor As Boolean = True
+        ' -1 = first attached DXGI output; explicit index requires a
+        ' matching connected output on the same NVIDIA adapter.
+        Public Property CaptureOutputIndex As Integer = -1
         Public Property BitrateBps As Long = 20_000_000L
         Public Property GopSize As Integer = 60
         Public Property RateControl As String = "cbr"

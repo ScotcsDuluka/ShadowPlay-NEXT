@@ -102,15 +102,13 @@
     <Reference Include="DulukaEngine">
       <HintPath>bin\Release\net10.0-windows10.0.26100.0\DulukaEngine.dll</HintPath>
     </Reference>
-    <Reference Include="DulukaEngine.Recording">
-      <HintPath>bin\Release\net10.0-windows10.0.26100.0\DulukaEngine.Recording.dll</HintPath>
-    </Reference>
+    <!-- Build the capture orchestration from its real source so monitor
+         selection cannot silently link against an older prebuilt DLL. -->
+    <ProjectReference Include="EngineCapture\Duluka Capture\Recording\DulukaEngine.Recording\DulukaEngine.Recording.vbproj" />
     <Reference Include="DulukaEngine.Video">
       <HintPath>bin\Release\net10.0-windows10.0.26100.0\DulukaEngine.Video.dll</HintPath>
     </Reference>
-    <Reference Include="DulukaEngine.Video.Ddagrab">
-      <HintPath>bin\Release\net10.0-windows10.0.26100.0\DulukaEngine.Video.Ddagrab.dll</HintPath>
-    </Reference>
+
     <Reference Include="DulukaEngine.Encoder">
       <HintPath>bin\Release\net10.0-windows10.0.26100.0\DulukaEngine.Encoder.dll</HintPath>
     </Reference>
@@ -150,6 +148,7 @@
     <Compile Remove="EngineCapture\MediaEvidence.Tests\**\*.vb" />
     <Compile Remove="EngineCapture\Mux.Tests\**\*.vb" />
     <Compile Remove="EngineCapture\SessionRecovery.Tests\**\*.vb" />
+    <Compile Remove="EngineCapture\DisplaySelection.Tests\**\*.vb" />
     <EmbeddedResource Remove="EngineCapture\Duluka Capture\**\*.resx" />
   </ItemGroup>
 </Project>

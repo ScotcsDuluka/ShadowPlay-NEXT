@@ -365,6 +365,99 @@ Partial Public Class UI_Engine
                 End Try
             End If
 
+            ' Screenshot / Record / Replay must share ONE actual display
+            ' selection owned by NvCapture. Container and NodeAPI only relay.
+            If path = "/displays" AndAlso method = "GET" Then
+                Dim displays = CaptureDisplayCatalog.Enumerate()
+                Dim selected As CaptureDisplayCatalog.Display = Nothing
+                Dim selectionError As String = ""
+                Try
+                    selected = CaptureDisplayCatalog.Resolve(AppLayout.Dir, displays)
+                Catch ex As Exception
+                    selectionError = ex.Message
+                End Try
+                Return JsonSerializer.Serialize(New With {
+                    .schemaVersion = 1, .readOnly = True, .source = "NvCapture",
+                    .displays = displays,
+                    .selected = selected,
+                    .selectionValid = selected IsNot Nothing,
+                    .error = selectionError,
+                    .appliesOnEngineRebuild = True,
+                    .recording = RestRecording()
+                })
+            End If
+
+            If path = "/display/select" AndAlso method = "POST" Then
+                If RestRecording() OrElse _engineReconfiguring Then
+                    Return "{""saved"":false,""error"":""capture_busy""}"
+                End If
+                Try
+                    Using parsed = JsonDocument.Parse(body)
+                        Dim root = parsed.RootElement
+                        Dim confirmed As JsonElement = Nothing
+                        Dim idx As JsonElement = Nothing
+                        Dim low As JsonElement = Nothing
+                        Dim high As JsonElement = Nothing
+                        If root.ValueKind <> JsonValueKind.Object OrElse
+                           Not root.TryGetProperty("confirmed", confirmed) OrElse
+                           confirmed.ValueKind <> JsonValueKind.True OrElse
+                           Not root.TryGetProperty("outputIndex", idx) OrElse
+                           Not root.TryGetProperty("adapterLuidLow", low) OrElse
+                           Not root.TryGetProperty("adapterLuidHigh", high) Then
+                            Return "{""saved"":false,""error"":""invalid_display_selection_request""}"
+                        End If
+                        Dim candidate As New CaptureDisplayCatalog.Choice With {
+                            .OutputIndex = idx.GetInt32(),
+                            .AdapterLuidLow = low.GetUInt32(),
+                            .AdapterLuidHigh = high.GetInt32()
+                        }
+                        Dim display = CaptureDisplayCatalog.SaveSelection(
+                            AppLayout.Dir, candidate, CaptureDisplayCatalog.Enumerate())
+                        Return JsonSerializer.Serialize(New With {
+                            .saved = True, .selected = display,
+                            .appliesOnEngineRebuild = True,
+                            .effectiveNow = False
+                        })
+                    End Using
+                Catch ex As Exception
+                    DebugLog("[CaptureRestApi] display selection rejected: " & ex.Message)
+                    Return JsonSerializer.Serialize(New With {
+                        .saved = False, .error = "capture_display_invalid"
+                    })
+                End Try
+            End If
+
+            If path = "/screenshot" AndAlso method = "POST" Then
+                If RestRecording() OrElse _engineReconfiguring Then
+                    Return "{""saved"":false,""error"":""capture_busy""}"
+                End If
+                Try
+                    Using doc = JsonDocument.Parse(body)
+                        Dim root = doc.RootElement
+                        Dim confirmed As JsonElement = Nothing
+                        If root.ValueKind <> JsonValueKind.Object OrElse
+                           Not root.TryGetProperty("confirmed", confirmed) OrElse
+                           confirmed.ValueKind <> JsonValueKind.True Then
+                            Return "{""saved"":false,""error"":""screenshot_confirmation_required""}"
+                        End If
+                    End Using
+                    Dim display = CaptureDisplayCatalog.Resolve(
+                        AppLayout.Dir, CaptureDisplayCatalog.Enumerate())
+                    Dim ffmpeg = AppLayout.P("FFmpeg", "ffmpeg.exe")
+                    If _settings IsNot Nothing AndAlso
+                       File.Exists(_settings.FFmpegPath) Then
+                        ffmpeg = _settings.FFmpegPath
+                    End If
+                    Dim image = CaptureScreenshotEngine.TakeOne(display, ffmpeg)
+                    Return JsonSerializer.Serialize(image)
+                Catch ex As Exception
+                    DebugLog("[CaptureRestApi] screenshot refused: " & ex.Message)
+                    Return JsonSerializer.Serialize(New With {
+                        .saved = False, .error = "screenshot_display_or_runtime_unavailable"
+                    })
+                End Try
+            End If
+
             If path = "/settings" AndAlso method = "GET" Then
                 Return OscSettingsJson()
             End If

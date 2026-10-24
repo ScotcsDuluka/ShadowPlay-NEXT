@@ -38,7 +38,9 @@ const exposed = source.replace(ending, `
     syncCodecs: syncEncoderControls,
     loadSettingsAndCatalog: readCaptureSettingsAndCatalog,
     save: save,
-    refreshStatus: refreshCaptureRuntimeStatus
+    refreshStatus: refreshCaptureRuntimeStatus,
+    refreshDisplays: refreshCaptureDisplays,
+    displayKey: captureDisplayKey
   };
 })();
 `);
@@ -256,4 +258,62 @@ test('invalid Container schema/unsupported route fails closed rather than claimi
     ...containerCatalog(), providers: [{ id: 'Duluka', routeWired: false,
       encoders: ['NVENC_H264'] }, ...containerCatalog().providers.slice(1)]
   }), /Capture route unavailable/);
+});
+
+function displayCatalog() {
+  return { schemaVersion: 1, selectionValid: true, recording: false,
+    displays: [
+      { OutputIndex: 0, AdapterLuidLow: 111, AdapterLuidHigh: 8,
+        Width: 1680, Height: 1050, Label: 'Display 1 — 1680x1050 (Primary)' },
+      { OutputIndex: 2, AdapterLuidLow: 111, AdapterLuidHigh: 8,
+        Width: 1080, Height: 1920, Label: 'Display 2 — 1080x1920' }
+    ],
+    selected: { OutputIndex: 0, AdapterLuidLow: 111, AdapterLuidHigh: 8 } };
+}
+
+test('capture display list comes from Capture-selected LUID and output, not guessed monitor indexes', async () => {
+  const h = startHarness();
+  const view = h.hooks.prime();
+  h.respond(async () => ({ ok: true, status: 200, json: async () => displayCatalog() }));
+  assert.equal(await h.hooks.refreshDisplays(), true);
+  assert.equal(view.scope.captureDisplayReady, true);
+  assert.equal(view.scope.captureDisplayChoices.length, 2);
+  assert.equal(view.scope.captureUi.displayKey, '8:111:0');
+  assert.match(view.scope.captureDisplayStatus, /Record \/ Replay \/ Screenshot/);
+  assert.equal(h.requests.some(x => x.options && x.options.method === 'POST'), false);
+});
+
+test('cannot pick a monitor when Container cannot supply a verified display catalog', async () => {
+  const h = startHarness();
+  const view = h.hooks.prime();
+  h.respond(async () => ({ ok: false, status: 503 }));
+  assert.equal(await h.hooks.refreshDisplays(), false);
+  assert.equal(view.scope.captureDisplayReady, false);
+  assert.equal(view.scope.captureDisplayChoices.length, 0);
+  await view.scope.onCaptureDisplayChange();
+  assert.equal(h.requests.length, 1, 'no POST after 503');
+});
+
+test('changing capture display posts exact selected LUID plus output index', async () => {
+  const h = startHarness();
+  const view = h.hooks.prime();
+  h.respond(async (url, opts) => {
+    if (opts && opts.method === 'POST') {
+      const body = JSON.parse(opts.body);
+      assert.deepEqual(body, {
+        confirmed: true, outputIndex: 2, adapterLuidLow: 111, adapterLuidHigh: 8
+      });
+      return { ok: true, status: 200, json: async () =>
+        ({ saved: true, effectiveNow: false }) };
+    }
+    return { ok: true, status: 200, json: async () => ({
+      ...displayCatalog(), selected: displayCatalog().displays[1]
+    }) };
+  });
+  assert.equal(await h.hooks.refreshDisplays(), true);
+  view.scope.captureUi.displayKey = '8:111:2';
+  await view.scope.onCaptureDisplayChange();
+  assert.equal(view.scope.captureUi.displayKey, '8:111:2');
+  assert.match(view.scope.captureDisplayStatus, /restart\/rebuild/i);
+  assert.equal(h.requests.filter(x => x.options && x.options.method === 'POST').length, 1);
 });
