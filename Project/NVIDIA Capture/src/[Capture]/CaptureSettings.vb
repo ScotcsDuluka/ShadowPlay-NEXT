@@ -116,6 +116,12 @@ Public Class CaptureSettings
             End If
 
             If OverlayConfig.ApplyUnifiedToCaptureSettings(settings) Then
+                ' Unified settings still need a validated FFmpeg binary.
+                ' Without this step the early return left FFmpegPath empty
+                ' and NvCapture /engines incorrectly reported binary_missing.
+                If Not FFmpegLocator.IsUsableFFmpeg(settings.FFmpegPath) Then
+                    settings.FFmpegPath = FindFFmpegPath()
+                End If
                 Return settings
             End If
         End If
@@ -388,6 +394,10 @@ Public Class CaptureSettings
     Private Shared Function FindFFmpegPath() As String
         Dim appDir As String = AppLayout.Dir
         Dim candidates As New List(Of String)()
+        ' AppLayout.Dir is the shared ShadowPlay root, whereas installed
+        ' ffmpeg.exe lives beside NvCapture.exe under NVIDIA Capture\FFmpeg.
+        ' Probe the actual process location first, then legacy root paths.
+        candidates.Add(Path.Combine(AppContext.BaseDirectory, "FFmpeg", "ffmpeg.exe"))
         candidates.Add(AppLayout.P("FFmpeg", "ffmpeg.exe"))
         candidates.Add(Path.Combine(appDir, "API-Core", "ffmpeg.exe"))
         candidates.Add(Path.Combine(appDir, "api-core", "ffmpeg.exe"))
