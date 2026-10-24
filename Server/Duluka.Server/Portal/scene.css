@@ -1,0 +1,76 @@
+/* ShadowPlay NEXT Account — visual language adapted from Web Github.
+   CSS is decorative only. Existing auth controls, validation and sessions remain untouched. */
+:root { --bg: #060906; --surface:#11160f; --card:#0c120a; --line:#33482b;
+  --green:#76b900; --bright:#a7e843; --text:#f8fbf5; --muted:#a9b3a5; }
+html { background: #060906; }
+body { background:radial-gradient(ellipse at 22% 32%,rgba(69,109,0,.12),transparent 48%),
+  radial-gradient(ellipse at 75% 76%,rgba(29,56,18,.1),transparent 55%),#060906;
+  letter-spacing:.002em; overflow-x:hidden; }
+#constellation-bg { position:fixed;inset:0;width:100%;height:100%;z-index:0;
+  pointer-events:none;opacity:.72; }
+.background-grid { display:none; }
+.page { position:relative;z-index:1;max-width:1440px;padding:0 clamp(20px,5vw,75px); }
+.site-header { margin:0 calc(-1 * clamp(20px,5vw,75px));padding:0 clamp(20px,5vw,75px);
+  min-height:71px; background:rgba(6,7,6,.94);border-bottom:1px solid rgba(143,186,89,.18);
+  backdrop-filter:blur(11px);position:relative;z-index:2; }
+.brand-mark {width:34px;height:34px;background:none;color:var(--green);
+  border:2px solid var(--green);font:900 23px/1 'Segoe UI',sans-serif;transform:skew(-10deg);box-shadow:none; }
+.brand-copy strong {font-size:15px;font-weight:900;letter-spacing:.02em}
+.brand-copy small {color:var(--bright);font-size:9px}
+.environment {font-size:10px;color:var(--green);border:1px solid rgba(118,185,0,.37);
+  background:rgba(60,91,3,.12);padding:11px 16px; }
+.hero {max-width:none;padding:clamp(54px,8vh,112px) 0 41px;position:relative; }
+.eyebrow {display:inline-block;color:#0c1404;background:var(--green);font-size:10px;
+  letter-spacing:.16em;font-weight:900;padding:6px 12px;margin-bottom:22px; }
+.hero h1 {font-family:'Arial Black','Segoe UI',system-ui,sans-serif;
+  font-weight:900;font-size:clamp(47px,6.9vw,102px);line-height:.99;
+  letter-spacing:-.055em;text-shadow:0 0 32px rgba(0,0,0,.6); }
+.hero h1 span {color:#8ad01e; }
+.hero-sub {color:#c1cabd;font-size:clamp(13px,1.2vw,16px);
+  max-width:760px;margin:24px 0 0;line-height:1.85; }
+.hero-tags {margin-top:25px;gap:10px}
+.hero-tags span {border-color:#385824;background:rgba(10,15,6,.8);color:#aedb87;
+  font-size:10px;letter-spacing:.08em}
+.showcase-runway {height:4px;margin:39px 0 0;
+  background:repeating-linear-gradient(90deg,var(--green) 0 25px,rgba(89,135,20,.13) 25px 52px);
+  box-shadow:0 0 18px rgba(118,185,0,.28);animation:portal-runway 7s linear infinite; }
+@keyframes portal-runway {to {background-position:-104px 0}}
+.workspace {grid-template-columns:minmax(0,1.04fr) minmax(0,.96fr);
+  gap:18px;align-items:start;position:relative;}
+.surface {background:linear-gradient(140deg,rgba(23,34,12,.94),rgba(5,9,5,.97) 56%,rgba(14,22,10,.97));
+  border:1px solid rgba(118,185,0,.56);border-top:3px solid #76b900;
+  box-shadow:0 15px 65px rgba(0,0,0,.47),inset 0 0 32px rgba(118,185,0,.035);
+  padding:clamp(21px,2.8vw,37px);min-height:400px; }
+.surface::before {width:21px;height:21px;top:-3px;left:-1px;
+  background:transparent;border-top:2px solid var(--bright);border-left:2px solid var(--bright);}
+.surface::after {content:'';position:absolute;width:21px;height:21px;right:-1px;bottom:-1px;
+  pointer-events:none;border-right:2px solid var(--green);border-bottom:2px solid var(--green);}
+.surface-head {margin-bottom:26px;border-bottom:1px solid rgba(118,185,0,.24);padding-bottom:17px}
+.section-number {font-weight:900;color:#a5d957;letter-spacing:.16em;font-size:11px}
+.pill {color:#b9cfb0;border-color:#465a38;background:rgba(16,27,9,.7);}
+.pill.active {background:#1e3a0e;color:var(--bright)}
+.surface h2 {font-family:'Arial Black','Segoe UI',system-ui,sans-serif;
+  font-weight:900;letter-spacing:-.045em;font-size:clamp(22px,2.45vw,33px)}
+.supporting {color:#bac4b4}
+.switcher {background:#070b06;border-color:#466037;}
+.switch.active {background:#76b900;color:#0c1a07;}
+.switch:not(.active):hover {background:rgba(118,185,0,.16);color:#deefcf}
+.auth-form input,.apply-form input:not([type=checkbox]),.apply-form select,.apply-form textarea {
+  background:rgba(4,8,5,.97);border-color:#415737;color:#f3faf0;min-height:48px; }
+.action {background:#76b900;box-shadow:0 0 30px rgba(118,185,0,.12);min-height:48px;}
+.action:hover {background:#9cde27;box-shadow:0 0 30px rgba(118,185,0,.3)}
+.action:focus-visible,.switch:focus-visible,.secondary:focus-visible {outline:2px solid var(--bright);outline-offset:3px}
+.phase {border-color:#3b5d24;background:linear-gradient(115deg,#14250b,#081009);}
+.phase-icon {border-color:var(--bright)}
+.warning-banner {background:rgba(8,18,7,.88);border:1px solid #365726;border-left:3px solid var(--green);}
+footer {border-color:#2e4b20;background:rgba(0,0,0,.35);}
+@media(max-width:920px) {.workspace{grid-template-columns:minmax(0,1fr)}.hero{padding:56px 0 31px}
+  .showcase-runway{margin-top:25px}.surface{min-height:0}}
+@media(max-width:600px) {.site-header{flex-direction:row;flex-wrap:wrap;align-items:center;padding-top:14px;padding-bottom:14px}
+  .brand-copy strong{font-size:13px}.brand-copy small{font-size:8px}
+  .environment{font-size:8px;padding:8px}
+  .hero h1{font-size:clamp(42px,11vw,60px)}.hero-sub{font-size:13px}
+  .hero-tags span{font-size:9px;padding:6px 8px}
+  .surface{padding:20px 17px}}
+@media(prefers-reduced-motion:reduce){.showcase-runway{animation:none}
+  *,*::before,*::after{scroll-behavior:auto!important}}

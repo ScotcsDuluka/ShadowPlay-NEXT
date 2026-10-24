@@ -2,6 +2,7 @@
 // metadata, periodic timer retries, or desktop idle Presents.
 #include "../src/OscFramePublisher/Common/OscPublishCadence.h"
 #include "../src/OscFramePublisher/Common/OscD3D9CpuMirrorPolicy.h"
+#include "../src/OscFramePublisher/Common/OscHookTransportPolicy.h"
 #ifdef NDEBUG
 #error "Cadence assertions must be enabled in Release tests"
 #endif
@@ -9,6 +10,15 @@
 #include <cstdint>
 #include <iostream>
 int main() {
+  // D3D9 GPU is an opt-in WINDOWED DWM compositor, not D3D9Ex sharing
+  // or a false promise about Fullscreen Exclusive.
+  const auto* d3d9=osc::hook_transport::Find("d3d9");
+  const auto* d3d9ex=osc::hook_transport::Find("d3d9ex");
+  assert(d3d9 && d3d9->rendererImplemented && d3d9->gpuModeAvailable);
+  assert(osc::hook_transport::Allowed(*d3d9,"auto"));
+  assert(osc::hook_transport::Allowed(*d3d9,"cpu"));
+  assert(osc::hook_transport::Allowed(*d3d9,"gpu"));
+  assert(d3d9ex && !osc::hook_transport::Allowed(*d3d9ex,"gpu"));
   // CPU v1 mapping must NOT need the unrelated keyed D3D11 GPU mirror.
   assert(osc::d3d9_cpu_mirror::PublishCpuBridgeWithoutNtGpuMirror(
       osc_frame_bridge::ConsumerRenderApiD3D9));

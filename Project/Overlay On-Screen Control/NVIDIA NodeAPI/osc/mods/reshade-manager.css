@@ -1,240 +1,295 @@
-/* ShadowPlay NEXT / ReShade Manager — native NVIDIA + compiled Angular Material.
-   Scope all overrides: never change global md-select, md-checkbox or OSC actions. */
+/* ReShade Manager — NVIDIA OSC preferences presentation.
+   Use native Material controls; never restyle other OSC settings pages. */
 #nv-reshade-manager[hidden] { display: none !important; }
-#nv-filter-settings.nv-reshade-open > md-tabs { display: none !important; }
+
+/* Keep the underlying Freestyle tabs from appearing behind this subpage. */
+#nv-filter-settings.nv-reshade-open {
+  position: relative;
+  width: 100%;
+  min-height: calc(100vh - 170px);
+  background: #262b30;
+}
+#nv-filter-settings.nv-reshade-open > :not(#nv-reshade-manager) {
+  display: none !important;
+}
+
+/* Fill the native Settings content panel instead of centering a narrow card. */
 #nv-reshade-manager {
   box-sizing: border-box;
-  color: #f1f1f1;
+  display: block;
   width: 100%;
-  padding: 4px 18px 20px 0;
-  max-height: calc(100vh - 188px);
+  max-width: none;
+  min-width: 0;
+  margin: 0;
+  padding: 22px 36px 28px;
+  max-height: calc(100vh - 164px);
   overflow-x: hidden;
   overflow-y: auto;
-  scrollbar-color: #4b5157 transparent;
+  scrollbar-color: #4a5157 transparent;
   scrollbar-width: thin;
+  color: #e7eaed;
+  background: #262b30;
+  font-size: 16px;
+  line-height: 1.5;
 }
+#nv-reshade-manager,
+#nv-reshade-manager * { box-sizing: border-box; }
+
 #nv-reshade-manager .nv-reshade-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 22px;
-  padding: 8px 0 14px;
-  border-bottom: 3px solid #76b900;
-  margin-bottom: 16px;
-}
-#nv-reshade-manager .nv-reshade-heading h2 {
-  margin: 0 0 4px;
-  font-size: 22px;
-  font-weight: 600;
-  letter-spacing: .1px;
-}
-#nv-reshade-manager .nv-reshade-heading p {
+  display: block;
   margin: 0;
-  font-size: 13px;
-  color: #bec4c8;
-  line-height: 1.4;
+  padding: 0 0 18px;
+  border-bottom: 2px solid #76b900;
+}
+#nv-reshade-manager .nv-reshade-heading-text {
+  display: flex;
+  align-items: flex-start;
+  flex-direction: column;
 }
 #nv-reshade-manager .nv-reshade-back {
-  flex: 0 0 auto;
+  order: -1;
   appearance: none;
+  width: auto;
+  min-height: 26px;
+  padding: 0 0 8px;
+  margin: 0;
+  color: #a6ce71;
   background: none;
-  border: 1px solid transparent;
-  border-radius: 2px;
-  color: #cbd2d7;
-  padding: 8px 12px;
+  border: none;
+  border-radius: 0;
+  text-align: left;
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
+  line-height: 1.4;
   cursor: pointer;
-  white-space: nowrap;
 }
 #nv-reshade-manager .nv-reshade-back:hover,
 #nv-reshade-manager .nv-reshade-back:focus-visible {
-  border-color: #76b900;
-  color: #fff;
+  color: #b9f66c;
+  text-decoration: underline;
   outline: none;
 }
+#nv-reshade-manager .nv-reshade-heading h2 {
+  margin: 0 0 5px;
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+#nv-reshade-manager .nv-reshade-heading p {
+  margin: 0;
+  font-size: 15px;
+  color: #c0c6cb;
+  line-height: 1.45;
+}
+
+/* Standard NVIDIA Settings hierarchy: quiet rows and separators. */
 #nv-reshade-manager .nv-reshade-section {
-  border: 1px solid rgba(157,164,170,.18);
-  background: rgba(15,19,23,.17);
-  padding: 14px 18px 12px;
-  margin: 0 0 12px;
-  box-sizing: border-box;
   min-width: 0;
+  padding: 20px 0 19px;
+  margin: 0;
+  border: 0;
+  border-bottom: 1px solid rgba(171, 179, 184, .22);
+  background: none;
 }
 #nv-reshade-manager .nv-reshade-section-heading {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 8px;
+  margin: 0 0 11px;
 }
 #nv-reshade-manager .nv-reshade-section-heading h3 {
   margin: 0;
-  font-size: 15px;
+  color: #f2f4f5;
+  font-size: 18px;
+  line-height: 1.4;
   font-weight: 600;
 }
-#nv-reshade-manager .nv-reshade-step {
-  font-size: 12px;
-  line-height: 23px;
-  min-width: 27px;
-  text-align: center;
-  font-weight: bold;
-  color: #76b900;
-  background: rgba(118,185,0,.09);
-  border: 1px solid rgba(118,185,0,.36);
-}
+
+/* Two proportional columns, using the space available in the native pane. */
 #nv-reshade-manager .nv-reshade-fields {
   display: grid;
-  grid-template-columns: minmax(0,1.55fr) minmax(210px,1fr);
-  gap: 14px 22px;
+  grid-template-columns: minmax(0, 1.7fr) minmax(250px, 1fr);
+  gap: 16px 32px;
   align-items: center;
 }
 #nv-reshade-manager md-input-container.nv-reshade-md-field {
   display: block;
-  min-width: 0;
   width: 100%;
-  margin: 12px 0 4px;
+  min-width: 0;
+  max-width: none;
+  margin: 8px 0 6px;
   padding: 0;
 }
 #nv-reshade-manager .nv-reshade-md-field > label {
-  color: #c5cbd0 !important;
+  color: #cbd1d5 !important;
+  font-size: 14px !important;
+  font-weight: 500;
   text-transform: none;
-  font-size: 13px;
 }
-#nv-reshade-manager .nv-reshade-md-field .md-input,
-#nv-reshade-manager .nv-reshade-md-field input {
-  box-sizing: border-box;
+#nv-reshade-manager .nv-reshade-md-field input,
+#nv-reshade-manager .nv-reshade-md-field .md-input {
+  display: block;
   width: 100%;
-  color: #f4f6f7;
-  font-size: 14px;
+  min-width: 0;
+  min-height: 38px;
+  padding: 5px 4px;
+  color: #f1f3f4;
+  font-size: 16px !important;
+  line-height: 1.5;
+  border-bottom: 1px solid #676e73;
   border-radius: 0;
-  border-bottom: 1px solid #6c7278;
 }
 #nv-reshade-manager .nv-reshade-md-field input:focus,
 #nv-reshade-manager md-input-container.md-input-focused .md-input {
   border-bottom-color: #76b900;
 }
-#nv-reshade-manager .nv-reshade-md-field .nv-reshade-md-select {
-  box-sizing: border-box;
+#nv-reshade-manager md-select.nv-reshade-md-select {
   display: block;
-  width: 100%;
   min-width: 0;
+  width: 100%;
+  max-width: none;
   margin: 0;
-  color: #f4f6f7;
+  color: #f1f3f4;
+  font-size: 16px !important;
 }
 #nv-reshade-manager .nv-reshade-md-select .md-select-value {
   box-sizing: border-box;
-  min-height: 37px;
-  padding-left: 8px;
-  color: #f4f6f7;
-  border-bottom-color: #6c7278;
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: 3px 10px;
+  color: #f1f3f4;
+  font-size: 16px !important;
+  border-bottom-color: #697176;
+}
+#nv-reshade-manager .nv-reshade-md-select .md-select-value > span {
+  font-size: 16px !important;
 }
 #nv-reshade-manager .nv-reshade-md-select:focus .md-select-value {
   border-bottom-color: #76b900;
 }
-#nv-reshade-manager .nv-reshade-hint {
-  margin: 0 0 6px;
-  font-size: 12px;
-  color: #aeb7bc;
-  line-height: 1.5;
+#nv-reshade-manager .nv-reshade-hint,
+#nv-reshade-manager .nv-reshade-notice,
+#nv-reshade-manager .nv-reshade-disclosure summary,
+#nv-reshade-manager .nv-reshade-official-link,
+#nv-reshade-manager .nv-reshade-progress {
+  font-size: 15px;
+  line-height: 1.45;
 }
+#nv-reshade-manager .nv-reshade-hint,
+#nv-reshade-manager .nv-reshade-notice {
+  margin: 4px 0 7px;
+  color: #bfc6ca;
+}
+
+/* Buttons should read as controls, not full-height dashboard tiles. */
 #nv-reshade-manager .nv-reshade-actions {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 12px;
-  padding: 10px 0 2px;
+  padding: 8px 0 0;
 }
 #nv-reshade-manager .nv-reshade-actions > .osc-button {
-  flex: 0 0 auto;
   box-sizing: border-box;
+  flex: 0 0 auto;
+  width: auto !important;
+  min-width: 170px !important;
+  max-width: 290px;
+  height: 46px !important;
+  min-height: 46px !important;
+  line-height: 46px !important;
+  padding: 0 20px !important;
   margin: 0;
-  min-width: 156px;
-  max-width: 265px;
-  padding: 0 18px;
+  font-size: 15px !important;
+  font-weight: 500;
+  white-space: nowrap;
 }
 #nv-reshade-manager .osc-button:disabled {
-  opacity: .4;
+  opacity: .46;
   cursor: not-allowed;
 }
+#nv-reshade-manager .nv-reshade-launch-row > .osc-button {
+  min-width: 235px !important;
+  max-width: 330px;
+}
+#nv-reshade-manager .nv-reshade-launch-row {
+  padding-top: 12px;
+}
+
+/* Result is a short horizontal status; evidence expands only on request. */
 #nv-reshade-manager .nv-reshade-summary {
   display: flex;
   align-items: center;
-  gap: 16px;
-  min-height: 48px;
-  padding: 8px 0;
+  flex-wrap: wrap;
+  gap: 12px 15px;
+  min-height: 46px;
+  padding: 4px 0 9px;
 }
 #nv-reshade-manager .nv-reshade-state {
   flex: 0 0 auto;
-  min-width: 108px;
+  min-width: 110px;
+  padding: 7px 12px;
   text-align: center;
+  color: #d1d7db;
+  background: rgba(110, 115, 118, .14);
+  border: 1px solid rgba(157, 164, 170, .32);
+  font-size: 14px;
   font-weight: 600;
-  font-size: 13px;
-  padding: 8px 10px;
-  color: #d3d8dc;
-  background: rgba(110,115,118,.14);
-  border: 1px solid rgba(157,164,170,.32);
 }
 #nv-reshade-manager .nv-reshade-state[data-state="detected"] {
-  border-color: #76b900;
   color: #a4e246;
+  border-color: #76b900;
 }
 #nv-reshade-manager .nv-reshade-result-copy {
   min-width: 0;
   margin: 0;
-  color: #d5d9dc;
-  line-height: 1.5;
-  font-size: 13px;
+  color: #d2d8dc;
+  font-size: 15px;
+  line-height: 1.45;
 }
 #nv-reshade-manager .nv-reshade-disclosure {
-  border-top: 1px solid rgba(157,164,170,.16);
-  margin-top: 5px;
-  padding: 10px 0 2px;
+  margin: 4px 0 0;
+  padding: 8px 0 0;
+  border-top: 1px solid rgba(157, 164, 170, .16);
 }
 #nv-reshade-manager .nv-reshade-disclosure summary {
   display: list-item;
   width: fit-content;
+  padding: 3px 8px 3px 0;
+  color: #b5d695;
   cursor: pointer;
-  color: #b9d698;
-  font-size: 13px;
-  padding: 4px 8px 4px 0;
 }
 #nv-reshade-manager .nv-reshade-disclosure summary:focus-visible {
   outline: 1px solid #76b900;
 }
 #nv-reshade-manager .nv-reshade-evidence {
-  padding: 12px 0 0 14px;
+  padding: 10px 0 0 14px;
+  border-left: 2px solid rgba(118, 185, 0, .35);
   overflow-wrap: anywhere;
-  border-left: 2px solid rgba(118,185,0,.35);
 }
 #nv-reshade-manager .nv-reshade-evidence p {
-  margin: 0 0 7px;
-  font-size: 12px;
-  line-height: 1.45;
+  margin: 0 0 8px;
+  font-size: 14px;
   color: #c3c9cd;
+  line-height: 1.45;
 }
-#nv-reshade-manager .nv-reshade-notice {
-  margin: 2px 0 6px;
-  color: #c4cad0;
-  font-size: 12px;
-  line-height: 1.5;
-}
+
+/* Short, readable consent and Official Setup row. */
 #nv-reshade-manager md-checkbox.nv-reshade-confirm {
   display: flex;
-  min-height: 38px;
+  min-height: 36px;
   margin: 8px 0 4px;
-  color: #d4d9db;
-  line-height: 1.45;
-  font-size: 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #d2d8dc;
   white-space: normal;
 }
-#nv-reshade-manager .nv-reshade-confirm.md-checked .md-icon,
-#nv-reshade-manager .nv-reshade-confirm .md-icon:focus {
+#nv-reshade-manager .nv-reshade-confirm.md-checked .md-icon {
   background: #76b900;
   border-color: #76b900;
 }
 #nv-reshade-manager .nv-reshade-official-link {
-  color: #96d535;
-  font-size: 13px;
+  color: #9ad535;
   text-decoration: none;
   white-space: nowrap;
 }
@@ -244,177 +299,37 @@
   text-decoration: underline;
 }
 #nv-reshade-manager .nv-reshade-feedback {
-  font-size: 12px;
-  line-height: 1.4;
+  padding: 12px 0 0;
+  font-size: 14px;
 }
 #nv-reshade-manager .nv-reshade-progress {
-  color: #b5bdc2;
-  margin: 6px 0;
+  margin: 5px 0;
+  color: #bfc6ca;
 }
 #nv-reshade-manager .nv-reshade-feedback .settings-text-warning {
   margin: 6px 0;
 }
-@media (max-width: 900px) {
-  #nv-reshade-manager { padding-right: 4px; }
-  #nv-reshade-manager .nv-reshade-fields { grid-template-columns: minmax(0,1fr); gap: 0; }
-  #nv-reshade-manager .nv-reshade-heading { flex-wrap: wrap; }
-  #nv-reshade-manager .nv-reshade-actions > .osc-button { min-width: 130px; }
-}
 
-
-/* V2 layout: NVIDIA Settings proportions — quiet rows, not dashboard cards.
-   Preserve Material inputs, native green/gray buttons, and the outer OSC Back. */
-#nv-filter-settings.nv-reshade-open {
-  background: #262b30;
-}
-#nv-reshade-manager {
-  max-width: 1000px;
-  width: 100%;
-  margin: 0 auto;
-  padding: 10px 26px 20px 20px;
-  font-size: 15px;
-  line-height: 1.5;
-  max-height: calc(100vh - 172px);
-  background: transparent;
-}
-#nv-reshade-manager .nv-reshade-heading {
-  display: block;
-  border-bottom: 2px solid #76b900;
-  margin: 0 0 6px;
-  padding: 4px 0 14px;
-}
-#nv-reshade-manager .nv-reshade-heading-text {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-}
-#nv-reshade-manager .nv-reshade-back {
-  order: -1;
-  padding: 0 0 6px;
-  margin: 0;
-  line-height: 1.3;
-  color: #a8c985;
-  font-size: 13px;
-  font-weight: 400;
-  border: 0;
-  background: none;
-}
-#nv-reshade-manager .nv-reshade-back:hover,
-#nv-reshade-manager .nv-reshade-back:focus-visible {
-  color: #baff64;
-  border: 0;
-  text-decoration: underline;
-}
-#nv-reshade-manager .nv-reshade-heading h2 {
-  font-size: 22px;
-  line-height: 1.3;
-  margin: 0 0 5px;
-}
-#nv-reshade-manager .nv-reshade-heading p {
-  font-size: 14px;
-  line-height: 1.5;
-}
-#nv-reshade-manager .nv-reshade-section {
-  background: none;
-  border: 0;
-  border-bottom: 1px solid rgba(162, 169, 173, .21);
-  padding: 17px 4px 16px;
-  margin: 0;
-}
-#nv-reshade-manager .nv-reshade-section-heading {
-  margin-bottom: 12px;
-}
-#nv-reshade-manager .nv-reshade-section-heading h3 {
-  font-size: 17px;
-  font-weight: 600;
-  line-height: 1.3;
-  color: #f1f3f4;
-}
-#nv-reshade-manager .nv-reshade-fields {
-  grid-template-columns: minmax(0, 1.45fr) minmax(230px, 1fr);
-  column-gap: 28px;
-  row-gap: 6px;
-}
-#nv-reshade-manager md-input-container.nv-reshade-md-field {
-  margin: 10px 0 8px;
-  font-size: 15px;
-}
-#nv-reshade-manager .nv-reshade-md-field > label {
-  font-size: 14px !important;
-  font-weight: 500;
-}
-#nv-reshade-manager .nv-reshade-md-field .md-input,
-#nv-reshade-manager .nv-reshade-md-field input,
-#nv-reshade-manager .nv-reshade-md-field md-select,
-#nv-reshade-manager .nv-reshade-md-select .md-select-value,
-#nv-reshade-manager .nv-reshade-md-select .md-select-value > span {
-  font-size: 15px !important;
-  line-height: 1.4;
-}
-#nv-reshade-manager .nv-reshade-md-select .md-select-value {
-  min-height: 36px;
-}
-#nv-reshade-manager .nv-reshade-hint,
-#nv-reshade-manager .nv-reshade-notice,
-#nv-reshade-manager .nv-reshade-disclosure summary,
-#nv-reshade-manager .nv-reshade-official-link,
-#nv-reshade-manager .nv-reshade-progress {
-  font-size: 14px;
-  line-height: 1.5;
-}
-#nv-reshade-manager .nv-reshade-hint { margin: 2px 0 5px; }
-#nv-reshade-manager .nv-reshade-actions {
-  gap: 10px;
-  padding: 8px 0 0;
-}
-#nv-reshade-manager .nv-reshade-actions > .osc-button {
-  height: 42px !important;
-  min-height: 42px !important;
-  line-height: 42px !important;
-  padding: 0 20px !important;
-  min-width: 148px !important;
-  width: auto !important;
-  max-width: 240px;
-  font-size: 14px !important;
-  font-weight: 500;
-  white-space: nowrap;
-}
-#nv-reshade-manager .nv-reshade-launch-row > .osc-button {
-  width: auto !important;
-  min-width: 228px !important;
-  max-width: none;
-}
-#nv-reshade-manager .nv-reshade-summary {
-  min-height: 40px;
-  padding: 2px 0 8px;
-  gap: 12px;
-}
-#nv-reshade-manager .nv-reshade-state {
-  font-size: 14px;
-  min-width: 90px;
-  padding: 6px 10px;
-}
-#nv-reshade-manager .nv-reshade-result-copy {
-  font-size: 14px;
-}
-#nv-reshade-manager .nv-reshade-disclosure {
-  padding: 5px 0 0;
-  margin: 2px 0 0;
-}
-#nv-reshade-manager .nv-reshade-notice { margin: 0 0 5px; }
-#nv-reshade-manager md-checkbox.nv-reshade-confirm {
-  font-size: 14px;
-  line-height: 1.5;
-  margin: 4px 0 0;
-  min-height: 32px;
-}
-#nv-reshade-manager .nv-reshade-feedback { padding: 10px 4px 0; }
-@media (max-width: 900px) {
-  #nv-reshade-manager { padding: 10px 12px 20px; }
+/* Adaptive layout without an extra horizontal scrolling surface. */
+@media (max-width: 980px) {
+  #nv-reshade-manager { padding: 18px 22px 24px; }
   #nv-reshade-manager .nv-reshade-fields {
-    grid-template-columns: minmax(0,1fr);
-    row-gap: 0;
+    grid-template-columns: minmax(0, 1fr) minmax(220px, .85fr);
+    gap: 12px 20px;
   }
-  #nv-reshade-manager .nv-reshade-actions > .osc-button { min-width: 130px !important; }
-  #nv-reshade-manager .nv-reshade-launch-row > .osc-button { min-width: 200px !important; }
+}
+@media (max-width: 720px) {
+  #nv-reshade-manager { padding: 14px 16px 20px; }
+  #nv-reshade-manager .nv-reshade-fields {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 3px;
+  }
+  #nv-reshade-manager .nv-reshade-heading h2 { font-size: 21px; }
+  #nv-reshade-manager .nv-reshade-section { padding: 15px 0; }
+  #nv-reshade-manager .nv-reshade-actions > .osc-button {
+    min-width: 145px !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    line-height: 42px !important;
+  }
 }

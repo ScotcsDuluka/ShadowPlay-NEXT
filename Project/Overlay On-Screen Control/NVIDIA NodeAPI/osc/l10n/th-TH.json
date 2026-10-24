@@ -1122,8 +1122,9 @@
   "l10n.oscHookTransportError": "บันทึกโหมดส่งภาพของ Hook ไม่สำเร็จ",
   "l10n.oscHookTransportUnavailable": "Host เวอร์ชันนี้ยังไม่รองรับการตั้งค่า Hook แยกตาม API",
   "l10n.oscHookApiUnavailable": "ตรวจพบ API ได้เท่านั้น — ยังไม่มี Native Hook Renderer ที่ใช้งานได้",
-  "l10n.oscHookD3d9Note": "Direct3D 9 ส่งภาพผ่าน CPU Shared Memory ยังไม่มี GPU-only Transport",
+  "l10n.oscHookD3d9Note": "D3D9 GPU ผ่าน DWM/DirectComposition เฉพาะเกม Windowed ที่ตรวจยืนยันแล้วเท่านั้น เกม Fullscreen หรือไม่รองรับจะกลับไปใช้ CPU Shared Memory (โหมดทดลอง ยังไม่ได้ยืนยันภาพจริงในเกม)",
   "l10n.oscHookD3d9ExNote": "Direct3D 9Ex ใช้ CPU Shared Memory เป็นหลัก GPU Mailbox ต้องมี Pump ที่ยืนยันแล้วในโปรเซสเกม จึงยังไม่เปิดให้เลือกใน Build นี้",
   "l10n.oscHookD3d11Note": "Direct3D 11 ใช้ GPU_SHARED และอาจผ่าน CPU Mirror หาก GPU ต่างกัน ยังไม่มีการบังคับ CPU-only",
+  "l10n.oscHookD3d9GpuPreview": "เส้นทาง D3D9 Windowed GPU ทำงาน:",
   "l10n.oscHookTransportSaved": "บันทึกโหมดส่งภาพเรียบร้อย"
 }

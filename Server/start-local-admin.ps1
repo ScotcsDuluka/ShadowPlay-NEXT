@@ -38,9 +38,26 @@ if(-not $listener){
     $env:DULUKA_Urls='http://127.0.0.1:5117'
     $env:DULUKA_PublicApi__Enabled='false'
     $env:DULUKA_LocalAdmin__Enabled='true'
+    $secretsDir=Join-Path $env:LOCALAPPDATA 'DulukaAccount\Secrets'
+    New-Item -ItemType Directory -Force -Path $secretsDir | Out-Null
+    $identity=[Security.Principal.WindowsIdentity]::GetCurrent().Name
+    & icacls $secretsDir /inheritance:r /grant:r "${identity}:(OI)(CI)F" 'SYSTEM:(OI)(CI)F' 'Administrators:(OI)(CI)F' | Out-Null
+    if($LASTEXITCODE -ne 0){throw 'Cannot restrict recovery code directory permissions.'}
+    $codeFile=Join-Path $secretsDir 'admin-reset-code.txt'
+    if(-not(Test-Path -LiteralPath $codeFile)){
+        $b=New-Object byte[] 24
+        $rng=[Security.Cryptography.RandomNumberGenerator]::Create()
+        try{$rng.GetBytes($b)}finally{$rng.Dispose()}
+        $code=([BitConverter]::ToString($b)).Replace('-','')
+        [IO.File]::WriteAllText($codeFile,$code,[Text.UTF8Encoding]::new($false))
+    }
+    & icacls $codeFile /inheritance:r /grant:r "${identity}:F" 'SYSTEM:F' 'Administrators:F' | Out-Null
+    if($LASTEXITCODE -ne 0){throw 'Cannot protect recovery code file.'}
+    $env:DULUKA_LocalAdmin__ResetCodeFile=$codeFile
+    Write-Output ('Private recovery code file: '+$codeFile+' (code NOT displayed)')
     $env:DULUKA_Database__Path=$accountDb
     $env:DULUKA_Cbt1__Enabled='false'
-    $env:DULUKA_Cbt1__DatabasePath=Join-Path $env:TEMP 'duluka-local-admin-unused-cbt1.db'
+    $env:DULUKA_Cbt1__DatabasePath=Join-Path $env:LOCALAPPDATA 'DulukaAccount\CBT1\Applications.db'
     $env:DULUKA_GitHub__ClientSecret=''
     $logDir=Join-Path $env:LOCALAPPDATA 'DulukaAccount\AdminLogs'
     New-Item -ItemType Directory -Path $logDir -Force|Out-Null
@@ -73,7 +90,7 @@ try{
     }
     throw
 } finally {
-    foreach($name in @('DULUKA_Urls','DULUKA_PublicApi__Enabled','DULUKA_LocalAdmin__Enabled','DULUKA_Database__Path','DULUKA_Cbt1__Enabled','DULUKA_Cbt1__DatabasePath','DULUKA_GitHub__ClientSecret')){
+    foreach($name in @('DULUKA_Urls','DULUKA_PublicApi__Enabled','DULUKA_LocalAdmin__Enabled','DULUKA_LocalAdmin__ResetCodeFile','DULUKA_Database__Path','DULUKA_Cbt1__Enabled','DULUKA_Cbt1__DatabasePath','DULUKA_GitHub__ClientSecret')){
         Remove-Item ('Env:'+$name) -ErrorAction SilentlyContinue
     }
 }

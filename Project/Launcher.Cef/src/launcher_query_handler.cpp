@@ -272,6 +272,18 @@ bool LauncherQueryHandler::OnQuery(CefRefPtr<CefBrowser> browser,
     return true;
   }
 
+  if (cmd == "LAUNCHER_OPEN_ACCOUNT_PORTAL") {
+    // Credentials and sessions stay in the HTTPS browser account portal.
+    // Never pass passwords/tokens through the old CEF 73 native bridge.
+    // The destination is fixed, not supplied by an untrusted JS request.
+    HINSTANCE r = ShellExecuteW(NULL, L"open",
+                                L"https://aorus-desktop.taile6314b.ts.net/portal",
+                                NULL, NULL, SW_SHOWNORMAL);
+    RespondOk(callback, reinterpret_cast<INT_PTR>(r) > 32 ? "{\"ok\":true}"
+                                                          : "{\"ok\":false}");
+    return true;
+  }
+
   if (cmd == "LAUNCHER_DRAG") {
     launcherwin::BeginWindowDrag(host_wnd_);
     RespondOk(callback, "{\"ok\":true}");

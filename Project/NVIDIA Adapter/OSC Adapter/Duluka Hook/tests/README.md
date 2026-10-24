@@ -1,5 +1,9 @@
 # Native Hook tests
 
+> **Current interpretation (24 October 2026):** Earlier **expected-failure** entries for automatic D3D9 late attachment are historical and scoped to the original import/factory technique. The later no-import MinHook detour has its own offline fixture coverage, and DX9Ex mailbox tests now include the real Host publisher in separate processes. None of these should be advertised as proof of smooth in-game CEF→GPU→Hook composition. Read the newest sections and the [actual Host IPC record](../../../../Overlay%20On-Screen%20Control/NVIDIA%20OSC/HOST-DX9EX-IPC-DIRECT-GPU-20261024.md) before quoting a test result.
+
+
+
 Existing smoke-test sources and Visual C++ projects are intentionally kept at their current paths during this structural pass so that local invocation paths are not silently broken.
 
 - d3d9_smoke_test.cpp / NVIDIA OSC Adapter D3D9 Smoke Test.vcxproj: D3D9 and D3D9Ex composition path.

@@ -1,4 +1,15 @@
-# Launcher.Cef — CEF launcher lane (root Launcher.exe + NvLauncher\Cef\Launcher.dll)
+# Launcher.Cef — CEF launcher lane (root Launcher.exe + NVIDIA Launcher/Cef/Launcher.dll)
+
+## Current quick UI: Core READ-ONLY (24 October 2026)
+
+**Account Portal integration (source update):** The visible Launcher includes an **Account** button backed by the trusted-frame `LAUNCHER_OPEN_ACCOUNT_PORTAL` native command. It opens a fixed HTTPS Duluka Account Portal URL using the operating system's **external browser**; the Launcher does not collect passwords or own login sessions. The shared-account Portal currently disables new public registration and CBT1 submission. The external link and its source regression do **not** prove remote account login or enrollment acceptance. See [Duluka Account Server](../../Server/README.md).
+
+**This section supersedes the historical UI and Config Module descriptions below.** The current visible quick Launcher has **ShadowPlay ON/OFF**, **Core Modules** (11 built-in, suite-managed and *read-only*), and **Add-ons** (zero installed). The Core cards show local inventory/runtime telemetry but provide **no user editing, layout controls, per-Core settings/background customization, or independent enable/disable/uninstall**. Module-specific options, where supported, remain owned by the corresponding modules—not the Core catalog UI.
+
+The Core catalog is currently a clearly labelled **bundled fallback**. A **Server-owned read-only catalog** is designed, but **no verified remote endpoint or authentication flow is connected**. Never label the fallback as a live Server response or invent remote version numbers. The existing appearance `.spmod` data-only installer remains in source/on disk but is **not loaded by the visible Core quick UI**. See [the latest owner contract](Modules/CORE-CATALOG-SERVER-CONTRACT.md) and [handoff with superseded historical sections](Modules/MODULE-CONFIG-HANDOFF-20261024.md).
+
+**Release gating:** CEF 73/no-sandbox security, current quick-mode end-to-end CEF behavior and module telemetry require version-specific validation. Earlier deployed UI screenshots and 11-card/config-button tests below are **dated observations, not a promise of today's visible controls**.
+
 
 ## Simple Launcher — three destinations (2026-10-24)
 

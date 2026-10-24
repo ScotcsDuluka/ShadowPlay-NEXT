@@ -1,5 +1,9 @@
 ﻿# D3D9 Hook
 
+> **24 October 2026 status:** The older 23 October "no automatic late attach" observations below describe the **former import/factory-only strategy**. A newer MinHook implementation-code detour handles tested **pre-created D3D9/D3D9Ex devices when no imported D3D9 factory exists**. The other imported-factory edge case and safe game-device detach remain unresolved. Isolated fixture PASS is not proof of live-game OSC rendering/FPS. See the last section of this document and [Hook regression tests](../../../tests/README.md).
+
+
+
 D3D9Hook.cpp owns D3D9/D3D9Ex factory import patching, device-vtable Present/PresentEx and Reset/ResetEx interception, hook removal, and exported test/status entry points. Frame-bridge reads, D3D9 texture/state-block resources, CPU texture upload and composition live in src/Renderer/D3D9/D3D9Renderer.cpp.
 ## DX9 late attachment boundary (verified 2026-10-23)
 

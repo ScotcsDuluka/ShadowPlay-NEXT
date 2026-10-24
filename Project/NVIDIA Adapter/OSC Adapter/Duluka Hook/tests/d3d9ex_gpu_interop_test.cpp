@@ -355,6 +355,91 @@ int Test(D3DFORMAT fmt, DXGI_FORMAT expectedFormat,
     // legacyHandle belongs to shared resource, not the NT handle table.
     return result;
 }
+
+// Read-only platform capability probe for CLASSIC IDirect3DDevice9, not Ex.
+// Attempts to open an ordinary D3D11 legacy shared GPU texture directly.
+// An unsupported HRESULT is an expected discovery result, not a test failure.
+// This deliberately never loads Duluka Hook or touches a running game.
+void ProbeClassicD3D9GpuShare(HWND window, IDXGIAdapter1 *adapter)
+{
+    constexpr UINT width=64, height=64;
+    IDirect3D9 *factory=Direct3DCreate9(D3D_SDK_VERSION);
+    IDirect3DDevice9 *classic=nullptr;
+    ID3D11Device *gpu=nullptr;
+    ID3D11DeviceContext *context=nullptr;
+    ID3D11Texture2D *shared=nullptr;
+    IDXGIResource *resource=nullptr;
+    IDirect3DTexture9 *opened=nullptr;
+    IDirect3DSurface9 *surface=nullptr,*staging=nullptr;
+    HRESULT hr=E_FAIL;
+    HRESULT openHr=E_FAIL;
+    bool verifiedPixels=false;
+    if(factory) {
+        D3DPRESENT_PARAMETERS pp{};
+        pp.Windowed=TRUE;pp.SwapEffect=D3DSWAPEFFECT_DISCARD;
+        pp.BackBufferWidth=width;pp.BackBufferHeight=height;
+        pp.BackBufferCount=1;pp.BackBufferFormat=D3DFMT_UNKNOWN;
+        pp.hDeviceWindow=window;pp.PresentationInterval=D3DPRESENT_INTERVAL_IMMEDIATE;
+        hr=factory->CreateDevice(D3DADAPTER_DEFAULT,D3DDEVTYPE_HAL,
+            window,D3DCREATE_SOFTWARE_VERTEXPROCESSING,&pp,&classic);
+    }
+    if(SUCCEEDED(hr)&&classic) {
+        hr=D3D11CreateDevice(adapter,D3D_DRIVER_TYPE_UNKNOWN,nullptr,
+            D3D11_CREATE_DEVICE_BGRA_SUPPORT,nullptr,0,D3D11_SDK_VERSION,
+            &gpu,nullptr,&context);
+    }
+    if(SUCCEEDED(hr)&&gpu) {
+        D3D11_TEXTURE2D_DESC desc{};
+        desc.Width=width;desc.Height=height;desc.MipLevels=1;desc.ArraySize=1;
+        desc.SampleDesc.Count=1;desc.Format=DXGI_FORMAT_B8G8R8A8_UNORM;
+        desc.Usage=D3D11_USAGE_DEFAULT;
+        desc.BindFlags=D3D11_BIND_RENDER_TARGET|D3D11_BIND_SHADER_RESOURCE;
+        desc.MiscFlags=D3D11_RESOURCE_MISC_SHARED;
+        std::vector<std::uint32_t> pixels(width*height,0xFF123456u);
+        D3D11_SUBRESOURCE_DATA source{};
+        source.pSysMem=pixels.data();source.SysMemPitch=width*4;
+        hr=gpu->CreateTexture2D(&desc,&source,&shared);
+    }
+    HANDLE legacyHandle=nullptr;
+    if(SUCCEEDED(hr)&&shared) {
+        hr=shared->QueryInterface(__uuidof(IDXGIResource),
+            reinterpret_cast<void**>(&resource));
+        if(SUCCEEDED(hr))hr=resource->GetSharedHandle(&legacyHandle);
+    }
+    if(SUCCEEDED(hr)&&legacyHandle) {
+        HANDLE candidateHandle=legacyHandle;
+        openHr=classic->CreateTexture(width,height,1,
+            D3DUSAGE_RENDERTARGET,D3DFMT_A8R8G8B8,D3DPOOL_DEFAULT,
+            &opened,&candidateHandle);
+        if(SUCCEEDED(openHr)&&opened) {
+            hr=opened->GetSurfaceLevel(0,&surface);
+            if(SUCCEEDED(hr))hr=classic->CreateOffscreenPlainSurface(
+                width,height,D3DFMT_A8R8G8B8,D3DPOOL_SYSTEMMEM,
+                &staging,nullptr);
+            if(SUCCEEDED(hr))hr=classic->GetRenderTargetData(surface,staging);
+            if(SUCCEEDED(hr)) {
+                D3DLOCKED_RECT locked{};
+                hr=staging->LockRect(&locked,nullptr,D3DLOCK_READONLY);
+                if(SUCCEEDED(hr)) {
+                    const auto value=*reinterpret_cast<const std::uint32_t*>(
+                        static_cast<const std::uint8_t*>(locked.pBits)+
+                        (height/2)*locked.Pitch+(width/2)*4);
+                    verifiedPixels=value==0xFF123456u;
+                    staging->UnlockRect();
+                }
+            }
+        }
+    }
+    std::cout<<"CLASSIC_D3D9_GPU_LEGACY_HANDLE_OPEN="
+        <<((SUCCEEDED(openHr)&&opened)?"YES":"NO")
+        <<" OPEN_HR=0x"<<std::hex<<static_cast<unsigned long>(openHr)
+        <<" LAST_HR=0x"<<static_cast<unsigned long>(hr)
+        <<std::dec<<" GPU_PIXELS_VERIFIED="<<(verifiedPixels?"YES":"NO")
+        <<"\n";
+    Release(staging);Release(surface);Release(opened);Release(resource);
+    Release(shared);Release(context);Release(gpu);Release(classic);Release(factory);
+    // The legacy handle is owned by the GPU resource; never CloseHandle it.
+}
 }
 int wmain(int argc, wchar_t **argv)
 {
@@ -398,6 +483,14 @@ int wmain(int argc, wchar_t **argv)
         std::cerr<<"No matching DXGI adapter for D3D9Ex LUID\n";
         Release(factory);Release(dev9);Release(d3d);
         DestroyWindow(window);return 14;
+    }
+    if (argc==2 && std::wcscmp(argv[1],L"--classic-gpu-probe")==0) {
+        std::cout<<"Probing ordinary IDirect3DDevice9 + D3D11 same-adapter GPU sharing\n";
+        ProbeClassicD3D9GpuShare(window,matching);
+        Release(matching);Release(factory);Release(dev9);Release(d3d);
+        DestroyWindow(window);
+        UnregisterClassW(wc.lpszClassName,instance);
+        return 0; // capability discovery; unsupported is expected
     }
     HMODULE hook = argc == 2 ? LoadLibraryW(argv[1]) : nullptr;
     if (argc != 1 && (argc != 2 || !hook)) {

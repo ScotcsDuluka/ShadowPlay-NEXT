@@ -86,11 +86,14 @@ test('ReShade Manager uses compact NVIDIA Settings proportions without numbered 
   assert.doesNotMatch(script, /heading\.appendChild\(node\('span', 'nv-reshade-step'/);
   assert.match(script, /headingWrap\.insertBefore\(back, headingWrap\.firstChild\)/);
   assert.ok(styles.includes('#nv-reshade-manager .nv-reshade-section {'));
-  assert.ok(styles.includes('border-bottom: 1px solid rgba(162, 169, 173, .21)'));
-  assert.match(styles, /height: 42px !important/);
-  assert.match(styles, /font-size: 15px !important/);
-  assert.match(styles, /max-width: 1000px/);
-  assert.ok(styles.includes('#nv-filter-settings.nv-reshade-open'));
+  assert.ok(styles.includes('border-bottom: 1px solid rgba(171, 179, 184, .22)'));
+  assert.ok(styles.includes('height: 46px !important'));
+  assert.ok(styles.includes('font-size: 16px !important'));
+  assert.ok(styles.includes('max-width: none'));
+  assert.ok(styles.includes('grid-template-columns: minmax(0, 1.7fr) minmax(250px, 1fr)'));
+  assert.ok(styles.includes('#nv-filter-settings.nv-reshade-open > :not(#nv-reshade-manager)'));
+  assert.ok(styles.includes('background: #262b30'));
+  assert.ok(styles.includes('@media (max-width: 720px)'));
 });
 
 test('NodeAPI mounts safe installer route and OSC mod manifest', () => {

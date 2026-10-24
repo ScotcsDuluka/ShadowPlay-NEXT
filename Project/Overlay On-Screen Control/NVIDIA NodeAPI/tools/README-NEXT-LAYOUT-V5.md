@@ -1,5 +1,7 @@
 # ShadowPlay NEXT — Layout V5 implementation contract
 
+> **Historical V5 Phase 1 specification (24 October 2026):** This file retains original goals and source references. It predates later Freestyle V5 code/testing and must not be used as a claim about current Native OSC open-cycle readiness. Consult [the root engineering overview](../../../../README.md) and the newer V5 QA reports before describing current behavior.
+
 Status: **Phase 1, pure layout model only**. This is NOT a release, and it must not
 be confused with the current experimental V4 / Group Layout A preview.
 

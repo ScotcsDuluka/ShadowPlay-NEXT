@@ -20,6 +20,7 @@ Native Host โหลดหน้า UI นั้นผ่าน CEF และ�
 |---|---|
 | `src/osc_main.cpp` | CEF Host, Desktop/Hook state, GPU compositor/Present, input, query handler, worker/window procedure และจุดประสาน frame publisher |
 | `src/OscFramePublisher/OscD3D9FramePublisher/` | D3D9 consumer backend: shared-memory BGRA pixel bridge, version/owner checks, seqlock และ frame visibility |
+| `src/OscFramePublisher/OscD3D9ExFramePublisher/` | **ทดลอง DX9Ex GPU publisher**: ส่ง GPU shared texture แบบ opt-in ไปยัง D3D9Ex Hook ผ่าน mailbox/ACK; ผลทดสอบข้ามโปรเซสไม่ใช่หลักฐานว่า CEF→GPU→Hook ผ่านเกมจริงครบวงจร |
 | `src/OscFramePublisher/OscD3D11FramePublisher/` | D3D11 publisher backend: shared NT texture, adapter/device selection, keyed mutex, cross-adapter staging/readback worker และ metadata bridge |
 | `src/OscFramePublisher/OscD3D10FramePublisher/` | โฟลเดอร์เตรียมไว้; bridge ปัจจุบันยังไม่มี ConsumerRenderApiD3D10 |
 | `src/OscFramePublisher/Common/` | ยูทิลิตีส่วนกลาง: Dirty-Rect clipping/coalescing และ readback fingerprint diagnostics |

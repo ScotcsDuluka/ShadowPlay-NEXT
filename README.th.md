@@ -78,7 +78,9 @@
 
 **CBT1 ต้องเน้นหลักฐานการทำงานจริง ไม่ใช่แค่ความตื่นเต้นจาก Trailer** โดยเฉพาะวงจรเปิด/ปิด Overlay, การส่ง Input, ความสมบูรณ์ของไฟล์วิดีโอ, ความเข้ากันได้ของ GPU/Adapter และพฤติกรรมที่แตกต่างกันตามเกม
 
-**ยังไม่มีลิงก์รับสมัคร CBT1 ใน README นี้** เพราะยังไม่เปิดหน้าสมัครจริง เมื่อตัวระบบรับสมัครพร้อมจึงค่อยเพิ่มลิงก์
+**ยังไม่มีลิงก์รับสมัคร CBT1 ใน README นี้** เพราะยังไม่เปิดรับผู้ทดสอบจริง เมื่อตัวระบบสมัครพร้อมและประกาศเปิดจึงค่อยเพิ่มลิงก์
+
+**บัญชีผู้ใช้ไม่ใช่การสมัคร CBT1:** Source ของ Launcher มีปุ่ม **Account** เพื่อเปิด Duluka Account Portal ในเบราว์เซอร์ภายนอก (ไม่ใช่ฟอร์ม Login ภายใน CEF Launcher) ส่วน Portal แบบใช้ฐานข้อมูลบัญชีหลักยัง **ปิดการสมัครบัญชีใหม่จากภายนอก และปิดรับใบสมัคร CBT1** การเปิดหน้าเว็บ/ได้ HTTP 200 ยังไม่ยืนยันว่า Login ภายนอกครบวงจรผ่านแล้ว ดู [Server](Server/README.md) และ [Launcher](Project/Launcher.Cef/README.md)
 
 ---
 
@@ -98,8 +100,9 @@
 | **NVIDIA Capture** | Capture และ Encoder, ตรวจจอด้วย DXGI, เลือกจอ, Screenshot Engine และ Container Relay | **มีโค้ดและผลทดสอบเฉพาะส่วน; ยังไม่รับรอง Record/Replay และ UI End-to-End Runtime** |
 | **Encoder & Audio** | Native NVENC กับ FFmpeg หลายโหมด, WASAPI, Timing, Mux และ Integrity Checks | **ความพร้อมแตกต่างกันตาม Engine** |
 | **NVIDIA Container / Config** | ควบคุมโปรเซส, GameWatcher, Capture Relay, ตรวจคำขอและประสานโมดูล | **กำลังทดสอบ; Source, Staged Build และ Runtime ที่รันอยู่อาจไม่ตรงกัน** |
-| **Launcher / Modules** | CEF Command Center, เมนู 11 โมดูล, รายงานสถานะติดตั้ง/ทำงาน, ภาษาไทย/อังกฤษ และต้นแบบ Appearance Profiles | **พัฒนาแล้ว/กำลังทดสอบ; แค่มีปุ่มเมนูไม่ใช่ตัวติดตั้งหรือการรับรองว่าทุกโมดูลทำงานแล้ว** |
+| **Launcher / Modules** | หน้าแบบง่าย เปิด/ปิด ShadowPlay และแสดง Core Modules 11 รายการพร้อมสถานะ Runtime แบบอ่านอย่างเดียว; หน้า Add-ons ยังไม่มีโมดูลเสริม | **กำลังพัฒนา: Core ห้ามแก้ไข/ปิด/ถอนแยกจากชุดหลัก; ระบบข้อมูลจาก Server ยังเป็นสัญญาเสนอ ไม่ได้เชื่อมจริง; เครื่องมือ Appearance เก่าไม่ถูกโหลดในหน้า Core แบบใหม่** |
 | **Gallery / Media** | NodeAPI Recent, CopyFile, Metadata และ MSE/Seek Bridge | **ชุดทดสอบ Backend ผ่าน แต่ยังไม่ยืนยัน Play/Seek ใน CEF จริง; Delete ตอบ 501** |
+| **Duluka Account / Tester Portal** | Account Server แยกสำหรับ Username/Password, Session, จัดการอุปกรณ์ และ Portal ผ่านเบราว์เซอร์ พร้อมปุ่ม Account ใน Launcher | **มีโค้ดและผลทดสอบเฉพาะส่วน; Portal ที่ใช้บัญชีจริงปิดสมัครบัญชีใหม่และยังไม่เปิดสมัคร CBT1; ยังไม่รับรอง Login จากภายนอกครบวงจร** |
 
 **สองระบบนี้ไม่ใช่สิ่งเดียวกัน:** Game Profiles ใน OSC ใช้จัดการค่าการเลือก GPU รายแอปผ่านบริการ NVIDIA Graphics ในเครื่อง ส่วน ApplicationOntology เป็นระบบแค็ตตาล็อกและการระบุเกม/แจ้งอัปเดต **ไม่ได้เก็บหรือ Apply โปรไฟล์ GPU ของผู้ใช้** ดู [nv-ontology.pages.dev](https://nv-ontology.pages.dev/) และ [ซอร์ส ApplicationOntology-API](https://github.com/ScotcsDuluka/ApplicationOntology-API) โดยการแก้ข้อมูลใน Repository บนเครื่องไม่ได้หมายความว่า Deploy ขึ้นเว็บแล้ว
 
@@ -127,7 +130,7 @@
 
 | ระบบ | หลักฐานที่ตรวจพบ | สิ่งที่ยังต้องตรวจ |
 |---|---|---|
-| **Launcher / Modules** | CEF 73 Command Center มีเมนู **11 โมดูล** และตรวจสถานะแพ็กเกจ/โปรเซสตามชนิดโมดูลได้ มีโค้ด Appearance Profiles สำหรับสีและภาพพื้นหลัง พร้อมปุ่ม Overlay/Settings เดิม | กดหน้าโมดูลไม่ใช่การติดตั้งหรือเริ่มโมดูล และ Appearance ยังไม่ใช่ Package Manager แบบ Magisk ที่ผ่านการรับรอง; CEF เก่ายังต้องปรับความปลอดภัย |
+| **Launcher / Core แบบอ่านอย่างเดียว** | Quick UI ปัจจุบันมีสวิตช์ ShadowPlay, Core 11 โมดูลแสดงสถานะในเครื่อง และ Add-ons ที่ยังว่างอยู่; เครื่องมือ Appearance เก่ายังอยู่ใน Source แต่ไม่ได้เปิดใน Core UI | Core ไม่ให้ผู้ใช้แก้ Config/Layout/Background หรือเปิดปิด/ถอนทีละโมดูล ข้อมูล Core จาก Server ยังไม่เชื่อม API จริง และ CEF 73 ยังต้องตรวจความปลอดภัย |
 | **Game Profiles / Windows GPU** | Backend กำหนด GPU รายแอปได้; ผู้พัฒนารายงานว่าทดสอบโน้ตบุ๊กหลาย GPU แล้ว เกมเรนเดอร์ผ่านการ์ดที่เลือกจริง และค่าคงอยู่หลัง Restart | ยังไม่ยืนยันทุก Windows/Driver/เกม และ UI ยังไม่ได้โคลน Windows Graphics Settings ครบทุกความสามารถ |
 | **ApplicationOntology** | แค็ตตาล็อกในเครื่อง `C:\My Project\nv-ontology-pages\public\catalog.json` ระบุ **v1.2.8 / 8 รายการ** เมื่ออ่านวันที่ 24 ต.ค. 2569; Container ใช้แคชแค็ตตาล็อกที่ผ่านการตรวจข้อมูล | **ยังไม่ได้ตรวจว่ารุ่นนี้ Deploy ขึ้น Public API แล้ว**; ชื่อ `.exe` ตรงกันไม่ได้พิสูจน์ตัวตนเกมด้วย SHA-256 |
 | **OSC Adapter / Duluka Hook** | มีโค้ด Native D3D9/D3D9Ex และ D3D11; ผลทดสอบแบบแยกโปรเซสใช้ **Host DX9Ex ตัวจริงส่งให้ Hook Receiver** ผ่าน GPU Shared Texture และเส้นทาง x64→x86 โดยไม่ต้อง Readback CPU ระหว่างการ CopyResource | DX9Ex Mailbox ยังเป็นการทดลอง ต้องตรวจ Hook เกมจริง อัตราเฟรม/FPS การเปิดปิด Overlay และการกลับมาทำงานเมื่อ Focus เปลี่ยน |
@@ -135,6 +138,7 @@
 | **NodeAPI Gallery** | แก้ Recent ให้ค้นโฟลเดอร์ย่อย, CopyFile ตรวจสำเร็จจริง และเพิ่ม MSE Video/Seek Bridge ที่เสิร์ฟหน้า OSC; ชุดทดสอบเฉพาะส่วนผ่าน **58/58** | ยังต้องทดสอบเล่นวิดีโอ Seek และ A/V Sync ใน CEF จริง; คำสั่ง Delete ตั้งใจตอบ **501** ไม่แสร้งว่าลบสำเร็จ |
 | **Container / NodeAPI Security** | มี Browser/Loopback Guards, ตรวจ Path ของโปรเซส, นโยบาย Game Identity ด้วย SHA-256 และงาน Pairing Secret พร้อมชุดทดสอบเฉพาะส่วน | ตรวจ Host/Origin ช่วยลดความเสี่ยงจากเว็บ แต่ไม่ใช่การยืนยันตัวตนของทุก Local Process; ต้องตรวจ Policy หลัง Deploy จริง |
 | **Ansel / ReShade** | แยก Ansel Adapter จาก ReShade Ansel Engine และมีสัญญา Named Pipe / Game Filter UI | ปุ่ม Game Filter แสดงได้ ไม่ได้แปลว่า Effect หรือ Shader ทำงานในเกมจริง |
+| **Duluka Account / Portal** | Source ของ Launcher มีปุ่ม Account ที่เปิด Portal HTTPS ในเบราว์เซอร์ภายนอก; Server มี Login บัญชีเดิม หน้า Account/Devices และเปลี่ยนรหัสผ่าน พร้อมชุดทดสอบแยก | Portal แบบใช้บัญชีหลักปิดสมัครบัญชีใหม่และ CBT1; ยังไม่ผ่านการทดสอบ Login ภายนอกแบบเต็มวงจร และ **Server Core Catalog** ยังเป็นแผน ไม่ได้เชื่อมจริง |
 
 **เส้นทางเจ้าของระบบ:** `NVIDIA Capture → NVIDIA Container → NVIDIA NodeAPI → OSC UI` สำหรับสถานะและคำสั่ง Capture ส่วน `NVIDIA OSC Host → OSC Adapter / Duluka Hook` เป็นเส้นทาง Overlay Transport ที่ยังทดลองอยู่ โดย NvCapture เป็นผู้เลือกจอและสร้าง Screenshot จริง
 
@@ -143,6 +147,8 @@
 อ่านหลักฐานเพิ่มเติม: [Launcher](Project/Launcher.Cef/README.md) · [OSC Adapter](Project/NVIDIA%20Adapter/OSC%20Adapter/README.md) · [DX9Ex GPU Test](Project/Overlay%20On-Screen%20Control/NVIDIA%20OSC/HOST-DX9EX-IPC-DIRECT-GPU-20261024.md) · [Capture Relay](Project/NVIDIA%20Container/CAPTURE-DISPLAY-RELAY-CONTRACT-20261024.md) · [Gallery](Project/Overlay%20On-Screen%20Control/NVIDIA%20NodeAPI/NODEAPI-GALLERY-PLAYER-SEEK-20261024.md) · [Security](Project/NVIDIA%20Container/SECURITY-STABILITY-20261024.md)
 
 ---
+
+**เอกสารทุกโมดูล:** [ดัชนีเอกสาร](docs/README.md) · [รายการ README ที่ตรวจทั้งหมด](docs/README-COVERAGE-20261024.md)
 
 ## สถาปัตยกรรมเบื้องหลัง Flagship ReBuild
 

@@ -1,6 +1,10 @@
 # ShadowPlay NEXT — Appearance Modules v1 (.spmod)
 
-**Current user-facing entry:** Launcher quick UI → **Core Modules** (11 built-in modules) → **CONFIG**, or the dedicated **Config Module** tab. Background profiles now apply only to the selected module's card and Config preview, **not the entire Launcher window**. **Add-ons is empty** until actual optional modules are supported. See `MODULE-CONFIG-HANDOFF-20261024.md`. The notes below document the data-only `.spmod` installation backend, not a third-party executable module system.
+> **Historical/developer reference, 24 October 2026:** The current Launcher quick UI no longer exposes Core configuration, theme/background editing, or the `.spmod` installer. Core Modules are **11 read-only built-in suite components**. The visible Add-ons page currently contains **zero installed add-ons**. This document preserves the **data-only package format and installer tooling**, not a claim that its buttons are still visible in the latest quick UI. The future Core catalog is **Server-owned by design**, but no remote catalog API is verified or connected. [Current Core contract](CORE-CATALOG-SERVER-CONTRACT.md) · [Timeline and superseded UI designs](MODULE-CONFIG-HANDOFF-20261024.md).
+
+
+
+**CURRENT POLICY (2026-10-24): Core Modules are read-only and server-owned.** The quick Launcher no longer exposes Config Module, per-Core Settings, background/theme edit or .spmod management. Module names/descriptions currently use bundled fallback, runtime state comes from local Launcher, and the authoritative server catalog is NOT CONNECTED yet. Add-ons is empty. See `CORE-CATALOG-SERVER-CONTRACT.md` for the future server integration. The installation instructions below are HISTORICAL documentation of a preserved but currently hidden data-only appearance backend. They are NOT available in the quick Launcher UI.
 This phase installs **data-only** visual modules. A .spmod is a ZIP file with
 exactly two members:
 

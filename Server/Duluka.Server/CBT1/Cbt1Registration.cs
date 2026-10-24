@@ -205,6 +205,11 @@ internal sealed class Cbt1DecisionPayload
     public string? Decision { get; set; }
 }
 
+internal sealed class Cbt1InviteCodePayload
+{
+    public string? Code { get; set; }
+}
+
 public static class Cbt1Registration
 {
     private static readonly JsonSerializerOptions JsonOptions =
@@ -212,6 +217,9 @@ public static class Cbt1Registration
 
     private static bool Accepting(IConfiguration config) =>
         string.Equals(config["Cbt1:Enabled"], "true", StringComparison.OrdinalIgnoreCase);
+
+    private static bool InvitesEnabled(IConfiguration config) =>
+        config.GetValue<bool>("Cbt1:InviteEnabled");
 
     private static IResult Error(int status, string code, string message) =>
         Results.Json(new { ok = false, errorCode = code, httpStatus = status, message },
@@ -276,28 +284,55 @@ public static class Cbt1Registration
         group.MapGet("/status", (HttpContext context, IConfiguration config) =>
         {
             context.Response.Headers.CacheControl = "no-store";
-            return Results.Json(new { ok = true, accepting = Accepting(config), cycle = "CBT1" });
+            return Results.Json(new { ok = true, accepting = Accepting(config), inviteEnabled = InvitesEnabled(config), cycle = "CBT1" });
         });
 
         group.MapGet("/me", (
-            HttpContext context, SessionService sessions, Database accounts, Cbt1Store store) =>
+            HttpContext context, SessionService sessions, Database accounts, Cbt1Store store, Cbt1InviteStore invites, IConfiguration config) =>
         {
             context.Response.Headers.CacheControl = "no-store";
             var tester = AuthenticatedTester(context.Request, sessions, accounts);
             if (tester is null) return Error(401, "cbt1.login_required", "Sign in with a username.");
             return Results.Json(new { ok = true, username = tester.Value.Username,
-                application = store.ForAccount(tester.Value.AccountId) });
+                application = store.ForAccount(tester.Value.AccountId),
+                invited = InvitesEnabled(config) && invites.HasAccess(tester.Value.AccountId) });
         }).RequireRateLimiting("api");
 
-        group.MapPost("/apply", async (
-            HttpContext context, IConfiguration config, Cbt1Store store,
+        group.MapPost("/invite/redeem", async (
+            HttpContext context, IConfiguration config, Cbt1InviteStore invites,
             SessionService sessions, Database accounts) =>
         {
-            if (!Accepting(config))
-                return Error(503, "cbt1.closed", "CBT1 applications are not open.");
+            context.Response.Headers.CacheControl = "no-store";
+            if (!InvitesEnabled(config))
+                return Error(503, "cbt1.invites_closed", "CBT1 invitations are not open.");
+            var tester = AuthenticatedTester(context.Request, sessions, accounts);
+            if (tester is null)
+                return Error(401, "cbt1.login_required", "Sign in before redeeming an invitation.");
+            if (!context.Request.HasJsonContentType())
+                return Error(415, "cbt1.json_required", "JSON request required.");
+            Cbt1InviteCodePayload? payload;
+            try { payload = await ReadLimited<Cbt1InviteCodePayload>(context.Request,context.RequestAborted); }
+            catch (InvalidDataException) { return Error(413,"cbt1.too_large","Request too large."); }
+            catch (JsonException) { return Error(400,"cbt1.bad_invite","Invalid invitation."); }
+            if (payload?.Code is null)
+                return Error(400,"cbt1.bad_invite","Invalid invitation.");
+            var result = invites.Redeem(payload.Code,tester.Value.AccountId);
+            return result switch {
+                Cbt1InviteStore.RedeemResult.Success => Results.Json(new {ok=true,invited=true}),
+                Cbt1InviteStore.RedeemResult.AlreadyInvited => Results.Json(new {ok=true,invited=true}),
+                _ => Error(400,"cbt1.invalid_invite","Invalid, expired, or already-used invitation.")
+            };
+        }).RequireRateLimiting("auth-start");
+
+        group.MapPost("/apply", async (
+            HttpContext context, IConfiguration config, Cbt1Store store, Cbt1InviteStore invites,
+            SessionService sessions, Database accounts) =>
+        {
             var tester = AuthenticatedTester(context.Request, sessions, accounts);
             if (tester is null)
                 return Error(401, "cbt1.login_required", "Sign in with a username.");
+            if (!Accepting(config) && !(InvitesEnabled(config) && invites.HasAccess(tester.Value.AccountId)))
+                return Error(503, "cbt1.closed", "CBT1 applications require an invitation.");
             if (!context.Request.HasJsonContentType())
                 return Error(415, "cbt1.json_required", "JSON request required.");
 

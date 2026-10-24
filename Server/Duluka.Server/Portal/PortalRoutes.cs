@@ -27,9 +27,18 @@ public static class PortalRoutes
             await next();
         });
         app.MapGet("/", () => Results.Redirect("/portal"));
+        // The UI must distinguish disposable staging identities from the shared
+        // account database. The response contains no secrets and is no-store.
+        var accountMode = string.Equals(app.Configuration["Portal:AccountMode"], "main",
+            StringComparison.OrdinalIgnoreCase) ? "main" : "staging";
+        var registrationEnabled = accountMode != "main" ||
+            app.Configuration.GetValue<bool>("PublicApi:AllowRegistration");
+        app.MapGet("/portal/config", () => Results.Json(new { accountMode, registrationEnabled }));
         app.MapGet("/portal", () => ReadResource("index.html", "text/html; charset=utf-8"));
         app.MapGet("/portal/app.css", () => ReadResource("app.css", "text/css; charset=utf-8"));
         app.MapGet("/portal/app.js", () => ReadResource("app.js", "application/javascript; charset=utf-8"));
+        app.MapGet("/portal/scene.css", () => ReadResource("scene.css", "text/css; charset=utf-8"));
+        app.MapGet("/portal/scene.js", () => ReadResource("scene.js", "application/javascript; charset=utf-8"));
     }
 
     private static IResult ReadResource(string name, string contentType)

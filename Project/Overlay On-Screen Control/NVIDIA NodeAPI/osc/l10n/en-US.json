@@ -1122,8 +1122,9 @@
   "l10n.oscHookTransportError": "Hook transport preference could not be saved.",
   "l10n.oscHookTransportUnavailable": "This Host does not expose per-API transport settings.",
   "l10n.oscHookApiUnavailable": "API detection only — native Hook renderer is not implemented.",
-  "l10n.oscHookD3d9Note": "Direct3D 9 uses CPU Shared Memory. GPU-only transport is not implemented.",
+  "l10n.oscHookD3d9Note": "D3D9 GPU uses DWM/DirectComposition only in verified Windowed games. Fullscreen and unsupported games fall back to CPU Shared Memory. Experimental preview; not yet pixel-verified in a live game.",
   "l10n.oscHookD3d9ExNote": "Direct3D 9Ex uses CPU Shared Memory by default. GPU mailbox requires a verified game-owned Pump and remains unavailable in this build.",
   "l10n.oscHookD3d11Note": "Direct3D 11 uses GPU_SHARED; cross-GPU can fall back through a CPU mirror. CPU-only rendering is not implemented.",
+  "l10n.oscHookD3d9GpuPreview": "D3D9 Windowed GPU route active:",
   "l10n.oscHookTransportSaved": "Transport preference saved."
 }

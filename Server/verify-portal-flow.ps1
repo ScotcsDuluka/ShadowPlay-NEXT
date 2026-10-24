@@ -73,6 +73,55 @@ try{
     $token=$loggedIn.Data.resource.sessionToken
     Assert 'application still linked after new login' ((Call 'GET' '/v1/cbt1/me' $null).Data.application.decision -eq 'pending')
     Assert 'operator route remains hidden' ((Call 'GET' '/v1/cbt1/admin/applications' $null).Status -eq 404)
+
+    # Account management: verify /me + device listing, an explicitly requested
+    # disconnect of another device, and authenticated password change.
+    $profile=(Call 'GET' '/v1/account/me' $null)
+    $oldDeviceId=$profile.Data.resource.currentDevice.deviceId
+    Assert 'account details show matching username and active device' (
+        $profile.Status -eq 200 -and $profile.Data.resource.username -eq $username -and
+        -not [string]::IsNullOrWhiteSpace($oldDeviceId))
+    $knownDevices=Call 'GET' '/v1/account/devices' $null
+    Assert 'account device list includes current device' (
+        $knownDevices.Status -eq 200 -and
+        @($knownDevices.Data.resource.devices | Where-Object deviceId -eq $oldDeviceId).Count -eq 1)
+    $oldToken=$token
+    $secondDevice=New-Object byte[] 32
+    $rng2=[Security.Cryptography.RandomNumberGenerator]::Create()
+    try{$rng2.GetBytes($secondDevice)}finally{$rng2.Dispose()}
+    $secondAuth=$auth.Clone()
+    $secondAuth.deviceKey=[Convert]::ToBase64String($secondDevice).TrimEnd('=').Replace('+','-').Replace('/','_')
+    $secondAuth.deviceName='Secondary Synthetic Device'
+    $secondLogin=Call 'POST' '/v1/auth/login' $secondAuth
+    Assert 'second device login succeeds' (
+        $secondLogin.Status -eq 200 -and $secondLogin.Data.resource.sessionToken.Length -ge 32)
+    $token=$secondLogin.Data.resource.sessionToken
+    $secondProfile=Call 'GET' '/v1/account/me' $null
+    Assert 'second device has a distinct device ID' (
+        $secondProfile.Status -eq 200 -and
+        $secondProfile.Data.resource.currentDevice.deviceId -ne $oldDeviceId)
+    $secondDevices=Call 'GET' '/v1/account/devices' $null
+    Assert 'second device can see the two linked devices' (
+        $secondDevices.Status -eq 200 -and @($secondDevices.Data.resource.devices).Count -ge 2)
+    $disconnected=Call 'POST' ('/v1/account/devices/'+$oldDeviceId+'/revoke') @{}
+    Assert 'disconnect first device succeeds' (
+        $disconnected.Status -eq 200 -and $disconnected.Data.resource.revoked -eq $true)
+    $token=$oldToken
+    Assert 'disconnected device session is invalidated' (
+        (Call 'GET' '/v1/account/me' $null).Status -eq 401)
+    $token=$secondLogin.Data.resource.sessionToken
+
+    $newPassword='New-Only-'+$nonce.Substring(3,17)
+    Assert 'wrong current password cannot change password' (
+        (Call 'POST' '/v1/account/password' @{currentPassword='incorrect';newPassword=$newPassword}).Status -eq 400)
+    Assert 'password update with valid current password succeeds' (
+        (Call 'POST' '/v1/account/password' @{currentPassword=$password;newPassword=$newPassword}).Status -eq 200)
+    Assert 'old password no longer signs in' ((Call 'POST' '/v1/auth/login' $secondAuth).Status -eq 401)
+    $secondAuth.password=$newPassword
+    $changedLogin=Call 'POST' '/v1/auth/login' $secondAuth
+    Assert 'new password logs in to same account' (
+        $changedLogin.Status -eq 200 -and $changedLogin.Data.resource.accountId -eq $profile.Data.resource.accountId)
+    $token=$changedLogin.Data.resource.sessionToken
     Assert 'logout revokes session' ((Call 'POST' '/v1/auth/session/revoke' $null).Status -eq 200)
     Assert 'revoked bearer not usable' ((Call 'GET' '/v1/cbt1/me' $null).Status -eq 401)
     Write-Output 'PASS full staging register/login/CBT1/logout integration.'

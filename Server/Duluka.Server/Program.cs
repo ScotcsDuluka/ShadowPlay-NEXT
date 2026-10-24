@@ -61,6 +61,7 @@ builder.Services.AddSingleton<AccountProvisioningService>();
 builder.Services.AddSingleton<NativeAuthService>();
 builder.Services.AddSingleton<SessionService>();
 builder.Services.AddSingleton<Cbt1Store>();
+builder.Services.AddSingleton<Cbt1InviteStore>();
 // Browser API calls come only from the project's GitHub Pages origin.
 builder.Services.AddCors(options => options.AddPolicy("cbt1-web", policy =>
     policy.WithOrigins("https://scotcsduluka.github.io")
@@ -172,6 +173,17 @@ if (publicApiMode)
             return;
         }
         if (!IPAddress.IsLoopback(ctx.Connection.RemoteIpAddress ?? IPAddress.None))
+        {
+            ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return;
+        }
+        // Sharing the main account database does NOT automatically enable
+        // uninvited internet sign-ups. The operator can opt in separately.
+        if (string.Equals(app.Configuration["Portal:AccountMode"], "main",
+                StringComparison.OrdinalIgnoreCase)
+            && !app.Configuration.GetValue<bool>("PublicApi:AllowRegistration")
+            && HttpMethods.IsPost(ctx.Request.Method)
+            && ctx.Request.Path.Equals("/v1/auth/register", StringComparison.OrdinalIgnoreCase))
         {
             ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
             return;
@@ -876,6 +888,11 @@ app.MapPost("/v1/account/devices/{deviceId}/revoke", (string deviceId, HttpReque
 // remains available in ordinary, local-only operator mode.
 if (!publicApiMode)
     AdminConsole.Map(app, db, adminLogs);
+if (localAdminMode)
+{
+    LocalPasswordReset.Map(app, db);
+    Cbt1InviteAdminRoutes.Map(app);
+}
 
 app.Start();
 WarnIfExternalBind(app.Urls);

@@ -1,5 +1,7 @@
 # Engine REST integration — NVIDIA Capture.exe ต่อ REST :59001 (replaces TCP :5001)
 
+> **Historical contract / do not use for current worker routing (24 October 2026):** This document describes an earlier REST bridge on port 59001 and a migration away from TCP 5001. The newer NvCapture/Container ownership path is documented in [Capture README](README.md) and [Container communication contract](../NVIDIA%20Container/CAPTURE-COMMUNICATION-HUB-CONTRACT-20261024.md) (NvCapture worker :59077 and Container loopback API :59012). Do not assume any legacy port is active or expose recording commands based only on this proposal.
+
 `Engine/Rest/ShadowPlayRestClient.vb` is a dependency-free shared source
 (mirror it into any vbproj with one `<Compile Include>` line — the same
 pattern `Overlay.Engine` uses for `TcpClientHelper.vb`).

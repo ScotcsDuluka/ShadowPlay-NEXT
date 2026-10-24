@@ -1,5 +1,7 @@
 # ShadowPlay NEXT Layout V5 — Native Adapter Phase 2
 
+> **Historical Phase 2 state (24 October 2026):** Later Freestyle V5 editor work exists; this original disabled-flag statement documents its own phase only. Do not mistake it for a current feature gate or public-release certification. See the [project's current README](../../../../README.md) and recent QA notes.
+
 State: integrated behind a disabled-by-default owner flag. This phase does
 not claim the full Drag/Drop/Context Menu/Settings editor is finished.
 

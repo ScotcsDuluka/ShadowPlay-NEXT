@@ -5,7 +5,7 @@
   var catalogEndpoint = '/DulukaCapture/v.1.0/engines';
   var panelId = 'nv-video-capture-options';
   var panelStackId = 'nv-video-capture-panels';
-  var panelVersion = '70';
+  var panelVersion = '72';
   var state = null;
   var statusNode = null;
   var captureFields = [];
@@ -314,6 +314,61 @@
     if (panelScope) panelScope.$destroy();
     panelScope = injector.get('$rootScope').$new();
     panelScope.captureUi = {};
+    // Session-centric architecture UI is a local, non-persisted design draft.
+    // No draft choice is sent to /settings or to a capture runtime.
+    panelScope.capturePlanOpen = false;
+    panelScope.capturePlanReady = true;
+    panelScope.capturePlan = {
+      desktopApi: 'dxgi', exclusiveApi: 'dxgi',
+      encoder: 'NVENC_H264', systemAudio: 'off', microphone: 'off', recovery: 'planned'
+    };
+    panelScope.capturePlanDesktopChoices = [
+      { value: 'dxgi', label: 'DXGI Desktop Duplication (existing)' },
+      { value: 'wgc_monitor', label: 'WGC Monitor (not wired)', disabled: true },
+      { value: 'ffmpeg_ddagrab', label: 'FFmpeg ddagrab (separate engine)', disabled: true },
+      { value: 'ffmpeg_gdigrab', label: 'FFmpeg gdigrab (separate engine)', disabled: true }
+    ];
+    panelScope.capturePlanExclusiveChoices = [
+      { value: 'dxgi', label: 'DXGI (Exclusive unverified)' },
+      { value: 'wgc_monitor', label: 'WGC Monitor (not wired)', disabled: true },
+      { value: 'exclusive_source', label: 'Game Frame Source (not implemented)', disabled: true }
+    ];
+    panelScope.capturePlanEncoderChoices = [
+      { value: 'NVENC_H264', label: 'NVIDIA NVENC H.264 (existing)' },
+      { value: 'QuickSync_H264', label: 'Intel QSV Native (not wired)', disabled: true },
+      { value: 'AMF_H264', label: 'AMD AMF (not implemented)', disabled: true },
+      { value: 'software', label: 'Software (not wired)', disabled: true }
+    ];
+    panelScope.capturePlanAudioChoices = [
+      { value: 'off', label: 'Off' },
+      { value: 'duluka_wasapi', label: 'Duluka WASAPI (component exists)' },
+      { value: 'ffmpeg_audio', label: 'FFmpeg Audio (stub)', disabled: true }
+    ];
+    panelScope.capturePlanRecoveryChoices = [
+      { value: 'planned', label: 'Source recovery (planned)', disabled: true }
+    ];
+    panelScope.capturePlanSummary = '';
+    panelScope.onCapturePlanChange = function () {
+      var plan = panelScope.capturePlan;
+      function label(value, choices) {
+        var selected = choices.filter(function (choice) {
+          return choice.value === value;
+        })[0];
+        return selected ? selected.label : 'Unknown';
+      }
+      panelScope.capturePlanSummary =
+        'DRAFT ONLY  •  Desktop: ' +
+        label(plan.desktopApi, panelScope.capturePlanDesktopChoices) +
+        '  •  Exclusive: ' +
+        label(plan.exclusiveApi, panelScope.capturePlanExclusiveChoices) +
+        '  •  Encoder: ' +
+        label(plan.encoder, panelScope.capturePlanEncoderChoices) +
+        '  •  System: ' +
+        label(plan.systemAudio, panelScope.capturePlanAudioChoices) +
+        '  •  Mic: ' +
+        label(plan.microphone, panelScope.capturePlanAudioChoices);
+    };
+    panelScope.onCapturePlanChange();
     panelScope.captureSettingsReady = false;
     panelScope.captureDisplayReady = false;
     panelScope.captureDisplayChoices = [];
@@ -431,7 +486,7 @@
     if (panelScope) panelScope.$applyAsync();
   }
 
-  function makeSelect(id, label, model, choices, changeHandler) {
+  function makeSelect(id, label, model, choices, changeHandler, disabledExpression) {
     var wrap = document.createElement('md-input-container');
     wrap.className = 'fps flex resolution-fps nv-video-engine-field';
     var heading = document.createElement('div');
@@ -443,7 +498,7 @@
     var select = document.createElement('md-select');
     select.setAttribute('ng-model', model);
     select.setAttribute('ng-change', changeHandler);
-    select.setAttribute('ng-disabled', '!captureSettingsReady');
+    select.setAttribute('ng-disabled', disabledExpression || '!captureSettingsReady');
     select.setAttribute('aria-label', label);
     select.setAttribute('md-selected-text', 'captureSelectedLabel(' + model + ', ' + choices + ')');
     select.className = 'osc-select resolution-fps-select nv-video-engine-select';
@@ -734,6 +789,51 @@
     });
   }
 
+  function buildCapturePlanPanel() {
+    var plan = document.createElement('section');
+    plan.id = 'nv-video-session-plan';
+    plan.className = 'nv-video-plan';
+    plan.setAttribute('ng-show', 'capturePlanOpen');
+    var heading = document.createElement('div');
+    heading.className = 'nv-video-plan-heading';
+    heading.textContent = 'SESSION-CENTRIC PIPELINE  /  DESIGN PREVIEW';
+    plan.appendChild(heading);
+    var info = document.createElement('p');
+    info.className = 'nv-video-plan-info';
+    info.textContent = 'Preview capture routing. Changes here are not saved or applied.';
+    plan.appendChild(info);
+    var grid = document.createElement('div');
+    grid.className = 'nv-video-plan-grid';
+    [
+      ['nv-video-plan-desktop', 'Desktop Capture API', 'desktopApi', 'capturePlanDesktopChoices'],
+      ['nv-video-plan-exclusive', 'Exclusive Capture API', 'exclusiveApi', 'capturePlanExclusiveChoices'],
+      ['nv-video-plan-encoder', 'Video Encoder', 'encoder', 'capturePlanEncoderChoices'],
+      ['nv-video-plan-system-audio', 'System Audio', 'systemAudio', 'capturePlanAudioChoices'],
+      ['nv-video-plan-microphone', 'Microphone', 'microphone', 'capturePlanAudioChoices'],
+      ['nv-video-plan-recovery', 'Recovery Policy (planned)', 'recovery', 'capturePlanRecoveryChoices']
+    ].forEach(function (entry) {
+      var control = makeSelect(
+        entry[0], entry[1], 'capturePlan.' + entry[2], entry[3],
+        'onCapturePlanChange()', entry[2] === 'recovery'
+          ? 'true' : '!capturePlanReady'
+      );
+      control.wrap.classList.add('nv-video-plan-field');
+      grid.appendChild(control.wrap);
+    });
+    plan.appendChild(grid);
+    var summary = document.createElement('p');
+    summary.className = 'nv-video-plan-summary';
+    summary.setAttribute('role', 'status');
+    summary.setAttribute('title', '{{capturePlanSummary}}');
+    summary.textContent = '{{capturePlanSummary}}';
+    plan.appendChild(summary);
+    var reminder = document.createElement('p');
+    reminder.className = 'nv-video-plan-info';
+    reminder.textContent = 'Exclusive capture, QSV, FFmpeg audio and source recovery require runtime verification before activation.';
+    plan.appendChild(reminder);
+    return plan;
+  }
+
   function buildPanel(host) {
     var panel = document.createElement('section');
     panel.id = panelId;
@@ -838,8 +938,28 @@
     advanced.appendChild(encoderFields);
     advancedSection.appendChild(advanced);
     advancedSection.appendChild(codecStatus);
+    var viewTabs = document.createElement('div');
+    viewTabs.className = 'nv-video-plan-tabs';
+    function addViewTab(title, isPlan) {
+      var button = document.createElement('md-button');
+      button.className = 'nv-video-engine-toggle';
+      button.textContent = title;
+      button.setAttribute('type', 'button');
+      button.setAttribute('ng-click', 'capturePlanOpen = ' + (isPlan ? 'true' : 'false'));
+      button.setAttribute('ng-class', isPlan
+        ? "{'nv-video-engine-active': capturePlanOpen}"
+        : "{'nv-video-engine-active': !capturePlanOpen}");
+      button.setAttribute('aria-label', title);
+      viewTabs.appendChild(button);
+    }
+    addViewTab('Live Settings', false);
+    addViewTab('Pipeline Design', true);
+    panel.appendChild(viewTabs);
+    displaySection.setAttribute('ng-show', '!capturePlanOpen');
+    advancedSection.setAttribute('ng-show', '!capturePlanOpen');
     panel.appendChild(displaySection);
     panel.appendChild(advancedSection);
+    panel.appendChild(buildCapturePlanPanel());
 
     var footer = document.createElement('div');
     footer.className = 'nv-video-engine-row nv-video-engine-footer';

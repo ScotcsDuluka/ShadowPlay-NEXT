@@ -462,6 +462,17 @@
     });
   });
 
+  // Account credentials are entered ONLY in the external HTTPS browser.
+  // This button does not create/retain a desktop session or handle passwords.
+  on($('btnAccount'), 'click', function () {
+    rpc('LAUNCHER_OPEN_ACCOUNT_PORTAL').then(function (result) {
+      if (!result || result.ok !== true)
+        throw new Error('account portal could not be opened');
+    }).catch(function (error) {
+      reportFailure('accountPortalFailed', error);
+    });
+  });
+
   // EXIT ALL is armed by a first click (old RadioButton2 kills the whole
   // family — a single accidental click must not do that).
   var exitArm = null;

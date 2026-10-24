@@ -3,6 +3,30 @@
 Project: `C:\My Project\NVIDIA-Shadowplay` on `Stable`
 Owner: `Project\Launcher.Cef\ui`
 
+## Web Github-inspired Core UI — latest visual update (2026-10-24)
+
+- Design reference only: `C:\My Project\NVIDIA-Shadowplay\Web Github\index.html` and `CSS\index\style.css`. The website was not modified and Launcher uses its existing local GeForce/MiSansThai fonts.
+- Core page now has a full-width dark/green hero with GeForce typography, neon runway/angled corners, perspective grid, and a two-column grid of eleven premium module cards. Cards show a number, icon, module name, locally obtained status and description. No editable controls or fake release versions were added.
+- Each card remains `data-lifecycle="suite-managed"`. Server metadata is NOT connected: source stays explicitly `bundled-fallback`, runtime state `local-launcher`, and the UI says so once in the hero information bar.
+- Source edits: `ui/index.html`, `ui/quick-ui.css`, `ui/i18n.js`; regression added to `tests/quick-ui.test.cjs`. Quick UI JavaScript and Native service lifecycle are unchanged.
+- Launcher test suite **39/39 PASS** before the final cosmetic CSS adjustment; final preflight passed and `git diff --check` was clean. Initial deploy 3 files (SHA-256 3/3), final CSS-only polish deployed 1 file (SHA-256 1/1), both backed up in `build/DeploymentBackups`.
+- Launcher gracefully restarted successfully after both deploys. Loopback-served assets verified against installed Build: **5/5 SHA-256 PASS**, including additional Core design DOM/CSS proof from `build_test/Launcher ModuleLayout_Test/verify-runtime.cjs`.
+- Pixel-level Core screenshot remains unverified: attempts to generate an isolated Chrome/Edge headless screenshot on this Windows device exited without a screenshot. No misleading screenshot claims. Temporary QA HTML was cleaned up automatically.
+
+## Latest authoritative requirement: Core READ-ONLY / Server-owned
+
+This section supersedes all older Config Module / theme management notes below.
+User confirmed that users must NOT edit anything in Core Modules. The server will own Core catalog metadata. The browser must only display Core cards and local read-only runtime telemetry. Core Settings buttons, Layout editing control, Config detail page, and appearance/theme profile script were removed from the visible quick Launcher. No Core mutation is supported. Current catalog is a bundled fallback, clearly labelled until a verified read-only Server API exists. The Server application was NOT changed and remote catalog data is NOT yet connected.
+
+Use CORE-CATALOG-SERVER-CONTRACT.md as the integration handoff. Add-ons retain the separate future module-manager design; zero are installed today.
+
+## Core vs Add-ons — lifecycle policy (historical, superseded)
+**Core / built-in modules (11):** belong to the ShadowPlay NEXT suite; they are NOT independently enabled, disabled, uninstalled, or updated as separate plug-ins. The authoritative ShadowPlay system/supervisor manages their lifecycle. Individual module detail/settings pages are allowed for module-specific preferences/appearance, NOT independent lifecycle power switches. Inventory status is read-only telemetry.
+
+**Add-ons:** independent optional modules. Future supported add-ons may have individual install/update/enable/disable/remove actions, but only when actual validated host APIs, safety restrictions, and lifecycle ownership are implemented. The Add-ons page currently has zero installed add-ons and does not expose fake switches.
+
+UI enforcement: each of the 11 core cards uses `data-lifecycle="suite-managed"` and contains a Settings action rather than an enable/disable control. New EN/TH help text clarifies these rules in the Core, per-module Settings, and Add-ons views. 35 Launcher regressions passed; the UI was deployed (3 files, SHA-256 3/3), Launcher restarted gracefully, and loopback HTTP verified all served UI files against Build with 11 policy-marked core cards.
+
 ## Magisk-style cards — latest update
 - Launcher now has **three primary destinations**: ShadowPlay, Core Modules, and Add-ons. There is **no separate Config navigation item**.
 - Each of the 11 Core modules has a Magisk-inspired card: icon, name, built-in metadata (no invented version), real runtime status from Launcher inventory, description, and bottom Settings action.

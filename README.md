@@ -76,7 +76,9 @@ The old UI is part of the project's history. The live NEXT interface and integra
 
 **The point of CBT1 is evidence, not hype.** We want repeatable results for overlay lifecycle, input routing, capture integrity, GPU/adapter compatibility, and game-specific behavior **before** expanding access.
 
-There is **no registration form linked here yet**. An application page will be linked only when it actually exists and is ready to accept entries.
+There is **no CBT1 registration form linked here yet**. An application page will be linked only when it is explicitly opened for testers.
+
+**Account login is separate from CBT1 recruitment.** The Launcher source now includes an **Account** button that opens the Duluka Account Portal in an external browser, not inside the CEF Launcher. The current shared-account Portal uses existing accounts; **new public account registration and CBT1 applications are disabled**. Portal availability or a successful HTTP response is not proof that external sign-in or tester recruitment is fully accepted. See [Server implementation and deployment boundaries](Server/README.md) and [Launcher source status](Project/Launcher.Cef/README.md).
 
 ---
 
@@ -96,8 +98,9 @@ There is **no registration form linked here yet**. An application page will be l
 | **NVIDIA Capture** | Capture and encoder work, DXGI monitor enumeration/selection, screenshot engine and Container relay endpoints | **Implemented components and scoped tests; complete live recording/replay and UI integration are not certified** |
 | **Encoding & audio** | Native NVENC and FFmpeg engine regimes; WASAPI, timing, mux and integrity validation | **Implementation varies by regime** |
 | **NVIDIA Container / Config** | Process lifecycle, game catalog watcher, Capture relay, request security checks and module orchestration | **Active integration; source, staged builds and deployed processes may differ** |
-| **Launcher / Modules** | CEF Command Center, navigation for 11 modules, module availability/state reporting, Thai/English UI and appearance-profile prototype | **Implemented / testing; navigation is not an installer or evidence that a module is operational** |
+| **Launcher / Modules** | Simplified ShadowPlay ON/OFF and read-only Core Modules catalog (11 built-in components) with local runtime telemetry; Add-ons is presently empty | **Active development: Core cannot be independently edited, disabled or removed. A future Server-owned metadata API is proposed, not connected; legacy appearance tooling is not loaded by the visible quick Core UI** |
 | **Gallery / Media** | NodeAPI recent media, safe file copy, metadata and MSE/seek bridge | **Backend regressions passed; actual CEF playback and seeking remain to be tested; delete returns 501** |
+| **Duluka Account / tester portal** | Independent account Server with username/password, session/device management and a browser Portal; Launcher has an external Account entry | **Account Portal implemented/tested in isolated cases; current shared Portal uses existing accounts, public registration and CBT1 applications remain disabled. External account login not yet certified** |
 
 **These are two different systems:** Game Profiles manages per-application GPU preferences in OSC through the local Graphics service. ApplicationOntology provides the published game-identity catalog and catalog updates; it does **not** store or apply a user's GPU profiles. Public catalog: [nv-ontology.pages.dev](https://nv-ontology.pages.dev/) · [ApplicationOntology-API source](https://github.com/ScotcsDuluka/ApplicationOntology-API). The working catalog repository is separate from this tree, and local edits are not automatically public deployments.
 
@@ -125,7 +128,7 @@ This is a **dated development snapshot**, not a compatibility matrix or release 
 
 | Workstream | Evidence | Remaining acceptance gate |
 |---|---|---|
-| **Launcher / module navigation** | NVIDIA-style CEF 73 Command Center has 11 module entries, process/package inventory and existing Overlay/Settings RPCs. Appearance-profile code supports declarative colors/backgrounds. | A module page does not install or start that module. The appearance system is not a verified Magisk-like package manager; the older unsandboxed CEF needs hardening. |
+| **Launcher / read-only Core** | The current quick UI exposes ShadowPlay power, 11 built-in Core module cards, and an empty Add-ons area. Core cards show local status only; data-only appearance tooling remains outside the visible quick UI. | Core metadata is planned to be Server-owned but no verified catalog API is connected. Core users cannot edit settings/layout/backgrounds, disable components independently, or install/remove them as plug-ins; CEF 73 security still needs review. |
 | **Game Profiles / Windows GPU settings** | Graphics backend supports per-application preferences; the developer reports a multi-GPU laptop test confirming selected-GPU rendering and persistence after restart. | Validate across more Windows builds, drivers and games; do not present the UI as a full Windows Settings clone. |
 | **ApplicationOntology** | Local working catalog `C:\My Project\nv-ontology-pages\public\catalog.json` reports **v1.2.8 / 8 entries** in the 24 October inspection. NvContainer maintains a validated local cache for game matching. | Public API deployment of this local version was **not independently verified**. Executable-name matching alone does not authenticate game identity. |
 | **OSC Adapter / Duluka Hook** | D3D9/D3D9Ex and D3D11 native implementations exist. Separate-process tests exercise a **real DX9Ex Host producer and Hook receiver**, including GPU `CopyResource` without intermediate CPU readback and x64-to-x86 test routes. | DX9Ex mailbox remains experimental/opt-in. Live game attachment, frame cadence/FPS, focus/recovery and per-game compatibility remain distinct acceptance tests. |
@@ -133,6 +136,7 @@ This is a **dated development snapshot**, not a compatibility matrix or release 
 | **NodeAPI Gallery** | Bounded nested Recent scanning and checked CopyFile replaced false-success stubs. An MSE video/seek bridge is deployed as a served OSC asset; focused regression recorded **58/58** passes. | Play/pause, seek, A/V sync and long-recording behavior inside the actual OSC CEF are **not yet verified**. Gallery Remove intentionally returns **501**. |
 | **Container / NodeAPI security** | Loopback request guards, exact process-path checks, SHA-256 game-identity policy and pairing-secret work have isolated test evidence. | Same-origin/Host checks mitigate browser request abuse but do **not** strongly authenticate every same-user local process. Test real deployed policy before enabling injection or capture writes. |
 | **Ansel / ReShade** | Source contracts distinguish the Ansel Adapter boundary from the ReShade Ansel engine, with named-pipe and Game Filter UI integration. | A visible Game Filter menu does not confirm a real runtime effect or shader is active. |
+| **Duluka Account / Portal** | Native Launcher source now routes the Account button to an external fixed-HTTPS Portal. The Server provides existing-account login, account/device views and password change with isolated flow tests. | Public registration and CBT1 submission are disabled in shared mode. External end-to-end password login was not automation-verified. The Server's **Core module catalog** remains a separate unimplemented proposal. |
 
 **Architecture and ownership:** `NVIDIA Capture → NVIDIA Container → NVIDIA NodeAPI → OSC UI` for capture control/status; `NVIDIA OSC Host → OSC Adapter / Duluka Hook` for the separate experimental overlay transport. NvCapture is the screenshot/display authority, while Container validates and relays requests.
 
@@ -141,6 +145,8 @@ This is a **dated development snapshot**, not a compatibility matrix or release 
 **Evidence:** [Launcher](Project/Launcher.Cef/README.md) · [OSC Adapter](Project/NVIDIA%20Adapter/OSC%20Adapter/README.md) · [DX9Ex producer IPC](Project/Overlay%20On-Screen%20Control/NVIDIA%20OSC/HOST-DX9EX-IPC-DIRECT-GPU-20261024.md) · [Capture relay](Project/NVIDIA%20Container/CAPTURE-DISPLAY-RELAY-CONTRACT-20261024.md) · [Gallery player](Project/Overlay%20On-Screen%20Control/NVIDIA%20NodeAPI/NODEAPI-GALLERY-PLAYER-SEEK-20261024.md) · [Security](Project/NVIDIA%20Container/SECURITY-STABILITY-20261024.md).
 
 ---
+
+**Browse the first-party documentation:** [documentation index](docs/README.md) · [README coverage inventory](docs/README-COVERAGE-20261024.md).
 
 ## Architecture — the rebuild underneath
 

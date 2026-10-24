@@ -16,9 +16,13 @@ const digest=p=>crypto.createHash('sha256').update(fs.readFileSync(p)).digest('h
 if(!fs.existsSync(build)||!fs.existsSync(path.join(build,'index.html')))
   throw Error('No verified Launcher UI build destination: '+build);
 const html=fs.readFileSync(path.join(source,'index.html'),'utf8');
-if(!html.includes('id="quickPageConfig"')||
-   (html.match(/data-config-module="/g)||[]).length!==11||
-   !html.includes('id="quickCoreGrid"'))throw Error('Missing expected module layout contract');
+if(!html.includes('id="quickCoreGrid"')||
+   (html.match(/data-lifecycle="suite-managed"/g)||[]).length!==11||
+   (html.match(/class="quick-module-head"/g)||[]).length!==11||
+   html.includes('quick-module-readonly')||html.includes('quick-core-lock')||
+   html.includes('id="quickPageConfig"')||html.includes('data-config-module=')||
+   html.includes('src="module-profiles.js'))
+  throw Error('Core modules must be read-only; editable UI or wrong inventory');
 for(const file of files){
  const p=path.join(source,file);if(!fs.existsSync(p))throw Error('No source '+file);
  if(file.endsWith('.js')){

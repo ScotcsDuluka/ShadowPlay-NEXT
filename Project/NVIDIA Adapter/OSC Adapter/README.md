@@ -1,5 +1,9 @@
 # OSC Adapter — Host / Controller
 
+> **Current scope (24 October 2026):** Managed Host/Controller source is separate from the native Duluka Hook DLL. This document contains a historical *source-only split* note; later controlled deployment/build steps exist and must be checked against the installed runtime instead of treating that older note as a global "never deployed" claim. DX9/9Ex automatic routing and the GPU mailbox have isolated tests but **do not certify real-game smoothness, safe detach or general API compatibility**. See [DX9 coordination](AUTOHOOK-DX9-COORDINATION-20261024.md) and [Hook test history](Duluka%20Hook/tests/README.md).
+
+
+
 Source root: `Project/NVIDIA Adapter/OSC Adapter`.
 
 OSC Adapter is the **managed coordinator / controller**. **Duluka Hook** is the separate native **Hook Engine**. They share a deployment contract, but do not own each other's source code.

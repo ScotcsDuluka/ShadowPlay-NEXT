@@ -12,6 +12,8 @@ New-Item -ItemType Directory -Path $tmp -Force | Out-Null
 $env:DULUKA_Urls='http://127.0.0.1:5117'
 $env:DULUKA_PublicApi__Enabled='false'
 $env:DULUKA_LocalAdmin__Enabled='true'
+$env:DULUKA_LocalAdmin__ResetCodeFile=Join-Path $tmp 'test-reset-code.txt'
+[IO.File]::WriteAllText($env:DULUKA_LocalAdmin__ResetCodeFile,('A'*48))
 $env:DULUKA_Database__Path=Join-Path $tmp 'admin-test.db'
 $env:DULUKA_Cbt1__DatabasePath=Join-Path $tmp 'cbt-test.db'
 $env:DULUKA_Cbt1__Enabled='false'
@@ -72,5 +74,5 @@ try {
 } finally {
     if($server -and -not $server.HasExited){Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue}
     Remove-Item -LiteralPath $tmp -Force -Recurse -ErrorAction SilentlyContinue
-    foreach($name in @('DULUKA_Urls','DULUKA_PublicApi__Enabled','DULUKA_LocalAdmin__Enabled','DULUKA_Database__Path','DULUKA_Cbt1__DatabasePath','DULUKA_Cbt1__Enabled')){Remove-Item ('Env:'+$name) -ErrorAction SilentlyContinue}
+    foreach($name in @('DULUKA_Urls','DULUKA_PublicApi__Enabled','DULUKA_LocalAdmin__Enabled','DULUKA_LocalAdmin__ResetCodeFile','DULUKA_Database__Path','DULUKA_Cbt1__DatabasePath','DULUKA_Cbt1__Enabled')){Remove-Item ('Env:'+$name) -ErrorAction SilentlyContinue}
 }

@@ -28,6 +28,8 @@
     <EmbeddedResource Include="Portal\index.html" />
     <EmbeddedResource Include="Portal\app.css" />
     <EmbeddedResource Include="Portal\app.js" />
+    <EmbeddedResource Include="Portal\scene.css" />
+    <EmbeddedResource Include="Portal\scene.js" />
   </ItemGroup>
 
 </Project>

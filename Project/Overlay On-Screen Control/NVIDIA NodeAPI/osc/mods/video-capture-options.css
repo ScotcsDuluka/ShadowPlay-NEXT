@@ -315,3 +315,324 @@
     text-align: left;
   }
 }
+
+/* Session-centric Pipeline Design is a separate local draft view. It swaps
+   into the existing Advanced panel space, so the 960px OSC need not scroll. */
+#nv-video-capture-options .nv-video-plan-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 0 5px;
+}
+
+#nv-video-capture-options .nv-video-plan-tabs .nv-video-engine-toggle {
+  box-sizing: border-box;
+  width: auto;
+  min-width: 122px;
+  height: 30px;
+  min-height: 30px;
+  font: 11px "Segoe UI Semibold", "Segoe UI", sans-serif;
+}
+
+#nv-video-capture-options .nv-video-plan {
+  box-sizing: border-box;
+  padding: 10px 12px 8px;
+  background: #212326;
+  color: #fff;
+}
+
+#nv-video-capture-options .nv-video-plan-heading {
+  color: #fff;
+  font: 12px/1.35 "Segoe UI Semibold", "Segoe UI", sans-serif;
+  letter-spacing: .5px;
+}
+
+#nv-video-capture-options .nv-video-plan-info {
+  margin: 4px 0 7px;
+  color: #aab0b2;
+  font: 10px/1.4 "Segoe UI", sans-serif;
+}
+
+#nv-video-capture-options .nv-video-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px 12px;
+  min-width: 0;
+}
+
+#nv-video-capture-options .nv-video-plan-grid .nv-video-plan-field {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  gap: 3px;
+}
+
+#nv-video-capture-options .nv-video-plan-grid .customize-header-text {
+  min-height: 16px;
+}
+
+#nv-video-capture-options .nv-video-plan-summary {
+  box-sizing: border-box;
+  min-height: 38px;
+  margin: 8px 0 0;
+  padding: 7px 10px;
+  border-left: 3px solid #76b900;
+  background: #262b2f;
+  color: #d4d9db;
+  font: 10px/1.45 "Segoe UI", sans-serif;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  #nv-video-capture-options .nv-video-plan-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* UI v72: LOCKED NVIDIA-style Pipeline Design sizing.
+   Fixed heights inside the Settings panel; only track widths adapt to the
+   host (equal columns). Text never changes the grid/footprint. */
+#nv-video-capture-options .nv-video-plan-tabs {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 36px;
+  min-height: 36px;
+  max-height: 36px;
+  margin: 0;
+  padding: 0 0 6px;
+  overflow: hidden;
+}
+
+#nv-video-capture-options .nv-video-plan-tabs .nv-video-engine-toggle {
+  box-sizing: border-box;
+  flex: 0 0 128px;
+  width: 128px;
+  min-width: 128px;
+  max-width: 128px;
+  height: 28px;
+  min-height: 28px;
+  max-height: 28px;
+  margin: 0;
+  padding: 0 8px;
+  line-height: 28px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#nv-video-capture-options .nv-video-plan {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  height: 266px;
+  min-height: 266px;
+  max-height: 266px;
+  margin: 0;
+  padding: 9px 12px;
+  overflow: hidden;
+}
+
+#nv-video-capture-options .nv-video-plan-heading {
+  box-sizing: border-box;
+  height: 18px;
+  min-height: 18px;
+  max-height: 18px;
+  line-height: 18px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#nv-video-capture-options .nv-video-plan-info {
+  box-sizing: border-box;
+  height: 16px;
+  min-height: 16px;
+  max-height: 16px;
+  margin: 3px 0 5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 16px;
+}
+
+#nv-video-capture-options .nv-video-plan-grid {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(2, 66px);
+  grid-auto-rows: 66px;
+  gap: 8px 12px;
+  width: 100%;
+  min-width: 0;
+  height: 140px;
+  min-height: 140px;
+  max-height: 140px;
+  overflow: hidden;
+}
+
+#nv-video-capture-options .nv-video-plan-grid .nv-video-plan-field {
+  box-sizing: border-box;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  flex: none;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  height: 66px;
+  min-height: 66px;
+  max-height: 66px;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+#nv-video-capture-options .nv-video-plan-grid .nv-video-plan-field .customize-header-text {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  height: 18px;
+  min-height: 18px;
+  max-height: 18px;
+  line-height: 18px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#nv-video-capture-options .nv-video-plan-grid .nv-video-plan-field .customize-header-text span {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#nv-video-capture-options .nv-video-plan-grid .nv-video-plan-field md-select {
+  box-sizing: border-box;
+  display: block;
+  flex: 0 0 34px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  height: 34px;
+  min-height: 34px;
+  max-height: 34px;
+  margin: 0 !important;
+  overflow: hidden;
+}
+
+#nv-video-capture-options .nv-video-plan-grid .nv-video-plan-field md-select .md-select-value {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  height: 34px;
+  min-height: 34px;
+  max-height: 34px;
+  overflow: hidden;
+}
+
+#nv-video-capture-options .nv-video-plan-grid .nv-video-plan-field md-select .md-select-value .md-select-value-text,
+#nv-video-capture-options .nv-video-plan-grid .nv-video-plan-field md-select .md-text {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#nv-video-capture-options .nv-video-plan-summary {
+  box-sizing: border-box;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  width: 100%;
+  min-width: 0;
+  height: 39px;
+  min-height: 39px;
+  max-height: 39px;
+  margin: 7px 0 0;
+  padding: 5px 10px;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  font: 10px/14px "Segoe UI", sans-serif;
+}
+
+#nv-video-capture-options .nv-video-plan-summary + .nv-video-plan-info {
+  margin: 5px 0 0;
+}
+
+#nv-video-capture-options .nv-video-engine-row.nv-video-engine-footer {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  min-height: 36px;
+  max-height: 36px;
+  margin: 4px 0 0;
+  padding: 0 2px;
+  overflow: hidden;
+}
+
+#nv-video-capture-options .nv-video-engine-footer .nv-video-engine-cursor-label {
+  box-sizing: border-box;
+  justify-self: start;
+  min-width: 0;
+  max-width: 100%;
+  height: 32px;
+  min-height: 32px;
+  max-height: 32px;
+  margin: 0 !important;
+  white-space: nowrap;
+}
+
+#nv-video-capture-options .nv-video-engine-footer .nv-video-engine-runtime-status {
+  justify-self: center;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#nv-video-capture-options .nv-video-engine-footer .nv-video-engine-status {
+  justify-self: end;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 850px) {
+  #nv-video-capture-options .nv-video-plan {
+    height: 340px;
+    min-height: 340px;
+    max-height: 340px;
+  }
+  #nv-video-capture-options .nv-video-plan-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(3, 66px);
+    height: 214px;
+    min-height: 214px;
+    max-height: 214px;
+  }
+}

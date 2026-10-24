@@ -7,9 +7,12 @@
   <meta name="description" content="ShadowPlay NEXT Duluka Account staging tester portal.">
   <title>Duluka Account | ShadowPlay NEXT</title>
   <link rel="stylesheet" href="/portal/app.css">
+  <link rel="stylesheet" href="/portal/scene.css">
   <script src="/portal/app.js" defer></script>
+  <script src="/portal/scene.js" defer></script>
 </head>
 <body>
+  <canvas id="constellation-bg" aria-hidden="true"></canvas>
   <div class="background-grid" aria-hidden="true"></div>
   <div class="page">
     <header class="site-header">
@@ -17,17 +20,18 @@
         <span class="brand-mark" aria-hidden="true">N</span>
         <span class="brand-copy"><strong>SHADOWPLAY <b>NEXT</b></strong><small>DULUKA ACCOUNT</small></span>
       </a>
-      <span class="environment"><span class="led"></span> STAGING ENVIRONMENT</span>
+      <span class="environment"><span class="led"></span> <span id="environment-label">STAGING ENVIRONMENT</span></span>
     </header>
 
     <main>
       <section class="hero">
         <p class="eyebrow">TESTER ACCESS / BUILD PREVIEW</p>
         <h1>One account.<br><span>More ways to play.</span></h1>
-        <p class="hero-sub">Create a test account, sign in with a username, and check your CBT1 application status. This is a temporary test environment, not the production account service.</p>
+        <p class="hero-sub" id="hero-desc">Create a test account, sign in with a username, and check your CBT1 application status. This is a temporary test environment, not the production account service.</p>
         <div class="hero-tags" aria-label="Key features">
-          <span>USERNAME SIGN-IN</span><span>DEVICE SESSION</span><span>CBT1 ACCESS</span>
+          <span>USERNAME SIGN-IN</span><span>SECURE DEVICE SESSION</span><span>CBT1 ACCESS</span>
         </div>
+        <div class="showcase-runway" aria-hidden="true"></div>
       </section>
 
       <section class="workspace" aria-label="Duluka account and CBT1">
@@ -35,7 +39,7 @@
           <div class="surface-head"><span class="section-number">01 / ACCOUNT</span><span class="pill" id="account-state">NOT SIGNED IN</span></div>
           <div id="auth-panel">
             <h2>Welcome to Duluka.</h2>
-            <p class="supporting">Sign in or create a temporary tester account.</p>
+            <p class="supporting" id="account-supporting">Sign in or create a temporary tester account.</p>
             <div class="switcher" role="group" aria-label="Account action">
               <button type="button" id="show-login" class="switch active" aria-pressed="true">Sign in</button>
               <button type="button" id="show-register" class="switch" aria-pressed="false">Create account</button>
@@ -52,14 +56,44 @@
               <input id="register-username" name="username" type="text" required autocomplete="username" minlength="3" maxlength="32" pattern="[A-Za-z0-9._-]{3,32}" placeholder="3–32 letters, numbers, . _ -">
               <label for="register-password">Choose a password</label>
               <input id="register-password" name="password" type="password" required autocomplete="new-password" minlength="8" maxlength="128" placeholder="8–128 characters">
-              <button class="action" type="submit">CREATE TEST ACCOUNT <span aria-hidden="true">↗</span></button>
+              <label for="register-confirm-password">Confirm password</label>
+              <input id="register-confirm-password" name="confirmPassword" type="password" required autocomplete="new-password" minlength="8" maxlength="128" placeholder="Enter the same password again">
+              <button class="action" type="submit" id="register-submit">CREATE TEST ACCOUNT <span aria-hidden="true">↗</span></button>
             </form>
           </div>
           <div id="signed-in-panel" hidden>
             <h2>Access granted.</h2>
             <p class="supporting">Currently signed in as</p>
             <div class="signed-user" id="current-username">—</div>
-            <p class="small-notice">This session belongs to your current browser tab. Test accounts may be deleted when staging restarts.</p>
+            <div class="account-details" aria-label="Your account">
+              <div class="account-detail"><span>DISPLAY NAME</span><strong id="account-display-name">—</strong></div>
+              <div class="account-detail"><span>ACCOUNT ID</span><strong id="account-id-short" class="mono-detail">—</strong></div>
+              <div class="account-detail"><span>CREATED</span><strong id="account-created-at">—</strong></div>
+              <div class="account-detail"><span>THIS DEVICE</span><strong id="account-current-device">—</strong></div>
+            </div>
+            <section class="account-management" aria-label="Account devices">
+              <div class="management-heading"><h3>Connected devices</h3><button type="button" id="refresh-devices" class="small-ghost">REFRESH</button></div>
+              <p class="micro-copy">Review devices linked to your Duluka Account. Disconnecting one signs it out.</p>
+              <div id="account-device-list" class="device-list" aria-live="polite"><p class="micro-copy">Loading devices…</p></div>
+              <p id="device-message" class="message" role="status" aria-live="polite"></p>
+            </section>
+            <section class="account-management" aria-label="Account password">
+              <div class="management-heading"><h3>Account security</h3></div>
+              <details id="password-details">
+                <summary>Change password</summary>
+                <form id="change-password-form" class="auth-form security-form" autocomplete="off">
+                  <label for="current-account-password">Current password</label>
+                  <input id="current-account-password" name="currentPassword" type="password" autocomplete="current-password" required minlength="8" maxlength="128">
+                  <label for="new-account-password">New password</label>
+                  <input id="new-account-password" name="newPassword" type="password" autocomplete="new-password" required minlength="8" maxlength="128">
+                  <label for="confirm-account-password">Confirm new password</label>
+                  <input id="confirm-account-password" name="confirmPassword" type="password" autocomplete="new-password" required minlength="8" maxlength="128">
+                  <button type="submit" class="action">UPDATE PASSWORD <span aria-hidden="true">↗</span></button>
+                </form>
+              </details>
+              <p id="password-message" class="message" role="status" aria-live="polite"></p>
+            </section>
+            <p class="small-notice" id="session-notice">This session belongs to your current browser tab. Test accounts may be deleted when staging restarts.</p>
             <button class="secondary" id="sign-out" type="button">SIGN OUT</button>
           </div>
           <p id="auth-message" class="message" role="status" aria-live="polite"></p>
@@ -73,6 +107,11 @@
           <div id="application-summary" class="application-summary" hidden>
             <span>YOUR APPLICATION</span><strong id="application-decision">PENDING</strong><p id="application-description"></p>
           </div>
+          <form id="invite-form" class="auth-form" hidden>
+            <label for="invite-code">CBT1 invitation code</label>
+            <input id="invite-code" name="code" required minlength="69" maxlength="69" autocomplete="off" spellcheck="false" placeholder="CBT1-…">
+            <button type="submit" class="action">REDEEM INVITATION <span aria-hidden="true">↗</span></button>
+          </form>
           <form id="apply-form" class="apply-form" hidden>
             <label for="app-alias">Display name</label>
             <input id="app-alias" name="alias" maxlength="40" required placeholder="Your test nickname">
@@ -95,9 +134,9 @@
           <p id="cbt-message" class="message" role="status" aria-live="polite"></p>
         </div>
       </section>
-      <aside class="warning-banner"><strong>STAGING ONLY.</strong> Do not reuse an important password or submit sensitive personal information. Public CBT1 applications remain disabled until verified.</aside>
+      <aside class="warning-banner" id="portal-warning"><strong>STAGING ONLY.</strong> Do not reuse an important password or submit sensitive personal information. Public CBT1 applications remain disabled until verified.</aside>
     </main>
-    <footer><span>DULUKA / SHADOWPLAY NEXT</span><span>EARLY ACCESS PREVIEW · NOT PRODUCTION</span></footer>
+    <footer><span>DULUKA / SHADOWPLAY NEXT</span><span id="footer-environment">EARLY ACCESS PREVIEW · NOT PRODUCTION</span></footer>
   </div>
 </body>
 </html>

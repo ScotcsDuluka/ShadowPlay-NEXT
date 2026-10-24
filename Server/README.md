@@ -1,8 +1,20 @@
 # Duluka Account — v0 auth/security slice
 
 Central account system for the Duluka ecosystem (NVIDIA ShadowPlay, Duluka Web,
-future products). **This directory is a separate product — no ShadowPlay code
-depends on it and none was modified.**
+future products). **The server remains a separate service and code owner.** The
+Launcher now has a fixed-URL Account button that opens its external HTTPS Portal,
+but Launcher does **not** embed passwords, account tokens or direct authentication
+API calls. This makes an account entry point available without claiming
+ShadowPlay's Capture/OSC engine depends on Server uptime.
+
+> **Current Portal boundary (24 October 2026):** The latest shared-account
+> Tailscale Portal uses the main account database for existing-user login,
+> while public account registration and CBT1 application submission remain
+> **disabled**. The independent Local Admin stays on loopback-only port 5117.
+> A portal page loading successfully is not evidence of an externally verified
+> full login journey or an open tester recruitment program. Later sections
+> document older disposable staging and historical rollout steps; distinguish
+> them from the "Unified Duluka Account Portal" section.
 
 Architecture discovery: see the C/4 + C/5 + C/6 v0.1 design (data model, server
 modules, security model). Implemented here: the **C/6 auth/security slice**.
@@ -269,6 +281,11 @@ double-click `Server\Local-Admin-Stop.cmd` to stop. The underlying script is
 The disposable security check is `Server\verify-local-admin.ps1`; it must be
 run when the local admin instance is stopped because it uses port 5117.
 
+**Historical build note:** The conflict state described below occurred during an
+older AdminLocal rollout. A later Git check found **zero unmerged index entries**;
+this paragraph is retained only to explain the temporary isolated build and
+is **not a current instruction to treat the repository as unmerged**.
+
 **Important Git state on Oct 24:** another in-progress merge introduced conflict
 markers into `Program.cs` and `CBT1/Cbt1Registration.cs`. To avoid modifying
 the unfinished merge, the currently working AdminLocal executable was built
@@ -279,3 +296,164 @@ resolve both Git conflicts while keeping LocalAdmin middleware, the restricted
 `app.UseCors()` call, and the public-admin 404 guard. Do not build the
 canonical project until source is conflict-free. The current AdminLocal binary
 is operational and was independently smoke-tested.
+
+## Unified Duluka Account Portal — Tailscale + Local Admin
+
+**Current architecture (2026-10-24):**
+
+| Service | Binding / URL | Data |
+| --- | --- | --- |
+| Account API | `127.0.0.1:5115` (Cloudflare origin) | Existing main `DulukaAccount.db` |
+| Shared Portal | `127.0.0.1:5116` via `https://aorus-desktop.taile6314b.ts.net/` | **Same main `DulukaAccount.db`** |
+| Local Admin | `127.0.0.1:5117/admin` (not tunneled) | **Same main `DulukaAccount.db`** |
+
+Main DB: `Server/Duluka.Server/bin/Release/net10.0/AppData/DulukaAccount.db`.
+Public Portal **does not copy or migrate** the account database. Each
+account retains its username, password verifier, account ID, devices,
+provider links, and session history. The HTTP API uses separate .NET
+processes with short-lived SQLite connections sharing the one main DB.
+
+### Safeguards
+
+- Public Portal always binds `127.0.0.1:5116`; Tailscale Funnel supplies HTTPS.
+- The existing `PublicApi:Proxy=tailscale` middleware checks the loopback
+  address, HTTPS forwarding, client IP and expected *.ts.net hostname.
+- `/admin*` and `/v1/cbt1/admin*` are 404 from Funnel. The local
+  administrative dashboard on 5117 remains isolated from Funnel.
+- **Public registration OFF:** `PublicApi:AllowRegistration=false` blocks
+  `POST /v1/auth/register` on the main-account Funnel and hides the
+  registration tab. This does not disable existing-account login or
+  affect the standalone main-account service on 5115.
+- **CBT1 OFF:** `Cbt1:Enabled=false` in the shared Portal process; CBT1
+  application state uses a distinct, unused file, not the main account DB.
+- Browser sessionStorage and device key names are separated by backend mode
+  (`main` vs `staging`), avoiding staging-token reuse after cutover.
+- Do not submit real secrets to the chat or test console. Password resets
+  use the already-secured **Local Admin** recovery flow at port 5117.
+
+### Start, stop and rebuild
+
+```powershell
+& .\start-shared-account-funnel.ps1 -CheckOnly   # non-destructive checks
+& .\start-shared-account-funnel.ps1 -Start       # foreground shared DB Funnel
+& .\start-shared-account-funnel.ps1 -Stop        # stop ONLY Funnel + shared Portal
+& .\verify-tailscale-api.ps1 -BinaryPath '.\Duluka.Server\bin\TailscaleShared\Duluka.Server.exe'
+& .\verify-full-regression.ps1
+```
+
+Double-click `Server/Tailscale-Launcher.cmd` for the interactive menu.
+Menu [3] starts the main DB Portal, [4] stops it, [5] opens its URL,
+and [7] is reserved for **separate disposable STAGING** only.
+The older `start-tailscale-funnel.ps1` still uses disposable databases.
+Never run both on port 5116; use the launcher or dedicated scripts.
+
+Main Portal was compiled to `Duluka.Server/bin/TailscaleShared` without
+changing the running executable on 5115 or 5117.
+Before first cutover, `Server/Tools/Duluka.DbBackup` performed an SQLite
+online `BackupDatabase`, checked `PRAGMA integrity_check=ok` and the
+account row count, then placed an access-restricted file under
+`%LOCALAPPDATA%/DulukaAccount/Backups`. Backups contain private account
+information: do not publish them or check them into Git.
+
+**Verification:** isolated original proxy checks 27/27 passed;
+main-mode startup on a temporary clone of the main DB passed
+(portal config, /admin 404, /cbt1/admin 404, session 401,
+public registration 403, CBT1 closed). Live Funnel was cut over to the
+main DB after old disposable staging was stopped; separate HUAWEI-MateBook
+outside the tailnet fetched mode=`main`, registration=`false`,
+page and JS HTTP 200, admin HTTP 404 and anonymous /me HTTP 401.
+
+Operator must perform an actual browser sign-in with their own password;
+the administrator password and recovery codes must NEVER be sent in chat.
+The external end-to-end password login for an existing account has not
+been run by automation.
+
+## My Account & Connected Devices (2026-10-24)
+
+The HTTPS Portal's signed-in view now includes an Account summary with
+`/v1/account/me` identity and current device, plus a connected-device list
+from `/v1/account/devices`. It offers an explicit, confirmed Disconnect
+action for **other** devices via `/v1/account/devices/{id}/revoke` (the current
+device is labeled and has no Disconnect button). The current user can change
+their own native password using the existing
+`POST /v1/account/password` endpoint, current password, and confirmation.
+
+The UI only uses the signed-in Bearer token from sessionStorage and never
+persists or logs passwords. Account IDs/device labels are inserted with safe
+DOM `textContent`; no untrusted HTML interpolation. Data is reloaded after
+login or browser-tab restoration. Local sign-out revokes the token server-side
+and clears client-side account/device/password state.
+
+**Verification:** Build succeeded with 0 warnings/errors, Node JS syntax
+check passed, 27/27 public proxy security checks passed. Expanded
+`Server/verify-portal-flow.ps1` exercises 23 assertions with a disposable
+SQLite DB: register, login, /me, CBT1, two distinct devices, disconnect,
+revoked session, wrong/correct current password, new-password login, logout.
+The 59+135 original regression suites are independent of live account data.
+
+**Rollout:** `Server/Duluka.Server/bin/TailscaleShared` is the live
+Funnel's build destination; use `start-shared-account-funnel.ps1 -Stop`,
+build to that isolated output, then `-Start` to preserve public origin
+and main SQLite DB. Never rebuild into `bin/Release/net10.0` while its
+Cloudflare API executable is running.
+
+## CBT1 Invite-only rollout — 24 October 2026
+
+Cloudflare Pages website: https://nv-cbt.pages.dev/
+Local Admin dashboard: http://127.0.0.1:5117/admin (AORUS-DESKTOP only)
+Public API: Tailscale Funnel -> 127.0.0.1:5116
+
+### Operator instructions
+
+1. Open Local Admin on AORUS-DESKTOP.
+2. Under **CBT1 Invitation Codes**, enter a private label and select an
+   expiry (24 hours / 7 days / 30 days); click **Generate Invite**.
+3. Copy the newly generated `CBT1-...` code immediately. The browser only
+   shows it once, the server stores only SHA-256. Do not paste codes, account
+   passwords or other secrets in chat, source code or public issues.
+4. Give the code privately to ONE existing Duluka Account user.
+5. Tester visits `https://nv-cbt.pages.dev/`, logs in, redeems the code,
+   fills out the CBT1 application and submits it.
+6. In Local Admin, **CBT1 Applications / Tester approvals** lists submitted
+   applications. Set Approved / Waitlist / Rejected, then save.
+7. Tester refreshes their account's CBT1 status to see the decision.
+8. To cancel a code / invitation, use **Revoke** in Local Admin.
+
+### Important security boundaries
+
+- `Cbt1:Enabled=false`: general applications are closed.
+- `Cbt1:InviteEnabled=true` on the **public Tailscale Portal only**,
+  allowing code holders to apply. Public native account registration stays
+  **disabled**. Existing Duluka login is required; Invite Code does not
+  bypass authentication or create an account.
+- CBT1 data is stored in a dedicated SQLite file shared by only the
+  Local Admin and Tailscale Portal:
+  `%LOCALAPPDATA%\DulukaAccount\CBT1\Applications.db`
+- Codes are generated cryptographically, single-use, expiring, and stored
+  as SHA-256. A redemption is committed transactionally to an account.
+- Operator routes live exclusively on loopback Local Admin port 5117,
+  require `X-Admin-Request`, and state-changing calls require the exact
+  local Origin. They are not present on Cloudflare Pages nor public Funnel.
+- Decisions are manual, never assigned merely because someone has a code.
+- The original Account SQLite is untouched by the CBT1 invite subsystem.
+- The current invite feature is for **existing accounts**. Do not enable
+  public new-account registration without a separate invite-gated signup
+  flow, abuse controls and privacy review.
+
+### Verification and regression
+
+`Server\verify-cbt1-invites.ps1` runs three isolated server processes
+on temporary test accounts and CBT1 database (plus the temporary 5117
+operator listener) and checks generation, Origin rejection, one-time use,
+second-account reuse rejection, eligible application, approval and revoke.
+Stop the real Local Admin briefly before running; restart it afterward.
+
+All new isolation tests pass. The original full regression also passes
+59/59 server tests + 135/135 HTTP tests with existing tracked mismatch
+M-9 (repeat revoke returns 401 instead of target 200). Cloudflare Pages
+Edge tests passed 11/11. Tested the public website from a HUAWEI laptop
+without Tailscale: home=200, inviteEnabled=true, CBT1 general accepting=false,
+anonymous redemption=401, admin edge route=404.
+
+Do not confuse `Cbt1:InviteEnabled` with `Cbt1:Enabled`: leave general
+registration off until the public CBT1 opening decision.

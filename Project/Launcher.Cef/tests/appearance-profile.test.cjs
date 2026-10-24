@@ -96,7 +96,9 @@ test('settings UI exposes only fixed native install/remove actions, no code eval
   assert.match(html,/id="btnImportBackground"/);
   assert.match(html,/id="btnInstallAppearance"/);
   assert.match(html,/id="btnRemoveAppearance"/);
-  assert.match(html,/src="module-profiles\.js\?v=/);
+  // Appearance code remains archived for future optional add-ons, but Core
+  // explicitly does not execute it or expose profile management.
+  assert.doesNotMatch(html,/src="module-profiles\.js/);
   assert.match(script,/LAUNCHER_IMPORT_BACKGROUND/);
   assert.match(script,/LAUNCHER_INSTALL_APPEARANCE/);
   assert.match(script,/LAUNCHER_UNINSTALL_APPEARANCE/);

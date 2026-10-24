@@ -63,6 +63,10 @@ foreach($arch in @('Win32','x64')) {
     $gpuHook = Join-Path $hookRoot "bin\$arch\Release\NVIDIA OSC Adapter Hook.dll"
     & $gpuTest $gpuHook
     Check-Exit "D3D9Ex $arch D3D11 GPU bridge, Stage/Commit/Discard, Hook backbuffer pixels"
+    # Capability discovery only: non-Ex D3D9 may reject legacy shared
+    # D3D11 handles (D3DERR_INVALIDCALL). This is not a GPU path fallback.
+    & $gpuTest '--classic-gpu-probe'
+    Check-Exit "classic D3D9 $arch hardware GPU shared-handle capability probe"
 }
 # Production ABI-compatible Mailbox v1 cross-process receiver fixture.
 # Synthetic producer and a PRIVATE, per-PID mailbox; never enables the live

@@ -558,6 +558,31 @@ static bool g_dcomp_bound = false;
 static ID3D11Texture2D* g_own_rt = nullptr;   // RT ของเรา (back buffer ของ swapchain เครื่องนี้ bind=0 วาดไม่ได้)
 static int g_own_w = 0, g_own_h = 0;
 static std::atomic<bool> g_game_focused{ false };
+// Classic D3D9 external DWM compositor preview. No Hook or CPU readback.
+// Only enabled explicitly on the OSC HOST process, never by GPU UI alone.
+static std::atomic<bool> g_dx9_windowed_gpu_active{ false };
+static std::atomic<bool> g_dx9_windowed_gpu_user_requested{ false };
+static std::atomic<bool> g_dx9_windowed_gpu_explicit_cpu{ false };
+static std::mutex g_dx9_windowed_gpu_mutex;
+static RECT g_dx9_windowed_gpu_bounds{};
+static HWND g_dx9_windowed_gpu_target = nullptr; // HWND/UI thread only
+static bool OscDx9WindowedPreviewRequested() {
+    static const bool requested = [] {
+        char flag[4]{};
+        return GetEnvironmentVariableA(
+            "OSC_DX9_WINDOWED_GPU_COMPOSITOR_PREVIEW",
+            flag, sizeof(flag)) == 1 && flag[0] == '1';
+    }();
+    return requested ||
+        g_dx9_windowed_gpu_user_requested.load(std::memory_order_acquire);
+}
+static bool OscDx9WindowedGpuRect(RECT& rect) {
+    if (!g_dx9_windowed_gpu_active.load(std::memory_order_acquire))
+        return false;
+    std::lock_guard<std::mutex> lock(g_dx9_windowed_gpu_mutex);
+    rect = g_dx9_windowed_gpu_bounds;
+    return rect.right > rect.left && rect.bottom > rect.top;
+}
 static std::atomic<bool> g_ui_open_snapshot{ false };
 static std::atomic<bool> g_notifier_overlay_visible{ false };
 static bool OscFramePublisherOverlayVisible() {
@@ -595,6 +620,9 @@ static void OscRefreshDesktopMonitor() {
     g_desktop_monitor_rect=chosen?chosen->rect:RECT{0,0,GetSystemMetrics(SM_CXSCREEN),GetSystemMetrics(SM_CYSCREEN)};
 }
 static RECT OscRenderScreenRect() {
+    RECT game{};
+    if (OscDx9WindowedGpuRect(game))
+        return game;
     if(g_game_focused.load(std::memory_order_acquire))return RECT{0,0,GetSystemMetrics(SM_CXSCREEN),GetSystemMetrics(SM_CYSCREEN)};
     std::lock_guard<std::mutex> lock(g_desktop_monitor_mutex);
     if(g_desktop_monitor_rect.right>g_desktop_monitor_rect.left)return g_desktop_monitor_rect;
@@ -702,6 +730,85 @@ static bool IsHookGameFullscreen(DWORD gamePid) {
     return search.fullscreen;
 }
 
+struct OscDx9WindowedGpuSearch {
+    DWORD pid=0;
+    HWND hwnd=nullptr;
+    RECT client{};
+    LONGLONG largestArea=0;
+};
+
+static BOOL CALLBACK OscFindDx9WindowedGpuHwnd(HWND hwnd, LPARAM parameter) {
+    auto* found=reinterpret_cast<OscDx9WindowedGpuSearch*>(parameter);
+    if(!found || !IsWindowVisible(hwnd) || IsIconic(hwnd) ||
+       GetWindow(hwnd,GW_OWNER) ||
+       (GetWindowLongPtrW(hwnd,GWL_STYLE)&WS_CHILD))
+        return TRUE;
+    DWORD pid=0;
+    GetWindowThreadProcessId(hwnd,&pid);
+    if(pid!=found->pid) return TRUE;
+    RECT rc{};
+    if(!GetClientRect(hwnd,&rc)) return TRUE;
+    POINT first{rc.left,rc.top},last{rc.right,rc.bottom};
+    if(!ClientToScreen(hwnd,&first) || !ClientToScreen(hwnd,&last))
+        return TRUE;
+    const LONG width=last.x-first.x, height=last.y-first.y;
+    if(width<160 || height<100) return TRUE;
+    // DWM top-level GPU composition is NOT a Fullscreen Exclusive overlay.
+    // Even a fullscreen-sized borderless HWND must use the existing Hook route.
+    MONITORINFO monitor{sizeof(monitor)};
+    const HMONITOR nearest=MonitorFromWindow(hwnd,MONITOR_DEFAULTTONEAREST);
+    if(!nearest || !GetMonitorInfoW(nearest,&monitor)) return TRUE;
+    const RECT& mr=monitor.rcMonitor;
+    constexpr LONG tolerance=2;
+    if(first.x<=mr.left+tolerance && first.y<=mr.top+tolerance &&
+       last.x>=mr.right-tolerance && last.y>=mr.bottom-tolerance)
+        return TRUE;
+    const LONGLONG area=static_cast<LONGLONG>(width)*height;
+    if(area>found->largestArea) {
+        found->hwnd=hwnd;
+        found->client=RECT{first.x,first.y,last.x,last.y};
+        found->largestArea=area;
+    }
+    return TRUE;
+}
+
+static bool OscEligibleClassicD3D9GpuWindow(HWND& hwnd,RECT& bounds,
+    DWORD previousGameForegroundPid) {
+    hwnd=nullptr;
+    if(!OscDx9WindowedPreviewRequested() ||
+       g_dx9_windowed_gpu_explicit_cpu.load(std::memory_order_acquire) ||
+       !g_gpu_ok || !g_gpu_shared || !g_dcomp_bound || g_cfg.windowed ||
+       !g_last_cef_gpu_shared_tick.load(std::memory_order_acquire))
+        return false;
+    // Explicit renderer identity is mandatory; never guess from an EXE name.
+    const auto* consumer=osc::d3d11_frame_publisher::GetConsumerAdapterInfo();
+    if(!consumer || consumer->magic!=osc_frame_bridge::ConsumerAdapterMagic ||
+       consumer->version!=osc_frame_bridge::ConsumerAdapterVersion ||
+       consumer->ownerProcessId<=0 ||
+       osc_frame_bridge::LoadConsumerRenderApi(*consumer)!=
+           osc_frame_bridge::ConsumerRenderApiD3D9)
+        return false;
+    const DWORD gamePid=static_cast<DWORD>(consumer->ownerProcessId);
+    if(IsHookGameFullscreen(gamePid))return false;
+    HWND foreground=GetForegroundWindow();
+    if(foreground)foreground=GetAncestor(foreground,GA_ROOT);
+    DWORD foregroundPid=0;
+    if(foreground)GetWindowThreadProcessId(foreground,&foregroundPid);
+    const bool gameForeground=foregroundPid==gamePid;
+    const bool oscInteractive=foreground==g_hwnd &&
+        g_ui_open_snapshot.load(std::memory_order_acquire) &&
+        (g_dx9_windowed_gpu_active.load(std::memory_order_acquire) ||
+         previousGameForegroundPid==gamePid);
+    if(!gameForeground && !oscInteractive)return false;
+    OscDx9WindowedGpuSearch found{};
+    found.pid=gamePid;
+    EnumWindows(OscFindDx9WindowedGpuHwnd,reinterpret_cast<LPARAM>(&found));
+    if(!found.hwnd)return false;
+    hwnd=found.hwnd;
+    bounds=found.client;
+    return true;
+}
+
 static bool IsHookGameForeground() {
     const auto* consumerAdapterInfo = osc::d3d11_frame_publisher::GetConsumerAdapterInfo();
     if (!consumerAdapterInfo ||
@@ -787,12 +894,21 @@ static bool CopyOwnRTToSwap(int w, int h) {
 
     if(!g_game_focused.load(std::memory_order_acquire)&&g_dcomp_visual&&w>0&&h>0) {
         const RECT screen=OscRenderScreenRect();
-        const float scale=static_cast<float>(screen.right-screen.left)/w;
-        const float offsetY=(static_cast<float>(screen.bottom-screen.top)-h*scale)*0.5f;
-        static float previousScale=-1,previousOffset=-1;
-        if(scale!=previousScale||offsetY!=previousOffset) {
-            const D2D_MATRIX_3X2_F transform{scale,0,0,scale,0,offsetY};
-            if(SUCCEEDED(g_dcomp_visual->SetTransform(transform))){previousScale=scale;previousOffset=offsetY;}
+        RECT gpuWindow{};
+        const bool dx9WindowedGpu = OscDx9WindowedGpuRect(gpuWindow);
+        const float scaleX=static_cast<float>(screen.right-screen.left)/w;
+        // The DComp visual always contains full CEF content. Restrict it to
+        // the verified classic-DX9 client in opt-in windowed GPU mode.
+        const float scaleY=dx9WindowedGpu ?
+            static_cast<float>(screen.bottom-screen.top)/h : scaleX;
+        const float offsetY=dx9WindowedGpu ? 0.0f :
+            (static_cast<float>(screen.bottom-screen.top)-h*scaleY)*0.5f;
+        static float previousScaleX=-1,previousScaleY=-1,previousOffset=-1;
+        if(scaleX!=previousScaleX||scaleY!=previousScaleY||offsetY!=previousOffset) {
+            const D2D_MATRIX_3X2_F transform{scaleX,0,0,scaleY,0,offsetY};
+            if(SUCCEEDED(g_dcomp_visual->SetTransform(transform))) {
+                previousScaleX=scaleX;previousScaleY=scaleY;previousOffset=offsetY;
+            }
         }
     }
     const auto copyStartUs = OscPerfNowUs();
@@ -1903,6 +2019,85 @@ static void ApplyGenuineZoom(bool force_log = false) {
         Log("[zoom] failed to schedule geometry update on CEF UI thread");
 }
 
+// The only live-preview route for classic D3D9: external DWM composition over
+// a verified WINDOWED target. Never enable on a fullscreen/exclusive window.
+// Runs on our OSC HWND thread; the CEF callback + DesktopPresent worker retain
+// their existing GPU-shared frame path. No game CPU Bridge frame is published.
+static void OscUpdateClassicD3D9GpuPreview() {
+    if (!OscDx9WindowedPreviewRequested() || !g_hwnd)
+        return;
+    HWND game=nullptr;
+    RECT bounds{};
+    DWORD previousGameForegroundPid=0;
+    if(g_prev_fore && IsWindow(g_prev_fore))
+        GetWindowThreadProcessId(g_prev_fore,&previousGameForegroundPid);
+    const bool eligible=OscEligibleClassicD3D9GpuWindow(
+        game,bounds,previousGameForegroundPid) &&
+        !g_game_focused.load(std::memory_order_acquire);
+    const bool wasActive=
+        g_dx9_windowed_gpu_active.load(std::memory_order_acquire);
+    if (eligible) {
+        RECT previous{};
+        const bool hadBounds=OscDx9WindowedGpuRect(previous);
+        const bool changed=!hadBounds || g_dx9_windowed_gpu_target!=game ||
+            !EqualRect(&previous,&bounds);
+        if (!changed)return;
+        const int width=bounds.right-bounds.left;
+        const int height=bounds.bottom-bounds.top;
+        if (!SetWindowPos(g_hwnd,HWND_TOPMOST,
+                bounds.left,bounds.top,width,height,
+                SWP_NOACTIVATE|SWP_NOOWNERZORDER)) {
+            Log("[dx9-windowed-gpu] SetWindowPos FAILED err=" +
+                std::to_string(GetLastError()));
+            return;
+        }
+        {
+            std::lock_guard<std::mutex> lock(g_dx9_windowed_gpu_mutex);
+            g_dx9_windowed_gpu_bounds=bounds;
+            g_dx9_windowed_gpu_target=game;
+        }
+        g_dx9_windowed_gpu_active.store(true,std::memory_order_release);
+        if (!wasActive) {
+            // Retire any stale in-game CPU bridge image before showing the
+            // out-of-process DWM overlay. Do not enqueue any CPU readback.
+            // This prevents drawing the previous fullscreen Hook frame behind
+            // the newly active GPU window compositor.
+            const bool hidden=osc::d3d11_frame_publisher::PublishMetadata(true);
+            Log(hidden
+                ? "[dx9-windowed-gpu] retired stale CPU Hook frame; GPU DComp route active"
+                : "[dx9-windowed-gpu] CPU Hook retirement pending (mapping unavailable)");
+        }
+        if (g_ui_open_snapshot.load(std::memory_order_acquire) ||
+            g_notifier_overlay_visible.load(std::memory_order_acquire))
+            ShowWindow(g_hwnd,SW_SHOWNOACTIVATE);
+        if (g_browser)g_browser->GetHost()->Invalidate(PET_VIEW);
+        ApplyGenuineZoom(true);
+        Log("[dx9-windowed-gpu] active: DWM GPU compositor -> classic D3D9 client "+
+            std::to_string(bounds.left)+","+std::to_string(bounds.top)+" "+
+            std::to_string(width)+"x"+std::to_string(height));
+        return;
+    }
+    if (!wasActive)return;
+    g_dx9_windowed_gpu_active.store(false,std::memory_order_release);
+    {
+        std::lock_guard<std::mutex> lock(g_dx9_windowed_gpu_mutex);
+        g_dx9_windowed_gpu_bounds={};
+        g_dx9_windowed_gpu_target=nullptr;
+    }
+    // Restore ordinary desktop geometry on focus loss, game exit, or switch
+    // to the existing fullscreen Hook mode. Never cover unrelated windows.
+    OscRefreshDesktopMonitor();
+    if (!g_game_focused.load(std::memory_order_acquire)) {
+        const RECT monitor=OscRenderScreenRect();
+        SetWindowPos(g_hwnd,HWND_TOPMOST,monitor.left,monitor.top,
+            NotificationSafeOverlayWidth(monitor.right-monitor.left),
+            monitor.bottom-monitor.top,SWP_NOACTIVATE|SWP_NOOWNERZORDER);
+    }
+    if(g_browser)g_browser->GetHost()->Invalidate(PET_VIEW);
+    ApplyGenuineZoom(true);
+    Log("[dx9-windowed-gpu] inactive: game focus/window/capability changed; desktop restored");
+}
+
 // buffer premultiplied ถาวร — เฟรมที่แล้วค้างไว้ อัปเดตเฉพาะ dirty rects ของเฟรมนี้
 // ⚠ เคารพขอบเขต x ให้เป๊ะ: บัฟเฟอร์ของ CEF ใช้ได้เฉพาะใน dirty rect —
 // อ่านเกินออกไป = ดึงพิกเซลเก่ามาทับ = UI สองสถานะซ้อนกัน (บทเรียน 06:2x)
@@ -2692,6 +2887,12 @@ static void OscHandleHookTransportQueryOnUi(const std::string& req,
         if (name == "d3d9ex") {
             osc::d3d11_frame_publisher::SetD3D9ExCpuOnly(mode == "cpu");
         }
+        if (name == "d3d9") {
+            g_dx9_windowed_gpu_explicit_cpu.store(
+                mode=="cpu",std::memory_order_release);
+            g_dx9_windowed_gpu_user_requested.store(
+                mode=="gpu",std::memory_order_release);
+        }
         Log("[hook-transport] " + name + " requested=" + mode +
             " (only supported modes accepted; CPU fallback retained)");
     }
@@ -2894,7 +3095,12 @@ static void HandleOscQuery(const std::string& req, bool persistent,
             ",\"gameFocused\":" + (focused ? "true" : "false") +
             ",\"overlayOpen\":" + (overlayOpen ? "true" : "false") +
             ",\"gpuSharedRequested\":" + (g_gpu_shared ? "true" : "false") +
-            ",\"gpuDeviceReady\":" + (g_gpu_ok ? "true" : "false") + "}";
+            ",\"gpuDeviceReady\":" + (g_gpu_ok ? "true" : "false") +
+            ",\"dx9WindowedGpuPreviewRequested\":" +
+                (OscDx9WindowedPreviewRequested() ? "true" : "false") +
+            ",\"dx9WindowedGpuActive\":" +
+                (g_dx9_windowed_gpu_active.load(std::memory_order_acquire) ?
+                    "true" : "false") + "}";
         reply(json);
         return;
     }
@@ -3533,6 +3739,11 @@ public:
                 (int)((LONGLONG)viewY * displayHeight / g_view_h);
         } else {
             screenX = viewX; screenY = viewY;
+        }
+        RECT dx9Client{};
+        if (OscDx9WindowedGpuRect(dx9Client)) {
+            screenX+=dx9Client.left;
+            screenY+=dx9Client.top;
         }
         return true;
     }
@@ -4383,6 +4594,9 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     case WM_TIMER: {
         // WM_TIMER runs on the HWND thread; CEF MTML callbacks use a separate thread.
         if (w == 5) {
+            // Experimental classic-D3D9 GPU compositor stays outside Hook
+            // mode and follows only the verified windowed foreground game.
+            OscUpdateClassicD3D9GpuPreview();
             const bool hookMode = IsHookGameForegroundStable();
             const bool wasHookMode = g_game_focused.exchange(
                 hookMode, std::memory_order_acq_rel);
@@ -5070,6 +5284,13 @@ public:
         if (const auto* api = osc::hook_transport::Find("d3d9ex"))
             osc::d3d11_frame_publisher::SetD3D9ExCpuOnly(
                 OscHookSavedMode(*api) == "cpu");
+        if (const auto* api = osc::hook_transport::Find("d3d9")) {
+            const std::string saved=OscHookSavedMode(*api);
+            g_dx9_windowed_gpu_explicit_cpu.store(
+                saved=="cpu",std::memory_order_release);
+            g_dx9_windowed_gpu_user_requested.store(
+                saved=="gpu",std::memory_order_release);
+        }
         CefPostDelayedTask(TID_UI, new CreateBrowserTask(), 400);
     }
     IMPLEMENT_REFCOUNTING(OscApp);

@@ -3,7 +3,9 @@
 #include <string_view>
 namespace osc::hook_transport {
 // This table reflects NATIVE PIXEL RENDERERS, not merely folders or API probes.
-// No CPU D3D11 bridge and no D3D9Ex game-owned Pump are ready in live builds.
+// D3D9 GPU is restricted to opt-in Windowed DirectComposition preview.
+// Fullscreen Classic D3D9 still uses the CPU bridge. D3D9Ex's mailbox GPU
+// receiver is not yet supported by production Hook transport selection.
 struct Api {
     const char* id;
     const char* settingKey;
@@ -13,7 +15,7 @@ struct Api {
     const char* route;
 };
 inline constexpr Api Apis[] = {
-    {"d3d9", "OSC.HookTransport.d3d9", true, false, true, "cpu-shared-memory"},
+    {"d3d9", "OSC.HookTransport.d3d9", true, true, true, "cpu-or-windowed-gpu-dcomp-preview"},
     {"d3d9ex", "OSC.HookTransport.d3d9ex", true, false, true, "cpu-shared-memory"},
     {"d3d10", "OSC.HookTransport.d3d10", false, false, false, "unavailable"},
     {"d3d11", "OSC.HookTransport.d3d11", true, true, false, "gpu-shared-or-cpu-mirror"},

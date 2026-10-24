@@ -7,7 +7,7 @@ const vm=require('node:vm');
 const source=fs.readFileSync(path.join(__dirname,'../osc/mods/osc-hook-settings.js'),'utf8');
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
 const specs=[
- {id:'d3d9',mode:'auto',implemented:true,gpuAvailable:false,cpuAvailable:true,normalRoute:'cpu-shared-memory'},
+ {id:'d3d9',mode:'auto',implemented:true,gpuAvailable:true,cpuAvailable:true,normalRoute:'cpu-or-windowed-gpu-dcomp-preview'},
  {id:'d3d9ex',mode:'auto',implemented:true,gpuAvailable:false,cpuAvailable:true,normalRoute:'cpu-shared-memory'},
  {id:'d3d10',mode:'auto',implemented:false,gpuAvailable:false,cpuAvailable:false,normalRoute:'unavailable'},
  {id:'d3d11',mode:'auto',implemented:true,gpuAvailable:true,cpuAvailable:false,normalRoute:'gpu-shared-or-cpu-mirror'},
@@ -16,7 +16,8 @@ const specs=[
  {id:'opengl',mode:'auto',implemented:false,gpuAvailable:false,cpuAvailable:false,normalRoute:'unavailable'}
 ];
 const status={hostMode:'GPU_SHARED',consumerObserved:true,consumerApi:9,
-  gameFocused:true,overlayOpen:true,gpuSharedRequested:true,gpuDeviceReady:true};
+  gameFocused:true,overlayOpen:true,gpuSharedRequested:true,gpuDeviceReady:true,
+  dx9WindowedGpuPreviewRequested:false,dx9WindowedGpuActive:false};
 function fixture(handler){
   const states={},controllers={},routes=[],requests=[],listeners=[];
   const app={
@@ -51,6 +52,7 @@ test('native Hook status + per-API transport route render separately',async()=>{
   assert.equal(f.controller.transportName(),'Direct3D 9 / 9Ex');
   assert.equal(f.controller.apis.length,7);
   assert.match(f.controller.routeLabel(f.controller.apis[0]),/CPU Shared Memory/);
+  assert.match(f.states['main.osc-hook'].template,/oscHookD3d9GpuPreview/);
   assert.match(f.controller.routeLabel(f.controller.apis[3]),/GPU_SHARED/);
   assert.match(f.controller.selectionLabel(f.controller.apis[0]),/not proof/);
   const view=f.states['main.osc-hook'];
@@ -71,7 +73,7 @@ test('each native API displays accurate capabilities, not fake modes',async()=>{
   const f=fixture(responder);await flush();
   const map=Object.fromEntries(f.controller.apis.map(api=>[api.id,api]));
   assert.equal(f.controller.modeAllowed(map.d3d9,'cpu'),true);
-  assert.equal(f.controller.modeAllowed(map.d3d9,'gpu'),false);
+  assert.equal(f.controller.modeAllowed(map.d3d9,'gpu'),true); // windowed GPU preview only
   assert.equal(f.controller.modeAllowed(map.d3d9ex,'cpu'),true);
   assert.equal(f.controller.modeAllowed(map.d3d9ex,'gpu'),false);
   assert.equal(f.controller.modeAllowed(map.d3d11,'gpu'),true);
@@ -158,7 +160,40 @@ test('English and Thai translations contain every per-API mode key',()=>{
       'oscHookRefresh','oscHookRenderer','oscHookTransportTitle',
       'oscHookTransportInfo','oscHookTransportError','oscHookTransportUnavailable',
       'oscHookApiUnavailable','oscHookD3d9Note','oscHookD3d9ExNote',
-      'oscHookD3d11Note','oscHookTransportSaved'])
+      'oscHookD3d11Note','oscHookD3d9GpuPreview','oscHookTransportSaved'])
       assert.equal(typeof loc['l10n.'+key],'string');
   }
+});
+
+
+test('D3D9 GPU windowed preview is an opt-in preference, not fullscreen GPU proof',async()=>{
+  let selected='auto';
+  let active=false;
+  const f=fixture((req,opts)=>{
+    if(req.command==='QUERY_OSC_SET_HOOK_TRANSPORT'){
+      assert.equal(req.api,'d3d9');
+      assert.equal(req.mode,'gpu');
+      selected='gpu';
+    }
+    opts.onSuccess(JSON.stringify(req.command==='QUERY_OSC_GET_HOOK_STATUS'
+      ?{...status,dx9WindowedGpuPreviewRequested:selected==='gpu',
+          dx9WindowedGpuActive:active}
+      :{apis:specs.map(api=>api.id==='d3d9'?{...api,mode:selected}:api)}));
+  });
+  await flush();
+  const row=f.controller.apis.find(api=>api.id==='d3d9');
+  assert.equal(f.controller.modeAllowed(row,'gpu'),true);
+  row.mode='gpu';
+  await f.controller.saveMode(row);
+  assert.equal(f.controller.apis.find(api=>api.id==='d3d9').mode,'gpu');
+  assert.match(f.controller.routeLabel(f.controller.apis[0]),
+    /only verified Windowed games/);
+  assert.match(f.controller.routeLabel(f.controller.apis[0]),
+    /Fullscreen CPU fallback/);
+  assert.equal(f.controller.status.dx9WindowedGpuActive,false);
+  active=true;
+  await f.controller.refresh();
+  assert.match(f.controller.routeLabel(f.controller.apis[0]),
+    /preview active \(not pixel proof\)/);
+  assert.equal(f.controller.status.dx9WindowedGpuActive,true);
 });

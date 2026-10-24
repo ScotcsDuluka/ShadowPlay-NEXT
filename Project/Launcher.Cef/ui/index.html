@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ShadowPlay NEXT · Command Center</title>
 <link rel="stylesheet" href="app.css?v=modules20261024">
-<link rel="stylesheet" href="quick-ui.css?v=magisk-cards-20261024">
+<link rel="stylesheet" href="quick-ui.css?v=webgithub-core-20261024">
 </head>
 <body class="quick-mode">
   <nav id="titlebar" aria-label="Window">
@@ -17,6 +17,7 @@
     </div>
     <div class="titlebar-actions">
       <span class="top-system-state" id="headerHealth" data-i18n="connecting">CONNECTING</span>
+      <button type="button" id="btnAccount" class="quick-account-button" data-i18n="accountPortal" data-i18n-title="accountPortalHint" title="Open Duluka Account in your browser">ACCOUNT ↗</button>
       <label for="launcherLanguage" data-i18n="language">Language</label>
       <select id="launcherLanguage" data-i18n-aria-label="languageSelect" aria-label="Launcher language">
         <option value="en-US">English</option><option value="th-TH">ไทย</option>
@@ -59,202 +60,179 @@
         <p class="quick-notice" data-i18n="quickPowerCaution">Power status comes from saved settings; it does not guarantee recording or injection is ready.</p>
       </section>
 
-      <section class="quick-page" id="quickPageCore" aria-label="Core modules">
-        <div class="quick-heading"><span class="quick-eyebrow" data-i18n="quickModulesLabel">MODULES / CORE</span><h1 data-i18n="quickCoreTab">CORE MODULES</h1><p data-i18n="quickCoreIntro">Essential ShadowPlay NEXT services and interfaces.</p></div>
-        <div class="quick-core-toolbar">
-          <span class="quick-core-count" data-i18n="quickCoreCount">11 built-in modules</span>
-          <label for="quickModuleLayout" data-i18n="quickLayoutLabel">Layout</label>
-          <select id="quickModuleLayout" aria-label="Module layout"><option value="list" data-i18n="quickLayoutList">Module cards</option><option value="grid" data-i18n="quickLayoutGrid">Compact grid</option></select>
+            <section class="quick-page" id="quickPageCore" aria-label="Core modules">
+        <div class="quick-core-stage">
+          <div class="quick-core-stage-grid" aria-hidden="true"></div>
+          <div class="quick-core-stage-copy">
+            <span class="quick-core-kicker" data-i18n="quickModulesLabel">MODULES / CORE</span>
+            <h1 data-i18n="quickCoreTab">CORE MODULES</h1>
+            <span class="quick-core-title-underline" aria-hidden="true"></span>
+            <p data-i18n="quickCoreIntro">Built-in components powering ShadowPlay NEXT.</p>
+          </div>
+          <div class="quick-core-stage-mark" aria-hidden="true"><span class="quick-core-monogram">N</span><span class="quick-core-mark-label">NEXT / CORE</span></div>
+          <span class="quick-core-stage-corner c1" aria-hidden="true"></span>
+          <span class="quick-core-stage-corner c2" aria-hidden="true"></span>
+          <span class="quick-core-stage-corner c3" aria-hidden="true"></span>
+          <span class="quick-core-stage-corner c4" aria-hidden="true"></span>
         </div>
-        <div class="quick-module-grid" id="quickCoreGrid">
-          <article class="quick-module" data-module="Container">
+        <div class="quick-core-information">
+          <div class="quick-core-stat"><strong>11</strong><span data-i18n="quickCoreCount">BUILT-IN COMPONENTS</span></div>
+          <div class="quick-core-information-divider" aria-hidden="true"></div>
+          <div class="quick-core-source"><span class="quick-core-source-dot" aria-hidden="true"></span><span data-i18n="quickServerCatalogPending">Module details are bundled; server catalog is not connected yet.</span></div>
+        </div>
+        <div class="quick-module-grid" id="quickCoreGrid" data-catalog-source="bundled-fallback" data-runtime-source="local-launcher">
+          <article class="quick-module" data-lifecycle="suite-managed" data-module="Container">
+            <div class="quick-module-accent" aria-hidden="true"></div>
             <div class="quick-module-head">
               <span class="quick-module-icon" aria-hidden="true">▣</span>
               <div class="quick-module-copy">
+                <span class="quick-module-meta">01  /  11</span>
                 <strong>NVIDIA Container</strong>
-                <span class="quick-module-meta" data-i18n="quickBuiltIn">ShadowPlay NEXT · Built-in</span>
               </div>
               <span class="quick-module-state" id="quickStatusContainer" data-i18n="moduleWaiting">—</span>
             </div>
             <p class="quick-module-description" data-i18n="quickDescContainer">NVIDIA Container</p>
-            <div class="quick-module-bottom">
-              <span class="quick-module-category" data-i18n="quickCoreBadge">CORE MODULE</span>
-              <button type="button" class="quick-config-open" data-config-module="Container" data-i18n="quickConfigure">SETTINGS →</button>
-            </div>
+            <div class="quick-module-edge" aria-hidden="true"><i></i><i></i><i></i></div>
           </article>
-          <article class="quick-module" data-module="Overlay">
+          <article class="quick-module" data-lifecycle="suite-managed" data-module="Overlay">
+            <div class="quick-module-accent" aria-hidden="true"></div>
             <div class="quick-module-head">
               <span class="quick-module-icon" aria-hidden="true">▤</span>
               <div class="quick-module-copy">
+                <span class="quick-module-meta">02  /  11</span>
                 <strong>On-Screen Control</strong>
-                <span class="quick-module-meta" data-i18n="quickBuiltIn">ShadowPlay NEXT · Built-in</span>
               </div>
               <span class="quick-module-state" id="quickStatusOverlay" data-i18n="moduleWaiting">—</span>
             </div>
             <p class="quick-module-description" data-i18n="quickDescOverlay">On-Screen Control</p>
-            <div class="quick-module-bottom">
-              <span class="quick-module-category" data-i18n="quickCoreBadge">CORE MODULE</span>
-              <button type="button" class="quick-config-open" data-config-module="Overlay" data-i18n="quickConfigure">SETTINGS →</button>
-            </div>
+            <div class="quick-module-edge" aria-hidden="true"><i></i><i></i><i></i></div>
           </article>
-          <article class="quick-module" data-module="NodeApi">
+          <article class="quick-module" data-lifecycle="suite-managed" data-module="NodeApi">
+            <div class="quick-module-accent" aria-hidden="true"></div>
             <div class="quick-module-head">
               <span class="quick-module-icon" aria-hidden="true">⌘</span>
               <div class="quick-module-copy">
+                <span class="quick-module-meta">03  /  11</span>
                 <strong>NVIDIA NodeAPI</strong>
-                <span class="quick-module-meta" data-i18n="quickBuiltIn">ShadowPlay NEXT · Built-in</span>
               </div>
               <span class="quick-module-state" id="quickStatusNodeApi" data-i18n="moduleWaiting">—</span>
             </div>
             <p class="quick-module-description" data-i18n="quickDescNodeApi">NVIDIA NodeAPI</p>
-            <div class="quick-module-bottom">
-              <span class="quick-module-category" data-i18n="quickCoreBadge">CORE MODULE</span>
-              <button type="button" class="quick-config-open" data-config-module="NodeApi" data-i18n="quickConfigure">SETTINGS →</button>
-            </div>
+            <div class="quick-module-edge" aria-hidden="true"><i></i><i></i><i></i></div>
           </article>
-          <article class="quick-module" data-module="Capture">
+          <article class="quick-module" data-lifecycle="suite-managed" data-module="Capture">
+            <div class="quick-module-accent" aria-hidden="true"></div>
             <div class="quick-module-head">
               <span class="quick-module-icon" aria-hidden="true">◉</span>
               <div class="quick-module-copy">
+                <span class="quick-module-meta">04  /  11</span>
                 <strong>NVIDIA Capture</strong>
-                <span class="quick-module-meta" data-i18n="quickBuiltIn">ShadowPlay NEXT · Built-in</span>
               </div>
               <span class="quick-module-state" id="quickStatusCapture" data-i18n="moduleWaiting">—</span>
             </div>
             <p class="quick-module-description" data-i18n="quickDescCapture">NVIDIA Capture</p>
-            <div class="quick-module-bottom">
-              <span class="quick-module-category" data-i18n="quickCoreBadge">CORE MODULE</span>
-              <button type="button" class="quick-config-open" data-config-module="Capture" data-i18n="quickConfigure">SETTINGS →</button>
-            </div>
+            <div class="quick-module-edge" aria-hidden="true"><i></i><i></i><i></i></div>
           </article>
-          <article class="quick-module" data-module="Graphics">
+          <article class="quick-module" data-lifecycle="suite-managed" data-module="Graphics">
+            <div class="quick-module-accent" aria-hidden="true"></div>
             <div class="quick-module-head">
               <span class="quick-module-icon" aria-hidden="true">▧</span>
               <div class="quick-module-copy">
+                <span class="quick-module-meta">05  /  11</span>
                 <strong>NVIDIA Graphics</strong>
-                <span class="quick-module-meta" data-i18n="quickBuiltIn">ShadowPlay NEXT · Built-in</span>
               </div>
               <span class="quick-module-state" id="quickStatusGraphics" data-i18n="moduleWaiting">—</span>
             </div>
             <p class="quick-module-description" data-i18n="quickDescGraphics">NVIDIA Graphics</p>
-            <div class="quick-module-bottom">
-              <span class="quick-module-category" data-i18n="quickCoreBadge">CORE MODULE</span>
-              <button type="button" class="quick-config-open" data-config-module="Graphics" data-i18n="quickConfigure">SETTINGS →</button>
-            </div>
+            <div class="quick-module-edge" aria-hidden="true"><i></i><i></i><i></i></div>
           </article>
-          <article class="quick-module" data-module="Helper">
+          <article class="quick-module" data-lifecycle="suite-managed" data-module="Helper">
+            <div class="quick-module-accent" aria-hidden="true"></div>
             <div class="quick-module-head">
               <span class="quick-module-icon" aria-hidden="true">⌨</span>
               <div class="quick-module-copy">
+                <span class="quick-module-meta">06  /  11</span>
                 <strong>ShadowPlay Helper</strong>
-                <span class="quick-module-meta" data-i18n="quickBuiltIn">ShadowPlay NEXT · Built-in</span>
               </div>
               <span class="quick-module-state" id="quickStatusHelper" data-i18n="moduleWaiting">—</span>
             </div>
             <p class="quick-module-description" data-i18n="quickDescHelper">ShadowPlay Helper</p>
-            <div class="quick-module-bottom">
-              <span class="quick-module-category" data-i18n="quickCoreBadge">CORE MODULE</span>
-              <button type="button" class="quick-config-open" data-config-module="Helper" data-i18n="quickConfigure">SETTINGS →</button>
-            </div>
+            <div class="quick-module-edge" aria-hidden="true"><i></i><i></i><i></i></div>
           </article>
-          <article class="quick-module" data-module="Adapter">
+          <article class="quick-module" data-lifecycle="suite-managed" data-module="Adapter">
+            <div class="quick-module-accent" aria-hidden="true"></div>
             <div class="quick-module-head">
               <span class="quick-module-icon" aria-hidden="true">⌁</span>
               <div class="quick-module-copy">
+                <span class="quick-module-meta">07  /  11</span>
                 <strong>OSC Adapter</strong>
-                <span class="quick-module-meta" data-i18n="quickBuiltIn">ShadowPlay NEXT · Built-in</span>
               </div>
               <span class="quick-module-state" id="quickStatusAdapter" data-i18n="moduleWaiting">—</span>
             </div>
             <p class="quick-module-description" data-i18n="quickDescAdapter">OSC Adapter</p>
-            <div class="quick-module-bottom">
-              <span class="quick-module-category" data-i18n="quickCoreBadge">CORE MODULE</span>
-              <button type="button" class="quick-config-open" data-config-module="Adapter" data-i18n="quickConfigure">SETTINGS →</button>
-            </div>
+            <div class="quick-module-edge" aria-hidden="true"><i></i><i></i><i></i></div>
           </article>
-          <article class="quick-module" data-module="Hook">
+          <article class="quick-module" data-lifecycle="suite-managed" data-module="Hook">
+            <div class="quick-module-accent" aria-hidden="true"></div>
             <div class="quick-module-head">
               <span class="quick-module-icon" aria-hidden="true">⚙</span>
               <div class="quick-module-copy">
+                <span class="quick-module-meta">08  /  11</span>
                 <strong>Duluka Hook</strong>
-                <span class="quick-module-meta" data-i18n="quickBuiltIn">ShadowPlay NEXT · Built-in</span>
               </div>
               <span class="quick-module-state" id="quickStatusHook" data-i18n="moduleWaiting">—</span>
             </div>
             <p class="quick-module-description" data-i18n="quickDescHook">Duluka Hook</p>
-            <div class="quick-module-bottom">
-              <span class="quick-module-category" data-i18n="quickCoreBadge">CORE MODULE</span>
-              <button type="button" class="quick-config-open" data-config-module="Hook" data-i18n="quickConfigure">SETTINGS →</button>
-            </div>
+            <div class="quick-module-edge" aria-hidden="true"><i></i><i></i><i></i></div>
           </article>
-          <article class="quick-module" data-module="Ansel">
+          <article class="quick-module" data-lifecycle="suite-managed" data-module="Ansel">
+            <div class="quick-module-accent" aria-hidden="true"></div>
             <div class="quick-module-head">
               <span class="quick-module-icon" aria-hidden="true">✧</span>
               <div class="quick-module-copy">
+                <span class="quick-module-meta">09  /  11</span>
                 <strong>Ansel Adapter</strong>
-                <span class="quick-module-meta" data-i18n="quickBuiltIn">ShadowPlay NEXT · Built-in</span>
               </div>
               <span class="quick-module-state" id="quickStatusAnsel" data-i18n="moduleWaiting">—</span>
             </div>
             <p class="quick-module-description" data-i18n="quickDescAnsel">Ansel Adapter</p>
-            <div class="quick-module-bottom">
-              <span class="quick-module-category" data-i18n="quickCoreBadge">CORE MODULE</span>
-              <button type="button" class="quick-config-open" data-config-module="Ansel" data-i18n="quickConfigure">SETTINGS →</button>
-            </div>
+            <div class="quick-module-edge" aria-hidden="true"><i></i><i></i><i></i></div>
           </article>
-          <article class="quick-module" data-module="Ffmpeg">
+          <article class="quick-module" data-lifecycle="suite-managed" data-module="Ffmpeg">
+            <div class="quick-module-accent" aria-hidden="true"></div>
             <div class="quick-module-head">
               <span class="quick-module-icon" aria-hidden="true">▦</span>
               <div class="quick-module-copy">
+                <span class="quick-module-meta">10  /  11</span>
                 <strong>FFmpeg</strong>
-                <span class="quick-module-meta" data-i18n="quickBuiltIn">ShadowPlay NEXT · Built-in</span>
               </div>
               <span class="quick-module-state" id="quickStatusFfmpeg" data-i18n="moduleWaiting">—</span>
             </div>
             <p class="quick-module-description" data-i18n="quickDescFfmpeg">FFmpeg</p>
-            <div class="quick-module-bottom">
-              <span class="quick-module-category" data-i18n="quickCoreBadge">CORE MODULE</span>
-              <button type="button" class="quick-config-open" data-config-module="Ffmpeg" data-i18n="quickConfigure">SETTINGS →</button>
-            </div>
+            <div class="quick-module-edge" aria-hidden="true"><i></i><i></i><i></i></div>
           </article>
-          <article class="quick-module" data-module="Config">
+          <article class="quick-module" data-lifecycle="suite-managed" data-module="Config">
+            <div class="quick-module-accent" aria-hidden="true"></div>
             <div class="quick-module-head">
               <span class="quick-module-icon" aria-hidden="true">▥</span>
               <div class="quick-module-copy">
+                <span class="quick-module-meta">11  /  11</span>
                 <strong>NVIDIA Config</strong>
-                <span class="quick-module-meta" data-i18n="quickBuiltIn">ShadowPlay NEXT · Built-in</span>
               </div>
               <span class="quick-module-state" id="quickStatusConfig" data-i18n="moduleWaiting">—</span>
             </div>
             <p class="quick-module-description" data-i18n="configRoleTitle">NVIDIA Config</p>
-            <div class="quick-module-bottom">
-              <span class="quick-module-category" data-i18n="quickCoreBadge">CORE MODULE</span>
-              <button type="button" class="quick-config-open" data-config-module="Config" data-i18n="quickConfigure">SETTINGS →</button>
-            </div>
+            <div class="quick-module-edge" aria-hidden="true"><i></i><i></i><i></i></div>
           </article>
         </div>
-        <p class="quick-notice" data-i18n="quickStatusNotice">Installed does not mean the engine is running.</p>
+        <p class="quick-core-footer-note" data-i18n="quickStatusNotice">Core status is a local runtime snapshot.</p>
       </section>
 
-
-      <section class="quick-page" id="quickPageConfig" aria-label="Config Module">
-        <div class="quick-heading"><span class="quick-eyebrow" data-i18n="quickConfigLabel">MODULES / CONFIG</span><h1 id="quickConfigTitle" data-i18n="quickConfigTab">MODULE SETTINGS</h1><p data-i18n="quickConfigIntro">Appearance settings belong to each module, not the Launcher.</p></div>
-        <div class="quick-config-return">
-          <button type="button" class="quick-back-button" id="quickGoCore" data-i18n="quickBackToCore">← CORE MODULES</button>
-          <span class="quick-config-state" id="quickConfigStatus" data-i18n="moduleWaiting">WAITING FOR DATA</span>
-        </div>
-        <div class="quick-config-preview" id="quickConfigPreview">
-          <div><span class="quick-eyebrow" data-i18n="quickPreviewTitle">MODULE PREVIEW</span><h2 id="quickConfigName">NVIDIA Container</h2><p data-i18n="quickConfigPreviewHint">Background changes affect the selected module only.</p></div>
-          <span class="quick-config-preview-mark">NEXT</span>
-        </div>
-        <div class="quick-appearance-title"><span class="quick-eyebrow" data-i18n="quickThemeLabel">MODULE THEME</span><h2 data-i18n="quickThemeTitle">Themes & backgrounds</h2></div>
-        <div id="quickAppearanceSlot"></div>
-        <p class="quick-notice" data-i18n="quickConfigSafeNotice">Display settings only. No game hooks, recording or service activation is changed.</p>
-      </section>
 
       <section class="quick-page" id="quickPageAddons" aria-label="Add-ons">
         <div class="quick-heading"><span class="quick-eyebrow" data-i18n="quickExtensionsLabel">MODULES / ADD-ONS</span><h1 data-i18n="quickAddonTab">ADD-ONS</h1><p data-i18n="quickAddonIntro">Optional components, media dependencies and launcher themes.</p></div>
         <div class="quick-empty-addons"><span class="quick-empty-icon" aria-hidden="true">◇</span><h2 data-i18n="quickAddonEmpty">No add-on modules installed</h2><p data-i18n="quickAddonEmptyDetail">Only core modules are listed for now. Optional modules will appear here when supported.</p></div>
+        <p class="quick-lifecycle-note" data-i18n="quickAddonLifecycle">Add-ons are independent, optional modules. Future supported add-ons can be enabled, disabled and removed individually.</p>
       </section>
     </main>
   </div>
@@ -492,7 +470,6 @@
 <script src="osc-locales.js"></script>
 <script src="i18n.js"></script>
 <script src="app.js"></script>
-<script src="module-profiles.js?v=modules-magisk-20261024"></script>
-<script src="quick-ui.js?v=magisk-cards-20261024"></script>
+<script src="quick-ui.js?v=server-readonly-20261024"></script>
 </body>
 </html>

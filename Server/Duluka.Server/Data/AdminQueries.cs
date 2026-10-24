@@ -194,6 +194,28 @@ public sealed partial class Database
             ("$st", status), ("$ua", DateTimeOffset.UtcNow.ToString("o")), ("$id", accountId)) > 0;
     }
 
+    /// <summary>Reset an existing native credential, preserve account/devices,
+    /// and atomically revoke existing sessions so old logins become invalid.</summary>
+    public bool AdminResetNativePassword(string accountId, string passwordHash)
+    {
+        using var conn = OpenConn();
+        using var tx = conn.BeginTransaction();
+        var now = DateTimeOffset.UtcNow.ToString("o");
+        var updated = ExecTx(tx,
+            "UPDATE NativeCredential SET PasswordHash=$ph, UpdatedAt=$now WHERE AccountId=$aid",
+            ("$ph", passwordHash), ("$now", now), ("$aid", accountId));
+        if (updated != 1)
+        {
+            tx.Rollback();
+            return false;
+        }
+        ExecTx(tx, "UPDATE AccountSession SET RevokedAt=$now, RevokedReason='admin-password-reset' " +
+            "WHERE AccountId=$aid AND RevokedAt IS NULL",
+            ("$now", now), ("$aid", accountId));
+        tx.Commit();
+        return true;
+    }
+
     /// <summary>Hard-delete a device AND its sessions (admin cleanup — distinct
     /// from RevokeDevice, which keeps the history and only invalidates).</summary>
     public bool AdminDeleteDevice(string deviceId)

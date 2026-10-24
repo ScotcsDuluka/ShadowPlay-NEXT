@@ -20,6 +20,7 @@
     '<p><strong translate="l10n.oscHookOverlay">Overlay open:</strong> <span ng-if="hookSettings.status.overlayOpen" translate="l10n.oscHookYes">Yes</span><span ng-if="!hookSettings.status.overlayOpen" translate="l10n.oscHookNo">No</span></p>',
     '<p><strong translate="l10n.oscHookSharedGpu">Host GPU_SHARED requested:</strong> <span ng-if="hookSettings.status.gpuSharedRequested" translate="l10n.oscHookYes">Yes</span><span ng-if="!hookSettings.status.gpuSharedRequested" translate="l10n.oscHookNo">No</span></p>',
     '<p><strong translate="l10n.oscHookGpuReady">Host GPU device ready:</strong> <span ng-if="hookSettings.status.gpuDeviceReady" translate="l10n.oscHookYes">Yes</span><span ng-if="!hookSettings.status.gpuDeviceReady" translate="l10n.oscHookNo">No</span></p>',
+    '<p><strong translate="l10n.oscHookD3d9GpuPreview">DX9 Windowed GPU route active:</strong> <span ng-if="hookSettings.status.dx9WindowedGpuActive" translate="l10n.oscHookYes">Yes</span><span ng-if="!hookSettings.status.dx9WindowedGpuActive" translate="l10n.oscHookNo">No</span></p>',
     '<p class="preferences-instructional-text" translate="l10n.oscHookCaveat">An observed game adapter does not confirm that the in-game Hook is drawing. DX9Ex GPU preview requires an explicit game-side Pump; CPU fallback remains available.</p>',
     '</div>',
     '<div class="preferences-root-label"><p translate="l10n.oscHookTransportTitle">Hook transport per graphics API</p></div>',
@@ -34,7 +35,7 @@
     '</md-select></md-input-container>',
     '<p class="preferences-instructional-text" ng-if="api.implemented" role="status">{{hookSettings.routeLabel(api)}} · {{hookSettings.selectionLabel(api)}}</p>',
     '<p class="preferences-instructional-text" ng-if="!api.implemented" translate="l10n.oscHookApiUnavailable">Detection only. Native overlay renderer is not implemented.</p>',
-    '<p class="preferences-instructional-text" ng-if="api.id === \'d3d9\'" translate="l10n.oscHookD3d9Note">DX9 uses the CPU Shared Memory bridge.</p>',
+    '<p class="preferences-instructional-text" ng-if="api.id === \'d3d9\'" translate="l10n.oscHookD3d9Note">DX9 GPU preview uses DWM only for verified Windowed games; Fullscreen uses CPU fallback.</p>',
     '<p class="preferences-instructional-text" ng-if="api.id === \'d3d9ex\'" translate="l10n.oscHookD3d9ExNote">DX9Ex GPU is experimental and requires an in-game Pump; CPU is the verified default.</p>',
     '<p class="preferences-instructional-text" ng-if="api.id === \'d3d11\'" translate="l10n.oscHookD3d11Note">D3D11 uses GPU_SHARED with a cross-GPU CPU mirror when needed; CPU-only is not implemented.</p>',
     '</div>',
@@ -61,7 +62,8 @@
         vm.loaded=false; vm.busy=false; vm.error='';
         vm.status={hostMode:'unknown',consumerObserved:false,consumerApi:0,
           gameFocused:false,overlayOpen:false,gpuSharedRequested:false,
-          gpuDeviceReady:false};
+          gpuDeviceReady:false,dx9WindowedGpuPreviewRequested:false,
+          dx9WindowedGpuActive:false};
         vm.apis=[];
         vm.transportLoaded=false;
         vm.transportBusy=false;
@@ -82,7 +84,10 @@
             typeof data.consumerObserved==='boolean' &&
             [0,9,11].indexOf(data.consumerApi)>=0 &&
             ['gameFocused','overlayOpen','gpuSharedRequested','gpuDeviceReady']
-              .every(function(k){return typeof data[k]==='boolean';});
+              .every(function(k){return typeof data[k]==='boolean';}) &&
+            ['dx9WindowedGpuPreviewRequested','dx9WindowedGpuActive']
+              .every(function(k){return data[k]===undefined ||
+                typeof data[k]==='boolean';});
         }
         vm.transportName=function(){
           if(!vm.status.consumerObserved)return 'Not connected';
@@ -125,7 +130,12 @@
         };
         vm.routeLabel=function(api){
           if(!api.implemented)return 'Unavailable';
-          if(api.id==='d3d9')return 'Route: CPU Shared Memory';
+          if(api.id==='d3d9') {
+            if(api.mode==='gpu')return vm.status.dx9WindowedGpuActive ?
+              'Route: Windowed DComp GPU preview active (not pixel proof)' :
+              'Route: GPU requested; only verified Windowed games (Fullscreen CPU fallback)';
+            return 'Route: CPU Shared Memory (Auto/CPU)';
+          }
           if(api.id==='d3d9ex')return 'Route: CPU fallback; GPU preview not verified';
           if(api.id==='d3d11')return 'Route: GPU_SHARED; CPU mirror if needed';
           return 'Native renderer not available';
