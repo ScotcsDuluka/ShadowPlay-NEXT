@@ -1,6 +1,7 @@
 using System.Threading.RateLimiting;
 using System.Text.Json;
 using Duluka.Server.Admin;
+using Duluka.Server.CBT1;
 using Duluka.Server.Auth;
 using Duluka.Server.Data;
 using Duluka.Server.Domain;
@@ -26,6 +27,12 @@ builder.Services.AddSingleton<GitHubOAuthService>();
 builder.Services.AddSingleton<AccountProvisioningService>();
 builder.Services.AddSingleton<NativeAuthService>();
 builder.Services.AddSingleton<SessionService>();
+builder.Services.AddSingleton<Cbt1Store>();
+// Browser access is limited to the official project site; no credentials/cookies.
+builder.Services.AddCors(options => options.AddPolicy("cbt1-web", policy =>
+    policy.WithOrigins("https://scotcsduluka.github.io")
+          .WithMethods("GET", "POST", "DELETE")
+          .AllowAnyHeader()));
 builder.Services.AddHttpClient("github");
 
 builder.Services.AddSingleton<Database>(sp =>
@@ -56,6 +63,9 @@ builder.Services.AddRateLimiter(options =>
             message = "Too many requests — retry later.",
         }, ct));
     };
+    options.AddPolicy("cbt1-apply", ctx => RateLimitPartition.GetFixedWindowLimiter(
+        ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = 3, Window = TimeSpan.FromHours(1) }));
     options.AddPolicy("auth-start", ctx => RateLimitPartition.GetFixedWindowLimiter(
         ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1) }));
@@ -71,7 +81,9 @@ builder.Services.AddSingleton(adminLogs);
 builder.Logging.AddProvider(new AdminLogBufferProvider(adminLogs));
 
 var app = builder.Build();
+app.UseCors("cbt1-web");
 app.UseRateLimiter();
+app.MapCbt1();
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
