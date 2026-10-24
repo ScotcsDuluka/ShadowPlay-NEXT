@@ -92,13 +92,14 @@
 | **Freestyle V5** | ลากจัด Main-menu, Group/Control, Block แบบ Small / Side / Big, Auto-Fill, Undo / Done / Cancel พร้อม `md-menu` และ `md-select` จริง | **พัฒนาแล้ว / กำลังทดสอบ** |
 | **OSC Motion** | Transition, การจัดตำแหน่งล่วงหน้า และการทำงานร่วมกับวงจร Native OSC | **พัฒนาแล้ว / ยังตรวจ Open-Close** |
 | **Game Profiles / GPU Preferences** | จัดการโปรไฟล์รายแอปจากไฟล์ `.exe`, ตั้งชื่อ, เลือก GPU Adapter และกำหนด Windows Graphics Preferences ผ่าน NVIDIA Graphics Backend พร้อม Control เสริมใน Freestyle V5 | **ผู้พัฒนาทดสอบบนโน้ตบุ๊กจริง: พบ GPU แยกกัน เลือกการ์ดได้ เกมเรนเดอร์ผ่าน GPU ที่เลือกจริง และค่าที่บันทึกยังอยู่หลัง Restart** |
-| **ApplicationOntology / ฐานข้อมูลเกม** | API แค็ตตาล็อกเกมแยกบน Cloudflare Pages จาก `C:\\My Project\\nv-ontology-pages`: ระบุชื่อไฟล์เกม, ตรวจจับเบื้องต้น, คำใบ้ Graphics API และแจ้งอัปเดตแค็ตตาล็อก | **Public API พร้อม: v1.2.7 / 6 เกม (ตรวจ 24 ต.ค. 2569); จับคู่ชื่อไฟล์ไม่เท่ากับยืนยันตัวตน** |
+| **ApplicationOntology / ฐานข้อมูลเกม** | แค็ตตาล็อก Game Identity แยกที่ `C:\\My Project\\nv-ontology-pages` มีข้อมูลเกม ชื่อ `.exe` คำใบ้ Graphics API และการแจ้งอัปเดต | **แค็ตตาล็อกในเครื่อง v1.2.8 / 8 รายการ (24 ต.ค. 2569); ยังไม่ยืนยันว่า Public API อัปเดตแล้ว; การจับคู่ชื่อไฟล์ไม่ใช่ SHA-256 Identity** |
 | **Game Filter** | การเชื่อม ReShade Effect/Preset กับหน้า OSC | **ทดลอง / ยังตรวจการเชื่อมจริง** |
-| **DirectX Adapter / Hook** | เส้นทาง D3D9/D3D9Ex และ DXGI/D3D11 พร้อมการส่งเฟรมแบบแชร์ | **ทดลอง / มีเกณฑ์ทดสอบแยกตาม API** |
-| **NVIDIA Capture** | Capture Backend, ตรวจอัตลักษณ์ GPU, Video/Audio Pipeline และการป้องกันความผิดพลาด | **พัฒนาต่อเนื่อง / ยังไม่รับรองครบทุกกรณี** |
+| **DirectX Adapter / Hook** | มีโค้ด Native D3D9/D3D9Ex และ D3D11 พร้อมชุดทดสอบ DX9Ex GPU-to-GPU IPC ข้ามโปรเซสและ x86/x64 | **ทดลองอยู่; ยังไม่รับรอง Auto-Hook เกมจริง อัตราเฟรม หรือความเข้ากันได้ทุกเกม** |
+| **NVIDIA Capture** | Capture และ Encoder, ตรวจจอด้วย DXGI, เลือกจอ, Screenshot Engine และ Container Relay | **มีโค้ดและผลทดสอบเฉพาะส่วน; ยังไม่รับรอง Record/Replay และ UI End-to-End Runtime** |
 | **Encoder & Audio** | Native NVENC กับ FFmpeg หลายโหมด, WASAPI, Timing, Mux และ Integrity Checks | **ความพร้อมแตกต่างกันตาม Engine** |
-| **NVIDIA Container / Config** | ควบคุมโปรเซส คอนฟิก และประสานบริการต่าง ๆ | **กำลังเชื่อมต่อระบบ** |
-| **Launcher / Gallery / Localization** | ตัวเปิดโปรแกรม การจัดการสื่อ และหน้า UI ภาษาไทย/อังกฤษ | **กำลังพัฒนาต่อเนื่อง** |
+| **NVIDIA Container / Config** | ควบคุมโปรเซส, GameWatcher, Capture Relay, ตรวจคำขอและประสานโมดูล | **กำลังทดสอบ; Source, Staged Build และ Runtime ที่รันอยู่อาจไม่ตรงกัน** |
+| **Launcher / Modules** | CEF Command Center, เมนู 11 โมดูล, รายงานสถานะติดตั้ง/ทำงาน, ภาษาไทย/อังกฤษ และต้นแบบ Appearance Profiles | **พัฒนาแล้ว/กำลังทดสอบ; แค่มีปุ่มเมนูไม่ใช่ตัวติดตั้งหรือการรับรองว่าทุกโมดูลทำงานแล้ว** |
+| **Gallery / Media** | NodeAPI Recent, CopyFile, Metadata และ MSE/Seek Bridge | **ชุดทดสอบ Backend ผ่าน แต่ยังไม่ยืนยัน Play/Seek ใน CEF จริง; Delete ตอบ 501** |
 
 **สองระบบนี้ไม่ใช่สิ่งเดียวกัน:** Game Profiles ใน OSC ใช้จัดการค่าการเลือก GPU รายแอปผ่านบริการ NVIDIA Graphics ในเครื่อง ส่วน ApplicationOntology เป็นระบบแค็ตตาล็อกและการระบุเกม/แจ้งอัปเดต **ไม่ได้เก็บหรือ Apply โปรไฟล์ GPU ของผู้ใช้** ดู [nv-ontology.pages.dev](https://nv-ontology.pages.dev/) และ [ซอร์ส ApplicationOntology-API](https://github.com/ScotcsDuluka/ApplicationOntology-API) โดยการแก้ข้อมูลใน Repository บนเครื่องไม่ได้หมายความว่า Deploy ขึ้นเว็บแล้ว
 
