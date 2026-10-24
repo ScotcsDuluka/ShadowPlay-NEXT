@@ -178,10 +178,13 @@
 }
 
 #nv-video-capture-options .nv-video-engine-advanced-fields {
-  display: flex;
+  /* Codec and preset share one row rather than wasting a second full
+     md-select row below Advanced. This saves vertical room without scrolling. */
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 0.7fr);
+  align-items: start;
   min-width: 0;
-  flex-direction: column;
-  gap: 5px;
+  gap: 8px;
   padding-top: 0;
 }
 

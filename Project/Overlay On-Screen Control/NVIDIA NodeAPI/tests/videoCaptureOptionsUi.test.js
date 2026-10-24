@@ -367,7 +367,9 @@ test('Video Settings uses compact static sections, not a nested scrollbar', () =
   assert.match(section, /margin:\s*0 0 6px/);
   assert.match(heading, /height:\s*34px/);
   assert.match(footer, /margin:\s*5px 0 0/);
-  assert.match(advancedFields, /gap:\s*5px/);
+  assert.match(advancedFields, /display:\s*grid/);
+  assert.match(advancedFields, /grid-template-columns:\s*minmax\(0, 1\.6fr\) minmax\(0, 0\.7fr\)/);
+  assert.match(advancedFields, /gap:\s*8px/);
   assert.match(css, /\.nv-video-engine-section > \.nv-video-engine-field\s*\{[^}]*gap:\s*3px/);
   assert.doesNotMatch(css, /overflow-y:\s*(auto|scroll)/);
   assert.doesNotMatch(css, /max-height:\s*[0-9].*overflow/);
