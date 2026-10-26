@@ -98,33 +98,16 @@
   <!-- Phase 12b: RecordingEngine + all transitive dependencies -->
   <ItemGroup><Compile Remove="src\[API]\CaptureMediaInspector.vb" /></ItemGroup>
   <ItemGroup>
-    <!-- Dependency projects consolidated away; reference built DulukaEngine
-         assemblies directly (same source family, 2026-09-25). -->
-    <Reference Include="DulukaEngine">
-      <HintPath>bin\Release\net10.0-windows10.0.26100.0\DulukaEngine.dll</HintPath>
-    </Reference>
-    <!-- Build the capture orchestration from its real source so monitor
-         selection cannot silently link against an older prebuilt DLL. -->
+    <!-- Always resolve Capture dependencies from their actual projects.
+         Cached Release DLLs vary across computers and may lack new contracts. -->
     <ProjectReference Include="EngineCapture\Duluka Capture\Recording\DulukaEngine.Recording\DulukaEngine.Recording.vbproj" />
-    <Reference Include="DulukaEngine.Video">
-      <HintPath>bin\Release\net10.0-windows10.0.26100.0\DulukaEngine.Video.dll</HintPath>
-    </Reference>
-
-    <Reference Include="DulukaEngine.Encoder">
-      <HintPath>bin\Release\net10.0-windows10.0.26100.0\DulukaEngine.Encoder.dll</HintPath>
-    </Reference>
-    <Reference Include="DulukaEngine.Encoder.Nvenc">
-      <HintPath>bin\Release\net10.0-windows10.0.26100.0\DulukaEngine.Encoder.Nvenc.dll</HintPath>
-    </Reference>
-    <Reference Include="DulukaEngine.Audio">
-      <HintPath>bin\Release\net10.0-windows10.0.26100.0\DulukaEngine.Audio.dll</HintPath>
-    </Reference>
-    <Reference Include="DulukaEngine.Audio.Wasapi">
-      <HintPath>bin\Release\net10.0-windows10.0.26100.0\DulukaEngine.Audio.Wasapi.dll</HintPath>
-    </Reference>
-    <Reference Include="DulukaEngine.FFmpegBackend">
-      <HintPath>bin\Release\net10.0-windows10.0.26100.0\DulukaEngine.FFmpegBackend.dll</HintPath>
-    </Reference>
+    <ProjectReference Include="EngineCapture\Duluka Capture\Core\DulukaEngine\DulukaEngine.vbproj" />
+    <ProjectReference Include="EngineCapture\Duluka Capture\Video\Contracts\DulukaEngine.Video\DulukaEngine.Video.vbproj" />
+    <ProjectReference Include="EngineCapture\Duluka Capture\Encoding\DulukaEngine.Encoder\DulukaEngine.Encoder.vbproj" />
+    <ProjectReference Include="EngineCapture\Duluka Capture\Encoding\NVENC\DulukaEngine.Encoder.Nvenc\DulukaEngine.Encoder.Nvenc.vbproj" />
+    <ProjectReference Include="EngineCapture\Duluka Capture\Audio\DulukaEngine.Audio\DulukaEngine.Audio.csproj" />
+    <ProjectReference Include="EngineCapture\Duluka Capture\Audio\DulukaEngine.Audio.Wasapi\DulukaEngine.Audio.Wasapi.csproj" />
+    <ProjectReference Include="EngineCapture\Duluka Capture\Recording\Backends\FFmpeg\DulukaEngine.FFmpegBackend\DulukaEngine.FFmpegBackend.vbproj" />
 
   </ItemGroup>
   <ItemGroup>
