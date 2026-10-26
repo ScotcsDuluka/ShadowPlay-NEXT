@@ -1,0 +1,74 @@
+﻿ M "Project/NVIDIA Capture/EngineCapture/DisplaySelection.Tests/DisplaySelection.Tests.vbproj"
+ M "Project/NVIDIA Capture/EngineCapture/DisplaySelection.Tests/Program.vb"
+ M "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Encoding/DulukaEngine.Encoder/Contract/EncoderConfig.vb"
+ M "Project/NVIDIA Capture/EngineCapture/Duluka Capture/README.md"
+ M "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/Backends/FFmpeg/DulukaEngine.FFmpegBackend/LiveMuxSession.vb"
+ M "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/DulukaEngine.Recording/CaptureSession.vb"
+ M "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/DulukaEngine.Recording/DulukaEngine.Recording.vbproj"
+ M "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/DulukaEngine.Recording/RecordingDTOs.vb"
+ M "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/DulukaEngine.Recording/RecordingEngine.vb"
+ M "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/FFmpeg/DulukaEngine.FFmpegTests/LiveMuxSessionTests.vb"
+ M "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/FFmpeg/DulukaEngine.FFmpegTests/Program.vb"
+ M "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Video/DulukaEngine.Video.Tests/HardwareGate.vb"
+ M "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Video/DulukaEngine.Video.Tests/Program.vb"
+ M "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/DXGI Desktop Duplication/DulukaEngine.Video.DXGI/D3D11VideoFrame.vb"
+ M "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/DXGI Desktop Duplication/DulukaEngine.Video.DXGI/DdagrabBackend.vb"
+ M "Project/NVIDIA Capture/EngineCapture/HardwareReadiness.Tests/DxgiInventory.cs"
+ M "Project/NVIDIA Capture/EngineCapture/HardwareReadiness.Tests/Program.cs"
+ M "Project/NVIDIA Capture/EngineCapture/Invoke-CaptureHardwarePreflight.ps1"
+ M "Project/NVIDIA Capture/EngineCapture/MediaEvidence.Tests/CaptureMediaInspector.Tests.vbproj"
+ M "Project/NVIDIA Capture/EngineCapture/Routing.Tests/Program.cs"
+ M "Project/NVIDIA Capture/EngineCapture/Routing/BackendCatalog.cs"
+ M "Project/NVIDIA Capture/NVIDIA Capture.vbproj"
+ M "Project/NVIDIA Capture/src/[API]/CaptureDisplayCatalog.vb"
+ M "Project/NVIDIA Capture/src/[API]/CaptureScreenshotEngine.vb"
+ M "Project/NVIDIA Capture/src/[API]/RecordingEngineHost.vb"
+ M "Project/NVIDIA Capture/src/[FFmpeg]/FFmpegArgumentBuilder.vb"
+ M README.md
+ M README.th.md
+ M Server/README.md
+ M docs/ARCHITECTURE.md
+ M docs/README.md
+?? AGENTS.md
+?? "Project/NVIDIA Capture/EngineCapture/Composition.Tests/"
+?? "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Encoding/DulukaEngine.Encoder/Contract/IEncoderRuntimeBackend.vb"
+?? "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Encoding/DulukaEngine.Encoder/Contract/IEncoderSubmissionBackend.vb"
+?? "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Encoding/Intel/"
+?? "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/DulukaEngine.Recording/CaptureSession.OwnedFrames.vb"
+?? "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/DulukaEngine.Recording/Composition/"
+?? "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/DulukaEngine.Recording/SessionFrameRouter.vb"
+?? "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/DulukaEngine.Recording/SessionPacketSink.vb"
+?? "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/DulukaEngine.Recording/SourceCompositionDriver.vb"
+?? "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/Media/"
+?? "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Video/B1WorkerQuiescence.Tests/"
+?? "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Contract/CaptureTarget.vb"
+?? "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Contract/INv12VideoFrame.vb"
+?? "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Contract/IVideoCaptureRuntime.vb"
+?? "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Contract/SourceLifecycle.vb"
+?? "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Conversion/"
+?? "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/DXGI Desktop Duplication/DulukaEngine.Video.DXGI/DdagrabBackend.Lifecycle.vb"
+?? "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/DXGI Desktop Duplication/DulukaEngine.Video.DXGI/DisplayTopology.vb"
+?? "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/DXGI Desktop Duplication/DulukaEngine.Video.DXGI/DxgiDisplayInventory.vb"
+?? "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Transport/"
+?? "Project/NVIDIA Capture/EngineCapture/Invoke-IntelCaptureI1Regression.ps1"
+?? "Project/NVIDIA Capture/EngineCapture/Invoke-IntelCaptureI2Regression.ps1"
+?? "Project/NVIDIA Capture/EngineCapture/Invoke-IntelCaptureI3Regression.ps1"
+?? "Project/NVIDIA Capture/EngineCapture/QsvNative.Tests/"
+?? "Project/NVIDIA Capture/README.md"
+?? docs/INTEL-DULUKA-CAPTURE-ARCHITECTURE.md
+?? docs/INTEL-DULUKA-CAPTURE-I2-HANDOFF.md
+?? docs/INTEL-DULUKA-CAPTURE-I3-HANDOFF.md
+?? docs/INTEL-DULUKA-CAPTURE-I3-INPROGRESS-HANDOFF-2026-10-25.md
+?? docs/INTEL-DULUKA-CAPTURE-I3-SYNTHETIC-HANDOFF-2026-10-25.md
+?? docs/INTEL-DULUKA-CAPTURE-I3B-HANDOFF.md
+?? docs/README-COVERAGE-MATEBOOK-20261025.md
+?? docs/WORKTREE-STATUS-20261025.md
+?? docs/architecture/
+?? docs/reports/intel-duluka-2026-10-24/
+?? docs/reports/intel-duluka-i1-2026-10-24/
+?? docs/reports/intel-duluka-i2-2026-10-24/
+?? docs/reports/intel-duluka-i3-2026-10-25/
+?? docs/reports/intel-duluka-i3-composition-2026-10-25/
+?? docs/reports/intel-duluka-i3b-2026-10-25/
+?? docs/reports/intel-duluka-i3c-2026-10-25/
+?? docs/reports/intel-duluka-i3d-2026-10-25/

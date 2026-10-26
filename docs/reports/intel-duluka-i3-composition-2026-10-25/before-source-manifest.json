@@ -1,0 +1,2962 @@
+﻿[
+    {
+        "Path":  "AGENTS.md",
+        "Hash":  "2AD2E56C53DFAF6061C5AF583D29BC6968BEE76A22B13DF91773BA3F979FEAE0"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Composition.Tests/CaptureComposition.Tests.csproj",
+        "Hash":  "2ED90F9F12E26C107CFBF327D2124EF6A2EED94EC09AA131A5EDD5615B9114F3"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Composition.Tests/Program.cs",
+        "Hash":  "7053B96075034260D79AECDDB00B9E2CD88AB97069EE360B05649358EE3F41EA"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Encoding/DulukaEngine.Encoder/Contract/IEncoderRuntimeBackend.vb",
+        "Hash":  "24578AFE23D5925F7C064FA98858D80ED8837E52DF5F5A3A57123018B7BDF8C0"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Encoding/DulukaEngine.Encoder/Contract/IEncoderSubmissionBackend.vb",
+        "Hash":  "55EA11D7D583E4CC62211802BDEC748D83C2F44EBABE9F05C5868098814B211D"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Encoding/Intel/DulukaEngine.Encoder.Qsv/DulukaEngine.Encoder.Qsv.csproj",
+        "Hash":  "CF84C52D5B52C2E805D77BDB2F9F612E73A3D37E3C1C470A166762195F98D29D"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Encoding/Intel/DulukaEngine.Encoder.Qsv/NativeMethods.cs",
+        "Hash":  "5522C3CBCEC4ADC757EDAD39169E366C06F1B832C745A226C51B77AEC39B19A7"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Encoding/Intel/DulukaEngine.Encoder.Qsv/QsvEncoderBackend.cs",
+        "Hash":  "8356913A7775146A41BEA742D3F7C3F2A95EAF0AEF3E8E9AB9975731FD7808A6"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Encoding/Intel/Native/Build-NativeQsv.ps1",
+        "Hash":  "18A9E7441EF1BB85D5F242BB720BAA75C4E44FEF75CAC01218149892494FAE84"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Encoding/Intel/README.md",
+        "Hash":  "804357DC91A6380F966D3F9CC6D5A65008A3E9E1DAB3C6002E88FC989E9947D5"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/DulukaEngine.Recording/CaptureSession.OwnedFrames.vb",
+        "Hash":  "1E42D2AA0CD8A16D00C6908F94A1CB0A36A7C13BA8A2A4D3C0CA035A945A97CB"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/DulukaEngine.Recording/Composition/EncoderConfigurationPolicy.vb",
+        "Hash":  "5A0607141710B11B72D618AB5640D9148EBFF4725DB490E0CF45BB455F352F83"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/DulukaEngine.Recording/Composition/NvencRuntimeAdapter.vb",
+        "Hash":  "FE0245F3DB272791679EFACB1040C13BD457B4660012A73D037D65BE44FF3C38"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/DulukaEngine.Recording/Composition/RecordingBackendFactory.vb",
+        "Hash":  "095092EF6AD569861C05A4FF7843EFE6C36AF1DC5DFDB93DB2CA7B90BF201553"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/DulukaEngine.Recording/SessionFrameRouter.vb",
+        "Hash":  "DCDCB07895921D522D4DAC2574397904F6BF4D22A8F1D0101F4027756AE0DFBC"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/DulukaEngine.Recording/SessionPacketSink.vb",
+        "Hash":  "44C64B7BEBD4E572F7A8DB72F1EEE33F36328F4FA85FFCD25F4FC03D6DF90544"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/Media/DulukaEngine.Media/DulukaEngine.Media.vbproj",
+        "Hash":  "F340F0FF289C35F12AE4E76BAEE128E30E77FCBFCCB530E45882DD91165C0EAC"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/Media/DulukaEngine.Media/SessionMediaVerifier.vb",
+        "Hash":  "00413514C8E25A506FAD50FFE62AF0F94A84C10C625F3C8042788DE7B1D75A30"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Contract/CaptureTarget.vb",
+        "Hash":  "CFC2B136BE6375FC276FCD0100438FABFE1A3AA9A216A638C48B1286786B4AC1"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Contract/INv12VideoFrame.vb",
+        "Hash":  "8F5EE47F6F6FBB29AAD4C937A3329695C5DB45A0680B5386187D4AB95E0D2488"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Contract/IVideoCaptureRuntime.vb",
+        "Hash":  "8FB3CEB507B0E125DE9732CCEE8D8AF10BF525F7E5008BF66BCD5FAB53C5D9CD"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Conversion/BgraToNv12Converter.vb",
+        "Hash":  "8060813A6C7A8724243CE9D9BD0F48813259DF56DE28666FC87B3E53446C0703"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/DXGI Desktop Duplication/DulukaEngine.Video.DXGI/DisplayTopology.vb",
+        "Hash":  "3287FF3C394559D446A462653EBA8CC74FF6ED5024B88C669AC72EB56865D699"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/DXGI Desktop Duplication/DulukaEngine.Video.DXGI/DxgiDisplayInventory.vb",
+        "Hash":  "811BE3B3477723A63A85F4A6F11BA100D024074172ACE9B0B669DC2D5EAC3650"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Transport/DulukaEngine.Video.Transport.D3D11/BgraStagingTransport.cs",
+        "Hash":  "E149FD859806E176619B8CADAF760DD39C9733A95712003E9608524CCF4C00F1"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Transport/DulukaEngine.Video.Transport.D3D11/DulukaEngine.Video.Transport.D3D11.csproj",
+        "Hash":  "1C9FC84A6623A56E118EBAC47F040A8FAE868A8932003F6882212A04ADAACF33"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Transport/DulukaEngine.Video.Transport.D3D11/README.md",
+        "Hash":  "68D4FAECFE8CDD87EFEFC361713DB160CD999D95AD834990EC659963AF2A1190"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Invoke-IntelCaptureI1Regression.ps1",
+        "Hash":  "473A29E2A47AD0896F9CF6C5E2FAD8E46862B89EE35E32ADBF11662B6C9568B4"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Invoke-IntelCaptureI2Regression.ps1",
+        "Hash":  "2363A99899941988B0CE579C4CDF45E24399BAA5DC87683202BD86AEE8FF5A55"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Invoke-IntelCaptureI3Regression.ps1",
+        "Hash":  "9F21EA74B3D33F26A23EC1FEA677C6887DFAC13DF81869AED7FEDD5C9318EB92"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/QsvNative.Tests/I3D3D11Transport.cs",
+        "Hash":  "2DBDD29AE277FAA758DBA1814FCECA9994A8CC213D07B078FB67310416564384"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/QsvNative.Tests/I3PixelTransport.cs",
+        "Hash":  "2E6FA5F890DDE5A06D9E74A4271F90F6E1D717AC16FF3CBBFA73C17118578BF8"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/QsvNative.Tests/Program.cs",
+        "Hash":  "7C3017DF5EE8FC7AF11A66B1C1F846961E202FD55459A6D591E7DB1CB4F73828"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/QsvNative.Tests/QsvNative.Tests.csproj",
+        "Hash":  "EE7389C6E2123B83583579449DAF37851E7E57B0A4A53BED405BBC79C64DC45C"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/QsvNative.Tests/SessionTests.cs",
+        "Hash":  "A4D65C017B697C1C469C40E5B0DF4B9AB8CCC55AA19631472388FFC2B68CFC3B"
+    },
+    {
+        "Path":  "docs/INTEL-DULUKA-CAPTURE-ARCHITECTURE.md",
+        "Hash":  "01E1AB72767F31DD0D8EA693F168D33BC1AEEABE05850C83710AC65A79546983"
+    },
+    {
+        "Path":  "docs/INTEL-DULUKA-CAPTURE-I2-HANDOFF.md",
+        "Hash":  "B0020753B664803470BA1A61BCF20CE911056E941C5F291B0AC4BD050A800B53"
+    },
+    {
+        "Path":  "docs/INTEL-DULUKA-CAPTURE-I3-HANDOFF.md",
+        "Hash":  "1B1E249F5C9F96A77F0D592897C112676A03F4EA15C66B512E4E09FCA86EF6FF"
+    },
+    {
+        "Path":  "docs/INTEL-DULUKA-CAPTURE-I3-INPROGRESS-HANDOFF-2026-10-25.md",
+        "Hash":  "4596E4CCFDC96C1429B5A818BB4F7A9E47DB4042FE1A77243C54DBEC3A3F6C71"
+    },
+    {
+        "Path":  "docs/INTEL-DULUKA-CAPTURE-I3-SYNTHETIC-HANDOFF-2026-10-25.md",
+        "Hash":  "7804FCD8D5206A621E28C0ADF2023C7ED7199016CBB7BD58AC1B312DC4049C78"
+    },
+    {
+        "Path":  "docs/architecture/SESSION-CENTRIC-RECORDING-CONTRACT.md",
+        "Hash":  "F922A73E9A21AC6FCB568F505C9A9D89BDDF8AFF6291F6FEB9E8EDE15D996639"
+    },
+    {
+        "Path":  "docs/architecture/SESSION-CENTRIC-RECORDING-TH.md",
+        "Hash":  "B231E10BC11D2716AB657B41919598AF937B09201A09E58C89F14C70FB7F2015"
+    },
+    {
+        "Path":  "docs/reports/intel-duluka-2026-10-24/README.md",
+        "Hash":  "6C290475ACC0A21C27A64F4C1E3FF43B33B4577D3D0F6AE447DE88722F6F63D6"
+    },
+    {
+        "Path":  "docs/reports/intel-duluka-i1-2026-10-24/README.md",
+        "Hash":  "491E7044A41717F6E1D7DE0C0038343C7EB9B79E87BDA9C9DB9976285F2F9C8B"
+    },
+    {
+        "Path":  "docs/reports/intel-duluka-i2-2026-10-24/README.md",
+        "Hash":  "945299C9F5F37648219CB7A0EA39689C01AA9E1644FD9D5F31B655DCE9176C20"
+    },
+    {
+        "Path":  "docs/reports/intel-duluka-i3-2026-10-25/README.md",
+        "Hash":  "378A5A5B9C01BDC94F0FC9A22A4BA22E59D692B26EB5BBADA4E41471B5CF75D1"
+    },
+    {
+        "Path":  ".zcode/classify-usage.ps1",
+        "Hash":  "57026E7388F89F51F591712E996CC19DC5DD83C8C78AE4B3E7E4964178DD54A8"
+    },
+    {
+        "Path":  ".zcode/dissect-round2.ps1",
+        "Hash":  "A567A9F8B16CC311BADE3CF0D58DFA9EA714BA493167486F11DF68416B158F5B"
+    },
+    {
+        "Path":  ".zcode/dissect-round3.ps1",
+        "Hash":  "1EE7DF7D6CE26C4743A6657A671202734600FBCA18A02F58C2456B8AA22062CE"
+    },
+    {
+        "Path":  ".zcode/dissect-shadowplay.ps1",
+        "Hash":  "E3182B3C02E25B3AFF60635D0C6EE4EFEC5DCD26F884EBD52DB2E1EE2D00C8CB"
+    },
+    {
+        "Path":  ".zcode/duluka-login.ps1",
+        "Hash":  "927F4F8D32246A526970F80808EBA5640E191589D25AA22078CBFFC083656462"
+    },
+    {
+        "Path":  ".zcode/endpoint-diff.ps1",
+        "Hash":  "BA4F01914F7F586275FB9CCC0736EBDCCEBFC965E92C234B734DB12DB38BFCA8"
+    },
+    {
+        "Path":  ".zcode/extract-augment.ps1",
+        "Hash":  "8026758D554E6B4D5951E370180C54FFCE95A6B7035EEC922470084A773DFFA9"
+    },
+    {
+        "Path":  ".zcode/grep-auth.ps1",
+        "Hash":  "8FCF7AC69D67A5A4391BE0C8A4CA5EA33B1DD6C707A35396388E255545EDBCC3"
+    },
+    {
+        "Path":  ".zcode/plans/plan-sess_086dcfaa-9769-4fbd-abb8-27fdd14690cd.md",
+        "Hash":  "8D6F6A2C317DA66E05446368238AEE56025954BA0DE8BAE87D0B7A0CF500F2BE"
+    },
+    {
+        "Path":  ".zcode/plans/plan-sess_570f5b4e-28ea-444c-a499-7441a1791dfb.md",
+        "Hash":  "DC1362C9FBBAC2F65308B6B1A40135D1892DDBB87B77A65EB79BD32C5C1496EA"
+    },
+    {
+        "Path":  ".zcode/plans/plan-sess_653c37e0-3e4f-460d-9a44-9ddca4b93ca9.md",
+        "Hash":  "9093E6A54CEC626BAA9102D37F27A51F28832987D400ADFC0B0A950AA4B3AC53"
+    },
+    {
+        "Path":  ".zcode/plans/plan-sess_c9987b01-979c-4386-a8d7-163382fa890f.md",
+        "Hash":  "52ECD15ECE29F142B9C2B4036595E01492B244F31E9F60BEBD0EF410908D3CB3"
+    },
+    {
+        "Path":  ".zcode/probe-real.ps1",
+        "Hash":  "5AA36C931BA0585DFD11BD3C4A17F359168FAF8153CED76E63C822260BE64D63"
+    },
+    {
+        "Path":  ".zcode/start-ported-gfe.ps1",
+        "Hash":  "BE011576DFD1A244ED2E550CE38D89DB8090B983BB7EAB267A88B5F5C2643E4B"
+    },
+    {
+        "Path":  ".zcode/stop-genuine-gfe.ps1",
+        "Hash":  "DD281F153E23F00FAADC5DD15E9A3A2A85C3F54099E8DC307778A1E4517322AF"
+    },
+    {
+        "Path":  ".zcode/strings-scan.ps1",
+        "Hash":  "4E93C141FEAEAC678BA79E6E44837CFF5389F5868C7C65B7EAD9CA2CF0B11C94"
+    },
+    {
+        "Path":  ".zcode/swap-cef-runtime.ps1",
+        "Hash":  "1EA5885769C1C6EA1F75D7B9B856DB6BB5258A77FA3E37D3987D05DF51965714"
+    },
+    {
+        "Path":  ".zcode/winrect.ps1",
+        "Hash":  "EBEE84C0D2A351E7324AA9681135D8FC2BB6B7EC93C7E731B33414CE6313BE70"
+    },
+    {
+        "Path":  ".zcode/winvis.ps1",
+        "Hash":  "E2F907CDD5DE908A62F2FF952D92957C06A7F748B775637B77372873CAE80099"
+    },
+    {
+        "Path":  "Build/DulukaPort/DulukaPort.cs",
+        "Hash":  "B0E792B81A72377EB762A7C9E64E36BC8C1F54A7138E0A6796E065DBBD0A8E33"
+    },
+    {
+        "Path":  "CODEX-HANDOFF-FREESTYLE-V5-CONTINUE-20261023.md",
+        "Hash":  "E21AF2EE209F73943B3E7C0B1DB3DC71603E05A99F1657F0F320CF258D5B61CB"
+    },
+    {
+        "Path":  "CODEX_HANDOFF.md",
+        "Hash":  "BDCE4A99A224AC9F85872E2F268BDB50E3274A139DA394906B67950610938623"
+    },
+    {
+        "Path":  "Common/AppConfigShared.vb",
+        "Hash":  "79379069CB359C5D67626D14384764F94912C11C164A9E57DFC7F486DB21A4E8"
+    },
+    {
+        "Path":  "Common/AppLayout.vb",
+        "Hash":  "FE5228E31BE5F1A8DB92147535596BE88195FFE793E7B8890933F2C48E4BCE5F"
+    },
+    {
+        "Path":  "Common/AppLayoutStartup.vb",
+        "Hash":  "A6CD2968B71BA7E03D5C6964377710685564A8857B58BC16C3C33C7D14EDCD0F"
+    },
+    {
+        "Path":  "Common/FFmpegLocator.vb",
+        "Hash":  "6A307FFDE64C3BA69746A53A62734E76CFF8736C6866124A290FC505E402CAB2"
+    },
+    {
+        "Path":  "Common/LoopbackGate.vb",
+        "Hash":  "C93390840BBA99DD38C4547B493A29EC52970DC688CE3CF6D8F09A04F143102A"
+    },
+    {
+        "Path":  "Common/ObsConfig.vb",
+        "Hash":  "CD44B0067AD65DB2955CC8FE3B499D637A49CF898EEC9B36BD6F956539613B47"
+    },
+    {
+        "Path":  "Project/Launcher.Cef/README.md",
+        "Hash":  "3B578491C551C6819056E3435EFBA051DA2D6137A4E6CFE36C1A98C8D4566ED5"
+    },
+    {
+        "Path":  "Project/Launcher.Cef/deploy-launcher.ps1",
+        "Hash":  "24A92559651E6488A792473C21F0D63948604FC9FE0C56666B3B1AAD085DF6CF"
+    },
+    {
+        "Path":  "Project/Launcher.Cef/shot.ps1",
+        "Hash":  "924DAB924D09E4DFA39D3E9071FD8C37C9B9C27A21062FF9BBA2AE54044F8B71"
+    },
+    {
+        "Path":  "Project/NVIDIA Adapter/Ansel Adapter/README.md",
+        "Hash":  "0B4DC8C373C21110D4903B5B9885B48FF9456288C792BEA117AAD9934FC85D8F"
+    },
+    {
+        "Path":  "Project/NVIDIA Adapter/Ansel Adapter/ReShade Ansel/README.md",
+        "Hash":  "92AEDA9F7CB3C888ABB23DE1146777B2D2101FAC210F52E7EAF540F757928F60"
+    },
+    {
+        "Path":  "Project/NVIDIA Adapter/Ansel Adapter/ReShade Ansel/include/reshade-api-v8/LICENSE.md",
+        "Hash":  "D2BB5EB908E9AA7AC2F7F4CF6441D62E1F6AC1256CF22BB5289516C9F30E5F0A"
+    },
+    {
+        "Path":  "Project/NVIDIA Adapter/OSC Adapter/Duluka Hook/ARCHITECTURE.md",
+        "Hash":  "8CA460BB191B417442EF6926074BEA2D7D1610856F9AB14D069F837A9609A803"
+    },
+    {
+        "Path":  "Project/NVIDIA Adapter/OSC Adapter/Duluka Hook/HOOK-CONTRACT.md",
+        "Hash":  "C5905C4DF0DD61C3B49F347D0F7ED6809795CA8A00838C7D8B1E890DA04A4CBC"
+    },
+    {
+        "Path":  "Project/NVIDIA Adapter/OSC Adapter/Duluka Hook/IMPLEMENTATION-STATUS.md",
+        "Hash":  "4E3EFD666A97EBD9357475AD4B1B0ACDD7FF2E667738ED1F5C0649066CE0456C"
+    },
+    {
+        "Path":  "Project/NVIDIA Adapter/OSC Adapter/Duluka Hook/NVIDIA OSC Adapter Host.csproj",
+        "Hash":  "D7A0C1AD1D1EE19856D30CE2B0A7F81A7E00675BFF4DFA3701577119923EFBB3"
+    },
+    {
+        "Path":  "Project/NVIDIA Adapter/OSC Adapter/Duluka Hook/Program.cs",
+        "Hash":  "648F5652CE7D962E37CA6A6BE7632BCB0342E8D18E877D97523BEC1E6399E0EC"
+    },
+    {
+        "Path":  "Project/NVIDIA Adapter/OSC Adapter/Duluka Hook/include/reshade-api-v3/LICENSE.md",
+        "Hash":  "D2BB5EB908E9AA7AC2F7F4CF6441D62E1F6AC1256CF22BB5289516C9F30E5F0A"
+    },
+    {
+        "Path":  "Project/NVIDIA Adapter/OSC Adapter/Duluka Hook/src/Common/README.md",
+        "Hash":  "A10B76F6784EA5E535BEB417FCF3838DCA2622287C64E682525631145AE186BB"
+    },
+    {
+        "Path":  "Project/NVIDIA Adapter/OSC Adapter/Duluka Hook/src/Detection/GraphicsApiProbe.cs",
+        "Hash":  "7EF5AE238654715B50E0FE5B386DD2C37509E10BCB558E7BA3400B06E42B0A84"
+    },
+    {
+        "Path":  "Project/NVIDIA Adapter/OSC Adapter/Duluka Hook/src/Detection/README.md",
+        "Hash":  "2714714C9048963220F9D6D927CD6541B6D4A7BED8314BB5B150013A17A6F139"
+    },
+    {
+        "Path":  "Project/NVIDIA Adapter/OSC Adapter/Duluka Hook/src/Hook/D3D10/README.md",
+        "Hash":  "1D15BE6190370C38E30A2ED5F11E199D7BA4EE960BF3BFEBB5E043AF18619EFB"
+    },
+    {
+        "Path":  "Project/NVIDIA Adapter/OSC Adapter/Duluka Hook/src/Hook/D3D11/README.md",
+        "Hash":  "F8D0636EDCCC5407A24D5322FFC38C7DB41BC55572C6332F0F37C6B12B755C1C"
+    },
+    {
+        "Path":  "Project/NVIDIA Adapter/OSC Adapter/Duluka Hook/src/Hook/D3D12/README.md",
+        "Hash":  "D607A5FAAA6F1E167C79BDCB00CC13C951EA4C24FE9E1970EA54C554F231717A"
+    },
+    {
+        "Path":  "Project/NVIDIA Adapter/OSC Adapter/Duluka Hook/src/Hook/D3D9/README.md",
+        "Hash":  "2ED0EACA67926A890FE3A969C2D30593954576EF7732F312433AE7778CF24891"
+    },
+    {
+        "Path":  "Project/NVIDIA Adapter/OSC Adapter/Duluka Hook/src/Hook/DXGI/README.md",
+        "Hash":  "989DD5C6E3B5E0A87C1EC4C9A2726491F753F3042B18B0A4F22A20C7ADBC01AA"
+    },
+    {
+        "Path":  "Project/NVIDIA Adapter/OSC Adapter/Duluka Hook/src/Hook/OpenGL/README.md",
+        "Hash":  "9E0DF49FA0681F911EAC2791F345EF0DEA7298884BC839BEB0AA7C9E500A3612"
+    },
+    {
+        "Path":  "Project/NVIDIA Adapter/OSC Adapter/Duluka Hook/src/Hook/README.md",
+        "Hash":  "3DA594CB1E68DA431DAA7EDCBAA254A9F25F2D0C964D21CBE56CBBE0F4FC83AF"
+    },
+    {
+        "Path":  "Project/NVIDIA Adapter/OSC Adapter/Duluka Hook/src/Hook/Vulkan/README.md",
+        "Hash":  "3B95AF2A832F39A95338CAD07A8217F241DC03BC86BBA9D04477104B887F860F"
+    },
+    {
+        "Path":  "Project/NVIDIA Adapter/OSC Adapter/Duluka Hook/src/Renderer/D3D10/README.md",
+        "Hash":  "5D45A89725C66FB08B4CF67020ABFBBA089D25A6EEB2A3E351C287D83181EEDF"
+    },
+    {
+        "Path":  "Project/NVIDIA Adapter/OSC Adapter/Duluka Hook/src/Renderer/D3D11/README.md",
+        "Hash":  "A65D55AF49465BB1A7EE0AEB3354119969B2C84A6CA4085FDD651D1078DD550E"
+    },
+    {
+        "Path":  "Project/NVIDIA Adapter/OSC Adapter/Duluka Hook/src/Renderer/D3D12/README.md",
+        "Hash":  "4AAE1A68A37AB465AC494F813CB671F207CE17D98D71A0E44EE00A5C8E453785"
+    },
+    {
+        "Path":  "Project/NVIDIA Adapter/OSC Adapter/Duluka Hook/src/Renderer/D3D9/README.md",
+        "Hash":  "02CF78F6997D4E66BFBDB898B979F2D392896EDD8080F15024C775554E8D075E"
+    },
+    {
+        "Path":  "Project/NVIDIA Adapter/OSC Adapter/Duluka Hook/src/Renderer/OpenGL/README.md",
+        "Hash":  "C17D4E5F1651A1B770B834B71EF50B20C510558143BDE0F2B9EF0B91E11BE433"
+    },
+    {
+        "Path":  "Project/NVIDIA Adapter/OSC Adapter/Duluka Hook/src/Renderer/README.md",
+        "Hash":  "DAD9F1EF0705DF74C8495D8C160DBDDF3FC5BEC3F5AFCABAD53936635D65972C"
+    },
+    {
+        "Path":  "Project/NVIDIA Adapter/OSC Adapter/Duluka Hook/src/Renderer/Vulkan/README.md",
+        "Hash":  "BD763F397920C0B404E0A58708E917F069F4F5AA28B2405F214BD7D2D252960F"
+    },
+    {
+        "Path":  "Project/NVIDIA Adapter/OSC Adapter/Duluka Hook/tests/README.md",
+        "Hash":  "0A68D3122D10B702BAE0C0A9B2DDFB499A2C5A192E2D3CECAB5C5475291EAB2F"
+    },
+    {
+        "Path":  "Project/NVIDIA Adapter/OSC Adapter/Duluka Hook/tests/verify-adapter.ps1",
+        "Hash":  "28D32F197F43E219F19E13237B03C1123A6BE05B245B64A9D2660202C74F91A4"
+    },
+    {
+        "Path":  "Project/NVIDIA Adapter/OSC Adapter/Duluka Hook/tests/verify-host-probe.ps1",
+        "Hash":  "ADD4E78256D289E0AC6D2B27E30AEF099347BF51E7F4EF98E038642335F1C344"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/CAPTURE-REST-PLAN.md",
+        "Hash":  "9A0962933E446B867371BC4C33A2F1005F09DE354877BFEDDD633DCA011C9D2E"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/ENGINE-REALTIME-ARCHITECTURE.md",
+        "Hash":  "41F0B7370CA0DA5B26DA2E67335587F6207A90BE00474A1D9412515C7AF0E92C"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/AudioOffline.Tests/AudioOffline.Tests.csproj",
+        "Hash":  "010192676C70C18AF5B07216B302450E7DC43C6F0E4910C73CCAB5420CAA45BB"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/AudioOffline.Tests/AudioStressTests.cs",
+        "Hash":  "AFF44D8357AD441C480CDF5DF2B4F48C0C7D804CA7231E7440C0630AF4C7D10C"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/AudioOffline.Tests/Program.cs",
+        "Hash":  "39EC85AF63068C4F8F1C98524207B9739AD7F1180C0B2A73F784CAE5D1F566A5"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/BACKEND-PHASE1.md",
+        "Hash":  "1382A4E43954CFF1A344EE4E992A678513C3320612C7D9588B0FC3C914FB3A87"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/BACKEND-PHASE2.md",
+        "Hash":  "A8F99822947434778F8166D89BFF04124B00F6DC96E86C65F3302EFE7765ADDE"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/BACKEND-PHASE3.md",
+        "Hash":  "DDB5365F767FFDED286C044CEA6E715EC2B15F48C62DA254CA4EA04E5E28F374"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/BACKEND-PHASE4.md",
+        "Hash":  "2986EBDE46F5F5C6197D05DAC1C9A298A3DE71387F3B0A946B6E900FC8F1CE96"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/BACKEND-PHASE5A.md",
+        "Hash":  "9101063AA3353BC3D49CE03B74BE9E9574125CA09DCE695734283C47C6BC319E"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/BACKEND-PHASE5B.md",
+        "Hash":  "517B383AF882E84A475FAC9E0C82E77C4B11290BAF05D35C6E6294DFCFB7B653"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/BACKEND-PHASE5C-OFFLINE.md",
+        "Hash":  "C66E2BF64D7C29DE7AE458DBB5A76F0D66F087991E18974B8179A09DBBD7F70C"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/BACKEND-PHASE5D-OFFLINE.md",
+        "Hash":  "3041A195F95956D1C06CE4DF164EE0FAD5B56FF4C810B992BDE64574F1E82C69"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/BACKEND-PHASE6A-OFFLINE-STABILITY.md",
+        "Hash":  "4A03F4BBF784E545B828C34DE6E7EF144B61B27C51A0AD095E74EA61BA0A14BC"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/BACKEND-PHASE6B-SESSION-OUTCOME.md",
+        "Hash":  "42F6B25D754D04D85187EECB5302EC1FE34FFF8235A8F1B71DE71695B02B4763"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/BACKEND-PHASE6C-RECOVERY-OFFLINE.md",
+        "Hash":  "36C8B4F1C769CF97148CDB9DE108B43AB9D1B8B5E86247EFE9A2A15DC18AD760"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/BACKEND-PHASE6D-SYNTHETIC-SESSIONS.md",
+        "Hash":  "59DC48378EB9AD5A5E0CC24834B81C4262ACD9988EE2DD1C6D06F5F9464D963F"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/BACKEND-PHASE6E-MP4-INTEGRITY.md",
+        "Hash":  "3AFE17467FEEBBA98CD89FF9ED201D7A8F41777BBBC34903559123E3D924563D"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/BACKEND-PHASE6F-LONG-MEDIA-SCAN.md",
+        "Hash":  "CC621B67F5EEBAA444EADCF35E7D4C13C8CBD9495A392752204DF6706AE4B62C"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/BACKEND-PHASE6G-OPTIONAL-DEEP-VIDEO-DECODE.md",
+        "Hash":  "94CF7D26399D6F7BC54A3B94281D2E713AE8E1C091AEE063C57CE13CFFC161BC"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/BACKEND-PHASE6H-OFFLINE-RELEASE-GATE.md",
+        "Hash":  "4779AB89D29BA1EDC1ED5C5A98350EECBD09893460A234BAF7696C51955956BD"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/BACKEND-PHASE7A-HARDWARE-PREFLIGHT.md",
+        "Hash":  "503C0C1F24C1E4099C930C00CFB0182DE9C59609BF34065739814CB6B17A585E"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/BACKEND-PHASE7B-ADAPTER-LUID-GATE.md",
+        "Hash":  "6E414ACE571A6E508E37CBA50E1B334355EDC39DE038669F259694C7C9C9826D"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/BACKEND-PHASE7C-READONLY-DXGI-TOPOLOGY.md",
+        "Hash":  "ABBB8FFF040CC8249846A14A722C4A318A2E12D8C346EE0F61CD1B9BB41B872A"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/BACKEND-PHASE7D-REAL-NVENC-SYNTHETIC.md",
+        "Hash":  "E4BF00258AD1927FDEE2E81BF5EE1132871F724535F119D85D1CDE397571594D"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/BACKEND-PHASE8-DISPLAY-SCREENSHOT.md",
+        "Hash":  "DA253B080EF2D193E308A9FC73A5466BE8BCB0AD843A061F2D9B6FB14839256F"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/DisplaySelection.Tests/DisplaySelection.Tests.vbproj",
+        "Hash":  "C945F73AA07D973294513593B20B64178A76CD9BF769557E9D067ABFBBA348D9"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/DisplaySelection.Tests/Program.vb",
+        "Hash":  "BEB4914F257C7B8F92FE65ED880FA70B3E3EC51F9DAC89613E62278E6F1C5C60"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Audio/DulukaEngine.Audio.Wasapi/AudioPositionTracker.cs",
+        "Hash":  "8B729A9D624E6173D6B12BCA99AEA10520E4FE7588D47B26F2308EF927E6D957"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Audio/DulukaEngine.Audio.Wasapi/DulukaEngine.Audio.Wasapi.csproj",
+        "Hash":  "3B66E207959E840B2E7B964A4D4A439AE6D989229B4D633762E621B5451B0B39"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Audio/DulukaEngine.Audio.Wasapi/WasapiCaptureOptions.cs",
+        "Hash":  "729A3BF0603C9A3B65B2A43AD2EF1AC51B7588374911DE2F35B6E48047D74065"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Audio/DulukaEngine.Audio.Wasapi/WasapiDirectInterop.cs",
+        "Hash":  "A139259D0DB4748F36243624A643C6B5AC85991FAE60ED22EEA87295CC0EF458"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Audio/DulukaEngine.Audio.Wasapi/WasapiPacket.cs",
+        "Hash":  "DF0661C41CB52E6D4A6A4EE12CC844C21EB81495FEEF3E5C07D31805961C7C23"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Audio/DulukaEngine.Audio.Wasapi/WasapiPositionCapture.cs",
+        "Hash":  "B3322AD3CF2025A9929964A0DC8BB280A3AEB3F68AAD79E98AC84288310B2111"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Audio/DulukaEngine.Audio/AudioEngineSession.cs",
+        "Hash":  "0E5156B5A9B6F41FA526865A9A161F6240148B9DB1B1756B37EB99AF56479C36"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Audio/DulukaEngine.Audio/AudioEngineTypes.cs",
+        "Hash":  "7B7EA0708CF17E960526DD840769C9B172CBFAF35B65361707A564F65000BEE5"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Audio/DulukaEngine.Audio/AudioPcm16.cs",
+        "Hash":  "207490D608D2C2B25762A60496484328E1057E82FE0FAD0EA04FE97A0E00B60F"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Audio/DulukaEngine.Audio/AudioTimelineWavSink.cs",
+        "Hash":  "59A47EFFB91A759A5B793E1F4CD9CCA7BF02C8A536BCF678E1BBA02EDFE25512"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Audio/DulukaEngine.Audio/AudioWavSink.cs",
+        "Hash":  "D1217CBFBBAEFC46816286CC3AC0CCE6C05DECAA1C4F4F1F5D8DEA4DAA442D47"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Audio/DulukaEngine.Audio/DulukaEngine.Audio.csproj",
+        "Hash":  "27C16C3DBEB01CE98B0D2FAF19F8F8D22A80A47F516A31CB5E9F076CA7FCD666"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Core/DulukaEngine/AssemblyInfo.vb",
+        "Hash":  "D4E113F294F1EEA3647AD6F645BB174B105D2CBD67776837611A092675EF3041"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Core/DulukaEngine/Backends/IVideoBackend.vb",
+        "Hash":  "25BDD1B0412965410A664A004DDCEB5371F2BC4BD53A6FCA9CBC7E822FE01C9C"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Core/DulukaEngine/Configuration/ConfigLoader.vb",
+        "Hash":  "532FB156F895A6C63501DD2C4AFCF55AFB5AF7BEAE4EDF73ECDA7BEDCD0CB154"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Core/DulukaEngine/Configuration/ConfigMigrator.vb",
+        "Hash":  "D795EAB5B2A95B798C5BC1280BB5894A0F4ABC783F1F0A6A56C4F2C0FBF35F79"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Core/DulukaEngine/Configuration/ConfigValidator.vb",
+        "Hash":  "D7BC919A127374F324215806B41FDFFA0FBD6B342A6C0C28B5A611794FCC3C62"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Core/DulukaEngine/Configuration/EngineConfig.vb",
+        "Hash":  "74FC610381A05B326E179A932FF81BD28B40D799E5839A50C2D01ABEA7213581"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Core/DulukaEngine/Configuration/EngineConfigV2.vb",
+        "Hash":  "7C60FD01CDB8D2608BF96CDF9FD07B8EE5D3C55CD9738454CD3CECD7AB30C303"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Core/DulukaEngine/Diagnostics/EngineLogger.vb",
+        "Hash":  "B07BA1C67E7A4994D3928C4D9095068C3BB812558665D059CCA25CF3CFDAF225"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Core/DulukaEngine/DulukaEngine.vbproj",
+        "Hash":  "B6E286E7104B8DD92F4680E11E6D8FC91BE95B2B5A30459F18DCBD31753C7052"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Core/DulukaEngine/Engine/DulukaEngine.vb",
+        "Hash":  "C84769430893DF65AED6E62299047B9CDE6D609A42A7AF8DB63E9137C94C8877"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Core/DulukaEngine/Engine/EngineState.vb",
+        "Hash":  "AFEA740E433CDB300FCDCB0DB21F5C46F073E4B1832E1C875895C4B07411003B"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Core/DulukaEngine/FFmpeg/FFmpegCommandBuilderV1.vb",
+        "Hash":  "FB0FF9EEA9DC3E23CDDB88B853A337968247A6648E0C709DAD88421132D4624D"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Core/DulukaEngine/FFmpeg/FFmpegCommandBuilderV2.vb",
+        "Hash":  "28F0505B4797A42676F82DAF68BD8F9708E2BE13B2ACB78AABD92BE2F6DCFD72"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Core/DulukaEngine/FFmpeg/IFFmpegCommandBuilder.vb",
+        "Hash":  "A8E828F4E405C6F510CD3A634FBD24960AED3635A84628A138FB5F4BE3A6984F"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Core/DulukaEngine/Pipeline/PipelineConfig.vb",
+        "Hash":  "A696FAEED23C240AC26933B70B4F41CCEAEF6BF7CED89ACDA54410A98B0042C3"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Core/DulukaEngine/Pipeline/PipelineResolver.vb",
+        "Hash":  "7451F4F222FBF17A2C5F81936C05661F76D3B39E16A52C77C2A247E2716C879A"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Encoding/DulukaEngine.Encoder/AssemblyInfo.vb",
+        "Hash":  "F8F4634A275CE8161C20AEF31EAE7898A69824B995645FCB89B054ECDFC1487D"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Encoding/DulukaEngine.Encoder/Backends/Fake/FakeEncoderBackend.vb",
+        "Hash":  "4DBD80D893BB787969302D1C6A50488E32BD7A4D30E2EB4C5DC1F45AFB17AEF2"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Encoding/DulukaEngine.Encoder/Contract/EncodedPacket.vb",
+        "Hash":  "1F654EE9A1282A27A7ACC37F975A3D8D51D284F429CD3BC5D9AB6CB427CC57CA"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Encoding/DulukaEngine.Encoder/Contract/EncoderConfig.vb",
+        "Hash":  "F9CC1DC5E7FFCDF2A2A0A81E315DBD13AE026DB297DEAC26B80D1476ED9F6BCC"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Encoding/DulukaEngine.Encoder/Contract/EncoderDiagnostics.vb",
+        "Hash":  "18E94E6962C3E062538AAF33B9DBF040E90B539C129CD0CB32621DC174571247"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Encoding/DulukaEngine.Encoder/Contract/EncoderException.vb",
+        "Hash":  "7F6B46A907C4C85AAC8D9FEBD5CF5432FD8014C1C36E28BB42029DB44A5AA266"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Encoding/DulukaEngine.Encoder/Contract/EncoderState.vb",
+        "Hash":  "256D06A8605A68AA731A2987AFEC804694B0EA4ADD11FEF9135AA48E18452713"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Encoding/DulukaEngine.Encoder/Contract/IEncoderBackend.vb",
+        "Hash":  "BF288DE3E35A79C7DB373A678A5B06B425C72AB263414592C1FF1D05B0CE5F02"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Encoding/DulukaEngine.Encoder/Contract/PacketMetadata.vb",
+        "Hash":  "63439E0AACE0DA6354F540E35181BFAAA4321556F2847CB09B99BBEA015D0CE7"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Encoding/DulukaEngine.Encoder/DulukaEngine.Encoder.vbproj",
+        "Hash":  "A01C9AA4DE4EED1E27EE9CD3E709EF7DCA22022A7862F0B31E33DF9440D40948"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Encoding/NVENC/DulukaEngine.Encoder.Nvenc/DulukaEngine.Encoder.Nvenc.vbproj",
+        "Hash":  "69803D949A4A33E7D117704F2DA696D7C9CF7F103524FE8EA4D4CD63CF93939C"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Encoding/NVENC/DulukaEngine.Encoder.Nvenc/Internal/D3D11DeviceFactory.vb",
+        "Hash":  "6E8F7DB346918DD537BBA8B264A28983D82E758A66CA3A0C73463F669A3EC7D3"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Encoding/NVENC/DulukaEngine.Encoder.Nvenc/Internal/NvEncConfigSerializer.vb",
+        "Hash":  "44CDD30EE2450235CA8A3A8E076B044E32383B124B6F01111AB81E4DAAE3B6D4"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Encoding/NVENC/DulukaEngine.Encoder.Nvenc/Internal/NvEncFunctionTable.vb",
+        "Hash":  "82074940864E4171B09289717AE22A693AF22E00E408EC49CB3DE6D9ACDDD559"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Encoding/NVENC/DulukaEngine.Encoder.Nvenc/Internal/NvEncParamBuilder.vb",
+        "Hash":  "ACBC90E5608AED400F2043CD36ACE10645AC0EE5E0C50857D2F17B3CFD6898A8"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Encoding/NVENC/DulukaEngine.Encoder.Nvenc/Internal/NvEncodeAPI.vb",
+        "Hash":  "55B7742F118D989BCE77B78A16B5815B22C894407F786B45D3915BEE6F6DBF0C"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Encoding/NVENC/DulukaEngine.Encoder.Nvenc/Internal/NvencResources.vb",
+        "Hash":  "E007355A21DC8FBD676AEDADBD9D175FA62E342157D25D10A5C8398610E5FC3B"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Encoding/NVENC/DulukaEngine.Encoder.Nvenc/NvencEncoderBackend.vb",
+        "Hash":  "9D8A81CC67E98F0F593DC53ECC2432B881D9E738438FCD5BDBBED06695CAFE3B"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/README.md",
+        "Hash":  "696E9EB91C067887A15B11FF3EC882D37994AF5C9752A17B880035CFAF3CDC31"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/Backends/FFmpeg/DulukaEngine.FFmpegBackend/AssemblyInfo.vb",
+        "Hash":  "23FB564465F8B6D5D7DC610DCF82AF069BCDE36C8F8A2F810CD682E85E3AF6B8"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/Backends/FFmpeg/DulukaEngine.FFmpegBackend/AudioSidecar.vb",
+        "Hash":  "DF24A30ADB9E4E7F827BA80324D204ABDFF0DCEBE77D919EB989B60E11C33604"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/Backends/FFmpeg/DulukaEngine.FFmpegBackend/AudioTap.vb",
+        "Hash":  "C7C17C8B8224305AA366D0BCFD2F4F2E1C8CAF51CBF1184E1FBC24F0CEB36F1C"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/Backends/FFmpeg/DulukaEngine.FFmpegBackend/AudioTapDeviceClock.vb",
+        "Hash":  "8D74C56C19FA8CACC56BF0E228E971DBFFC09FFEFDD1B22B6E031ED28472F21B"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/Backends/FFmpeg/DulukaEngine.FFmpegBackend/AudioTimelineRepair.vb",
+        "Hash":  "1772388B8F14415454708E6562A7680F2B4D3D5A294DE68B34D7B57BA195B1F2"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/Backends/FFmpeg/DulukaEngine.FFmpegBackend/DulukaEngine.FFmpegBackend.vbproj",
+        "Hash":  "42AA763DEA90765A58EACF47C56EB8DCC195D16B4B97A4190B102A59E0406CFE"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/Backends/FFmpeg/DulukaEngine.FFmpegBackend/FFmpegPipelineBackend.vb",
+        "Hash":  "CE09C7315BDD5AB2C710201CE32E1537D2829769E5E1FF6664B1DDF910B15474"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/Backends/FFmpeg/DulukaEngine.FFmpegBackend/FFmpegProcessHost.vb",
+        "Hash":  "24730E8D3364E56F9873107480D48C84F70F5FBE300DA274A1B34F5C94D62089"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/Backends/FFmpeg/DulukaEngine.FFmpegBackend/FFmpegStderrParser.vb",
+        "Hash":  "3B188E3F4E9FD6089A423D24A8FAD1442B32C283B14A136C43443E9628EEDEB5"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/Backends/FFmpeg/DulukaEngine.FFmpegBackend/LiveMuxSession.vb",
+        "Hash":  "D1CAE482A93A2123B0C53F853D4A694CE826300EA182D4D2A9915A2CEAEE63E0"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/Backends/FFmpeg/DulukaEngine.FFmpegBackend/MuxCoordinator.vb",
+        "Hash":  "D4FA0E4187FFE96DB0D025841E62BEE52D40E5427E0AAA0A1E6F3FB3AC9DF52C"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/Backends/FFmpeg/DulukaEngine.FFmpegBackend/SyncMath.vb",
+        "Hash":  "1C8C9D86DBC28DB736B2201F9251BE2F445B51C715B4D890D6ED93B34F83FE1C"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/Backends/FFmpeg/DulukaEngine.FFmpegBackend/WavSidecarWriter.vb",
+        "Hash":  "7842AA5F0B5745E629FF69502680156F4B5A98124DD6A88EC1327545A31E5F84"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/DulukaEngine.Recording/AudioEngineMuxSink.vb",
+        "Hash":  "704F4A4F257F39E466303341390D5330D2846429E80ACAC9DDB12EFCE087A010"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/DulukaEngine.Recording/AudioSidecarSink.vb",
+        "Hash":  "78884CC52DB83676DA3320E33CA9E7B016572F428CEE231840BAF8EF4375A9E0"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/DulukaEngine.Recording/CaptureSession.vb",
+        "Hash":  "3501D2CE55E4826479D816883EE3825A1F5BC7D3928D00035CCBBD40598C1BBA"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/DulukaEngine.Recording/DeferredVideoFrameDisposer.vb",
+        "Hash":  "CB19BDB40A97777DE8C5A306073EEF29DBFEFC751B1219C7BD26D935E1373037"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/DulukaEngine.Recording/DiskHeadroom.vb",
+        "Hash":  "9AE38B3C4029D2C1D2F38D9FFC6496DF1C86E0B447B25EA938960508E8DD5C0E"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/DulukaEngine.Recording/DulukaEngine.Recording.vbproj",
+        "Hash":  "6356C65204E95C22DFB097982E5E0E8FBCB3D6A18A75A9494FB17AA2319DC6D7"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/DulukaEngine.Recording/RecordingDTOs.vb",
+        "Hash":  "970EA4CE3314E28BBAC3ECFB9E33457B8945EA5F106136662F4EF3BEA630BD40"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/DulukaEngine.Recording/RecordingEngine.vb",
+        "Hash":  "D83F08584A4A806B95F766997013579CFA2B522667617C27488D6CC19155B7C6"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/DulukaEngine.Recording/SessionEndBroadcastPolicy.vb",
+        "Hash":  "281CB66C20D26CDEE34802A03EBC1A1B362D22B989C6F9FB16D3835ED6C23997"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/DulukaEngine.Recording/SilenceKeepAlive.vb",
+        "Hash":  "9C10B9F467D2B840B11E70E5919879D5F043AF66A870C279ACA3797E803EDF92"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Configuration/DulukaEngine.ConfigTests/DulukaEngine.ConfigTests.vbproj",
+        "Hash":  "B78A93D02958C729FE9D60469D0A1CBD94911D066ECF466B5D0318B478FED062"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Configuration/DulukaEngine.ConfigTests/Program.vb",
+        "Hash":  "E01B3F2A57CD1E1F857870FD1B411F8A28160C62AFC9BF055493904AE04AC841"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Configuration/DulukaEngine.ConfigTests/RegressionTests.vb",
+        "Hash":  "4AF8D5B61815243FEA1B9164F775FBB4D76F8473796F6AFA8BBDEB6624C7F7A4"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Contracts/DulukaEngine.FrameContractTests/DulukaEngine.FrameContractTests.vbproj",
+        "Hash":  "9744A96CD6D6623DAAE86B789EC21C20DE3AA58E145CC3F268A6F883460F182C"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Contracts/DulukaEngine.FrameContractTests/Program.vb",
+        "Hash":  "1A4421279338CCD65783CC19D1B58660DBD9D148D67435A27A049DAA2D73870B"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Core/DulukaEngine.Tests/DulukaEngine.Tests.vbproj",
+        "Hash":  "DEFF18C3C5AAD6CEDAEA89E5151C83307DA024501580B964FD8B62BB66EE96AF"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Core/DulukaEngine.Tests/Program.vb",
+        "Hash":  "0CE896E3ABC34379783E16161D41367E149D82809A95452DFAA944600920B618"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Encoder/DulukaEngine.Encoder.Tests/Concurrency/EncoderConcurrencyTests.vb",
+        "Hash":  "7F669CAED52E8E940BF51506B36D0DED2248667C84D02CC23C5FB91BA59F388A"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Encoder/DulukaEngine.Encoder.Tests/Contract/EncodedPacketTests.vb",
+        "Hash":  "575A63D63C9D2E92CA2341FD6BA7AE884D88F513F3DB486411E138DD5600706E"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Encoder/DulukaEngine.Encoder.Tests/DulukaEngine.Encoder.Tests.vbproj",
+        "Hash":  "370605DF1FB6E5F6341EFF9AACADE80B238B60E014D2EA37FDDF9476A3696D6F"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Encoder/DulukaEngine.Encoder.Tests/Encode/EncodeTests.vb",
+        "Hash":  "EEB4C3091D9B3861590B34E9EC955AD995B1F524F60E54767D07D8FA13FC941F"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Encoder/DulukaEngine.Encoder.Tests/Lifecycle/EncoderLifecycleTests.vb",
+        "Hash":  "AD54B723DC327290E48BCBABC6591F095CC9F134A126D90AB68860CA7B5DB0BC"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Encoder/DulukaEngine.Encoder.Tests/Lifecycle/NvencLifecycleTests.vb",
+        "Hash":  "BFC7ABA1174D2AB2E64C9747D860F36D080E0DCB04A8E9BB8744076E3E96D083"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Encoder/DulukaEngine.Encoder.Tests/Lifecycle/NvencNativeFaultTests.vb",
+        "Hash":  "97D4023F822E4222CB0FE4FF4616FB8D2984CCF30A2F247C57F99221E7A79307"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Encoder/DulukaEngine.Encoder.Tests/NvEncParamBuilderTests.vb",
+        "Hash":  "85AF941F9A007D1923CBEFF4F9517E5798130D96CF8DF4FEF58E36DCBF48EBA7"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Encoder/DulukaEngine.Encoder.Tests/Program.vb",
+        "Hash":  "A096DCB4EBE13FA6013D36197012A2745A5AAFFFEF4B4BA3AB117495E327CCCB"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Encoder/DulukaEngine.Encoder.Tests/SkipException.vb",
+        "Hash":  "DFCE70023514109094B18ABCD3F39DA0829B6CFE690ABA5C117C794A44BDD4B4"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Encoder/DulukaEngine.Encoder.Tests/TestHelpers.vb",
+        "Hash":  "8B03535D8FFED0C880CE9C8B46BFB3788C09760C84FB6AEDF495D0AFB57732CD"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/FFmpeg/DulukaEngine.FFmpegTests/DulukaEngine.FFmpegTests.vbproj",
+        "Hash":  "525EBDFDD972A9D9D838890021C21E71F7F162CAAA61198594D91EE955ED8628"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/FFmpeg/DulukaEngine.FFmpegTests/LiveMuxSessionTests.vb",
+        "Hash":  "32BFFF67E493212FF00E6C7F9E89EE199DBE67C428C4F69FF7956627FE9D755D"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/FFmpeg/DulukaEngine.FFmpegTests/MediaValidation.vb",
+        "Hash":  "C961DB4081727C2F52035857406C4A6A32A7BC443A0B33BEB9969B8358082641"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/FFmpeg/DulukaEngine.FFmpegTests/Program.vb",
+        "Hash":  "E6C6596A56A8DB712D83F735310F9DCF6552E113A9D6CE4CC5E47E33A54D50D9"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Recording/DulukaEngine.Recording.Tests/AudioTimelineDeviceClockTests.vb",
+        "Hash":  "E103CAF15D2825A594BD402A6CD22929E167513835E25F73D5FC0B2BB525A8B0"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Recording/DulukaEngine.Recording.Tests/AudioTimelineRepairTests.vb",
+        "Hash":  "6479179E28520BCE0C7854D9E6FBBFDF0FA733A6FD81E161CEF7127C7DD090F5"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Recording/DulukaEngine.Recording.Tests/DisposerTests.vb",
+        "Hash":  "C344CE77238A8F64F4F2A831740EBE259857434D7398838B88D437C40FA3DFD7"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Recording/DulukaEngine.Recording.Tests/DualTrackTests.vb",
+        "Hash":  "A34F1833FBD845D086D0673D9B2720B8A28FB539473E567913C257E699CEA3BD"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Recording/DulukaEngine.Recording.Tests/DulukaEngine.Recording.Tests.vbproj",
+        "Hash":  "AC16DB44EB201A2687D297F9DB20BFE675A54FAB58BC90635C54E063349522F4"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Recording/DulukaEngine.Recording.Tests/LiveMuxJobOwnershipTests.vb",
+        "Hash":  "55B029DDD51259DB54F02AC1567D5C33BBE68FC0AE6641CA4F325CB8AFAFD200"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Recording/DulukaEngine.Recording.Tests/MuxSinkAccountingTests.vb",
+        "Hash":  "413FECC1C123736A2FB8E78CEA25881407E033D8F2911371FFEBF576D1111C13"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Recording/DulukaEngine.Recording.Tests/P3AStopHardeningTests.vb",
+        "Hash":  "CB6E2132EB8AF271AEBAB1039AB8BE177FF571DB2D6E586A391B80FBF094055B"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Recording/DulukaEngine.Recording.Tests/Program.vb",
+        "Hash":  "3B1EC8F18A35B871883B650DAE0F21D27B0414956E2DEBCD89B1F1F3D9EFAFD7"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Recording/DulukaEngine.Recording.Tests/RuntimeSyncTests.vb",
+        "Hash":  "1E8C114E62DE242D4BF74FA4EF9A8C4F10BE12F4DD4A5DAA2A2CCEA406D32854"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Recording/DulukaEngine.Recording.Tests/SessionResultContractTests.vb",
+        "Hash":  "5FDEB1C3DD466B8333B39104557CD0C83E271758EB4549883D76C339DACFAEAA"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Video/DulukaEngine.Video.Tests/Delivery/BoundedHandoffTests.vb",
+        "Hash":  "B14F2CC2C14EE5F03DDE89F0F281A165629FD718D662A87237E76AFB843247D1"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Video/DulukaEngine.Video.Tests/DulukaEngine.Video.Tests.vbproj",
+        "Hash":  "2AEA9555047D1934763BEC321938AA2C4A14468B64CCF2B28B0ABA2C3AD4796C"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Video/DulukaEngine.Video.Tests/Fakes/BlockingVideoFrameSink.vb",
+        "Hash":  "1C1EFCB0A2CE33480C0BEB98EBAA66BA0CFE3F4F03F337E16FA89398A8D203F5"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Video/DulukaEngine.Video.Tests/Fakes/EvictingVideoFrameSink.vb",
+        "Hash":  "E1A9F9639C6229BB8E917E9B0A588AAE9A2EA38AD4810D3E7DF57DF955EDF4C1"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Video/DulukaEngine.Video.Tests/Fakes/OwnershipTrackingVideoFrameSink.vb",
+        "Hash":  "3C81E4836AFBE20F55CB175A091DCB2C6311AB5C70175DCCC9E794B5E0CBDC05"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Video/DulukaEngine.Video.Tests/Fakes/RecordingVideoFrameSink.vb",
+        "Hash":  "4EA96A6F64DA09E2320B260CFFA371FC41C92E6E24D4445C334B330E67AD1314"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Video/DulukaEngine.Video.Tests/Fakes/RefusingVideoFrameSink.vb",
+        "Hash":  "1F2A15D13783AA0C880D8FD8339458534C51F56F4515D9CAF61195A2D9427AFD"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Video/DulukaEngine.Video.Tests/FrameContract/FrameAvailabilityTests.vb",
+        "Hash":  "1F3EAC00A25AA32F307A34E11C179DE9BEA1975EF639E24593CBC6D0980738F8"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Video/DulukaEngine.Video.Tests/FrameContract/FrameOwnershipTests.vb",
+        "Hash":  "4D26D6ABFD6E948FD4DA77ABE69FAE4D72E4C697C0A6811EDDCEE7FE8D3FF932"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Video/DulukaEngine.Video.Tests/HardwareGate.vb",
+        "Hash":  "75E216D6DF63C8F233171CF137BF7E43A0AA92C12396F2368CE60E6F01EDB851"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Video/DulukaEngine.Video.Tests/Lifecycle/BackendLifecycleTests.vb",
+        "Hash":  "A4E0E4EB6217B6B4D30E8DBF69789F1A175CF0966A63D00C23795F2D8E9C9BF9"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Video/DulukaEngine.Video.Tests/Lifecycle/DdagrabBackendLifecycleTests.vb",
+        "Hash":  "8CFA024FC072463B31E858F53490A44C400EEC0F693B9187C6663EE9FA9DD103"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Video/DulukaEngine.Video.Tests/Lifecycle/DdagrabOwnershipTests.vb",
+        "Hash":  "9FDF7FC7E7FA3850A1B1151E24C4ADDA4E4EEBB1B9108E09A16E8C7605376C8C"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Video/DulukaEngine.Video.Tests/Lifecycle/DeadlockRegressionTests.vb",
+        "Hash":  "8A8326F6EF2CADA26E75538DFE65D9F0BD5999B87A4D838BF049B4234B361139"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Video/DulukaEngine.Video.Tests/Program.vb",
+        "Hash":  "844AE14D500942925EE50323926F77B6BAE21662DC4FFFCFECCB595649065382"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Video/DulukaEngine.Video.Tests/Replaceability/DdagrabReplaceabilityTests.vb",
+        "Hash":  "A5D1B25C96E6EA449D9CEB50CB7C619C24AB5D3FB06B7FBF086AD19B8CB11BFB"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Video/DulukaEngine.Video.Tests/Replaceability/ReplaceabilityTests.vb",
+        "Hash":  "3FD8D235BE594EC74995B88F17CFC6C6CFA8D007EC45F8D75402BD5E19382EE6"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/Video/DulukaEngine.Video.Tests/TestHelpers.vb",
+        "Hash":  "102E6535D6AE499481D4474B8CBCCC20D1A4550B9498A5A77355155DD3720590"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tools/DulukaEngine.Recording.ConsoleDriver/DulukaEngine.Recording.ConsoleDriver.vbproj",
+        "Hash":  "0E7E38A4BDA21877DB75A651AE86E6E1DC048B3AFF697E25192F4893569276EC"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tools/DulukaEngine.Recording.ConsoleDriver/Program.vb",
+        "Hash":  "5902A1902A3317CD6A21A98AAFCAE86603F1101B30987D58FDCBAAEC62A16FA4"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tools/DulukaEngine.Recording.ConsoleDriver/evidence/phase-12b-validation-20260904-112737.md",
+        "Hash":  "296A23797700937DC83031A4ECE08BF322E77BF9791AA2636DA2264B6701CB6C"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tools/DulukaEngine.Recording.ConsoleDriver/evidence/phase-12b-validation-20260904-112838.md",
+        "Hash":  "37DDE1DE941C0496FEFFC9B0EC5834D96352981B08DDD6FFF63279F0732DE52C"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tools/DulukaEngine.Recording.ConsoleDriver/evidence/phase-12b-validation-20260904-113230.md",
+        "Hash":  "D819E5B1C3BA1CFFE87C50E8A57AC2C26BF80B37B4E2DD84ADB759585083C686"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/AssemblyInfo.vb",
+        "Hash":  "1F4AD4D94CD821D383728D112C8828AE0B993BDECE793946350448409D2BAC9D"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Backends/Fake/FakeFrameDescriptor.vb",
+        "Hash":  "69095CBA0FC44509FB43FEA5D71C623E572EA793DD1461EE339A4219D8423042"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Backends/Fake/FakeVideoBackendContext.vb",
+        "Hash":  "4251692D45A8FB5AA30FD01A4C7398D306FFAE0C7185A9F88D6354DEFD83B133"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Backends/Fake/FakeVideoCaptureBackend.vb",
+        "Hash":  "C8D9ABB00045ED2D9C020065BCBD00BE8D2114AF080AA122CB879EF0BCA6D08F"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Backends/Fake/FakeVideoCaptureBackendFactory.vb",
+        "Hash":  "9D75656D585858B80AFC1707EB4569F15CADFBC3AB283CCAD0186F12D9A3B2B1"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Backends/Fake/FakeVideoFrame.vb",
+        "Hash":  "395C2297476D8A1AE8516652D86B5A36DA6F3FA1038D22BE906E7609DA0C4464"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Contract/BoundedHandoffPolicy.vb",
+        "Hash":  "6B759F91C9F21074E8213647B5ECBA8FA2E580486055D12B441A76F70FE4F009"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Contract/FrameAcquisitionResult.vb",
+        "Hash":  "9636A293FC02C9596C53FBF0D3075C153CE8F95C90C51D55B893043CA31A962B"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Contract/FrameAcquisitionStatus.vb",
+        "Hash":  "EE27F87433A14AB5EC7065743A9BF7AB04EBB960781427F4D663C8485C6E2A0C"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Contract/FrameDiagnostics.vb",
+        "Hash":  "3623EFBCA94F4C3BB63FE1A0DA3F9700F2FA71FF61F302429FE322B7970237DB"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Contract/ID3D11VideoFrame.vb",
+        "Hash":  "01CA9C098ABD4400E74790C83349777E9ED07E2FBECFB77A564244A6F88A547A"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Contract/IVideoBackendContext.vb",
+        "Hash":  "767B8350E44C595803FF83FE4FB261C5CAC379D27BC06639C921D0DE41F22B00"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Contract/IVideoBackendDiagnostics.vb",
+        "Hash":  "E4B41AFCB5A13F1F12258259CB647513A6B8730CEC831C15806794E4826CC25E"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Contract/IVideoCaptureBackend.vb",
+        "Hash":  "996D8C5CA0CC88CD43758D01D1F7B3DA5A37E21F076C8590252D816FD4528D95"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Contract/IVideoCaptureBackendFactory.vb",
+        "Hash":  "BCF7C5C4BB27A41B822C997A9FD4CE37A2A747611ACA0EB7D1F6B097887D0876"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Contract/IVideoFrame.vb",
+        "Hash":  "DC56B8CEB1E45051595F73E41598C9E25E16C562B8884FA35B6CEE9AC6D3A5FC"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Contract/IVideoFrameSink.vb",
+        "Hash":  "90953A7F84760706107D7F7C581CB252C283A3E70517417E9C91A8915B683897"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Contract/PushOutcome.vb",
+        "Hash":  "A217F03D92CF4C5A9481F69C5953B288CC972E5F4A4B6A9AE42EAE775E1C6C8F"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Contract/VideoBackendConfigurationException.vb",
+        "Hash":  "290C2D8DDEEF61168FC216A179E158AFC1E3611FCFD35D8E569AA9B71653DEE0"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Contract/VideoBackendException.vb",
+        "Hash":  "947DFAEFE94F926CC7F6CA53DAE659A795EA63AC67614EE74F65D52B8A118116"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Contract/VideoBackendKind.vb",
+        "Hash":  "72B85642C03DB10162ADBC1D7CD1F6CD6F3AF8D6E2B157F28C1CE7576D15BBDE"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Contract/VideoBackendRuntimeException.vb",
+        "Hash":  "6A2A15179FDA3AD5ECC2A1A89A8805B82806FE743B148FFEC1C604D211E67E59"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Contract/VideoBackendShutdownException.vb",
+        "Hash":  "5EBE92F3BD2BB542BE97C49FB3B9D5995C0E4FBB1933DC98BA4FCFF702985CE9"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Contract/VideoFrameDimensions.vb",
+        "Hash":  "3CA1AF68757A1D3CED66A527B838BEC51B4B4B049A7F14054CAE72F88E21257F"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Contract/VideoFrameOrigin.vb",
+        "Hash":  "2E61A0ACF45B799AEBB7FBD76F6A3D56D8D20C1F1329DD34793971C31244D85C"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Contract/VideoPixelFormat.vb",
+        "Hash":  "039BAD6D42341A4B8ADFD732AA1B1DFB4DDD69CC79DD4502828FE7825C9CAE50"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/DulukaEngine.Video.vbproj",
+        "Hash":  "5EAC1E81358C2E00E0387773BDB5B2A6954469BB4319824C71195A0488B3CC35"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Frames/FrameMetadata.vb",
+        "Hash":  "3EB8FC4E491CD4D56F25F88085EDC498FEB205E7519122F93ABD02B246442D19"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Frames/IVideoFrame.vb",
+        "Hash":  "016128994C96F2B5B3C166589FA08A01B54258F16B89CEFF7E5A9A13BA2E7AAE"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Frames/PixelFormat.vb",
+        "Hash":  "1757B305EB9C6A56BE4A60A3EFE7874187CC63E88A0BB69D149A8C5019101E1A"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Frames/VideoFrame.vb",
+        "Hash":  "EFC7BADCEFCC9A971C8654FE5DFCA6D554559FD0FCF3D3194299C085CE84865E"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Handoff/BoundedVideoFrameSink.vb",
+        "Hash":  "D2370A47B4BDB8077963AA8E1E080959AF4167CCC4C715C052BE96D12045381C"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/DXGI Desktop Duplication/DulukaEngine.Video.DXGI/AssemblyInfo.vb",
+        "Hash":  "798BE4B580D646FB6F1089D6E925E41A26669D4E874EFF604F3D5313715C8857"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/DXGI Desktop Duplication/DulukaEngine.Video.DXGI/D3D11VideoFrame.vb",
+        "Hash":  "9DFF3F3EAA44C45DA9220DAD71B6F994FB662A47022D850A8AAEE8E62D6940AE"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/DXGI Desktop Duplication/DulukaEngine.Video.DXGI/DdagrabBackend.vb",
+        "Hash":  "6585DE9995412987A307715330EDA1001647B16B774B1C56A945557E20973C4D"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/DXGI Desktop Duplication/DulukaEngine.Video.DXGI/DdagrabBackendFactory.vb",
+        "Hash":  "F4BEFA4A755EFAF975DD93CB9B746026F81FF2B918B8F4CEDB089EC753551DB1"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/DXGI Desktop Duplication/DulukaEngine.Video.DXGI/DdagrabFrame.vb",
+        "Hash":  "D25FA7DE2392BFB386672CD1D4FC9174FF9842B09D14B6FE912E162D2DCBC55F"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/DXGI Desktop Duplication/DulukaEngine.Video.DXGI/DulukaEngine.Video.DXGI.vbproj",
+        "Hash":  "B6550788DD8EB9108D59193F5A60772DBC09DDA8E4001670DD522DDCF839922C"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Windows Graphics Capture/WgcCapture/WgcCapture.csproj",
+        "Hash":  "9DC38D3819C33161A4A16F4DDF658852149B90ECB153CEEC67DA79E85EEADEF7"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Windows Graphics Capture/WgcCapture/WgcFrameSource.cs",
+        "Hash":  "ABDBB0C97E5E6DCFE9B61CFBBF5945E6270F9164554668236F4C99013247B851"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/ENGINE-ROUTER.md",
+        "Hash":  "F478F57F9E7ACB4DDF5441748E96D2D318A0266CEDFF0A9B55230F1C85B81DED"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/HardwareReadiness.Tests/DxgiInventory.cs",
+        "Hash":  "AA9CED4ED47510EE7516E0E9932807AC66F7E69B129019D600D6A568EFB8452E"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/HardwareReadiness.Tests/HardwareReadiness.Tests.csproj",
+        "Hash":  "8ECB8AF8DEBF28C417433675E5006F5C446277492427FEFE8B81CA927E783F62"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/HardwareReadiness.Tests/Program.cs",
+        "Hash":  "43C490A41AED649839BACA27B5BE86747264EDF51EEB5C6D3770B58E58F84FF5"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Invoke-CaptureHardwarePreflight.ps1",
+        "Hash":  "C5A43F7908E3852B1CADCE5470B5C641D20C29381FC3308E8EC48E2F1EE5F254"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Invoke-CaptureOfflineGate.ps1",
+        "Hash":  "6213F3342E25099EC71DD3C5F95D2097591A80021481A84F8CB833AF9B7F574C"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Invoke-CaptureRelayReadOnlyPreflight.ps1",
+        "Hash":  "791245203DF36098302C12E6A2E37A2B2396F6230B5B013A2DE984D0A011BECA"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Invoke-IsolatedNvencSyntheticSmoke.ps1",
+        "Hash":  "D2D11BBF15C531D9F17A4DA2673E3C7A910CAD6599B67B1C3BA7BC15884A08A0"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/IsolatedTest/Invoke-CaptureSmoke.ps1",
+        "Hash":  "DDC3E474E0DB6FB8AE040ECF68349F9FE29246AB13EB1B89CD97445860B3C15A"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/MediaEvidence.Tests/CaptureMediaInspector.Tests.vbproj",
+        "Hash":  "39975F25468206584EE71958F377A3A0E5789F6B6189793F4DC1BF7D77AE87B0"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/MediaEvidence.Tests/Invoke-LongMediaScan.ps1",
+        "Hash":  "645B7EE86F4186ECA14D23B6DE01589B2909039C8B64A9BC4658175D0900EC9D"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/MediaEvidence.Tests/Invoke-SyntheticDecodeIntegrity.ps1",
+        "Hash":  "D0999C3644BA98645ED03F2C43D3BB64D811441ACC7408C7C4E6D534D9CABABC"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/MediaEvidence.Tests/Program.vb",
+        "Hash":  "CD890B85773EADD33ECE7D0BBFA7E6A0A2241B7B6BFAA2F09C086AA2C11D18FD"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/MediaEvidence.Tests/Run-SyntheticAudioEvidence.ps1",
+        "Hash":  "B48C698B40AD24CE1AA749467DB41FAB91C75FADDE3AD40BEF8018EFE9BAFC1B"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Mux.Tests/CaptureMux.Tests.vbproj",
+        "Hash":  "C9F97145772023526277AC3AF9DF3CD168566EF01B00255AED3E472469269DAE"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Mux.Tests/Program.vb",
+        "Hash":  "918A4877D7B10DCCEC62C5799DFDD98D81928987330221A7A93D8108099888E3"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/OBS Capture/README.md",
+        "Hash":  "907208C4854FFDF63843034C749E8E4493E0BAD9B7A4E1A5DFD186B1A7B83775"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Recovery.Tests/Program.cs",
+        "Hash":  "17DCD36CC6FEDF5A75B0F1A5146F8808A732BEAD65B9734238E7784C26C75BE5"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Recovery.Tests/Recovery.Tests.csproj",
+        "Hash":  "4F5B4B27533058DC73E858D021883A67D69028D865BE707AA4C8F1DFD3BE610A"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/RouteGuard.Tests/CaptureRouteGuard.Tests.vbproj",
+        "Hash":  "3E5F10A2F163F5327EA1A67FDBD326B10AB2F6496B4FDDBEF3FF11B941B4361B"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/RouteGuard.Tests/Program.vb",
+        "Hash":  "9C86553BC6209CCD932CD3CDDB64BD69BF941A6FB5F07698EC2647E7E29410E5"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Routing.Tests/Program.cs",
+        "Hash":  "9D47E53048A9D554CAAAB883D3FEFE82087AB49065A0F3C02FB207ECE2B62E69"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Routing.Tests/ShadowPlay.Capture.Routing.Tests.csproj",
+        "Hash":  "8F82CC09583C41D8C0412C27B7A339315DF53DEB23B84CEC8BEE5CE31CF0D23D"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Routing/BackendCatalog.cs",
+        "Hash":  "3D88D10D2D3CD0A2C6A100B65F0AC9FE3FE5757B2CC458514999A3664B79E335"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Routing/PipelineRouter.cs",
+        "Hash":  "5946F2085A58A8D1902D974AF3A03D27BD0A5AA9EA362E2AFEFB96029632D208"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Routing/Program.cs",
+        "Hash":  "6F1B9E586B7FEC979FD8631545873BCE4C651CE56178302D483456D7066A997A"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Routing/ShadowPlay.Capture.Routing.csproj",
+        "Hash":  "12757DB6B3EB0D9AB194BF49CDCDC693970C56804C68693FDC5DEF82D6F2FE8C"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/SessionRecovery.Tests/Program.vb",
+        "Hash":  "B4EF261A0B71FC6481DFB0604E907729E9A57F5B5D70279ABD9A518CCE1F785A"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/SessionRecovery.Tests/SessionRecovery.Tests.vbproj",
+        "Hash":  "D71453BC84A363E7981F322BCFCEDED0B6795DB58BB2372BBD37B389576C49F1"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/My Project/Application.Designer.vb",
+        "Hash":  "2856650B357D2281B6884CC9617AC5881745ED26BB6B54628D43605B4C32FBA7"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/NVIDIA Capture.vbproj",
+        "Hash":  "FE2971D6B039746C7029D53163A9EA1641707546860C6C823EAE3CDB950E50AB"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/README-REST-INTEGRATION.md",
+        "Hash":  "2F60DD5E587DDC1A02E7D20BC230D0D22E04C7A482A6F59CC401B43326220670"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/src/EncoderDetector.vb",
+        "Hash":  "4CAFEDB90BC7B3FD766B7EE0C6B2A4B58B6596B53C5067C66B39ABA005A2B3D2"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/src/[API]/CaptureBackendRoute.vb",
+        "Hash":  "B89A9AB53D829CD22A44564B175DED718F5A7112E506A5FE5520373072942A96"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/src/[API]/CaptureDisplayCatalog.vb",
+        "Hash":  "AC7EA2CB0DEE1659F33421EFBD2E72105C4F8B9A1416A69A99FAC6B7D47B0987"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/src/[API]/CaptureHttpRequestReader.vb",
+        "Hash":  "57BA84523D6AD9AB0D1DDC22E5A4E7B5BC5207763992179C1D0BDBFEA0EC9FD7"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/src/[API]/CaptureIsolation.vb",
+        "Hash":  "063CC51FBE51BB621CB4461A443E8EA32336412674C8CD5A50CB8DE7DCB5C303"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/src/[API]/CaptureMediaInspector.vb",
+        "Hash":  "C9593283380EC3DEE647CE69D7670CF5B98E3EFD207883BA8E346AD1CC04B04C"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/src/[API]/CaptureRestApiServer.vb",
+        "Hash":  "34662242402359A43322D1AB0612DCE7F9BAC40A0FE40DBD889F533A5046125D"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/src/[API]/CaptureScreenshotEngine.vb",
+        "Hash":  "F0882039EE2B6972351FEE2949C5E9634AAA604336584B9EC210E3C503BE4960"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/src/[API]/FFmpegRuntimeProbe.vb",
+        "Hash":  "9C81B3119271E2F6DC6C08B6E40186222E5DA23E9E26A7A3CFF5FA878C85E450"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/src/[API]/NextRecordingConfig.vb",
+        "Hash":  "F92D92E54FA2B021387B5FAD7631762C9B6F0411E602D5D8717795ABC2DB73DB"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/src/[API]/RecordingEngineHost.vb",
+        "Hash":  "A9F75D3B66F3E31D645B8B3D6F2230D5F4E8E85AA82BD9C29CB77595F6FA2208"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/src/[API]/TcpClientHelper.vb",
+        "Hash":  "FA81306CA0D9C94FEDF99D9FFCA5B0A5E6A182624776BFCE4FF912189EFD3742"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/src/[API]/[Engine] Client.vb",
+        "Hash":  "F38FBE53473865E892B970EDC2DBB9118E630C1B0CC8372573D729FC3E0ABAC8"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/src/[Audio]/AudioFileWriter.vb",
+        "Hash":  "14F387A360FA35ADD6D51A1C3D547FA583B3C427F441A7A6F68AF48150FF55E9"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/src/[Audio]/AudioFormat.vb",
+        "Hash":  "AF96C95AC884227CAA5FC99FC18116391AABDE57CBA1D0B6D29026AC6638A90A"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/src/[Capture]/CaptureSettings.vb",
+        "Hash":  "C8EF08DAE1EE301A9F6BAA37049C18A3654586845BF7119642EAA70CF504C2CF"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/src/[Capture]/LegacyCaptureEngine.vb",
+        "Hash":  "95FD659546B627E8EFDF77C8A21B0F279243E1B58D1F446EBA317F8FD14A86E5"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/src/[Capture]/NvShadowPlayRecorder.vb",
+        "Hash":  "4EC5952DCE65FCA409F412E221865CBFD4DDD30113C68343EAF6EC1B28FEDCDB"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/src/[Diagnostics]/StressTestRunner.vb",
+        "Hash":  "709A85C4303D31E5FF2816A6F9A98BE129B73DCD9FBAB820A55A285C85E42B70"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/src/[FFmpeg]/FFmpegArgumentBuilder.vb",
+        "Hash":  "523D213123CF0F3B53F31157D37FFCE5F69D805F0E9B460FD1BB29553D0F09AB"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/src/[Infrastructure]/BackgroundLogger.vb",
+        "Hash":  "A068BE8B6451C9BB2FFC8C9BD0D08BEE0CF781FCDCA9AD94A84B7B57DF0AC76C"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/src/[Infrastructure]/JobObjectGuard.vb",
+        "Hash":  "BFE7B7645192902E482644766BCF93E543B94C31ABFEE84F8D41CF2DB708CA20"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/src/[Integration]/OverlayConfig.vb",
+        "Hash":  "FC5EFC0364BA545D96656A1812236BBD50448571524BC0AB2ADE65FC46249364"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/src/[Integration]/ShadowPlayRest.vb",
+        "Hash":  "C4B11EA18830097A2A7E2112422663F94F755F00C7BBA7C0B0857B94741B5FFE"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/src/[UI]/AudioSettingsForm.Designer.vb",
+        "Hash":  "79FAEC40F3CDF1FEA281C5273BAD56C1BB7C1416B06E18D288C3AD22A390483E"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/src/[UI]/AudioSettingsForm.vb",
+        "Hash":  "40F541EE2C1A59CEEFF0788FC0C5CCFA341C8C92E6AF5D2A2BFB236E7093C45B"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/src/[UI]/UI_Engine.Designer.vb",
+        "Hash":  "0FE1FDAC7F7A07A03AB2A1327D277603236F6B466A23FA1901E0448992FA93D1"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/src/[UI]/UI_Engine.vb",
+        "Hash":  "6FCAAD365C8DCA3F5C56E6D3399A4E77D001FB0DE7B72934036BAD6BCE36F3BD"
+    },
+    {
+        "Path":  "Project/NVIDIA Container/APPLICATION-ONTOLOGY-INTEGRATION.md",
+        "Hash":  "41C17F751CFA953558BF4295B7F44760CCE246B2ECDA7CDA8977FA98AE4F36E2"
+    },
+    {
+        "Path":  "Project/NVIDIA Container/Components/Diagnostics/ContainerTestApi.cs",
+        "Hash":  "117A01E9BFB68128AB9B641F97730D5EB2DE54836B840397438C353D463C9A11"
+    },
+    {
+        "Path":  "Project/NVIDIA Container/Components/README.md",
+        "Hash":  "81219E00A900A0392B13D813DA7FE0B018AEC71995287C65289818025058D6F6"
+    },
+    {
+        "Path":  "Project/NVIDIA Container/Components/Routes/Gpu/GpuFilePickerRoute.cs",
+        "Hash":  "9EEF3537E7D21FC65303F912B202D3C866E4B5DFD966222B1C898D2CDBD207E1"
+    },
+    {
+        "Path":  "Project/NVIDIA Container/Components/Routes/Gpu/GpuManagerRoute.cs",
+        "Hash":  "DBA51F6977ED60060A42A7DDDE1507849F3D2A101809EDE2A26CF6E9A6ED7AED"
+    },
+    {
+        "Path":  "Project/NVIDIA Container/Components/Routes/Gpu/GpuProfilesRoute.cs",
+        "Hash":  "D9BC09C38E94714CA621E616B468D114BDA985892EAA232F00B3EFDB4D9F4E9A"
+    },
+    {
+        "Path":  "Project/NVIDIA Container/Components/Routes/Gpu/GpuRuntimeRoute.cs",
+        "Hash":  "07DC8AD82E27CC83394E75CAF29680AEAD02DB18E144406E3054AD78297B9ECA"
+    },
+    {
+        "Path":  "Project/NVIDIA Container/Components/Runtime/ApplicationOntologyClient.cs",
+        "Hash":  "13204F1C6D3D4652E1F7F97CF13790ACAC6FC23FEDBBF836FE0808F438FD908D"
+    },
+    {
+        "Path":  "Project/NVIDIA Container/Components/Runtime/CaptureEngineCatalog.cs",
+        "Hash":  "AC566B42F2A1DC98CF3E50DEDCABB5D88E3949930FDA43951CC4657DEF9FEEA1"
+    },
+    {
+        "Path":  "Project/NVIDIA Container/Components/Runtime/GameWatcher.cs",
+        "Hash":  "CEF16D264D52EF0DEA9A0D51EC3A3DFBF239C4332741E3E8F99FD8ACCD907A32"
+    },
+    {
+        "Path":  "Project/NVIDIA Container/Components/Runtime/ObsRuntime.cs",
+        "Hash":  "40732D67A77FA1D94C72217FAB9B95F0C85D44EE82A494BDBCDF050AEADAD7F9"
+    },
+    {
+        "Path":  "Project/NVIDIA Container/Components/Runtime/OscAdapterLifecycle.cs",
+        "Hash":  "D9DED89846E30C8C5869AD5F4EF9C31B75476A95836858F025860070124C1467"
+    },
+    {
+        "Path":  "Project/NVIDIA Container/NVIDIA ShadowPlay Helper/NvHotkeyHelper.cs",
+        "Hash":  "F30C462466FC64F955BDC4F5C479EBFD0702AF687F2A1DE865008CF97A02A031"
+    },
+    {
+        "Path":  "Project/NVIDIA Container/NVIDIA ShadowPlay Helper/nvsphelper.csproj",
+        "Hash":  "8E88799BC4EF65FC76E3ACACAF84550427F1EC97DA97BBB406E4BD75FCBC4DD8"
+    },
+    {
+        "Path":  "Project/NVIDIA Container/NvContainer.cs",
+        "Hash":  "72BB2E0E47CCF101D4C5710C4CECBF7541B95DE78099F1EBA7A2B24ADE5134E5"
+    },
+    {
+        "Path":  "Project/NVIDIA Container/NvContainer.csproj",
+        "Hash":  "8C4A79C7F70F697800FBE4A0353DF00EA72FB3BA2ECEEEC0E02616AD78CFBD7E"
+    },
+    {
+        "Path":  "Project/NVIDIA Container/Tests/CaptureEngineCatalog.Tests.csproj",
+        "Hash":  "F8FEFA7AC205FFBAF3FA39354CC2133559989CF04A167575EE6996570DA0E1D2"
+    },
+    {
+        "Path":  "Project/NVIDIA Container/Tests/Program.cs",
+        "Hash":  "7FBF916253F96C521A88846971AE0F8E71EE480D5740CABB496667D4BE53707F"
+    },
+    {
+        "Path":  "Project/NVIDIA Graphics/NvGraphics.App/Abstractions/IEngineCounterProvider.cs",
+        "Hash":  "4DD26A3BE7065E10770D1B82551467A7C576405E37CDCE714C77A017708673F6"
+    },
+    {
+        "Path":  "Project/NVIDIA Graphics/NvGraphics.App/Abstractions/IRegistryApi.cs",
+        "Hash":  "DC69474D608321157AE49606F79CDFB66FC49EAF52DB03798E59DBE904DF467C"
+    },
+    {
+        "Path":  "Project/NVIDIA Graphics/NvGraphics.App/Models/GameProfile.cs",
+        "Hash":  "3E5E2C135F24FB26D886D34325AB2466C104C8860034D2CAF0A97BEF28FE28F1"
+    },
+    {
+        "Path":  "Project/NVIDIA Graphics/NvGraphics.App/Models/GpuAdapterInfo.cs",
+        "Hash":  "3A6FC07F74EAA7F298F0339870CC6FAD5473A754E745CD8BB0FC54669578F31D"
+    },
+    {
+        "Path":  "Project/NVIDIA Graphics/NvGraphics.App/Models/RuntimeGpuState.cs",
+        "Hash":  "594DD1CC3540E850694DAB0CE810093F398DF21EE1B1B2106C97B12F9D00DABE"
+    },
+    {
+        "Path":  "Project/NVIDIA Graphics/NvGraphics.App/NvGraphics.csproj",
+        "Hash":  "20569CA0BCE8DC51ABCE45D0AA2C8A04B67ED6AF1BE48B8175BB50B292E13937"
+    },
+    {
+        "Path":  "Project/NVIDIA Graphics/NvGraphics.App/NvGraphicsForm.cs",
+        "Hash":  "09C0DD90E587FCEC83CD1EE788190559EB61D487FE2AADFE75BCBB5F11AC9D26"
+    },
+    {
+        "Path":  "Project/NVIDIA Graphics/NvGraphics.App/Program.cs",
+        "Hash":  "541EB46C59A86C566DCA3BD1E015F9A75F11D2F81C16B7A84A0AD06F54AE8911"
+    },
+    {
+        "Path":  "Project/NVIDIA Graphics/NvGraphics.App/Services/DxgiAdapterLuidResolver.cs",
+        "Hash":  "FF0706004063DD7EA8C0A112F5ECF1E09A1C1BDEF5646BD0353D6AE75C55CBB0"
+    },
+    {
+        "Path":  "Project/NVIDIA Graphics/NvGraphics.App/Services/GameProfileStore.cs",
+        "Hash":  "9294734033788AF5153D710C82153A75ACC4B1501B1C62EF7D5FE5D402E1D6B1"
+    },
+    {
+        "Path":  "Project/NVIDIA Graphics/NvGraphics.App/Services/GpuDiscoveryService.cs",
+        "Hash":  "5CA4EDC94C3F6ED0317202B049D99BB14EC2C8907AB25B3D526264D5ACDDE730"
+    },
+    {
+        "Path":  "Project/NVIDIA Graphics/NvGraphics.App/Services/GpuEngineCounterProvider.cs",
+        "Hash":  "3598AD87C1A0198992E4DB51ED8D862BAE370F8007567DD7CE5CE843C898691F"
+    },
+    {
+        "Path":  "Project/NVIDIA Graphics/NvGraphics.App/Services/GpuStatePublisher.cs",
+        "Hash":  "DE699A6641F2873044ACC0B9DF7D91A7E57E4039ADF603B835787ADB1567E1DE"
+    },
+    {
+        "Path":  "Project/NVIDIA Graphics/NvGraphics.App/Services/GpuTelemetryService.cs",
+        "Hash":  "B014B89DCDE129D2DBECF31599E8D51B040DF1BB0BC5348798BDB3192B56CE9A"
+    },
+    {
+        "Path":  "Project/NVIDIA Graphics/NvGraphics.App/Services/LuidUtility.cs",
+        "Hash":  "B95E9B34C67FF72F07A8367BE58DE7B80752DE843581A6B3B64D09016E33A79A"
+    },
+    {
+        "Path":  "Project/NVIDIA Graphics/NvGraphics.App/Services/ProcessPathResolver.cs",
+        "Hash":  "07FDC412585A401FA2C7F55FEB931CFC7D5E7679A0B9AEDEF058509D39432CE3"
+    },
+    {
+        "Path":  "Project/NVIDIA Graphics/NvGraphics.App/Services/RegistryBackupService.cs",
+        "Hash":  "79AFDBDB7B568DFD9EB8172CC4D328B75E40C89573D7B22E3CB571CAFDE1FEAD"
+    },
+    {
+        "Path":  "Project/NVIDIA Graphics/NvGraphics.App/Services/RuntimeCheckSchedule.cs",
+        "Hash":  "67865A22D75A0DD3DFC0C363F925C78DD1358CD5FBC1070EFF987156CB300179"
+    },
+    {
+        "Path":  "Project/NVIDIA Graphics/NvGraphics.App/Services/RuntimeGpuMonitorService.cs",
+        "Hash":  "4D04DCC318F9206D88E8EA3DD72B212AE9F43F3491684D9FD6F462178D42C57E"
+    },
+    {
+        "Path":  "Project/NVIDIA Graphics/NvGraphics.App/Services/WindowsGpuPreferenceService.cs",
+        "Hash":  "C503E1A36D9A57FA4A46B7D42CA25184A89391ECC6FFE0205671E49AE0E7EE73"
+    },
+    {
+        "Path":  "Project/NVIDIA Graphics/NvGraphics.Contracts/GpuAdapterInventoryPayload.cs",
+        "Hash":  "03C3EB01AE54B72DD55F15850952C77A0DEB1C44214F42F20E1C7CB75A16AA50"
+    },
+    {
+        "Path":  "Project/NVIDIA Graphics/NvGraphics.Contracts/GpuPreferencePayload.cs",
+        "Hash":  "EED1CC3A0A531EAEDF69BE95A54EA2F8DB1458E0BA7270D178639AE09D8A259B"
+    },
+    {
+        "Path":  "Project/NVIDIA Graphics/NvGraphics.Contracts/GpuRuntimePayload.cs",
+        "Hash":  "6FE65CA125E6380CD3EF7CD0991F1FD13A700A6D9B8611C8BAD14058C072FEF3"
+    },
+    {
+        "Path":  "Project/NVIDIA Graphics/NvGraphics.Contracts/GpuRuntimePayloadValidator.cs",
+        "Hash":  "93FB04B8D3094A6C3746C77441A648CBAA5E648F62016423D36F8CB9987CD164"
+    },
+    {
+        "Path":  "Project/NVIDIA Graphics/NvGraphics.Contracts/NvGraphics.Contracts.csproj",
+        "Hash":  "49047A626B1CF87B719846C5A9A0FFA9B1EA38AF17758B7A75EF4DD1EF571A8E"
+    },
+    {
+        "Path":  "Project/Overlay On-Screen Control/NVIDIA NodeAPI/NVIDIA Web Helper/Backend/README.md",
+        "Hash":  "B736ED57AE489BD4BD2C8CCB7D0F6562E75BF746878E44E4B249BAC260FB34E6"
+    },
+    {
+        "Path":  "Project/Overlay On-Screen Control/NVIDIA NodeAPI/NVIDIA Web Helper/Backend/data/README.md",
+        "Hash":  "F7C6CB4B4DBAD603A09E2CE2DCA2DE5F206CE1EB2867C5A164DEC2B648F26EC1"
+    },
+    {
+        "Path":  "Project/Overlay On-Screen Control/NVIDIA NodeAPI/NVIDIA Web Helper/BackendProcess.vb",
+        "Hash":  "8081651644516FFF568E197C7E4D6010F0FA91C7D0A9B97277E60A37419D6024"
+    },
+    {
+        "Path":  "Project/Overlay On-Screen Control/NVIDIA NodeAPI/NVIDIA Web Helper/HostConfig.vb",
+        "Hash":  "C3B1C6DD2D8DD67064D7BF0247650A9420FD2BA1DAAD43A08A0A740E5C8DCD50"
+    },
+    {
+        "Path":  "Project/Overlay On-Screen Control/NVIDIA NodeAPI/NVIDIA Web Helper/HostLog.vb",
+        "Hash":  "F93B496FEB869B258C5C906C1F8438EEEEBEFF1437DAFFE64B57DA487541F01A"
+    },
+    {
+        "Path":  "Project/Overlay On-Screen Control/NVIDIA NodeAPI/NVIDIA Web Helper/NVIDIA Web Helper.vbproj",
+        "Hash":  "0CC18E9CF447B89E2C960C2F5EED0BDAF24474EDF2B35B5969F3AFAD4CAAA35A"
+    },
+    {
+        "Path":  "Project/Overlay On-Screen Control/NVIDIA NodeAPI/NVIDIA Web Helper/NodeRuntime.vb",
+        "Hash":  "1F4D6FE61D085113BE9BAEC1A9E3A39FCC7449B5AE1E90E777C9DDC7F3C1B39F"
+    },
+    {
+        "Path":  "Project/Overlay On-Screen Control/NVIDIA NodeAPI/NVIDIA Web Helper/PortProbe.vb",
+        "Hash":  "0A4AA958305B353D60F11661030CAB010786386826C1D52F529F97400D626386"
+    },
+    {
+        "Path":  "Project/Overlay On-Screen Control/NVIDIA NodeAPI/NVIDIA Web Helper/Program.vb",
+        "Hash":  "8452692BCDA18D6085A1A173CFD93AC9D5B6A68B2601F54DE2A5F08834CD09C3"
+    },
+    {
+        "Path":  "Project/Overlay On-Screen Control/NVIDIA NodeAPI/NVIDIA Web Helper/README.md",
+        "Hash":  "BDC42CFC79C125EBDE2F0B1C59457A08F31EE9E1CA3C03847E7869A94A086997"
+    },
+    {
+        "Path":  "Project/Overlay On-Screen Control/NVIDIA NodeAPI/OSC-CAPTURE-CODEC-CATALOG-20261024.md",
+        "Hash":  "307B65C1D0E6DDCB3D2C5FA5E0AFC273BDEBEF58C2A61562B6AFE132C5718CBC"
+    },
+    {
+        "Path":  "Project/Overlay On-Screen Control/NVIDIA NodeAPI/OSC-CAPTURE-UI-FAIL-CLOSED-20261024.md",
+        "Hash":  "A355202C97DB2A4059736829BD784CAB447E52E34C378F93675E55C92B96EA53"
+    },
+    {
+        "Path":  "Project/Overlay On-Screen Control/NVIDIA NodeAPI/osc/mods/notifier/README.md",
+        "Hash":  "46DBABDDF5C8F59F200E18835D740E9EB23C2864FF7AA8EF11CDFCF4B9F8CD4E"
+    },
+    {
+        "Path":  "Project/Overlay On-Screen Control/NVIDIA NodeAPI/tools/FREESTYLE-V5-CEF-RAF-AUDIT-20261023.md",
+        "Hash":  "C94FCFA2F8DADBEAB8CB7FBF9C58F0A55990CF4E9FF6871A6BE146CF8BA2346E"
+    },
+    {
+        "Path":  "Project/Overlay On-Screen Control/NVIDIA NodeAPI/tools/FREESTYLE-V5-RELEASE-QA-20261023.md",
+        "Hash":  "EB2467C566AF2B93D511A82605B42886D71E155628EE1B54FBCB02A22A6B8192"
+    },
+    {
+        "Path":  "Project/Overlay On-Screen Control/NVIDIA NodeAPI/tools/OSC-MOTION-SETTINGS-QA-20261024.md",
+        "Hash":  "EC9FED802C46D11F5A7BD073F0F4AEBAFF283B6C5F1AE3FF2988D398220745EF"
+    },
+    {
+        "Path":  "Project/Overlay On-Screen Control/NVIDIA NodeAPI/tools/README-NEXT-LAYOUT-V5.md",
+        "Hash":  "B754852AF1B685749293289974801A156B8890B303348FBF6E54504526B9D361"
+    },
+    {
+        "Path":  "Project/Overlay On-Screen Control/NVIDIA NodeAPI/tools/README-NEXT-V5-NATIVE.md",
+        "Hash":  "DEED6A5F5757B0E552E6EB28BF1CE4C1840E10D3EAD7717DCCAC4BF4CDC8CE15"
+    },
+    {
+        "Path":  "Project/Overlay On-Screen Control/NVIDIA NodeAPI/tools/README-OSC-LIVE-PREVIEW.md",
+        "Hash":  "5CA869CC6AEB488B0C4C0EF0D8C5F26BE1BA4A859DBDE23EE1F566D19213ADCA"
+    },
+    {
+        "Path":  "Project/Overlay On-Screen Control/NVIDIA NodeAPI/tools/README-OSC-PREVIEW.md",
+        "Hash":  "EAE5AE10FC83F62C60D53A56D21BF796E69DF9F8DE1EF4A63E2100B0EB026739"
+    },
+    {
+        "Path":  "Project/Overlay On-Screen Control/NVIDIA NodeAPI/tools/osc-preview-audit.ps1",
+        "Hash":  "2EE793FCC8B668193B5C1ECDD4AF1B6C33BE3DF9D9445289089F6AC1534BE851"
+    },
+    {
+        "Path":  "Project/Overlay On-Screen Control/NVIDIA OSC/README.md",
+        "Hash":  "49284FD8C7943D89120AB354FB76F0C59855F600BC1E37DBB381033DE7F58685"
+    },
+    {
+        "Path":  "Project/Overlay On-Screen Control/NVIDIA OSC/build_test/README.md",
+        "Hash":  "A3A319EB079F358BCFFA94448CE7DEC60507C0E5F8536E1AB8BDECCC85AACFF7"
+    },
+    {
+        "Path":  "Project/Overlay On-Screen Control/NVIDIA OSC/build_test/build-osc-test.ps1",
+        "Hash":  "AD781EBCADA46A61F0A1D7182EE57664DAA0AA5B401A8E869B65588B3A3AC123"
+    },
+    {
+        "Path":  "Project/Overlay On-Screen Control/NVIDIA OSC/src/OscFramePublisher/OscD3D10FramePublisher/README.md",
+        "Hash":  "06F277E338A3B007164D47CE16E3AD6244E398DFD516079B7F57DDEB11A2034A"
+    },
+    {
+        "Path":  "Project/Overlay On-Screen Control/NVIDIA OSC/src/OscFramePublisher/OscD3D11FramePublisher/README.md",
+        "Hash":  "2BC5615A14390710F1ECD5C9662D6E72337D7CE61A173B127ADBC7FC91FEE1DF"
+    },
+    {
+        "Path":  "Project/PROJECT-MAP.md",
+        "Hash":  "ED8E4EA009A0C2CDDE019334FE28831ACBEA48F6298DF7F8448D6A4071777D6E"
+    },
+    {
+        "Path":  "README.md",
+        "Hash":  "BC9A7E83FFCB53F5C5C3261DABFE4B31BF874D078A79D11EF0C1D86C9C22A757"
+    },
+    {
+        "Path":  "README.th.md",
+        "Hash":  "D92FC528AFDBE509A762FA52B799417732BDD7AB1B77E83DEC6C65F996407C89"
+    },
+    {
+        "Path":  "Scripts/build-ansel.ps1",
+        "Hash":  "B3220B9B2E798D5D07EBCBA7936425F9222D2990D20BD0E008A78E876521483F"
+    },
+    {
+        "Path":  "Scripts/build-dev.ps1",
+        "Hash":  "D2823562C8C503FFB40A9AA150AF5726CBBEA673DC24366B784AE5F7923FF875"
+    },
+    {
+        "Path":  "Scripts/build-osc-remote.ps1",
+        "Hash":  "E1FBCF307310E6ADFA5723D33D5FFF4D34F674BB0145FDC32C8F0AE314EAFAD7"
+    },
+    {
+        "Path":  "Scripts/deploy-osc-genuine.ps1",
+        "Hash":  "CAB79C767AE0DB2204E2A95C6BB7D6377A77F7261E76816B1DECFF0418B22697"
+    },
+    {
+        "Path":  "Scripts/deploy-osc-perf1.ps1",
+        "Hash":  "3AB37C52E7CB752FEC2694C36D2F7853961662FBBEC0682A326D3F0C996BE878"
+    },
+    {
+        "Path":  "Scripts/deploy-osc-remote.ps1",
+        "Hash":  "5FE8BA90CF2FD509E497D28D1B9E211583F4F9AE4937F9A9E27B23EE591576FF"
+    },
+    {
+        "Path":  "Scripts/legacy/build-all.ps1",
+        "Hash":  "6CCCF40209FA6FCC407E811B43CB51D2400E07F862F75B1ECF4448ED95C7AC16"
+    },
+    {
+        "Path":  "Scripts/legacy/build-dev.ps1",
+        "Hash":  "B2A4803ECB0520AC26DE831CBB802A7277E00DC2B0977B66A819C6827A41E81E"
+    },
+    {
+        "Path":  "Scripts/legacy/diag-recording.ps1",
+        "Hash":  "29E6FFC450B4676B5A7F33D010953C5164996C91177602C4DAB2DE03A8CAD84F"
+    },
+    {
+        "Path":  "Scripts/legacy/diag-startup.ps1",
+        "Hash":  "F9B247C24CCF480712D1ED674B353F7F7B22650BF24BAF6BC28F7729DA06C5C2"
+    },
+    {
+        "Path":  "Scripts/legacy/forensics/analyze-forensic-output.ps1",
+        "Hash":  "BD57649B4F25B29D1E638FD187285341BDEC6B6E0C40948EF9C6044F8041A7FC"
+    },
+    {
+        "Path":  "Scripts/legacy/forensics/extract-forensic-data.ps1",
+        "Hash":  "4168B2723F2CF9DD3450406BF9C1D743B7D6BCB17FFF109E42EE37959A25FE44"
+    },
+    {
+        "Path":  "Scripts/legacy/forensics/extract-timing-data.ps1",
+        "Hash":  "3F47ED09742E8F7D4E00C59522796ABB9AC62D00CA598D052543F2D544775F65"
+    },
+    {
+        "Path":  "Scripts/legacy/recording/record-baseline-01.ps1",
+        "Hash":  "81561833670C98C884054699156580A7A6154D8FFC68C167D5C30498F6DB4D8E"
+    },
+    {
+        "Path":  "Scripts/legacy/run-recording.ps1",
+        "Hash":  "B156A4EC0181DE08B57C76275DB36CF4DEB52B8608CCD86B904C5CC77154448E"
+    },
+    {
+        "Path":  "Scripts/legacy/stress-startup.ps1",
+        "Hash":  "43AB6FF8D41A745181527650C59869E79138035A9626A52BBB579F9FC3965BBC"
+    },
+    {
+        "Path":  "Scripts/legacy/sync-verify.ps1",
+        "Hash":  "F4714126E80CAC4A00F72CC72F7570B05634C1CA969746BA9C92B10972BDA31A"
+    },
+    {
+        "Path":  "Scripts/legacy/test-autospawn.ps1",
+        "Hash":  "B4A904A24FE2B9CB3CAF32418EA73CD0E6DBA3911E0F9CBF5901AE2C9FD918A0"
+    },
+    {
+        "Path":  "Scripts/legacy/test-level1-reconnect.ps1",
+        "Hash":  "43D8DBF7E0791A2B8591E449BF5314203D9CDDCB69FE86080A46EA241F0A1B00"
+    },
+    {
+        "Path":  "Scripts/legacy/validate-phase12b.ps1",
+        "Hash":  "AA43A6D44B8298B16C24C2BF2D7F2453B22A38AE0B51AD7E8AF114E1D8B67630"
+    },
+    {
+        "Path":  "Scripts/legacy/windows-phase1-video-validation.ps1",
+        "Hash":  "F2A0E2C6ED37A212E8EE92B1B424F3FF3E8C648A21FB3A5708E8E8DEECA70D89"
+    },
+    {
+        "Path":  "Scripts/restart-osc-console.ps1",
+        "Hash":  "CA7FAA3C2329DA3ADF001878C893271A5741CED40B6A3318BCBD7C62ADC3286A"
+    },
+    {
+        "Path":  "Scripts/verify-dx9-reshade.ps1",
+        "Hash":  "116E726B892F5802CD0635AE6284F082DEAA4CD78824426D144FC1DC8AADCADF"
+    },
+    {
+        "Path":  "Scripts/verify-dx9.ps1",
+        "Hash":  "A7A31671ED6527709D258556483FF04AD43C7F5DF7436A8623EE033A2DC5CECC"
+    },
+    {
+        "Path":  "Server/CBT1-SETUP.md",
+        "Hash":  "135AAA77948F756F893DF7A46958414627620E6080512D98608FA5E3FAF70AD6"
+    },
+    {
+        "Path":  "Server/Duluka.Server.Manager/Duluka.Server.Manager.csproj",
+        "Hash":  "1E691F4F5A0510D1B8F6CCC67966AE6BC1B74679B954EB13BC9F8BE63220D45D"
+    },
+    {
+        "Path":  "Server/Duluka.Server.Manager/MainForm.cs",
+        "Hash":  "292755C91E298433A88CC0B4ECD45332DDEDF25A39614B735E4AC9E56700BD4C"
+    },
+    {
+        "Path":  "Server/Duluka.Server.Manager/Program.cs",
+        "Hash":  "FFF11914B53D07E8B4DB6194FB9CB04C57821F690D954248D6EB6E3A376BB1DC"
+    },
+    {
+        "Path":  "Server/Duluka.Server.Manager/UiTheme.cs",
+        "Hash":  "8F9A414049CD78D6DC799CE8EE962851EE162B2053F41C0FDA0662C78108B23A"
+    },
+    {
+        "Path":  "Server/Duluka.Server/Admin/AdminConsole.cs",
+        "Hash":  "9EEA82259927B7539A915BC95255B4258AD4FC71E9D1C7B3AFD0750C7BE898E3"
+    },
+    {
+        "Path":  "Server/Duluka.Server/Admin/AdminLogBuffer.cs",
+        "Hash":  "A0A57554B36383BC611C5BB62AE5F60571DFC67EFA7A6B0BF269E274AEBD2FFA"
+    },
+    {
+        "Path":  "Server/Duluka.Server/Auth/GitHubOAuth.cs",
+        "Hash":  "C459CF72137E46912A0B64CC5059F7DE517C210F80E71B78F3F684E9740F15C9"
+    },
+    {
+        "Path":  "Server/Duluka.Server/Auth/SessionService.cs",
+        "Hash":  "6739307DEB9BFBB330BFD210076F9AF28E0D85CFAB966008517516322358CF6A"
+    },
+    {
+        "Path":  "Server/Duluka.Server/CBT1/Cbt1Registration.cs",
+        "Hash":  "E059F20AC9295D13D0E154BA1353120CA48CB79C0BB4FE17629DF96FAE9B7EA5"
+    },
+    {
+        "Path":  "Server/Duluka.Server/Data/AdminQueries.cs",
+        "Hash":  "A641015210A925C387FB948DD9E48A2E9D29C3C62244453DA41E8B93D7D9B9C9"
+    },
+    {
+        "Path":  "Server/Duluka.Server/Data/Database.cs",
+        "Hash":  "E34372E07451D8C790956252CC5550B571C0B5C8BAD031D9DAAFAAC12614860D"
+    },
+    {
+        "Path":  "Server/Duluka.Server/Domain/Entities.cs",
+        "Hash":  "874EB880F6FA154D97889057FE9E837C6AC77B8188FE2B11138AB7F9F8555899"
+    },
+    {
+        "Path":  "Server/Duluka.Server/Duluka.Server.csproj",
+        "Hash":  "0D8C9118EBEDA8F51A2EE1F59EF53CD3B079BA39278E6854A9B07E08219E2CBE"
+    },
+    {
+        "Path":  "Server/Duluka.Server/Program.cs",
+        "Hash":  "2F78816B09F615ABB05A01662681362453AF2A310640C54F29949B41E076CF4B"
+    },
+    {
+        "Path":  "Server/Duluka.Server/Security/Secrets.cs",
+        "Hash":  "620EAFC331CAB3331CF30061BCBC81C3AC99A16CE27934D568BF356932DDF88A"
+    },
+    {
+        "Path":  "Server/README.md",
+        "Hash":  "23CFE6CC0689BB36934916CD2D8822EA413C5B47259B9FA66C8C5B5553E61EAE"
+    },
+    {
+        "Path":  "Server/run-server.ps1",
+        "Hash":  "7C32E2787F03736269167B53DC83D8441D2F19AA6CF431FCAEC75FEEF2C49C55"
+    },
+    {
+        "Path":  "Tester/Spikes/D3D11_NVENC_Spike/CaptureEngine.Video.Spike.D3D11.csproj",
+        "Hash":  "B4C5E792FC8D0F8A740781A7454EC5F9A24DF0A9C199F71D33B348724BBFD3CA"
+    },
+    {
+        "Path":  "Tester/Spikes/D3D11_NVENC_Spike/D3D11_NVENC_Spike_Report.md",
+        "Hash":  "967E22152B8DC8872AF20172C273D5D43D503AFF4CEFD7321BBA97D0F107D56F"
+    },
+    {
+        "Path":  "Tester/Spikes/D3D11_NVENC_Spike/Phases/Phase10_RealRecording.cs",
+        "Hash":  "18B9B7E3E9F474E6EA39F7BBA3D43A20F34D6CAD438283BE0A453E81054665BE"
+    },
+    {
+        "Path":  "Tester/Spikes/D3D11_NVENC_Spike/Phases/Phase11_SessionLifecycle.cs",
+        "Hash":  "CE7BB603AFD0E2FF664D32DA71D72D76B5AD453E4FB32C6CE29A1532441C09A1"
+    },
+    {
+        "Path":  "Tester/Spikes/D3D11_NVENC_Spike/Phases/Phase1_DeviceTest.cs",
+        "Hash":  "D9F7326A2128BF37B34D4603BA982B4822108E8D382B743CA64B316759304D4C"
+    },
+    {
+        "Path":  "Tester/Spikes/D3D11_NVENC_Spike/Phases/Phase2_DesktopDuplication.cs",
+        "Hash":  "6FEB6B952426ED54C75BA6984C925558DAB863DD9FDB86AAE6ED1A14DDC2352F"
+    },
+    {
+        "Path":  "Tester/Spikes/D3D11_NVENC_Spike/Phases/Phase3_TextureOwnership.cs",
+        "Hash":  "A4DEF76C4F8AA9B5D46A0590BD375362B84EBEF9D045B3F0A209249F0029FC4A"
+    },
+    {
+        "Path":  "Tester/Spikes/D3D11_NVENC_Spike/Phases/Phase4_NVENCRegistration.cs",
+        "Hash":  "ACC9A9928AE48B7B267A9445F15E610FE6D6A21C8C0E16C1E116A4B46C490451"
+    },
+    {
+        "Path":  "Tester/Spikes/D3D11_NVENC_Spike/Phases/Phase5_PerformanceBenchmark.cs",
+        "Hash":  "0C5741DB6CA3D33D49402A703FB773BF4D8E6A19466DE540155EBC31389B2B4C"
+    },
+    {
+        "Path":  "Tester/Spikes/D3D11_NVENC_Spike/Phases/Phase6_MinimalEncode.cs",
+        "Hash":  "2B7898D0029B019FDB27FFC404B67860352FB108E007AC96AD6159208B4DA9D6"
+    },
+    {
+        "Path":  "Tester/Spikes/D3D11_NVENC_Spike/Phases/Phase7_FullPipelineLoop.cs",
+        "Hash":  "6D32981815048B0FFF189DD1EE1F40491A7D566CD814B39049153358352DC3E1"
+    },
+    {
+        "Path":  "Tester/Spikes/D3D11_NVENC_Spike/Phases/Phase8_Profiling.cs",
+        "Hash":  "B480E9FC5B1AC9635EB53A024B0A435F17AD6C61A61DB4CDEEA6F0E273422738"
+    },
+    {
+        "Path":  "Tester/Spikes/D3D11_NVENC_Spike/Phases/Phase9_SynchronizationIsolation.cs",
+        "Hash":  "F3BC8D2B1E54D20C0BF4C9A1C2D306F7CA9BA74747443C3D3C6F0FB659AC9D5C"
+    },
+    {
+        "Path":  "Tester/Spikes/D3D11_NVENC_Spike/Program.cs",
+        "Hash":  "C6B64600AE6EC1D4714530BD13BAD8AB93C15A43633A62F242B964E963BFA60D"
+    },
+    {
+        "Path":  "Tester/Spikes/D3D11_NVENC_Spike/README.md",
+        "Hash":  "411C2097D8D45D07667C09E2D4312F9A4CFDCABAE101E6D8AD9048D40D642BB5"
+    },
+    {
+        "Path":  "Tester/Spikes/D3D11_NVENC_Spike/Utils/GpuInfo.cs",
+        "Hash":  "CC0E9CE9620F372B0129B80C9B23BEF8BA2D594ABCC7265186648FA8C917AEE3"
+    },
+    {
+        "Path":  "Tester/Spikes/D3D11_NVENC_Spike/Utils/Metrics.cs",
+        "Hash":  "8B8697A3DD735EC95AAF4C94892EAC247916F9FB470E55303345952B3EAAA6E4"
+    },
+    {
+        "Path":  "Tester/Spikes/D3D11_NVENC_Spike/Utils/NvEncodeAPI.cs",
+        "Hash":  "8F5E51CCBDB92ECA96CA927F98ED7B91E9F98F193D04A3DCFA2F247343B9E54E"
+    },
+    {
+        "Path":  "Tester/Spikes/Ddagrab_Nvenc_Integration_Spike/DdagrabNvencIntegration.csproj",
+        "Hash":  "1C7ADBE4A6B786F6B2E75300F3D93265276B27539EC71F0E5B5755C2BA9482D9"
+    },
+    {
+        "Path":  "Tester/Spikes/Ddagrab_Nvenc_Integration_Spike/EVIDENCE.md",
+        "Hash":  "0222A30E1FFCD1E05DB205B7837AAE7EA0CE3B0509F2B6AF69A8AFBFA0272C35"
+    },
+    {
+        "Path":  "Tester/Spikes/Ddagrab_Nvenc_Integration_Spike/Program.cs",
+        "Hash":  "462CC0B93899FA561A46C29ACB40370D4A2A1334A4E6ED8563FA791A62887B95"
+    },
+    {
+        "Path":  "Tester/Spikes/V2_WGC_Timestamp_Spike/Program.cs",
+        "Hash":  "0BB9E5D327366EDEC96428F734C96B9CFE3FA66C1905413ABDCA26514A05F978"
+    },
+    {
+        "Path":  "Tester/Spikes/V2_WGC_Timestamp_Spike/Tests/ForbiddenMultiplyTests.cs",
+        "Hash":  "ABCD7E3EDC5C728E02C611F1674E49FD874628552A16377A77F8CBB7A1001391"
+    },
+    {
+        "Path":  "Tester/Spikes/V2_WGC_Timestamp_Spike/Tests/LongDurationTests.cs",
+        "Hash":  "6B212AA6E365B4355C7CED428DD0159FCCF3BEA0493A7FE1910C76B10775FC0B"
+    },
+    {
+        "Path":  "Tester/Spikes/V2_WGC_Timestamp_Spike/Tests/QpcSeparationTests.cs",
+        "Hash":  "DF45D3BDC90DF44596F795577229E37ACE5EE2139213460B1E1664498E80ACCA"
+    },
+    {
+        "Path":  "Tester/Spikes/V2_WGC_Timestamp_Spike/Tests/TimestampBoundaryTests.cs",
+        "Hash":  "3E1C0C1A9651ED6A2A17610DF19CC680AD112A0239FF76A64E3903314CE9757A"
+    },
+    {
+        "Path":  "Tester/Spikes/V2_WGC_Timestamp_Spike/Tests/TimestampMathTests.cs",
+        "Hash":  "4491826F97CE8E0E3353A7A2F6478F080788938196E28CCFFFF284DE3B676FB7"
+    },
+    {
+        "Path":  "Tester/Spikes/V2_WGC_Timestamp_Spike/Tests/TimestampMonotonicityTests.cs",
+        "Hash":  "E2CE1D19991AF52B778663F6BCE9FEBFD6AB9DCF984F4BB8BCC6C9BE997E2ED2"
+    },
+    {
+        "Path":  "Tester/Spikes/V2_WGC_Timestamp_Spike/V2_WGC_Timestamp_Spike.csproj",
+        "Hash":  "CB2DFFE042225145AF6ED9A07006F70FFAB08E71BB30AA0CD5D94D261DD650D5"
+    },
+    {
+        "Path":  "Tester/Spikes/V3_WGC_Runtime_Timestamp_Spike/Direct3D11Helper.cs",
+        "Hash":  "3346FDAFE72A4C92BFE70A6EDCCF64CA4FF7DEEAB8F204F4055CEF31E1FE3D34"
+    },
+    {
+        "Path":  "Tester/Spikes/V3_WGC_Runtime_Timestamp_Spike/Program.cs",
+        "Hash":  "4A9D08C4975AA122D86F92A911FB9F0D17AA656FB0011E5E1B687D353E1BFF24"
+    },
+    {
+        "Path":  "Tester/Spikes/V3_WGC_Runtime_Timestamp_Spike/README.md",
+        "Hash":  "BDFE5775CCF853B4E9B361C60F912412D113D4E742ADACCD9211EF7661E10407"
+    },
+    {
+        "Path":  "Tester/Spikes/V3_WGC_Runtime_Timestamp_Spike/V3_WGC_Runtime_Timestamp_Spike.csproj",
+        "Hash":  "168DD8AC7086921E2AE815DBECE35165C05D8A8D19C4CEF0AA8B46F6E2CD3FD4"
+    },
+    {
+        "Path":  "Tester/Spikes/V4_WGC_Timestamp_EdgeCase_Spike/ActiveContentGenerator.cs",
+        "Hash":  "D97FEB0AABBB71C02172AF2DA28C4A8179555CFBC747EA4CEB79757FBDE96894"
+    },
+    {
+        "Path":  "Tester/Spikes/V4_WGC_Timestamp_EdgeCase_Spike/Direct3D11Helper.cs",
+        "Hash":  "DFA912AB908FC0315084046F9796C287731B6D4167C72D959C20668E3CC58D4B"
+    },
+    {
+        "Path":  "Tester/Spikes/V4_WGC_Timestamp_EdgeCase_Spike/EvidenceWriter.cs",
+        "Hash":  "8992F159B97FD59DE411A82CD059742E884D87544EB98FF52F67969D2CF7726F"
+    },
+    {
+        "Path":  "Tester/Spikes/V4_WGC_Timestamp_EdgeCase_Spike/FrameRecord.cs",
+        "Hash":  "208CBB9A846F588545493D7F5183B89E778A0D55715885ED992C1A813CEC8B91"
+    },
+    {
+        "Path":  "Tester/Spikes/V4_WGC_Timestamp_EdgeCase_Spike/LoadGenerator.cs",
+        "Hash":  "4B9641F53298EACCB49DC4D5303618C2538FFD56AD93C5AC21A0761CB972EFA6"
+    },
+    {
+        "Path":  "Tester/Spikes/V4_WGC_Timestamp_EdgeCase_Spike/Program.cs",
+        "Hash":  "14A487E701276632EFD01C30BCB826ADC6DF5B3ED08DA5D96375AAA96BA04F95"
+    },
+    {
+        "Path":  "Tester/Spikes/V4_WGC_Timestamp_EdgeCase_Spike/README.md",
+        "Hash":  "BE3BA4127D4CDBC09FCB937BAC0A7200BA29E8E856364D860D2C3CAB68F06692"
+    },
+    {
+        "Path":  "Tester/Spikes/V4_WGC_Timestamp_EdgeCase_Spike/SessionResult.cs",
+        "Hash":  "316039BB9937C424EF91B7060DE946553942A61B7672E37770BF235A408DAA40"
+    },
+    {
+        "Path":  "Tester/Spikes/V4_WGC_Timestamp_EdgeCase_Spike/TimestampAnalyzer.cs",
+        "Hash":  "F0A4236A3335EE83216E02A816A05A8B2264789EC61BAAD7CA43AC6A1180C56D"
+    },
+    {
+        "Path":  "Tester/Spikes/V4_WGC_Timestamp_EdgeCase_Spike/V4Spike.csproj",
+        "Hash":  "9C6C08E9B831712EA3BA6B51298FEBE1283F60E11D2D0633139236F58C32A84A"
+    },
+    {
+        "Path":  "Tester/Spikes/V4_WGC_Timestamp_EdgeCase_Spike/WgcSession.cs",
+        "Hash":  "7D7393F7EF00EEAAB3A069F5AFCECED6B9D4968D5C3BE1D1AD2DC9AC2E3F12EC"
+    },
+    {
+        "Path":  "Tester/Spikes/V5_WASAPI_Position_Spike/Program.cs",
+        "Hash":  "2EF14451E370CACCD1F78AD59DDD1D9BBD0E69377EE72116CA6074DF1E1F4619"
+    },
+    {
+        "Path":  "Tester/Spikes/V5_WASAPI_Position_Spike/README.md",
+        "Hash":  "9377DC0BB7E7422953C9BEFF18DABED741F9597694B702ACADBF35BCB503A57F"
+    },
+    {
+        "Path":  "Tester/Spikes/V5_WASAPI_Position_Spike/V5Spike.csproj",
+        "Hash":  "7696B9F8A0A0BDCD29BE000982152B5EF47EF274C0188FDD3CC92AA25B490744"
+    },
+    {
+        "Path":  "Tester/Spikes/V5_WASAPI_Position_Spike/WasapiDirectInterop.cs",
+        "Hash":  "063EF9F1EAF33753B9A207705FBD2CD767C4CC639E8BEF343A33197CD195D886"
+    },
+    {
+        "Path":  "Tester/Spikes/V5_WASAPI_Position_Spike/evidence/ANALYSIS.md",
+        "Hash":  "5B67B341C8D7E22C114EB53A2549C09F4AB3EED2A6ECE66967F48DD79C272E49"
+    },
+    {
+        "Path":  "Tester/Spikes/legacy/CaptureSession-no-delay.vb",
+        "Hash":  "78A4C666FBD4784D049BEB5011E61D727679D4B05873F8488C4A663EAF2BCCAC"
+    },
+    {
+        "Path":  "Tester/test-recordings/fps-matrix/FPS-MATRIX-REPORT-M2W3.md",
+        "Hash":  "24FBBA6AE09E7383A00EA45D845A33B465E3B40ECF39BFD0B1DD018B8CA8D507"
+    },
+    {
+        "Path":  "Tester/test-recordings/fps-matrix/analyze-pts.ps1",
+        "Hash":  "0A3680634C108F1CEA10C41AB2FB1DC44123B816B949C280957074B9684E54E4"
+    },
+    {
+        "Path":  "Tester/test-recordings/fps-matrix/list-test-ids.ps1",
+        "Hash":  "CD9B1262DD5EC9AF94819C1B5434BF55E9D50D9C8B9FA630A06A212D04EB1F0E"
+    },
+    {
+        "Path":  "Tester/test/API/Hub-Boundary/API.Hub.Boundary.Tests.vbproj",
+        "Hash":  "0BE948DBE8252746D732A8632E5B841A15F5CCD63E74B7837F888B0CEEAB80FF"
+    },
+    {
+        "Path":  "Tester/test/API/Hub-Boundary/Program.vb",
+        "Hash":  "36BBA811B21BF0A3FD3B7376C0D5CE279758DAF109EAE6555C134EA86AEDF98C"
+    },
+    {
+        "Path":  "Tester/test/Duluka/Account/Contract/DulukaContractTests.vb",
+        "Hash":  "69E5A77D8DD1713A59FC9780A4FEA3873FC163E6E78B4E1398A3079E3DCE8599"
+    },
+    {
+        "Path":  "Tester/test/Duluka/Account/Contract/DulukaContracts.vb",
+        "Hash":  "EEB78B5FF11CE4D8F7FA058FB0AE3C566E82D49045888FF9B5F506EE06D35C11"
+    },
+    {
+        "Path":  "Tester/test/Duluka/Account/Contract/InMemoryDulukaAccountService.vb",
+        "Hash":  "BC798D15D7D4FDA31210D9DD195C09F44448DF0B0FCDF45FBCC7CFFE4E92D287"
+    },
+    {
+        "Path":  "Tester/test/Duluka/Account/Duluka.Account.Tests.vbproj",
+        "Hash":  "1BB92CB61A047EA6B134E5A9DEFEE851584232D0D842A57FFBE23DB7AFA85962"
+    },
+    {
+        "Path":  "Tester/test/Duluka/Account/DulukaHttpContractProbe.vb",
+        "Hash":  "9B519D9A5C1B92ABE73017E92F26F2BF083C32CF7105300B5855EC60295DE29A"
+    },
+    {
+        "Path":  "Tester/test/Duluka/Account/Program.vb",
+        "Hash":  "D419FB29F15880488B35415DA796C9A9DEEC2BDE6CDFDEA2C00F70FF0CBEA84F"
+    },
+    {
+        "Path":  "Tester/test/Duluka/Account/TEST-MATRIX.md",
+        "Hash":  "EF0E6F5BF62E038D4337F455B92A3E3446A0BEF687A54403EBF06D568114C834"
+    },
+    {
+        "Path":  "Tester/test/Duluka/HttpIntegration/Duluka.Http.Integration.Tests.csproj",
+        "Hash":  "697C17C2D96226B1AEC438C25184D7F72EB389989A9F1BDDA5AAD32401930E52"
+    },
+    {
+        "Path":  "Tester/test/Duluka/HttpIntegration/Groups.cs",
+        "Hash":  "AF485371A62FD15EDFD543429691B9EEAED8E2B72C8CB461EA3769FA2697D8BD"
+    },
+    {
+        "Path":  "Tester/test/Duluka/HttpIntegration/Harness.cs",
+        "Hash":  "661A2E5EEBBA5C5B36E141C0C7D49E73877F89880DC45F67010F43F5683ED344"
+    },
+    {
+        "Path":  "Tester/test/Duluka/HttpIntegration/Program.cs",
+        "Hash":  "45B52F90C6C2AA55B06D6244F17FBD9816F27731E1F5494C5FF4AC19EBE68136"
+    },
+    {
+        "Path":  "Tester/test/Duluka/HttpIntegration/TEST-MATRIX.md",
+        "Hash":  "ADE933D17C9D46CEB0DDBA2A2056B9133C2E67C58381D03C8EB17524D47B25E8"
+    },
+    {
+        "Path":  "Tester/test/Duluka/Server/Duluka.Server.Tests.csproj",
+        "Hash":  "0AD871F3422B21AC57381DDCAD7056A4B979E5D3C58E46F070A0D4411A79FA34"
+    },
+    {
+        "Path":  "Tester/test/Duluka/Server/Program.cs",
+        "Hash":  "D92CFAAAA5131A5297843DF6F3903FD6793561C417E8BD27E6E6887BC371EA2B"
+    },
+    {
+        "Path":  "Tester/test/Engine/Concurrency/Engine.Concurrency.Tests.vbproj",
+        "Hash":  "8F4F273D0AF2DA4C14A665523F63F1461AA59975B3C868CD940FD2BF9F22BC78"
+    },
+    {
+        "Path":  "Tester/test/Engine/Concurrency/F03LegacyTests.vb",
+        "Hash":  "B8B4EC428F304D4197B667C63BD0229136498F4A1CFCDA85EADDD1A7EF93B6DC"
+    },
+    {
+        "Path":  "Tester/test/Engine/Concurrency/G2LegacyEngineTests.vb",
+        "Hash":  "3008509F6CF6B15361F0D41C6C9DE7D5561D3E17B81EFE4F174BB4FBC411D1B0"
+    },
+    {
+        "Path":  "Tester/test/Engine/Concurrency/G3LegacyEngineTests.vb",
+        "Hash":  "126CFD8A4ED7E9C5630F0E358E0F2F5691D971452799BAC66912ECB91EF9C31A"
+    },
+    {
+        "Path":  "Tester/test/Engine/Concurrency/GithubTokenSecurityTests.vb",
+        "Hash":  "3155D6C0EA139E63366ADE6B0E86BB17CE0BFCA0EB3CD2886597B172AB47D3E7"
+    },
+    {
+        "Path":  "Tester/test/Engine/Concurrency/HardwareGate.vb",
+        "Hash":  "1AC13982C0C56C520128A76406549635A291548CDDBD7A0C7BB575CA62CA820F"
+    },
+    {
+        "Path":  "Tester/test/Engine/Concurrency/M1M2Tests.vb",
+        "Hash":  "D75B821E8B4B95074EC3675A7711BE631034D285A8E5D716BEA252D0A1C31C99"
+    },
+    {
+        "Path":  "Tester/test/Engine/Concurrency/MediaAssert.vb",
+        "Hash":  "1E987C7CA6B08F3BA06CEFE360021B49D9A65DF7F96A1837C834574B72E2217B"
+    },
+    {
+        "Path":  "Tester/test/Engine/Concurrency/NvidiaProofTests.vb",
+        "Hash":  "B682EA74078B5E0966708982560D3B2A58865870FE187FEAE7887B38D448B3CE"
+    },
+    {
+        "Path":  "Tester/test/Engine/Concurrency/Program.vb",
+        "Hash":  "43D961BCB054F7BCC70F20CD3B018A6CF17D4FBEBC5ECD2FBA2B38D66DD6FA09"
+    },
+    {
+        "Path":  "Tester/test/Engine/ConfigTruth/CT4ConfigTruthTests.vb",
+        "Hash":  "7CC1C5B1B672C2832CDFF2E7A185A489CB28D5D7406DA2DE33CB4177B0F8B30E"
+    },
+    {
+        "Path":  "Tester/test/Engine/ConfigTruth/Engine.ConfigTruth.Tests.vbproj",
+        "Hash":  "07345688FA2CBFF73CCBE9B8D1F9C0BD0304192F146CC645AEE72FEAD04D1DD9"
+    },
+    {
+        "Path":  "Tester/test/Engine/ConfigTruth/FrameRetirementContractTests.vb",
+        "Hash":  "4E02FF8F7B4F2D9896BEA42485CA6C0F318193D910ED42EC0DE3BB50B3AF2907"
+    },
+    {
+        "Path":  "Tester/test/Engine/ConfigTruth/GetEngineModeTests.vb",
+        "Hash":  "CC0C26F20CBC6DFD673EE3EE45D5690E3BED4FC5AEC07E132FBCA574834CA94B"
+    },
+    {
+        "Path":  "Tester/test/Engine/ConfigTruth/H1OutputPathTests.vb",
+        "Hash":  "C6A387BFDFA3E4199AE94F3CD1F617C99DC6C84B881A4196FC459E7AB48A03E5"
+    },
+    {
+        "Path":  "Tester/test/Engine/ConfigTruth/L1ReconnectTests.vb",
+        "Hash":  "EA3BD3F0A5BAC2D6BE23BA46A7AB50E54336EAB1D1DD69BE987CF944FEC21A49"
+    },
+    {
+        "Path":  "Tester/test/Engine/ConfigTruth/P3UIContractTests.vb",
+        "Hash":  "3B0FE39580FCE65625DB6E584404DE53585DBFE1CD6449B8C6F85B703BFA7795"
+    },
+    {
+        "Path":  "Tester/test/Engine/ConfigTruth/Program.vb",
+        "Hash":  "27E04FAF9AD629BCEF04A8164F1D3A1207E03C01128A7407A65BE6245150D470"
+    },
+    {
+        "Path":  "Tester/test/Engine/ConfigTruth/SessionEndContractTests.vb",
+        "Hash":  "4D78020E7B7CECF7D77485F0B09B99C36E3A9DEFF19D8AB23B6F5FD56F3B96A3"
+    },
+    {
+        "Path":  "Tester/test/Engine/ConfigTruth/TestShims.vb",
+        "Hash":  "7AED75C0820587562F2297A674E2D849C55BAF3304D3241B0271483F802F3B18"
+    },
+    {
+        "Path":  "Tester/test/Engine/ConfigTruth/VCTVideoWiringTests.vb",
+        "Hash":  "51D6F1F736D44EB9B198413A3551CBD40F52275859A50AF982E9AF0396C882BF"
+    },
+    {
+        "Path":  "Tester/test/Engine/ConfigTruth/W2OverlayHonestyTests.vb",
+        "Hash":  "60ABC727630982ADD919D99971BBE90F8D9D42F391C32979DFEF715B2BEA3567"
+    },
+    {
+        "Path":  "Tester/test/Engine/ConfigTruth/W3AudioTrackPinTests.vb",
+        "Hash":  "97DBCB1C2E322BF722BE2E8F0FE50EAC3EF658B9AF5EFB11BD92C1E4C0A88052"
+    },
+    {
+        "Path":  "Tester/test/Engine/FpsMatrix/FpsMatrixDriver.vbproj",
+        "Hash":  "674D89305D52C29A52D2FF6F7B5EA0F90A48073D9EEFACE730DF282567946321"
+    },
+    {
+        "Path":  "Tester/test/Engine/FpsMatrix/Program.vb",
+        "Hash":  "12A6EB22923432ABEEE8BDA4CC7DDC8FEFA163BAF8ACBAE26A4F71344CF0253D"
+    },
+    {
+        "Path":  "Tester/test/Engine/TimingGate/Engine.TimingGate.Tests.vbproj",
+        "Hash":  "2F71BC024AF7A8036B5D501F8FCB95A183A8A9C0EFC82F09F0B32B6796C13A67"
+    },
+    {
+        "Path":  "Tester/test/Engine/TimingGate/Gates.vb",
+        "Hash":  "1563C781B8DA7BACE0D17D4067196B7BC14DC880CFE1B3FA7F4D37D9722F155C"
+    },
+    {
+        "Path":  "Tester/test/Engine/TimingGate/L0Tests.vb",
+        "Hash":  "D480487CBB5D9A3BB0776F8EF1EEFDD3227E73A088F668950DE3C10914E25270"
+    },
+    {
+        "Path":  "Tester/test/Engine/TimingGate/L1Tests.vb",
+        "Hash":  "99F066EBEA1973D0DCFCB7D4328F0578DA38AE278DA70E0649C4C18F2122F3B7"
+    },
+    {
+        "Path":  "Tester/test/Engine/TimingGate/L2Tests.vb",
+        "Hash":  "CA6BFF70F28BC4567A9F482F994356AC2C2E3794200BD14E327D73F658A181A1"
+    },
+    {
+        "Path":  "Tester/test/Engine/TimingGate/Program.vb",
+        "Hash":  "FD631E7F640FF15FECE32EF85B217DD84C7360A1BE7AF13C8DE5C01C9B4A35E2"
+    },
+    {
+        "Path":  "Tester/test/Engine/TimingGate/PtsAnalyzer.vb",
+        "Hash":  "58D86B46EF846868498D71669FE42E24FCAAED02C9653E08265C0BA79B67F59B"
+    },
+    {
+        "Path":  "Tester/test/Engine/TimingGate/TestRig.vb",
+        "Hash":  "492FF6D7B1AC44741DF66C35A9C3FB3AEF807A7CA9012C0F2C674FEF615105C5"
+    },
+    {
+        "Path":  "Tester/test/Engine/W2ErrorPropagation/Program.vb",
+        "Hash":  "B05F42EC933E71E685FAFD2A65BACA53B70E3FDE69464979B3D5D27CCF73EB4C"
+    },
+    {
+        "Path":  "Tester/test/Engine/W2ErrorPropagation/W2ErrorPropagation.vbproj",
+        "Hash":  "4AAF5D8F26986F4F07C381D7BAF974B765C5B5999BE2B356195C91C325933163"
+    },
+    {
+        "Path":  "Tester/test/Engine/W2MuxGate/Program.vb",
+        "Hash":  "8146729FDD2A0C73FBEBDEACAD165602CF904CB42E0EAE9C064A7D6D5FCB980C"
+    },
+    {
+        "Path":  "Tester/test/Engine/W2MuxGate/W2MuxGate.vbproj",
+        "Hash":  "4A59C8964CD55511E2BAD673B365BF2C31D7FA2B97543B1CF2E80330BB9D75FD"
+    },
+    {
+        "Path":  "Tester/test/Gallery/Gallery.Video.Tests/AudioClockDomainTests.vb",
+        "Hash":  "E3E71929242F7E7EAC8B689158E30511C791F9C71D1222A1616EE90973AA0208"
+    },
+    {
+        "Path":  "Tester/test/Gallery/Gallery.Video.Tests/CompletionGate.vb",
+        "Hash":  "7F50B9E0159FC19D97236A9700074367AEB7A6EA8A0D5BD4E2F144D68262D5B2"
+    },
+    {
+        "Path":  "Tester/test/Gallery/Gallery.Video.Tests/DecodeIntegrationTests.vb",
+        "Hash":  "B82996783653D0B3DDB4E78577F2872AD98D4DDB3A47D3175EFAB07081794DC9"
+    },
+    {
+        "Path":  "Tester/test/Gallery/Gallery.Video.Tests/DecodeLivenessTests.vb",
+        "Hash":  "3DA632FCA79E395BEC5C385A3690BC1BB096F556858CBB2989E5C949A87052C8"
+    },
+    {
+        "Path":  "Tester/test/Gallery/Gallery.Video.Tests/FaultIntegrationTests.vb",
+        "Hash":  "B1152518452E4B0AC152F11A5D23EFA15A00E35DB829364B03369401F5667B40"
+    },
+    {
+        "Path":  "Tester/test/Gallery/Gallery.Video.Tests/FrameQueueTests.vb",
+        "Hash":  "A9CEAEC2FB56CDF58F687D2A9BFC2CE458717D48D9C9F208384D3B17166BD2E0"
+    },
+    {
+        "Path":  "Tester/test/Gallery/Gallery.Video.Tests/Gallery.Video.Tests.vbproj",
+        "Hash":  "77CD83C9BF5AA56F58ADBC288D32E3C6F11C93AF6295B55F01103DE1094AF847"
+    },
+    {
+        "Path":  "Tester/test/Gallery/Gallery.Video.Tests/GalleryLibraryTests.vb",
+        "Hash":  "9BCE68EDD2558096534FE4A9B2CD5E989A4FFA3F0F709C8EE9C8A8CD4D785973"
+    },
+    {
+        "Path":  "Tester/test/Gallery/Gallery.Video.Tests/HardwareGatedTests.vb",
+        "Hash":  "32B2D62F30C77E0C77386BC29A64B5CF164F01E9E4D4746283E339855CC4B7EE"
+    },
+    {
+        "Path":  "Tester/test/Gallery/Gallery.Video.Tests/MediaProbeTests.vb",
+        "Hash":  "3E69D22AF8AC29A5FE1DFAFA2F78DE2F1434204F96682330AB7C824FE612BB74"
+    },
+    {
+        "Path":  "Tester/test/Gallery/Gallery.Video.Tests/MemoryStressTests.vb",
+        "Hash":  "C9C3A590C932ED8717617246AE6756EED6EC2673E74DB25895BC7F8BF5A61DE8"
+    },
+    {
+        "Path":  "Tester/test/Gallery/Gallery.Video.Tests/PlaybackClockTests.vb",
+        "Hash":  "C9D83324BA264AA350C4E72EBF16D135F27521B75499911A50A503BAE0C3D6F3"
+    },
+    {
+        "Path":  "Tester/test/Gallery/Gallery.Video.Tests/PlaybackTimingRegressionTests.vb",
+        "Hash":  "426547B7491B1893F1C3099344D0BA7C8FD27815C02214EF6E9FD2C9B640FA55"
+    },
+    {
+        "Path":  "Tester/test/Gallery/Gallery.Video.Tests/Program.vb",
+        "Hash":  "FBFC24479B6229FCBE3A64C184FFFA09A0FCF01BA861AE7A6A4F7ECB8A1C5077"
+    },
+    {
+        "Path":  "Tester/test/Gallery/Gallery.Video.Tests/SeekIntegrationTests.vb",
+        "Hash":  "77C972A084825B128B0BAE3E21CCB82BD4C07DF8DB817C9C2DD283FD128667CF"
+    },
+    {
+        "Path":  "Tester/test/Gallery/Gallery.Video.Tests/SessionTests.vb",
+        "Hash":  "581EEAF35BD65AB51101D69EB9550DEC46C916D9BD9C098B0E27602AD70339FD"
+    },
+    {
+        "Path":  "Tester/test/Gallery/Gallery.Video.Tests/StateMachineTests.vb",
+        "Hash":  "19F2D186B89654EFD36A36F5C4391C6A4C780D6F9B1DBB1D3C0EE6BC282B2CA4"
+    },
+    {
+        "Path":  "Tester/test/Gallery/Gallery.Video.Tests/StressLoopTests.vb",
+        "Hash":  "D10B9159D891563AE72E6249D318B2F9DF0CB8E278287ADA07863F851820D0EF"
+    },
+    {
+        "Path":  "Tester/test/Gallery/Gallery.Video.Tests/TestMedia.vb",
+        "Hash":  "B7EBE98B01F4EAE32C6D64F25A61332A13BA851DA47710907997FC5809E2D07E"
+    },
+    {
+        "Path":  "Tester/test/Notifier/OBS-Resilience/FfprobeBoundaryTests.vb",
+        "Hash":  "4713C9C5E30B3A11979601AD4F63CDDBE668F7AA1B0EF20A89A35C98BE44DB9D"
+    },
+    {
+        "Path":  "Tester/test/Notifier/OBS-Resilience/Notifier.Obs.Resilience.Tests.vbproj",
+        "Hash":  "AC08EC14CD4D0CB9E9C326CCC1DB8CF005692CBFC89B3745A2ED870B589F807E"
+    },
+    {
+        "Path":  "Tester/test/Notifier/OBS-Resilience/Program.vb",
+        "Hash":  "3797F75BF1477374F953CC7577B5C3F3E9AA78BB0B4AA4F8AACF92F5616AC69A"
+    },
+    {
+        "Path":  "Tester/test/Notifier/OBS-Resilience/TestObsServer.vb",
+        "Hash":  "1E5EA1DA99D720B5CEC0B1FEF9156757EA9772C6D4E41640A5DF22DE7B937FC9"
+    },
+    {
+        "Path":  "Tester/test/Overlay/Account/Overlay.Account.Tests.vbproj",
+        "Hash":  "4F4298869B10EAB78D2DC67BFBB0F5E80867298321C292D8ED8C245DDE81A112"
+    },
+    {
+        "Path":  "Tester/test/Overlay/Account/Program.vb",
+        "Hash":  "25189DF3386860BE0AA2E3741A187622F2D6D894A3CD5688FAE11AD24E72D12C"
+    },
+    {
+        "Path":  "Tester/test/Overlay/OAuth/Overlay.OAuth.Tests.vbproj",
+        "Hash":  "182203926180777502EB95F27B0E1FCB7D5DC9105814835F080BFB6567E3F130"
+    },
+    {
+        "Path":  "Tester/test/Overlay/OAuth/Program.vb",
+        "Hash":  "C14C0AB8B86CC859BABDF58A7257B8E0BA73F2DA96F24EF5DFA52425289B8278"
+    },
+    {
+        "Path":  "Tester/test/Overlay/Overlay.OscEngine.Tests/Overlay.OscEngine.Tests.vbproj",
+        "Hash":  "FB35DD797818E557932E30162336C2FF06042C4F891872D170ABD060F4B1E7E0"
+    },
+    {
+        "Path":  "Tester/test/Overlay/Overlay.OscEngine.Tests/Program.vb",
+        "Hash":  "401C279A67799BD0DF96E0A2F147E9699FB87F2F66EECC1FBD9A469553C5A1B0"
+    },
+    {
+        "Path":  "Tester/test/Soak/NVIDIA/NVIDIA.Soak.vbproj",
+        "Hash":  "DAE6301E815AE06AFA1E8DA335C3AEF0A4BD4715F35BF73A0E2D42C707915687"
+    },
+    {
+        "Path":  "Tester/test/Soak/NVIDIA/Program.vb",
+        "Hash":  "16E39BFA844BDBFF39028E66E761994837E6527B1105D60A266612DF2602BDD2"
+    },
+    {
+        "Path":  "Tester/test/Soak/NVIDIA/SoakInfra.vb",
+        "Hash":  "50E767838AF0B225F8D2EF6A657E9C51487E645DAE8319BEE6CB4A711EA9B1BD"
+    },
+    {
+        "Path":  "Tester/test/scripts/apphost_test/README.md",
+        "Hash":  "91BD3DAA70F648C60BE072B62067CC299827A83B672C5B4202FE11763EA5CABC"
+    },
+    {
+        "Path":  "Tester/test/scripts/apphost_test/hosttest.csproj",
+        "Hash":  "AEA1AF3EA625957EF1847E7B7773BF6BEA2E0CB37CCDFE676831F1A96CEC90B0"
+    },
+    {
+        "Path":  "build_test/NVIDIA FilterEntry_Test/CURRENT-STATUS.md",
+        "Hash":  "D275BB87DA02FA772F9CBC0E072E9B23E2AB7EB3C6FF4F2CE08B144BA89D9E9D"
+    },
+    {
+        "Path":  "build_test/NVIDIA FilterEntry_Test/HANDOFF.md",
+        "Hash":  "C220C0FD3ECFF1A1D0DDFD86CF3F8265F12FF35B7DA5A89C8E6F31D698386909"
+    },
+    {
+        "Path":  "build_test/NVIDIA FreestyleSettings_Test/REPORT.md",
+        "Hash":  "F45C03993D65DAEAA455C44232317563042E03F100AE5A154C85356A3EDDC71C"
+    },
+    {
+        "Path":  "devtools/osc-live/README.md",
+        "Hash":  "BE6A00D67BA1CCFDC539537DB93480E60E698EC43FE96188AF4199CDDA30B2DB"
+    },
+    {
+        "Path":  "docs/APP-LAYOUT.md",
+        "Hash":  "807A8A9C3ADED2498307F11BB6834162367FD184DB1F463F189F5BB83DE96B62"
+    },
+    {
+        "Path":  "docs/ARCHITECTURE.md",
+        "Hash":  "6B1A1071647CA1732C371F79D273D4180FF27B222B78778471F30F6C84AF0037"
+    },
+    {
+        "Path":  "docs/BUILD_PROTOCOL.md",
+        "Hash":  "604AFFE6DABF3566AEF29475E8E06EACDFC94CD258EE155E6FCADBDCC7AEBDED"
+    },
+    {
+        "Path":  "docs/CONFIG_OWNERSHIP_MATRIX.md",
+        "Hash":  "01583F1DE3F387688E89D03F46E189182B6B4FFA2308C4E50757953F32DC9A7D"
+    },
+    {
+        "Path":  "docs/CONFIG_RUNTIME_CONTRACT.md",
+        "Hash":  "29AF89255215C7B8D4513E75ECDCFEC06C3A610E1B412FF7C60648C28FDC9399"
+    },
+    {
+        "Path":  "docs/DISSECT-ALTZ-GENUINE-CHAIN.md",
+        "Hash":  "E22A0DA8873C4F3E44465DF12DC1ECC08CE0578F7911480155B6A1BD1550276B"
+    },
+    {
+        "Path":  "docs/DULUKA-V0.1-IMPLEMENTATION-CONTRACT.md",
+        "Hash":  "C028EB07D8575B14264B3E11F4E6FD12EBDF8C8C3F6CE4BAA84826F55FAFCA5E"
+    },
+    {
+        "Path":  "docs/GALLERY-VIDEO-PLAYBACK-DESIGN-2026-09-10.md",
+        "Hash":  "2765D094736DC9A7275A4F98FB8030ADA04DC568139E7D1E9B755D807D6C8602"
+    },
+    {
+        "Path":  "docs/GFE-PROCESS-MAP.md",
+        "Hash":  "800F6D8DC16EF9BAC23D7A6E9209333C3BE884B3408B57389FBCE5D9F7D7D38D"
+    },
+    {
+        "Path":  "docs/GFE-STACK-GENUINE-INSTALLED.md",
+        "Hash":  "CE48875B2342E9F0C26AB2EF505A995F4AC7011A83D73289C27B2C802A98CC9F"
+    },
+    {
+        "Path":  "docs/HANDOFF-GFE-INTEL-2026-09-25.md",
+        "Hash":  "4F3F344171AD4C3481185637356D71BBF62AAABE62D244BD0E2BD17821B5C38C"
+    },
+    {
+        "Path":  "docs/M3W2-TCPCLIENTHELPER-CONSOLIDATION-DESIGN.md",
+        "Hash":  "5AB38787CAE453D0D0D65C2187045428F957F8B946172F1672436D882665FF60"
+    },
+    {
+        "Path":  "docs/NOTIFIER_SLOT_AUDIT.md",
+        "Hash":  "E8061A4D5C29A29866B2F24627929F7E90053952C5267A36B5E8A33F638506B5"
+    },
+    {
+        "Path":  "docs/OSC-APPJS-EXTRACTION.md",
+        "Hash":  "24A41FEB8122C1E2400533781793CF0699F4FF6B210CA46DAAEB32EF055DEF7B"
+    },
+    {
+        "Path":  "docs/OSC-GALLERY-IPC-EXTRACTION.md",
+        "Hash":  "128DBFB99FFAEE51E997728F3DC99B66C166E842B04C738E12FAF9451F4E1A07"
+    },
+    {
+        "Path":  "docs/OSC-NODE-API-EXTRACTION.md",
+        "Hash":  "015FCA146E92BB2587E8C0EF319A389CCF32E1DEE2CEF40F4B7DAA4DA4091942"
+    },
+    {
+        "Path":  "docs/OSC-REQUIREMENTS-INVENTORY.md",
+        "Hash":  "0A3CC4ADC8A28D34413D8581B04E6A4ED5D837951CC8F860FA505FDB6622F399"
+    },
+    {
+        "Path":  "docs/P1-F-ENCODER-ARCHITECTURE.md",
+        "Hash":  "1A19061BD8AC4BDC29C4FB145E71CB6EBEBD52B554BB37F300A42900F3DBBCA7"
+    },
+    {
+        "Path":  "docs/P1-F-NVENC-API-MAP.md",
+        "Hash":  "0B375CDDAE185DD62E7E827CFE1FD840865CB0DC1A40C6A87BC846D31F386786"
+    },
+    {
+        "Path":  "docs/P1-F-NVENC-CALL-SEQUENCE.md",
+        "Hash":  "BF9748CE8D10C1746DE5AD7DA55B91478A7F8F4458276EA0897577393950B866"
+    },
+    {
+        "Path":  "docs/P1-F-NVENC-CONTRACT-GAP.md",
+        "Hash":  "3E099E0E60B836F88AAC91FF061625690B8F1F8FB7B655CC8345DC9ED9F04DA2"
+    },
+    {
+        "Path":  "docs/P1-F-NVENC-IMPLEMENTATION-CHECKLIST.md",
+        "Hash":  "D619B13F1E829CC7982C4907B1C51E7A7D49B0CB59C858E21CAEF8F84E4580C3"
+    },
+    {
+        "Path":  "docs/P1-F-NVENC-PHASE6-RESULT.md",
+        "Hash":  "9F6C6178A6CC6AEAC03DB4EBDF5A5529AA46081CCC4A09D2A85EDDE16BDF9345"
+    },
+    {
+        "Path":  "docs/P13.5-REMOVAL-INVENTORY.md",
+        "Hash":  "056DD953BE101294F6322F25CAA6A064FF4F5D97FF8A1AD32CC0E6FFFC90B205"
+    },
+    {
+        "Path":  "docs/PHASE-13-SHADOWPLAY-CLOCK.md",
+        "Hash":  "536126B1D7CA97DCC3284855FEF0ED05C852942D9A73E5DBDB8E5ABA64DCA996"
+    },
+    {
+        "Path":  "docs/PHASE0_BASELINE.md",
+        "Hash":  "F885643872BB48AB15FB664C73782F7701CA5D7D10B58867CF3ADB94D9B87841"
+    },
+    {
+        "Path":  "docs/PHASE1_VIDEO_VALIDATION_STATUS.md",
+        "Hash":  "9586FFE5255A750C0A52781B5262398623DDBCB283D2C1CF4B2AC5A4D1427B9C"
+    },
+    {
+        "Path":  "docs/PHASE_PLAN.md",
+        "Hash":  "52F18E5427A7322AEE473B4451B3B2A773F2670A79C94E1363641B2367EB306F"
+    },
+    {
+        "Path":  "docs/README.md",
+        "Hash":  "F2C0F5403AFE708CCD94450215A2F1C1E2FC5585B33FC113715678E52170EBC5"
+    },
+    {
+        "Path":  "docs/REPO-ORGANIZATION.md",
+        "Hash":  "1936518FB41711F776EECF00C7D06E11EACEAB41742522352298A893B57AF181"
+    },
+    {
+        "Path":  "docs/REPOSITORY-REBUILD-PLAN.md",
+        "Hash":  "41C6B7C185057392CD2F910367C519FD1672B660E965AC9028061AC38AEA3835"
+    },
+    {
+        "Path":  "docs/STATUS-2026-08-28.md",
+        "Hash":  "B701B6A2508FC2672DB6FC9A328A7E34DAAC71982F7D89FE6DBB12F1419302FE"
+    },
+    {
+        "Path":  "docs/STATUS-2026-09-07.md",
+        "Hash":  "E0CAB141A4A7222AC423334D0085EED1CF5A85C691CDFA472ECAE84CFCC31F16"
+    },
+    {
+        "Path":  "docs/UI_CONFIG_ARCHITECTURE.md",
+        "Hash":  "EEA67AF7AE4F04EF219B4C65040E64F079C8D5A7B66FA7C4BEFDFE661FF3CD7C"
+    },
+    {
+        "Path":  "docs/VIDEO_CAPTURE_PAGE_AUDIT.md",
+        "Hash":  "E4487541E2E848F6832383FFCE151582B273456FFC991361FE04953289FE1455"
+    },
+    {
+        "Path":  "docs/osc/01-inventory.md",
+        "Hash":  "CAE8106F1139DA7022193516C068B5DF9B432A18DF15776F1ED60FCC259BFB86"
+    },
+    {
+        "Path":  "docs/osc/02-bundle-map.md",
+        "Hash":  "C67198E17DFA4AD59D195CA516B80908DA14590F6247CFA14B459082F5FFD85F"
+    },
+    {
+        "Path":  "docs/osc/03-protocol-map.md",
+        "Hash":  "FEDE6661243422FA72A587A16706188AA91624648E285A548AA7B73476F44FAD"
+    },
+    {
+        "Path":  "docs/osc/04-state-model.md",
+        "Hash":  "4B11F4CCA7ADB506D1937D114E7F61365311B69A7C5FA6AACC8C162147843D9C"
+    },
+    {
+        "Path":  "docs/osc/05-screen-map.md",
+        "Hash":  "3F95CB68AC96F3F480B33D121144EBB1FC9729A65F5F6F8BEDF2D3B75AB51F97"
+    },
+    {
+        "Path":  "docs/osc/06-ui-components.md",
+        "Hash":  "58E706A239E3948632C4725C67FEA2A463B7932764125ED28FFA2966B1BF39D1"
+    },
+    {
+        "Path":  "docs/osc/07-boundary-matrix.md",
+        "Hash":  "D005FB72F36E3854081C252C60B020285E282E1C3986F5A9A335B851E5075B40"
+    },
+    {
+        "Path":  "docs/osc/08-host-contract.md",
+        "Hash":  "7AC4C8AF94ED8CC5BE26EE3BA5EAC67B6C0F94480158A197D09FBD9C98319B3A"
+    },
+    {
+        "Path":  "docs/osc/09-record-flow.md",
+        "Hash":  "94A0B952EBEB4930F91B1AA49CB4C290C17F5652E4D0402DA2B7AB36A0C500C4"
+    },
+    {
+        "Path":  "docs/osc/10-replay-flow.md",
+        "Hash":  "9C7157A75EDB1ABAF79FF27D9EDC53ED946B2A58D177030B346F0081820690B2"
+    },
+    {
+        "Path":  "docs/osc/11-window-flow.md",
+        "Hash":  "722891F8C12569C0A6C024981EDC8ABFDCE94432EF140DBF6790290785ECB620"
+    },
+    {
+        "Path":  "docs/osc/12-real-system-map.md",
+        "Hash":  "B3A827D835F9DDCD557BEADFAAB851042F420AE9FD103A2E62F10DC230C98A59"
+    },
+    {
+        "Path":  "docs/osc/13-duluka-account.md",
+        "Hash":  "B159F752357DC027BA3CFF7E41FE00F81C5912932AE1225224D32017D56711BC"
+    },
+    {
+        "Path":  "docs/osc/14-shadowplay-dependency-inventory.md",
+        "Hash":  "4BEB1C23D45C62CD9E9802D08B0BF3A44454C6E9DAC15AB9585308D70D02F99B"
+    },
+    {
+        "Path":  "docs/osc/15-overlay-engine-handoff.md",
+        "Hash":  "C364F0023D231AC4B755AA8C9B7851FCE770E386B1AF6A0DD809FB9BB6BCF999"
+    },
+    {
+        "Path":  "docs/osc/16-real-host-portable.md",
+        "Hash":  "4007B88C47B23C6D15E457C07C9681191903F4E82B253F1703E2807ADEE47DC2"
+    },
+    {
+        "Path":  "docs/osc/18-session-handoff.md",
+        "Hash":  "977DE5555CA31B05253D33B288AEF40C0B57705F8549AE5470D822AAEDDBBD14"
+    },
+    {
+        "Path":  "docs/osc/README.md",
+        "Hash":  "3F549F26C48741EF7FE2BE1947E2A4BF1650BC24F4F5025DBFB13A1BE27A6606"
+    },
+    {
+        "Path":  "docs/osc/unpacked/README.md",
+        "Hash":  "F742B8CB57347BACEFE1D6981EA8FF811CD9D69C455CB6E365E55A6442D2CB05"
+    },
+    {
+        "Path":  "docs/osc/unpacked/app/INDEX.md",
+        "Hash":  "F5F8A367ADCCC3B45C10ED34F9A421C8909C23749C79E2193408786C44BFDD86"
+    },
+    {
+        "Path":  "docs/osc/unpacked/src/README.md",
+        "Hash":  "B6D5793A1201E50A4356843CB74604C1CA7D2D727C545581D4AA943EDED1B7D2"
+    },
+    {
+        "Path":  "docs/osc/unpacked/src/app/INDEX.md",
+        "Hash":  "8B9096809FB6026394A05646F9E15007B3A444552FF518927F0FC8D595E9239E"
+    },
+    {
+        "Path":  "docs/osc/unpacked/src/vendor/INDEX.md",
+        "Hash":  "ABD47F3C659A10C2B2DF538135701D41D8743536C8FE26BA87E7926979028B4A"
+    },
+    {
+        "Path":  "docs/osc/unpacked/vendor/INDEX.md",
+        "Hash":  "22064FAECFC9730305DA69C29B26F967E65F362DF89E2679A185765E70F55006"
+    },
+    {
+        "Path":  "docs/osc/v1-knowledge/BOOTSTRAP_AND_SHADOWPLAY_FLOW.md",
+        "Hash":  "289F78DD02F5BFA7C71B01DDD55C2E7E54EB1FB322DC8CA773A0AAA694BBB9F3"
+    },
+    {
+        "Path":  "docs/osc/v1-knowledge/README.md",
+        "Hash":  "2E585CFD8D0D9F68D521C481F3F7882AF9890586C340E85F2BC976ABB7A73935"
+    },
+    {
+        "Path":  "docs/phase-11-postmortem.md",
+        "Hash":  "003988E9C92D6DF0A35E0753C3E7E2BFA22890CDCE2E0EA94BA978D9D67827DC"
+    },
+    {
+        "Path":  "docs/phase-12-architecture-spec-v2.md",
+        "Hash":  "65F085BC261446884A25220D4386D26A88AD2D27B8C78ECF33DE7B40C918E2A9"
+    },
+    {
+        "Path":  "docs/phase-12-architecture-spec-v3.md",
+        "Hash":  "9DD0CFE8ACFA0DF65DD8958ABF8336F03CE97DECB3B367695F40AFFEDC188B62"
+    },
+    {
+        "Path":  "docs/phase-12-architecture-spec.md",
+        "Hash":  "CC3A4E9DC9F1ECCFB01AB2BE756F526FE927218475985AB07F0307A6CE4BF3D1"
+    },
+    {
+        "Path":  "docs/phase-12-source-audit.md",
+        "Hash":  "EE9ADD7E40685514217E53AE8FE3459561F1495267605232BD26B3894CA62436"
+    },
+    {
+        "Path":  "docs/phase-12-v3-source-audit.md",
+        "Hash":  "84E07D65A5E8E125B8E70398F8E2E3FCEAD9681FD004180C0BD2B515B8100F67"
+    },
+    {
+        "Path":  "docs/phase-12b-implementation-notes.md",
+        "Hash":  "58AD1CB4A9ACA643C473B0E72261B044489F2B0C7586DBB1C8BB6B31215888C0"
+    },
+    {
+        "Path":  "docs/reports/38ms-Gap-Analysis.md",
+        "Hash":  "0C9EEF663E298594DA960979937C12FE965BA0DC64E5F29CB249747523DA6C2E"
+    },
+    {
+        "Path":  "docs/reports/ENGINE-DEEP-FORENSIC-AUDIT-2026-09-07.md",
+        "Hash":  "4C68EDB423C549C6BF71DD12D666CEC107BACD03AF97DC8F10C00B2D44BC245E"
+    },
+    {
+        "Path":  "docs/reports/FIX-IMPLEMENTATION-SUMMARY.md",
+        "Hash":  "A8794B942A464CC3029C745FD98FD1D30D2A447370EF2C41D6D93DD67D9491F2"
+    },
+    {
+        "Path":  "docs/reports/FORENSIC-AUDIT-REPORT-2026-09-06.md",
+        "Hash":  "E7BB83701247873185A21D620127A6C412315A2F278B2E0DF5BB0EEF8F469EFD"
+    },
+    {
+        "Path":  "docs/reports/FORENSIC-INSTRUMENTATION-PLAN.md",
+        "Hash":  "7C65EB968BCFF8C7309365F4CC45C561B9E484CD0879F3DC584F076F102855DE"
+    },
+    {
+        "Path":  "docs/reports/M1-W1-TIMING-CAUSALITY-REPORT.md",
+        "Hash":  "F96855AD047E875AE7C4A4D6CE54A3968AC93C66D8B0122B304DC4B3787B1C4C"
+    },
+    {
+        "Path":  "docs/reports/PHASE3-BASELINE-ANALYSIS.md",
+        "Hash":  "D469B9A24F47D4B3DABD5440C8E7264614A569E6AAFA134D157EC0318E93D179"
+    },
+    {
+        "Path":  "docs/reports/PHASE3-FINAL-REPORT.md",
+        "Hash":  "9F28B1D6F8F5A30382F656CE01E98922EEBB4428427584733B6A9BDEE1C84288"
+    },
+    {
+        "Path":  "docs/reports/PHASE3B-ANALYSIS.md",
+        "Hash":  "6030794886CE7775B329F2C1584B0B81768E86515C2E3DA6E1E7F2958C91F694"
+    },
+    {
+        "Path":  "docs/reports/PHASE3B-COMPREHENSIVE-ANALYSIS.md",
+        "Hash":  "14385BBF6197932F5D13BE0ACECDBBF1FD13923EAF0783086CF65C899C52D165"
+    },
+    {
+        "Path":  "docs/reports/PHASE3B-FINAL-REPORT.md",
+        "Hash":  "705B6ED298B42E9320B473428772B1AC1B708ED6824442143FC71B6ADC3A2C63"
+    },
+    {
+        "Path":  "docs/reports/PHASE4-FINAL-REPORT.md",
+        "Hash":  "9AE0C5772EF07C7E378C2E335ADC975C1B3B02C2A894656D44B7D8DF657028BE"
+    },
+    {
+        "Path":  "docs/reports/PROJECT-STRUCTURE.md",
+        "Hash":  "85E1304E60E80799DA97EBDD57820CE86BBE1E772919F359182775467B208DB1"
+    },
+    {
+        "Path":  "docs/reports/TIMING-FORENSICS-ANALYSIS.md",
+        "Hash":  "1D0411F2B79805EB2B55A0B0517D992D177D3F48DA3E49B8F282E621E985D7EA"
+    },
+    {
+        "Path":  "docs/reports/W1-CAPTURE-LIFECYCLE-FORENSICS.md",
+        "Hash":  "487780D20F5D388B65E55310D963F08CF63D88ADAD356D073ACD4466DD0C99E0"
+    },
+    {
+        "Path":  "docs/reports/W1-FAULT-PROOF-REPORT.md",
+        "Hash":  "7C71BBADD09DD8679A7EE1D5ECA771CD2779919ECE10C9A719AE3CB96212E0A6"
+    },
+    {
+        "Path":  "docs/reports/W1-FINAL-ACCEPTANCE-REPORT.md",
+        "Hash":  "2378FD8B640A73C1D8B245AC6E6D8AA500967F5164561349517F243FD621ECEB"
+    },
+    {
+        "Path":  "docs/reports/W1-FINAL-GALLERY-VIDEO-REPORT.md",
+        "Hash":  "3C00FB39599429C0A46D6A817312BD7E2992E7B6D7B3AC38AE25637D3B9FD85A"
+    },
+    {
+        "Path":  "docs/reports/W1-FPS-MATRIX-REPORT.md",
+        "Hash":  "A03EBFFB042D143BF54DDD4B352B00C553581648BCC644AB27192C37DB6B92C5"
+    },
+    {
+        "Path":  "docs/reports/W1-OSC-FINAL-INTEGRATION-REPORT.md",
+        "Hash":  "1A6DAA62B0362476E7670FCCF69778023DD27BF0C1145265E81CE486ADEE7CEB"
+    },
+    {
+        "Path":  "docs/reports/W1-P1A-STOP-BOUNDARY-REPORT.md",
+        "Hash":  "D92083303E1208D208FB6561EF02A8D4622DA1AEB918E95360F32D353A8BD0C2"
+    },
+    {
+        "Path":  "docs/reports/W1-P3B-AUDIO-STARVATION-REPORT.md",
+        "Hash":  "677C8AC15C2911738654282B9BF01AC7C00E1731DED63F3963E855C1523AE01E"
+    },
+    {
+        "Path":  "docs/reports/W1-P3B-FINAL-AUDIO-STARVATION-REPORT.md",
+        "Hash":  "84607B2D15D50B37C32FC795D14F354DB2F25C09DB70285E498E6790E72AE1F0"
+    },
+    {
+        "Path":  "docs/reports/W1-P3C-SIDECAR-E2E-REPORT.md",
+        "Hash":  "54A7BBC76002E68151288C9C89CA295B057E1CD5D330E4535A2E5ACE8BF5BFB7"
+    },
+    {
+        "Path":  "docs/reports/W1-P3D-PRODUCTION-SIDECAR-REPORT.md",
+        "Hash":  "D8AFB4504295367C2273BA5ABE143E652B2480A568DE22F698367C4464B031C3"
+    },
+    {
+        "Path":  "docs/reports/W1-PASSTHROUGH-FIX-REGRESSION.md",
+        "Hash":  "9A2F7A5E6D0F4474CE7BF1249E6236429CD53508958C9DF71EF2B6D3C803145D"
+    },
+    {
+        "Path":  "docs/reports/W1-PASSTHROUGH-PROOF-REPORT.md",
+        "Hash":  "0DD0F500CA7951846F919A996BA51681EE08324A0245880FA49C5599965310EB"
+    },
+    {
+        "Path":  "docs/reports/W2-DECODE-BOTTLENECK-REPORT.md",
+        "Hash":  "758CA6A683492BDC732AA68BDEF9DF23B524090AA5902212DC8A91CE827C554E"
+    },
+    {
+        "Path":  "docs/reports/W2-FREEZE-JUMP-REPORT.md",
+        "Hash":  "E64F4C5A0A07BD06D583781029B42529EA5FFDDE64CC958356CB5864FE7EDC32"
+    },
+    {
+        "Path":  "docs/reports/W2-PLAYBACK-REPRO-REPORT.md",
+        "Hash":  "0B49281130F72006F258A9834DFF0334BB483D72087089A680D94E27E500DFD5"
+    },
+    {
+        "Path":  "docs/reports/W3-REGRESSION-GATE-DESIGN.md",
+        "Hash":  "B736019FC6FAD42C32829ED0D516BE7AAAA56C5D2A7E98156027E452BE46D240"
+    },
+    {
+        "Path":  "tools/BuildTool/Bridge.cs",
+        "Hash":  "CFFD9CA862D1ED2DD140E88B242776D09AFDF5211D5F8100107B9577FE36AE14"
+    },
+    {
+        "Path":  "tools/BuildTool/BuildTool.csproj",
+        "Hash":  "0A1086DB6FD02277BB9E96E003A2C528C8C3BD8B53A56D3FFB14C345D9A227A6"
+    },
+    {
+        "Path":  "tools/BuildTool/MainForm.cs",
+        "Hash":  "7EFF19A6C3B0FCAD5E8FFC93C591128CA455A321A3B9CA167B1E15952BAC246E"
+    },
+    {
+        "Path":  "tools/BuildTool/Program.cs",
+        "Hash":  "B9400EB466E4C0D9E037456F30542C51FCD164199A32ABC357BA177676F1CA4F"
+    },
+    {
+        "Path":  "tools/audio_flag_fix_test.ps1",
+        "Hash":  "35648054832C3AC45B0527CF2CAA888EDB119CCE376C6A6CC562228435759545"
+    },
+    {
+        "Path":  "tools/check_runtime.ps1",
+        "Hash":  "E0DB5B4897748F7E5E5C1CFB9C7D59A278BEBA81A54B086DEDC3E50706D4C866"
+    },
+    {
+        "Path":  "tools/duluka-account/README.md",
+        "Hash":  "EC3893CD14B48FDE20E120CA3347A4B8695ACD4B852C0B3B79811C319B5DAF0E"
+    },
+    {
+        "Path":  "tools/duluka-account/apply.ps1",
+        "Hash":  "9E74EF2B9159A5768BF8CCD8E3A4A754BAC275DC1BB4B0960A035A5F454F7108"
+    },
+    {
+        "Path":  "tools/duluka-account/revert.ps1",
+        "Hash":  "A9CB928072B41F4C55FFD02D0F1DCC12A27DAB430F9CCEB31F32F6CFA495C26B"
+    },
+    {
+        "Path":  "tools/duluka-account/stub-listener.ps1",
+        "Hash":  "DE04CB4AC1E2BEF31EB0C2A5B9C7DAD8C0176BBB9F6EE8354BBA7B5D0A764872"
+    },
+    {
+        "Path":  "tools/forensic-frame-identity.ps1",
+        "Hash":  "0B019C74DAA643A691945C264321A095A1F93E9C495BB2E62615F0BBD381449A"
+    },
+    {
+        "Path":  "tools/fps_sync_test.ps1",
+        "Hash":  "52C87814DC6C1E929D4F76AD6A2A04E309B60AD89FC43AD2909FC5FF3551EB3A"
+    },
+    {
+        "Path":  "tools/move_encoder_source.ps1",
+        "Hash":  "52989074DCC304F42D86739EBC2A97122106FC382534163F2B241E1B3C06A30D"
+    },
+    {
+        "Path":  "tools/patch_encoder_fps_authority.ps1",
+        "Hash":  "30AE2C0CDE1783265CAC211EE14311A78181805607798EAFC7F2C7651D212755"
+    },
+    {
+        "Path":  "tools/patch_live_stop.ps1",
+        "Hash":  "CDAC5E459D9574334E18368730BA49D1A777B7FE9A975DD982B9E6DC1FDED917"
+    },
+    {
+        "Path":  "tools/patch_session_fps_authority.ps1",
+        "Hash":  "C64DD50C8DCAD269CB3AA2F59F35364F94AB1AACD4A9173180D38895CD1809AB"
+    },
+    {
+        "Path":  "tools/patch_stop_snapshot.ps1",
+        "Hash":  "6B57E83918EC45D1438D7F788A80B1A6425698CAB5B46970765327270C196808"
+    },
+    {
+        "Path":  "tools/playwright/PLAYWRIGHT-MCP-SETUP.md",
+        "Hash":  "A89E6206A377335C10F369F7814DBBA8433410668D91E9E50916A96AB40CBCC1"
+    },
+    {
+        "Path":  "tools/start_runtime.ps1",
+        "Hash":  "241AFCEACAB40CF73248C549931616B6589AF65CC6E52A5344FB1E36A263A7A3"
+    },
+    {
+        "Path":  "tools/tmp_send_f9.ps1",
+        "Hash":  "CFF2D9846AEA2737D9CBEE929C91CCDE28DFD7F9CCD4E4629A6BB991868F2CF1"
+    },
+    {
+        "Path":  "tools/tmp_windows.ps1",
+        "Hash":  "089333858CF67C5EDF097DB1CC699598C7C6A780569755BFDC7BBBC4D3B21069"
+    },
+    {
+        "Path":  "tools/verify_audio_patch.ps1",
+        "Hash":  "C14C7A69653700EE96CEEF4F5B46749C7E78F8DEFFE9575EA94B22E8BB573DE6"
+    }
+]

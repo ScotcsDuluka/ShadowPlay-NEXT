@@ -1,0 +1,32 @@
+[
+  {
+    "file": "lifecycle-vbr-limited.mp4",
+    "bytes": 11445,
+    "sha256": "AD6C34200517EACE8A2DCA74EF9E78CAAF3022CEBD7F5F906C62A9C735D0FAA1",
+    "syntheticOnly": true
+  },
+  {
+    "file": "lifecycle-cqp-limited.mp4",
+    "bytes": 10310,
+    "sha256": "FD46C1D725B72AD7672054A96AEA535E7F09CA2964660C5BA4ED5CBC7185A9ED",
+    "syntheticOnly": true
+  },
+  {
+    "file": "lifecycle-vbr-full.mp4",
+    "bytes": 11691,
+    "sha256": "B2A94239D7BC0BDF4A94EA8F830CDDD1D3D7B02F601611693C36FDD7AA32EF79",
+    "syntheticOnly": true
+  },
+  {
+    "file": "lifecycle-cqp-full.mp4",
+    "bytes": 10182,
+    "sha256": "B96788FB4DC5A6D4939F30D5AB1797671FEBC9105D61D45638EA77C5DF7D284E",
+    "syntheticOnly": true
+  },
+  {
+    "file": "validated-new-session.mp4",
+    "bytes": 11445,
+    "sha256": "AD6C34200517EACE8A2DCA74EF9E78CAAF3022CEBD7F5F906C62A9C735D0FAA1",
+    "syntheticOnly": true
+  }
+]

@@ -21,6 +21,13 @@ Namespace DulukaEngine.FFmpegTests
         Friend ReadOnly _skips As New List(Of String)()
 
         Function Main(args As String()) As Integer
+            ' I2 shared-mux regression: lavfi test video/sine bytes only.
+            ' Avoid unrelated pipeline integration entrypoints/device sources.
+            If args.Length = 1 AndAlso args(0) = "--live-mux-synthetic-only" Then
+                LiveMuxSessionTests.RunAll()
+                Console.WriteLine($"SYNTHETIC_MUX_RESULT passed={_passed} failed={_failed} skipped={_skipped}")
+                Return If(_failed = 0 AndAlso _passed >= 13, 0, 1)
+            End If
             Console.WriteLine("==================================================")
             Console.WriteLine(" DulukaEngine.FFmpegBackend Tests (P1-C)")
             Console.WriteLine("==================================================")

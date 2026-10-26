@@ -16,7 +16,6 @@ Imports DulukaEngine.Diagnostics
 Imports DulukaEngine.Video
 Imports DulukaEngine.Video.Backends.Ddagrab
 Imports DulukaEngine.Encoder
-Imports DulukaEngine.Encoder.Nvenc
 Imports DulukaEngine.Video.Handoff
 
 Namespace DulukaEngine.Recording
@@ -28,8 +27,10 @@ Namespace DulukaEngine.Recording
         Private ReadOnly _logger As EngineLogger
 
         ' ─── Persistent backends (created in Initialize, disposed in Dispose) ─
-        Private _capture As DdagrabBackend
-        Private _encoder As NvencEncoderBackend
+        Private _capture As IVideoCaptureRuntime
+        Private _encoder As IEncoderRuntimeBackend
+        Private ReadOnly _backendFactory As IRecordingBackendFactory
+        Private _composition As CaptureCompositionPlan
         Private _state As RecordingEngineState = RecordingEngineState.Created
         Private _disposed As Boolean = False
 
@@ -45,7 +46,13 @@ Namespace DulukaEngine.Recording
         Private ReadOnly _sessionFinished As New ManualResetEventSlim(True)
 
         Public Sub New(logger As EngineLogger)
+            Me.New(logger, New RecordingBackendFactory())
+        End Sub
+
+        Public Sub New(logger As EngineLogger, backendFactory As IRecordingBackendFactory)
+            If backendFactory Is Nothing Then Throw New ArgumentNullException(NameOf(backendFactory))
             _logger = logger
+            _backendFactory = backendFactory
         End Sub
 
         ''' <summary>
@@ -99,16 +106,16 @@ Namespace DulukaEngine.Recording
 
             Try
                 ' ─── Initialize DdagrabBackend (creates D3D11 + DXGI duplication) ─
-                _capture = New DdagrabBackend(_logger)
-                ' OWNER (2026-09-25): cursor composition switch.
-                DirectCast(_capture, DulukaEngine.Video.Backends.Ddagrab.DdagrabBackend).CaptureCursor = startup.CaptureCursor
-                DirectCast(_capture, DulukaEngine.Video.Backends.Ddagrab.DdagrabBackend).RequestedOutputIndex = startup.CaptureOutputIndex
+                _composition = _backendFactory.Plan(startup)
+                ' Planned Intel routes must fail before DXGI creates duplication.
+                _composition.RequireWired()
+                _capture = _backendFactory.CreateCapture(_composition, startup.CaptureCursor, _logger)
                 Dim ctx As New BackendContext(_logger)
                 _capture.Initialize(ctx)
                 _logger.Info($"RecordingEngine: DdagrabBackend initialized — {_capture.OutputWidth}x{_capture.OutputHeight} @ {_capture.OutputRefreshRate}Hz")
 
                 ' ─── Initialize NvencEncoderBackend (creates D3D11 + NVENC session) ─
-                _encoder = New NvencEncoderBackend(_logger)
+                _encoder = _backendFactory.CreateEncoder(_composition, _logger)
                 Dim gop As Integer = If(startup.GopSize > 0, startup.GopSize, 60)
 
                 ' ★ PHASE 1 VIDEO RUNTIME WIRING (V-CT2): resolution group.
@@ -142,14 +149,14 @@ Namespace DulukaEngine.Recording
                     .EncodeWidth = encodeDims.Item1,
                     .EncodeHeight = encodeDims.Item2
                 }
+                EncoderConfigurationPolicy.Apply(encConfig, _composition.Provider.Id, startup)
                 _encoder.Initialize(encConfig)
                 ' Phase 7B: compare actual Windows adapter identities, not
                 ' model names or index assumptions. A second GTX 1080 Ti may
                 ' have the same display name but a different adapter LUID.
                 ' The outer Initialize Catch disposes both backends on failure.
-                RequireMatchingAdapterLuid(
-                    _capture.AdapterLuidLow, _capture.AdapterLuidHigh,
-                    _encoder.AdapterLuidLow, _encoder.AdapterLuidHigh)
+                RecordingBackendFactory.RequireIdentity(_composition, _capture.ActualTarget, _encoder.ActualAdapter)
+                _backendFactory.ValidateTarget(_composition)
                 _logger.Info("RecordingEngine: DXGI capture and NVENC adapter LUID MATCH")
                 _startupEcho = startup
 
@@ -226,6 +233,25 @@ Namespace DulukaEngine.Recording
         ''' Only ONE active session at a time.
         ''' </summary>
         Public Function StartSession(config As SessionConfig) As SessionResult
+            Return StartSessionCore(config, Nothing)
+        End Function
+
+        Public Function StartOwnedFrameSession(config As SessionConfig, frames As IEnumerable(Of SessionFrameInput)) As SessionResult
+            If frames Is Nothing Then Throw New ArgumentNullException(NameOf(frames))
+            Return StartSessionCore(config, frames)
+        End Function
+        Public Function StartSourceSession(config As SessionConfig, source As DulukaEngine.Video.Transport.D3D11.BgraSessionSource) As SessionResult
+            If source Is Nothing OrElse config Is Nothing Then Throw New ArgumentNullException(NameOf(source))
+            If _startupEcho.Color Is Nothing OrElse Not _startupEcho.Color.SameColor(source.Color) OrElse
+                Not _capture.ActualTarget.SameOutput(source.Target) OrElse source.FrameRateFps <> config.TargetFps Then
+                Throw New InvalidOperationException("source_session_plan_mismatch")
+            End If
+            config.Color = source.Color
+            Return StartSessionCore(config, Nothing, source)
+        End Function
+
+        Private Function StartSessionCore(config As SessionConfig, frames As IEnumerable(Of SessionFrameInput),
+            Optional source As DulukaEngine.Video.Transport.D3D11.BgraSessionSource = Nothing) As SessionResult
             If config Is Nothing Then Throw New ArgumentNullException(NameOf(config))
 
             ' ★ P1-A DISK HEADROOM GUARD (W1): refuse BEFORE any resource is
@@ -255,6 +281,8 @@ Namespace DulukaEngine.Recording
 
             Dim result As SessionResult = Nothing
             Try
+                _backendFactory.ValidateTarget(_composition)
+                RecordingBackendFactory.RequireIdentity(_composition, _capture.ActualTarget, _encoder.ActualAdapter)
                 ' ★ PHASE 1 VIDEO RUNTIME WIRING (V-CT2): stamp the ACTUAL
                 ' encode dimensions the persistent encoder runs with, so the
                 ' session evidence always shows requested vs actual.
@@ -309,6 +337,7 @@ Namespace DulukaEngine.Recording
                 Dim sessionBitrate As Long =
                     If(config.BitrateBps > 0, config.BitrateBps,
                        If(echo.BitrateBps > 0, echo.BitrateBps, 20_000_000L))
+                If _composition.Provider.Id = "intel:qsv-h264" AndAlso echo.RateControl = "cqp" Then sessionBitrate = 0
 
                 ' The NVENC frame rate is encoded into the native encoder session and
                 ' therefore into the raw H.264 stream timing. A per-session FPS change
@@ -320,7 +349,7 @@ Namespace DulukaEngine.Recording
                 ' triggers the rebuild below.
                 Dim encoderFps As Integer = _encoder.FrameRateFps
                 Dim needsRebuild As Boolean =
-                    encoderFps <> config.TargetFps OrElse
+                    _encoder.CurrentState = EncoderState.Faulted OrElse encoderFps <> config.TargetFps OrElse
                     _encoder.BitrateBpsOutput <> sessionBitrate OrElse
                     _encoder.EncodeWidthOutput <> sessionEncodeW OrElse
                     _encoder.EncodeHeightOutput <> sessionEncodeH
@@ -343,6 +372,7 @@ Namespace DulukaEngine.Recording
                         .EncodeWidth = config.EncodeWidth,
                         .EncodeHeight = config.EncodeHeight
                     }
+                    EncoderConfigurationPolicy.Apply(rebuiltConfig, _composition.Provider.Id, startup)
 
                     ' ★ Leak fix: a failed Initialize (NVENC open failure, D3D11
                     ' creation failure, driver busy) used to leak the freshly
@@ -351,9 +381,11 @@ Namespace DulukaEngine.Recording
                     ' process-lifetime across FPS-mismatched sessions). Dispose
                     ' the half-initialized instance and rethrow; the previous
                     ' encoder stays the live authority for this failed session.
-                    Dim rebuiltEncoder As New NvencEncoderBackend(_logger)
+                    Dim rebuiltEncoder As IEncoderRuntimeBackend = _backendFactory.CreateEncoder(_composition, _logger)
                     Try
                         rebuiltEncoder.Initialize(rebuiltConfig)
+                        RecordingBackendFactory.RequireIdentity(_composition, _capture.ActualTarget, rebuiltEncoder.ActualAdapter)
+                        _backendFactory.ValidateTarget(_composition)
                     Catch ex As Exception
                         Try : rebuiltEncoder.Dispose() : Catch : End Try
                         Throw
@@ -365,7 +397,7 @@ Namespace DulukaEngine.Recording
                     ' — the session below could then receive a disposed encoder.
                     ' Re-check the dispose gate UNDER _sync and swap atomically;
                     ' if Dispose won, discard the rebuilt backend instead.
-                    Dim previousEncoder As NvencEncoderBackend = Nothing
+                    Dim previousEncoder As IEncoderRuntimeBackend = Nothing
                     Dim disposeWon As Boolean = False
                     SyncLock _sync
                         If _disposeRequested OrElse _disposed Then
@@ -402,7 +434,11 @@ Namespace DulukaEngine.Recording
                     startStop = _stopRequested
                 End SyncLock
                 If startStop Then session?.[Stop]()
-                result = session.Run()
+                If source IsNot Nothing Then
+                    result = session.RunSourceFrames(source)
+                Else
+                    result = If(frames Is Nothing, session.Run(), session.RunOwnedFrames(frames, 1))
+                End If
             Catch ex As Exception
                 _logger.Error($"RecordingEngine: session failed: {ex.Message}", ex)
                 result = New SessionResult() With {
@@ -411,6 +447,7 @@ Namespace DulukaEngine.Recording
                     .ErrorMessage = ex.Message
                 }
             Finally
+                If result IsNot Nothing Then result.VideoIdentity = VideoIdentity()
                 SyncLock _sync
                     ' Publish the result for BOTH success and failure, and
                     ' never expose a phantom active session after an exception.
@@ -454,11 +491,24 @@ Namespace DulukaEngine.Recording
         Public Function GetStatus() As EngineStatus
             SyncLock _sync
                 Return New EngineStatus() With {
+                    .SourceLifecycleState = If(_currentSession Is Nothing, Nothing, _currentSession.SourceLifecycleState),
                     .State = _state,
-                    .CurrentSessionId = If(_currentSession IsNot Nothing, "active", Nothing),
+                    .VideoIdentity = VideoIdentity(),
+                    .CurrentSessionId = If(_currentSession IsNot Nothing, _currentSession.SessionId, Nothing),
                     .LastSessionResult = _lastSessionResult
                 }
             End SyncLock
+        End Function
+
+        Private Function VideoIdentity() As RecordingVideoIdentity
+            Dim capture = _capture?.ActualTarget
+            Dim encoder = _encoder?.ActualAdapter
+            If capture Is Nothing OrElse encoder Is Nothing OrElse _composition Is Nothing Then Return Nothing
+            Return New RecordingVideoIdentity With {
+                .CaptureLuidLow = capture.Adapter.Low, .CaptureLuidHigh = capture.Adapter.High,
+                .CaptureVendorId = capture.Adapter.VendorId, .OutputIndex = capture.OutputIndex,
+                .EncoderLuidLow = encoder.Low, .EncoderLuidHigh = encoder.High,
+                .EncoderVendorId = encoder.VendorId, .EncoderProvider = _composition.Provider.Id}
         End Function
 
         Private _lastSessionResult As SessionResult = Nothing
@@ -503,8 +553,8 @@ Namespace DulukaEngine.Recording
             ' Dispose persistent backends only after any active StartSession has
             ' fully unwound. Read the refs UNDER _sync so an FPS-rebuild swap
             ' cannot publish a different backend between the read and the dispose.
-            Dim encoderToDispose As NvencEncoderBackend = Nothing
-            Dim captureToDispose As DdagrabBackend = Nothing
+            Dim encoderToDispose As IEncoderRuntimeBackend = Nothing
+            Dim captureToDispose As IVideoCaptureRuntime = Nothing
             SyncLock _sync
                 encoderToDispose = _encoder
                 captureToDispose = _capture

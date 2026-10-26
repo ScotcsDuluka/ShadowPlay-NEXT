@@ -24,6 +24,8 @@
 
 </div>
 
+> **Architecture หลัก (อนุมัติแล้ว):** [อธิบายฉบับภาษาไทย](docs/architecture/SESSION-CENTRIC-RECORDING-TH.md) · [Canonical Contract ภาษาอังกฤษ](docs/architecture/SESSION-CENTRIC-RECORDING-CONTRACT.md) — Duluka ใช้ Recording Session เดียว เลือก Desktop Capture API, Fullscreen Exclusive Capture API และ Encoder แยกกันได้ โดยมี Audio Timeline และ MP4 Mux เดียว ฟีเจอร์ที่ยังไม่พัฒนาจะระบุสถานะตามจริง
+
 > [!IMPORTANT]
 > **สองยุคของโปรเจกต์ วิสัยทัศน์เดียวกัน**
 >
@@ -152,6 +154,31 @@
 
 **เอกสารทุกโมดูล:** [ดัชนีเอกสาร](docs/README.md) · [รายการ README ที่ตรวจทั้งหมด](docs/README-COVERAGE-20261024.md)
 
+## สถานะ Intel Capture บน HUAWEI-MateBook — 25 ตุลาคม 2569
+
+ข้อมูลส่วนนี้มาจาก **Branch `intel/duluka-capture` บน HUAWEI-MateBook** เท่านั้น ไม่ใช่การยืนยันว่า `Stable` บน AORUS หรือ Runtime ที่เผยแพร่ใช้ฟีเจอร์เดียวกันแล้ว สถาปัตยกรรมหลักยังยึด [Session-Centric Recording Contract](docs/architecture/SESSION-CENTRIC-RECORDING-CONTRACT.md): **หนึ่ง Duluka RecordingSession** ดูแล SessionId, Clock, Audio Plan, Encoder, Packet Sink และ MP4 Mux โดยแยก Capture API ออกจาก Encoder
+
+| ขั้นตอน | หลักฐานที่ตรวจพบ | ข้อจำกัด |
+|---|---|---|
+| **I1** | ตรวจ Intel UHD 8086:9B41 และตัวตนจอ/GPU จาก DXGI/CCD พร้อมนโยบายเลือกอุปกรณ์ | การอ่านข้อมูลจอไม่เท่ากับการบันทึกพิกเซลจริง |
+| **I2** | เฟรม NV12 สังเคราะห์ → Intel QSV H.264 → RecordingSession เดิม → MP4 ที่ Full Decode ผ่านแบบ VBR/CQP | CBR ยังไม่ผ่านและถูกปฏิเสธ |
+| **I3 Transport** | BGRA D3D11 จาก Texture ทดสอบ → CPU Staging → NV12 → Session/QSV/Mux เดิม; **ผ่าน 1,453 / ล้มเหลว 0 / ข้าม 33** ตามรายงาน I3 | ยังไม่ใช่ Live Desktop Capture และไม่ได้พิสูจน์ Audio/A-V Sync |
+| **I3 Frame Adapter** | เพิ่ม `BgraFrameAdapter` รับ Frame Wrapper แบบ Borrow โดยตรวจ LUID, Device, Display, Generation และ COM Ownership; รายงานรอบสุดท้าย **ผ่าน 1,725 / ล้มเหลว 0 / ข้าม 33** จาก 6 ขั้น | **ยังไม่เชื่อม Default Desktop Factory** และ Gate `intel_native_live_input_not_verified` ยังอยู่; ชุดล่าสุดไม่รัน 13 การทดสอบ Synthetic Audio เดิม |
+
+**ห้ามสับสน:** Synthetic QSV สำเร็จ **ไม่ได้แปลว่าอัด Desktop/Game จริงได้แล้ว** และข้อมูลของ MateBook ไม่ใช่สถานะ NVENC บน AORUS เครื่องอื่น ดู [NVIDIA Capture คู่มือบน MateBook](Project/NVIDIA%20Capture/README.md) · [รายงาน I3 Adapter](docs/reports/intel-duluka-i3-composition-2026-10-25/README.md) · [รายงาน I3 Transport](docs/reports/intel-duluka-i3-2026-10-25/README.md)
+
+---
+
+**ดัชนีเอกสาร MateBook:** [คู่มือ Capture ของ Branch Intel](Project/NVIDIA%20Capture/README.md) · [รายการ README ที่ตรวจบน MateBook](docs/README-COVERAGE-MATEBOOK-20261025.md) โดยแยกเอกสาร Third-party libvpl ออกจากเอกสารของโปรเจกต์ และไม่อ้างว่าได้ Build/Deploy ระบบใหม่ในงานแก้เอกสารนี้
+
+### อัปเดต Intel I3-B / I3-C — 25 ตุลาคม 2569
+
+ตัวเลข I3 ในตารางด้านบนเป็น **หลักฐานตามช่วงเวลาเดิม** ไม่ใช่ผลล่าสุด: Branch `intel/duluka-capture` บน MateBook มีผล **I3-B แบบ Synthetic ผ่าน 2,056 / ล้มเหลว 0 / ข้าม 33** และงาน I3-C ต่อเนื่องที่ Agent C ทดสอบแยกโดยได้ **ผ่าน 1,938 / ล้มเหลว 0 / ข้าม 0** ในขอบเขต Synthetic โดยเป็นเพียง **คำแนะนำให้รับงานของ Agent C ยังไม่ใช่อนุมัติจาก Main**
+
+ระบบ QSV บน MateBook มี Private ABI **3** และผลตรวจ Color Metadata BT.709 Limited/Full สำหรับไฟล์ Synthetic ที่ทดสอบแล้ว แต่ **B1 Worker Lifecycle ยังมีประเด็น State Race ที่ต้องตรวจ และ B2–B8 ยังไม่ปิด**; ส่วน `intel_native_live_input_not_verified` ยังคงล็อก Live Desktop Capture ไว้ ไม่เกี่ยวกับการ Deploy NVENC บน AORUS ดู [Capture MateBook](Project/NVIDIA%20Capture/README.md) และ [สถานะสอง Worktree](docs/WORKTREE-STATUS-20261025.md)
+
+---
+
 ## สถาปัตยกรรมเบื้องหลัง Flagship ReBuild
 
 ผังนี้เป็น **ภาพรวมความรับผิดชอบของระบบ** ไม่ใช่คำรับรองว่าการเชื่อมต่อทุกเส้นทางพร้อมใช้งานในรุ่น Public
@@ -242,7 +269,7 @@ Adapter มีโค้ดรองรับเส้นทาง D3D9/D3D9Ex �
 งานหลักที่กำลังให้ความสำคัญคือ **ความถูกต้องของข้อมูล Capture**, **รายงานความล้มเหลวตามจริง**, **GPU Adapter / LUID Safety**, **Host-Hook Synchronization**, **OSC Motion/Input ที่ไม่รบกวนเกม** และ **Regression Tests**
 
 - [ประวัติ Commit ล่าสุด](https://github.com/ScotcsDuluka/ShadowPlay-NEXT/commits/Stable)
-- [นโยบาย Build และ Deploy](docs/BUILD-DEPLOY-POLICY.md)
+- [Build Protocol รุ่นเก่า](docs/BUILD_PROTOCOL.md)
 - [รายละเอียดสถาปัตยกรรม Capture](Project/NVIDIA%20Capture/ENGINE-REALTIME-ARCHITECTURE.md)
 - [แผนจัดระเบียบ Repository](docs/REPOSITORY-REBUILD-PLAN.md) — ยังเป็นแผน ไม่ใช่การย้ายโปรเจกต์ที่เสร็จแล้ว
 
@@ -282,7 +309,7 @@ Repository นี้กำลังเปลี่ยนแปลงอย่า
 5. แยก Source, Build ที่เตรียมไว้, Runtime ที่ติดตั้ง และ Public Release ออกจากกัน
 6. ส่ง Pull Request ที่ตรวจสอบได้ พร้อมขั้นตอนทำซ้ำปัญหา
 
-การย้ายไฟล์จำนวนมากหรือแยก Repository ต้องผ่านการตรวจ Dependency และแผนย้อนกลับก่อน ดู [Repository Rebuild Plan](docs/REPOSITORY-REBUILD-PLAN.md) และ [Build/Deploy Policy](docs/BUILD-DEPLOY-POLICY.md)
+การย้ายไฟล์จำนวนมากหรือแยก Repository ต้องผ่านการตรวจ Dependency และแผนย้อนกลับก่อน ดู [Repository Rebuild Plan](docs/REPOSITORY-REBUILD-PLAN.md) และ [Build Protocol รุ่นเก่า](docs/BUILD_PROTOCOL.md)
 
 **ห้ามส่งรหัสผ่าน ข้อมูลส่วนตัว ไฟล์กรรมสิทธิ์ของ NVIDIA ไฟล์ที่แกะจากผลิตภัณฑ์โดยไม่ได้รับอนุญาต หรือส่วนประกอบที่ไม่มีสิทธิ์เผยแพร่**
 

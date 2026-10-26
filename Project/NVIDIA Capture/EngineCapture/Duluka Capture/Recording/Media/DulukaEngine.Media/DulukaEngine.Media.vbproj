@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework><RootNamespace></RootNamespace><OptionStrict>On</OptionStrict><OptionInfer>On</OptionInfer></PropertyGroup>
+  <ItemGroup><Compile Include="../../../../../src/[API]/CaptureMediaInspector.vb" Link="CaptureMediaInspector.vb" /></ItemGroup>
+  <ItemGroup><ProjectReference Include="../../../Video/Contracts/DulukaEngine.Video/DulukaEngine.Video.vbproj" /></ItemGroup>
+</Project>

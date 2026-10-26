@@ -42,6 +42,13 @@ Namespace DulukaEngine.Video.Tests
         Private _nvidiaAvailable As Boolean = False
         Private _reason As String = ""
 
+        Friend Sub UseOfflineMode()
+            If _probed Then Throw New InvalidOperationException("Offline mode must be selected before the hardware probe")
+            _probed = True
+            _nvidiaAvailable = False
+            _reason = "explicit --offline: live DXGI capture not authorized; hardware cases not executed"
+        End Sub
+
         ''' <summary>One-time probe through the REAL production backend —
         ''' Initialize enumerates DXGI adapters and throws
         ''' VideoBackendRuntimeException when no VendorId=0x10DE adapter

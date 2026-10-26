@@ -24,6 +24,7 @@ Namespace DulukaEngine.Encoder
     ''' </summary>
     Public NotInheritable Class EncoderConfig
         Implements ICloneable
+        Public Property Color As DulukaEngine.Video.VideoColorDescriptor
 
         ' ---- codec identity ----
 

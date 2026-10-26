@@ -8,6 +8,6 @@
     <RootNamespace></RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="../../src/[API]/CaptureMediaInspector.vb" Link="CaptureMediaInspector.vb" />
+    <ProjectReference Include="../Duluka Capture/Recording/Media/DulukaEngine.Media/DulukaEngine.Media.vbproj" />
   </ItemGroup>
 </Project>

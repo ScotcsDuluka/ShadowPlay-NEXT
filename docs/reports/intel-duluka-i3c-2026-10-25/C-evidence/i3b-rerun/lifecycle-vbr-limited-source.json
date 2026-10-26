@@ -1,0 +1,18 @@
+{
+  "Accepted": 60,
+  "Rejected": 0,
+  "QueueDrops": 0,
+  "SequenceGaps": 0,
+  "DuplicateFrames": 0,
+  "Recoveries": 1,
+  "RawFramesDisposed": 60,
+  "RoutedFrames": 60,
+  "Adapter": "00000000:0000bf60 vendor=8086 device=9b41",
+  "Encoder": "00000000:0000bf60 vendor=8086 device=9b41",
+  "Runtime": "1.34",
+  "OutputIndex": 0,
+  "SourceGeneration": 7,
+  "FinalGeneration": 8,
+  "full": false,
+  "State": "Stopped"
+}

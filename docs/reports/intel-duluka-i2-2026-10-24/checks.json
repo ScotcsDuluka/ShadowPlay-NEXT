@@ -1,0 +1,27 @@
+[
+  {
+    "name": "native-release-build",
+    "exitCode": 0,
+    "log": "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i2-2026-10-24\\native-release-build.log"
+  },
+  {
+    "name": "i1-safe-regression",
+    "exitCode": 0,
+    "log": "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i2-2026-10-24\\i1-safe-regression.log"
+  },
+  {
+    "name": "retained-media",
+    "exitCode": 0,
+    "log": "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i2-2026-10-24\\retained-media.log"
+  },
+  {
+    "name": "native-session-synthetic",
+    "exitCode": 0,
+    "log": "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i2-2026-10-24\\native-session-synthetic.log"
+  },
+  {
+    "name": "shared-mux-synthetic",
+    "exitCode": 0,
+    "log": "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i2-2026-10-24\\shared-mux-synthetic.log"
+  }
+]

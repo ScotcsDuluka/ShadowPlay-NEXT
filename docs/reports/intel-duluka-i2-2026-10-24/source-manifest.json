@@ -1,0 +1,126 @@
+[
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Encoding/Intel/README.md",
+    "sha256": "804357DC91A6380F966D3F9CC6D5A65008A3E9E1DAB3C6002E88FC989E9947D5"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Encoding/Intel/Native/Build-NativeQsv.ps1",
+    "sha256": "18A9E7441EF1BB85D5F242BB720BAA75C4E44FEF75CAC01218149892494FAE84"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Encoding/Intel/Native/CMakeLists.txt",
+    "sha256": "F0BC8C78DFAC6746AEB1A69963428B8F6826F489B214F0729FCEED862969DBBB"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Encoding/Intel/Native/qsv_bridge.cpp",
+    "sha256": "53AD95DC6E509BA4277C76E4EC40F9E3AFEADB3A319EE9D52DAE3FF91B5045C9"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Encoding/Intel/DulukaEngine.Encoder.Qsv/DulukaEngine.Encoder.Qsv.csproj",
+    "sha256": "CF84C52D5B52C2E805D77BDB2F9F612E73A3D37E3C1C470A166762195F98D29D"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Encoding/Intel/DulukaEngine.Encoder.Qsv/NativeMethods.cs",
+    "sha256": "5522C3CBCEC4ADC757EDAD39169E366C06F1B832C745A226C51B77AEC39B19A7"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Encoding/Intel/DulukaEngine.Encoder.Qsv/QsvEncoderBackend.cs",
+    "sha256": "8356913A7775146A41BEA742D3F7C3F2A95EAF0AEF3E8E9AB9975731FD7808A6"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Encoding/DulukaEngine.Encoder/Contract/IEncoderSubmissionBackend.vb",
+    "sha256": "55EA11D7D583E4CC62211802BDEC748D83C2F44EBABE9F05C5868098814B211D"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Contract/INv12VideoFrame.vb",
+    "sha256": "8F5EE47F6F6FBB29AAD4C937A3329695C5DB45A0680B5386187D4AB95E0D2488"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/DulukaEngine.Recording/CaptureSession.vb",
+    "sha256": "3501D2CE55E4826479D816883EE3825A1F5BC7D3928D00035CCBBD40598C1BBA"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/DulukaEngine.Recording/CaptureSession.OwnedFrames.vb",
+    "sha256": "1E42D2AA0CD8A16D00C6908F94A1CB0A36A7C13BA8A2A4D3C0CA035A945A97CB"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/DulukaEngine.Recording/SessionFrameRouter.vb",
+    "sha256": "DCDCB07895921D522D4DAC2574397904F6BF4D22A8F1D0101F4027756AE0DFBC"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/DulukaEngine.Recording/SessionPacketSink.vb",
+    "sha256": "44C64B7BEBD4E572F7A8DB72F1EEE33F36328F4FA85FFCD25F4FC03D6DF90544"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/DulukaEngine.Recording/RecordingDTOs.vb",
+    "sha256": "970EA4CE3314E28BBAC3ECFB9E33457B8945EA5F106136662F4EF3BEA630BD40"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/DulukaEngine.Recording/RecordingEngine.vb",
+    "sha256": "D83F08584A4A806B95F766997013579CFA2B522667617C27488D6CC19155B7C6"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/DulukaEngine.Recording/DulukaEngine.Recording.vbproj",
+    "sha256": "6356C65204E95C22DFB097982E5E0E8FBCB3D6A18A75A9494FB17AA2319DC6D7"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/DulukaEngine.Recording/Composition/RecordingBackendFactory.vb",
+    "sha256": "095092EF6AD569861C05A4FF7843EFE6C36AF1DC5DFDB93DB2CA7B90BF201553"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/DulukaEngine.Recording/Composition/EncoderConfigurationPolicy.vb",
+    "sha256": "5A0607141710B11B72D618AB5640D9148EBFF4725DB490E0CF45BB455F352F83"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/Media/DulukaEngine.Media/DulukaEngine.Media.vbproj",
+    "sha256": "F340F0FF289C35F12AE4E76BAEE128E30E77FCBFCCB530E45882DD91165C0EAC"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/Media/DulukaEngine.Media/SessionMediaVerifier.vb",
+    "sha256": "00413514C8E25A506FAD50FFE62AF0F94A84C10C625F3C8042788DE7B1D75A30"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Recording/Backends/FFmpeg/DulukaEngine.FFmpegBackend/LiveMuxSession.vb",
+    "sha256": "D1CAE482A93A2123B0C53F853D4A694CE826300EA182D4D2A9915A2CEAEE63E0"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/FFmpeg/DulukaEngine.FFmpegTests/Program.vb",
+    "sha256": "E6C6596A56A8DB712D83F735310F9DCF6552E113A9D6CE4CC5E47E33A54D50D9"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Tests/FFmpeg/DulukaEngine.FFmpegTests/LiveMuxSessionTests.vb",
+    "sha256": "32BFFF67E493212FF00E6C7F9E89EE199DBE67C428C4F69FF7956627FE9D755D"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/Composition.Tests/Program.cs",
+    "sha256": "7053B96075034260D79AECDDB00B9E2CD88AB97069EE360B05649358EE3F41EA"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/MediaEvidence.Tests/CaptureMediaInspector.Tests.vbproj",
+    "sha256": "39975F25468206584EE71958F377A3A0E5789F6B6189793F4DC1BF7D77AE87B0"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/QsvNative.Tests/QsvNative.Tests.csproj",
+    "sha256": "0AC27DF779E2CA401CA349F4BAED2F82CF04145F97FF251E7498B2693D8E412D"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/QsvNative.Tests/Program.cs",
+    "sha256": "231548E03EFFD0E0B62F490D58C5C7470A21D33CFA15F984FF134EAC38143A1E"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/QsvNative.Tests/SessionTests.cs",
+    "sha256": "77CE9C743E3908FD7949B1831376E415D0E26C769C21EB84000BE61F74C7BDD4"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/Invoke-IntelCaptureI1Regression.ps1",
+    "sha256": "473A29E2A47AD0896F9CF6C5E2FAD8E46862B89EE35E32ADBF11662B6C9568B4"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/Invoke-IntelCaptureI2Regression.ps1",
+    "sha256": "3805751DF75A8D0876104E41EFBFD11EF77255F5A3D3101F3DA5A6BC8400B3A9"
+  },
+  {
+    "path": "Project/NVIDIA Capture/NVIDIA Capture.vbproj",
+    "sha256": "FE2971D6B039746C7029D53163A9EA1641707546860C6C823EAE3CDB950E50AB"
+  }
+]

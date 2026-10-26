@@ -1,0 +1,11 @@
+{
+  "sdk": "10.0.402",
+  "nativeAbi": 3,
+  "runtime": "1.34",
+  "dispatcherRevision": "778a66d6c6537f08eabb91955dbbf1bce3812894",
+  "nativeDllSha256": "35CFA1F855A0893682D54A112818CAE59904A3EA6FDEE105DAFBC27288D67814",
+  "dispatcherDllSha256": "75233A36F1C4FDC82C9CE2E0F8221881516A11C380611E135E31EF28A9F2BE96",
+  "captureMainBuild": "0 errors, 3 existing warnings",
+  "scopedReleaseBuild": "0 errors, 0 warnings",
+  "nativeReleaseBuild": "passed"
+}

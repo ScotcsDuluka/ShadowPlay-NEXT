@@ -1,0 +1,3 @@
+64F1E2032A90DA0E0EE42522D673EBC5E35B379317D656FEDFC40829F5D91061  C:\My Project\NVIDIA-Shadowplay\Project\NVIDIA Capture\EngineCapture\Duluka Capture\Video\Transport\DulukaEngine.Video.Transport.D3D11\BgraSessionSource.cs
+74203A5AEDD8BF864C420C934E5C748EBF847623EF423E4903A8661472AFE2A0  C:\My Project\NVIDIA-Shadowplay\Project\NVIDIA Capture\EngineCapture\QsvNative.Tests\I3B.cs
+90953A7F84760706107D7F7C581CB252C283A3E70517417E9C91A8915B683897  C:\My Project\NVIDIA-Shadowplay\Project\NVIDIA Capture\EngineCapture\Duluka Capture\Video\Contracts\DulukaEngine.Video\Contract\IVideoFrameSink.vb

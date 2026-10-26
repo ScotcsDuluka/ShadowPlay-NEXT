@@ -23,3 +23,8 @@ NvCapture's worker API is described by [Container's Capture communication contra
 [Historical REST integration proposal](README-REST-INTEGRATION.md) describes an older API/polling design; **do not substitute its port or protocol for current NvCapture/Container worker contracts**.
 
 Never deploy an Engine update while recording without protecting finalization and preserving rollback backups.
+
+## Intel Capture development source (25 October snapshot)
+
+The MateBook Intel/QSV development notes have been preserved in [MateBook Intel development map](MATEBOOK-INTEL-DEVELOPMENT-20261025.md). Current source must be verified with build, tests and live hardware gates; merging source does not certify Intel recording.
+

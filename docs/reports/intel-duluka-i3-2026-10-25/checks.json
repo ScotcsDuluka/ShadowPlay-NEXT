@@ -1,0 +1,22 @@
+[
+  {
+    "name": "transport-release-build",
+    "exitCode": 0,
+    "log": "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3-2026-10-25\\transport-release-build.log"
+  },
+  {
+    "name": "i3-transport",
+    "exitCode": 0,
+    "log": "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3-2026-10-25\\i3-transport.log"
+  },
+  {
+    "name": "i2-regression",
+    "exitCode": 0,
+    "log": "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3-2026-10-25\\i2-regression.log"
+  },
+  {
+    "name": "capture-release-build",
+    "exitCode": 0,
+    "log": "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3-2026-10-25\\capture-release-build.log"
+  }
+]

@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0-windows</TargetFramework><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings><AllowUnsafeBlocks>false</AllowUnsafeBlocks></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../DulukaEngine.Encoder/DulukaEngine.Encoder.vbproj" />
+    <None Include="../Native/bin/DulukaQsvNative.dll" Link="DulukaQsvNative.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('../Native/bin/DulukaQsvNative.dll')" />
+    <None Include="../Native/bin/dispatcher/libvpl.dll" Link="libvpl.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('../Native/bin/dispatcher/libvpl.dll')" />
+    <None Include="../Native/bin/libvpl-LICENSE.txt" Link="libvpl-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('../Native/bin/libvpl-LICENSE.txt')" />
+    <None Include="../Native/bin/runtime/*.dll" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,18 @@
+{
+  "machine": "HUAWEI-MATEBOOK",
+  "branch": "intel/duluka-capture",
+  "head": "015f0548f82b5c1ed4d9c352fe095cc55e9a5453",
+  "i1Passed": 400,
+  "retainedVideoControlsPassed": 6,
+  "i2Passed": 659,
+  "i3Passed": 660,
+  "baselinePassed": 1725,
+  "i3bPassed": 331,
+  "passed": 2056,
+  "failed": 0,
+  "skipped": 33,
+  "audioMuxNotRun": 13,
+  "liveDesktopNotRun": true,
+  "liveIntelGate": "intel_native_live_input_not_verified",
+  "nativeAbi": 3
+}

@@ -1,0 +1,21 @@
+﻿{
+    "Compared":  740,
+    "Unchanged":  737,
+    "Changed":  [
+                    {
+                        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Transport/DulukaEngine.Video.Transport.D3D11/BgraStagingTransport.cs",
+                        "Before":  "E149FD859806E176619B8CADAF760DD39C9733A95712003E9608524CCF4C00F1",
+                        "After":  "42854D6E09FABDF164ED7B5BC83644E75B242624F78FA97E12554D28EB7A28D1"
+                    },
+                    {
+                        "Path":  "Project/NVIDIA Capture/EngineCapture/QsvNative.Tests/I3PixelTransport.cs",
+                        "Before":  "2E6FA5F890DDE5A06D9E74A4271F90F6E1D717AC16FF3CBBFA73C17118578BF8",
+                        "After":  "72F1C3913B4DD2D0F604073ABCB2254EF4BDED44EFEA8F2A9B5F7B18C0299D48"
+                    },
+                    {
+                        "Path":  "Project/NVIDIA Capture/EngineCapture/QsvNative.Tests/Program.cs",
+                        "Before":  "7C3017DF5EE8FC7AF11A66B1C1F846961E202FD55459A6D591E7DB1CB4F73828",
+                        "After":  "F6C47F519A296FA311BED578764DE73E2489B99065CEB037E99A3DE6970C17F6"
+                    }
+                ]
+}

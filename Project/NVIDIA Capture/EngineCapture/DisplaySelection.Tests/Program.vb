@@ -4,6 +4,8 @@ Option Infer On
 Imports System
 Imports System.IO
 Imports System.Collections.Generic
+Imports DulukaEngine.Video
+Imports DulukaEngine.Video.Backends.Ddagrab
 
 Module Program
     Private count As Integer
@@ -58,6 +60,17 @@ Module Program
             Test("synthetic PNG header with IEND accepted", CaptureScreenshotEngine.HasCompletePngSignature(header))
             File.WriteAllText(CaptureDisplayCatalog.SelectionPath(root), "{}")
             Test("corrupt saved JSON refuses to change monitor", Failed(Sub() CaptureDisplayCatalog.Resolve(root, displays)))
+            Dim identity As New AdapterIdentity(13UI, 9, CUInt(GpuVendor.Intel), &H1234UI, False, "\\?\PCI#VEN_8086&DEV_1234#test")
+            portrait.Target = New CaptureTarget(identity, 2, "TEST", New IntPtr(1), 1080, 1920, 0, 0, 1, True, 5UI, "test", "monitor-original")
+            CaptureDisplayCatalog.SaveSelection(root, desired, displays)
+            Test("v2 persists CCD monitor identity", CaptureDisplayCatalog.LoadSelection(root).MonitorDevicePath = "monitor-original")
+            Test("v2 preserves selected monitor", CaptureDisplayCatalog.Resolve(root, displays) Is portrait)
+            Dim serialized = System.Text.Json.JsonSerializer.Serialize(portrait)
+            Test("REST display JSON excludes process-local handles", Not serialized.Contains("Target") AndAlso Not serialized.Contains("Monitor"))
+            portrait.Target = New CaptureTarget(identity, 2, "TEST", New IntPtr(2), 1080, 1920, 0, 0, 1, True, 5UI, "test", "monitor-replacement")
+            Test("persisted monitor swap refused at same LUID and output index", Failed(Sub() CaptureDisplayCatalog.Resolve(root, displays)))
+            File.WriteAllText(CaptureDisplayCatalog.SelectionPath(root), "{""schemaVersion"":2,""outputIndex"":2,""adapterLuidLow"":13,""adapterLuidHigh"":9}")
+            Test("v2 cannot drop required monitor identity", Failed(Sub() CaptureDisplayCatalog.Resolve(root, displays)))
             Console.WriteLine("DISPLAY_SCREENSHOT_OFFLINE_PASS checks=" & count & " real_screen_read=false")
         Finally
             Directory.Delete(root, True)

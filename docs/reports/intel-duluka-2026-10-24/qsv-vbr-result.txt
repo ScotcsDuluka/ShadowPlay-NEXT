@@ -1,0 +1,5 @@
+MediaPath=C:\Users\SCOTCS~1\AppData\Local\Temp\Duluka-Intel-Architecture-20261024\qsv-vbr-97da006eaaa14dae83bea230387de805.mp4
+EncodeExit=0
+ProbeExit=0
+DecodeExit=0
+Source=lavfi testsrc2 only; no desktop/audio devices

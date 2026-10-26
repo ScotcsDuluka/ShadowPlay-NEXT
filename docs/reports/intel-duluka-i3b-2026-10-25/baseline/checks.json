@@ -1,0 +1,62 @@
+[
+  {
+    "name": "release-build",
+    "exitCode": 0,
+    "log": "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3b-2026-10-25\\baseline\\release-build.log"
+  },
+  {
+    "name": "hardware-dryrun",
+    "exitCode": 0,
+    "log": "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3b-2026-10-25\\baseline\\hardware-dryrun.log"
+  },
+  {
+    "name": "route-guards",
+    "exitCode": 0,
+    "log": "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3b-2026-10-25\\baseline\\route-guards.log"
+  },
+  {
+    "name": "display-selection",
+    "exitCode": 0,
+    "log": "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3b-2026-10-25\\baseline\\display-selection.log"
+  },
+  {
+    "name": "routing",
+    "exitCode": 0,
+    "log": "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3b-2026-10-25\\baseline\\routing.log"
+  },
+  {
+    "name": "configuration",
+    "exitCode": 0,
+    "log": "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3b-2026-10-25\\baseline\\configuration.log"
+  },
+  {
+    "name": "composition",
+    "exitCode": 0,
+    "log": "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3b-2026-10-25\\baseline\\composition.log"
+  },
+  {
+    "name": "dxgi-metadata",
+    "exitCode": 0,
+    "log": "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3b-2026-10-25\\baseline\\dxgi-metadata.log"
+  },
+  {
+    "name": "recovery",
+    "exitCode": 0,
+    "log": "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3b-2026-10-25\\baseline\\recovery.log"
+  },
+  {
+    "name": "video-contracts-offline",
+    "exitCode": 0,
+    "log": "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3b-2026-10-25\\baseline\\video-contracts-offline.log"
+  },
+  {
+    "name": "encoder-contracts",
+    "exitCode": 0,
+    "log": "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3b-2026-10-25\\baseline\\encoder-contracts.log"
+  },
+  {
+    "name": "session-result-contracts",
+    "exitCode": 0,
+    "log": "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3b-2026-10-25\\baseline\\session-result-contracts.log"
+  }
+]

@@ -1,0 +1,8 @@
+i3dworker EXIT=0 SUMMARY=PASS throwing lifecycle callback fails closed | I3D_WORKER_SUMMARY Passed=10 Failed=0 Skipped=0
+i3dframe EXIT=0 SUMMARY=PASS Replacement failure clears old and closes temp scope | B FRAME SUMMARY Passed=27 Failed=0 Skipped=0 Total=27
+b1worker EXIT=0 SUMMARY=B1 SUMMARY Passed=3 Failed=0 Skipped=0
+video-offline EXIT=0 SUMMARY=
+qsv-i2 EXIT=0 SUMMARY=PASS failed native initialization is terminal until disposed | QSV_NATIVE_PASS passed=659 failed=0 screen_pixels_read=false audio_opened=false
+qsv-i3transport EXIT=0 SUMMARY=I3_SAFE_TRANSPORT_PASS passed=660 failed=0 live_desktop=false audio_opened=false
+qsv-i3b EXIT=0 SUMMARY=I3B_PASS passed=331 failed=0 live_desktop=false audio_opened=false
+qsv-i3c EXIT=0 SUMMARY=PASS I3C injected device removal fails session without GPU fallback or fake media success | I3C_SYNTHETIC_ONLY_PASS passed=285 failed=0 live_desktop=false audio_opened=false

@@ -6,6 +6,7 @@ Imports System
 Imports System.Diagnostics
 Imports System.IO
 Imports System.Linq
+Imports DulukaEngine.Video.Backends.Ddagrab
 
 ' Screenshot is a one-frame display capture, completely independent of
 ' RecordingEngine and NVENC. No audio sources are opened. The source
@@ -80,7 +81,8 @@ Public NotInheritable Class CaptureScreenshotEngine
                 .RedirectStandardError = True,
                 .RedirectStandardOutput = True
             }
-            For Each arg In BuildArguments(display.OutputIndex, tempfile)
+            Dim binding = DxgiDisplayInventory.CaptureDeviceArguments(display.Target, DxgiDisplayInventory.Collect())
+            For Each arg In binding.Concat(BuildArguments(display.OutputIndex, tempfile))
                 psi.ArgumentList.Add(arg)
             Next
             Using child = Process.Start(psi)

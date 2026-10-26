@@ -1,0 +1,20 @@
+[
+  {
+    "file": "bgra-stride-to-qsv-synthetic.mp4",
+    "bytes": 10004,
+    "sha256": "3CF6C9AFC951B38C247F26DCC93F379634D73112EB8426FF49A3DAE08D321950",
+    "syntheticOnly": true
+  },
+  {
+    "file": "texture-staging-vbr.mp4",
+    "bytes": 11414,
+    "sha256": "B6E7A9FAF71FC7C878078864419C0F0AEE2C7B8D2DB869F7B7DC718EAA9307C8",
+    "syntheticOnly": true
+  },
+  {
+    "file": "texture-staging-cqp.mp4",
+    "bytes": 10279,
+    "sha256": "D551315B472EECA47D71BF3AE46D586398FD59D9987079306175E03945B597BC",
+    "syntheticOnly": true
+  }
+]

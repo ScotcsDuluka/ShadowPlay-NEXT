@@ -1,0 +1,20 @@
+[
+  {
+    "file": "native-session-vbr.mp4",
+    "bytes": 9956,
+    "sha256": "C06773761D2B5B2612B72EE4BA1558493C1711CF25E3204D2A4D78B67DAF2820",
+    "syntheticOnly": true
+  },
+  {
+    "file": "native-session-cqp.mp4",
+    "bytes": 9238,
+    "sha256": "325E82A43CC3C748CD663C26A47C4730755872A2833A2B0E145846B76693789F",
+    "syntheticOnly": true
+  },
+  {
+    "file": "native-recovered.mp4",
+    "bytes": 9956,
+    "sha256": "C06773761D2B5B2612B72EE4BA1558493C1711CF25E3204D2A4D78B67DAF2820",
+    "syntheticOnly": true
+  }
+]

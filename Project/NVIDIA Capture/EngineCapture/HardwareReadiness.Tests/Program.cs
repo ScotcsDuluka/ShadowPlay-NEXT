@@ -2,6 +2,9 @@ using System;
 using System.IO;
 using DulukaEngine.Recording;
 using DulukaEngine.Diagnostics;
+using DulukaEngine.Video;
+using DulukaEngine.Video.Backends.Ddagrab;
+using System.Linq;
 
 // Phase 7A: checks the real recording configuration and disk preflight.
 // It NEVER constructs RecordingEngine, calls Initialize/StartSession,
@@ -32,34 +35,37 @@ internal static class Program
         if (args.Length == 1 &&
             string.Equals(args[0], "--dxgi-only", StringComparison.Ordinal))
         {
-            var adapters = DxgiInventory.Collect(Console.WriteLine);
-            var nvidia = Array.FindAll(adapters, a => a.VendorId == 0x10DEu);
-            Check(nvidia.Length > 0, "DXGI metadata exposes NVIDIA adapter");
-            Check(adapters.Length >= nvidia.Length, "enumeration within available adapters");
-            // Both Ddagrab and NVENC currently pick the first NVIDIA DXGI
-            // adapter, NOT the first one with an attached display.
-            var chosen = nvidia[0];
-            var luidUsable = chosen.LuidLow != 0 || chosen.LuidHigh != 0;
-            Check(luidUsable, "first NVIDIA adapter has an identifiable LUID");
-            // DdagrabBackend currently selects the first NVIDIA adapter
-            // and the first output attached to desktop. A detached-only
-            // adapter cannot be certified, even if it has a valid LUID.
-            Check(chosen.AttachedCount > 0,
-                  "first NVIDIA adapter owns an attached desktop output");
-            Check(chosen.FirstAttachedIndex >= 0,
-                  "selected output index is physically present and attached");
-            if (!chosen.FirstAttachedIsPrimary)
-                Console.WriteLine("DXGI_CAUTION current first-attached selection is NOT Windows primary screen");
-            else
-                Check(chosen.PrimaryAttachedCount == 1,
-                      "selected first attached output is unique primary at origin");
-            Console.WriteLine($"DXGI_METADATA_ONLY_PASS total_adapters={adapters.Length} " +
-                              $"nvidia={nvidia.Length} " +
-                              $"capture_expected_adapter={chosen.Index} " +
-                              $"capture_attached_outputs={chosen.AttachedCount} " +
-                              $"first_output={chosen.FirstAttachedIndex} " +
-                              $"first_output_primary={chosen.FirstAttachedIsPrimary} " +
-                              "screen_pixels_read=false video_devices_initialized=false");
+            var snapshot = DxgiDisplayInventory.Collect();
+            DxgiInventory.Write(snapshot, Console.WriteLine);
+            Check(snapshot.Adapters.Count > 0, "DXGI metadata exposes adapters");
+            var eligible = snapshot.Outputs.Where(t => t.Eligible).ToArray();
+            Check(eligible.Length > 0, "physical attached output with CCD identity exists");
+            Check(eligible.All(t => t.Adapter.HasLuid && t.Adapter.IsPhysical && !t.Adapter.IsSoftware),
+                  "eligible outputs have nonzero physical hardware adapter identity");
+            Check(eligible.All(t => snapshot.Adapters.Count(a => a.Identity.SameDevice(t.Adapter)) == 1),
+                  "every output maps to one exact DXGI adapter LUID and PCI identity");
+            Check(eligible.Select(t => $"{t.Adapter}:{t.OutputIndex}").Distinct().Count() == eligible.Length,
+                  "adapter LUID and output index are unique");
+            Check(snapshot.Outputs.Where(t => !t.Adapter.IsPhysical || t.OutputTechnology is 15 or 16 or 17)
+                    .All(t => !t.Eligible), "software and indirect displays cannot pass eligibility");
+            var factory = new RecordingBackendFactory(() => snapshot);
+            foreach (var target in eligible)
+            {
+                var provider = RecordingBackendFactory.Providers.SingleOrDefault(p => p.Vendor == target.Adapter.Vendor);
+                if (provider is null)
+                {
+                    Console.WriteLine($"DXGI_UNSUPPORTED_VENDOR {target.Adapter.VendorId:x4}");
+                    continue;
+                }
+                var plan = factory.Plan(new EngineStartupConfig { CaptureTarget = target,
+                    CaptureOutputIndex = target.OutputIndex, CodecKey = provider.CodecKeys[0] });
+                Check(plan.Target.SameOutput(target), "factory preserves exact display identity");
+                Check(plan.Provider.Vendor == target.Adapter.Vendor, "provider matches actual adapter vendor");
+                Console.WriteLine($"COMPOSITION_METADATA provider={plan.Provider.Id} wired={plan.RuntimeWired} " +
+                    $"reason={plan.Reason} actual_capture_proven=false actual_encoder_proven=false");
+            }
+            Console.WriteLine($"DXGI_METADATA_ONLY_PASS checks={passes} total_adapters={snapshot.Adapters.Count} " +
+                $"eligible_outputs={eligible.Length} screen_pixels_read=false video_devices_initialized=false");
             return 0;
         }
         string output = Path.Combine(Path.GetTempPath(),

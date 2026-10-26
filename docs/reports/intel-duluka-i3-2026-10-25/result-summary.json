@@ -1,0 +1,60 @@
+{
+  "machine": "HUAWEI-MATEBOOK",
+  "branch": "intel/duluka-capture",
+  "baselineSuites": [
+    {
+      "suite": "video-contracts-offline",
+      "passed": 38
+    },
+    {
+      "suite": "configuration",
+      "passed": 95
+    },
+    {
+      "suite": "route-guards",
+      "passed": 33
+    },
+    {
+      "suite": "hardware-dryrun",
+      "passed": 24
+    },
+    {
+      "suite": "composition",
+      "passed": 78
+    },
+    {
+      "suite": "dxgi-metadata",
+      "passed": 8
+    },
+    {
+      "suite": "encoder-contracts",
+      "passed": 64
+    },
+    {
+      "suite": "display-selection",
+      "passed": 21
+    },
+    {
+      "suite": "routing",
+      "passed": 14
+    },
+    {
+      "suite": "recovery",
+      "passed": 15
+    },
+    {
+      "suite": "session-result-contracts",
+      "passed": 10
+    }
+  ],
+  "i2Passed": 1078.0,
+  "i3Passed": 375,
+  "totalPassed": 1453.0,
+  "totalFailed": 0,
+  "totalSkipped": 33,
+  "actualScreenRead": false,
+  "actualAudioCapture": false,
+  "liveIntelEnabled": false,
+  "cbr": "known_failure_rejected",
+  "builds": "native, transport/test, capture Release passed"
+}

@@ -1,6 +1,7 @@
 Imports System.Diagnostics
 Imports System.IO
 Imports System.Text
+Imports DulukaEngine.Video.Backends.Ddagrab
 
 Partial Public Class LegacyCaptureEngine
 
@@ -32,7 +33,8 @@ Partial Public Class LegacyCaptureEngine
         ' A saved Capture display is owned by NvCapture, not OSC/Container.
         ' Fail closed if the same DXGI monitor identity has disappeared.
         Dim selectedDisplay As CaptureDisplayCatalog.Display = Nothing
-        If IO.File.Exists(CaptureDisplayCatalog.SelectionPath(AppLayout.Dir)) Then
+        If IO.File.Exists(CaptureDisplayCatalog.SelectionPath(AppLayout.Dir)) OrElse
+            String.Equals(_settings.CaptureMethod, "ddagrab", StringComparison.OrdinalIgnoreCase) Then
             selectedDisplay = CaptureDisplayCatalog.Resolve(
                 AppLayout.Dir, CaptureDisplayCatalog.Enumerate())
         End If
@@ -41,6 +43,10 @@ Partial Public Class LegacyCaptureEngine
 
         Select Case _settings.CaptureMethod.ToLower()
             Case "ddagrab"
+                ' output_idx is adapter-local; bind the child to the freshly
+                ' resolved LUID's current DXGI index instead of the default GPU.
+                Dim binding = DxgiDisplayInventory.CaptureDeviceArguments(selectedDisplay.Target, DxgiDisplayInventory.Collect())
+                sb.Append(String.Join(" ", binding)).Append(" ")
                 sb.Append("-f lavfi -i ""ddagrab=output_idx=" & outputIndex.ToString() & ":framerate=" & fpsStr & """ ")
                 Select Case hwType
                     Case HwDeviceType.IntelQSV

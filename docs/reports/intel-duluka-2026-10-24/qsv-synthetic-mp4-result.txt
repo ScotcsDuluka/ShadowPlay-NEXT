@@ -1,0 +1,5 @@
+MediaPath=C:\Users\SCOTCS~1\AppData\Local\Temp\Duluka-Intel-Architecture-20261024\qsv-synthetic-d6bb894d11d54e6b94d92e369aa03ee3.mp4
+EncodeExit=0
+ProbeExit=0
+DecodeExit=-1094995529
+Source=lavfi testsrc2 only; no desktop/audio devices

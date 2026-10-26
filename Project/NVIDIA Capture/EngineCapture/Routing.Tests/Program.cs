@@ -29,6 +29,9 @@ Test("NvFBC not assumed available",
     !PipelineRouter.Plan("nvidia:nvfbc", "nvidia:nvenc-h264").ContractCompatible);
 Test("WGC overlay source not promoted to game capture",
     !PipelineRouter.Plan("duluka:wgc", "nvidia:nvenc-h264").ContractCompatible);
+Test("Intel native composition remains planned and non-runnable",
+    !PipelineRouter.Plan("duluka:dxgi", "intel:qsv-h264").MayStart &&
+    !PipelineRouter.Plan("duluka:dxgi", "intel:qsv-h264").ContractCompatible);
 Test("Unknown capture rejected", !PipelineRouter.Plan("wrong", "nvidia:nvenc-h264").ContractCompatible);
 Test("Unknown encoder rejected", !PipelineRouter.Plan("duluka:dxgi", "wrong").ContractCompatible);
 

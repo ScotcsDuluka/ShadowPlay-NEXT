@@ -28,6 +28,7 @@ Namespace DulukaEngine.Recording
     ''' (persistent encoder owner) and live in EngineStartupConfig.
     ''' </summary>
     Public NotInheritable Class SessionConfig
+        Public Property Color As Global.DulukaEngine.Video.VideoColorDescriptor
         Public Property OutputPath As String = ""
         Public Property DurationSeconds As Integer = 30
         Public Property UseSharedHandle As Boolean = False
@@ -168,11 +169,15 @@ Namespace DulukaEngine.Recording
     ''' Values mirror the proven legacy defaults when unset.
     ''' </summary>
     Public NotInheritable Class EngineStartupConfig
+        Public Property Color As Global.DulukaEngine.Video.VideoColorDescriptor
+        Public Property Cq As Integer = 24
+        ' Immutable, complete DXGI identity. Output index alone is adapter-local.
+        Public Property CaptureTarget As Global.DulukaEngine.Video.CaptureTarget
         Public Property CodecKey As String = "NVENC_H264"
         ' OWNER (2026-09-25): cursor composition switch (DdagrabBackend).
         Public Property CaptureCursor As Boolean = True
         ' -1 = first attached DXGI output; explicit index requires a
-        ' matching connected output on the same NVIDIA adapter.
+        ' matching connected output on the resolved adapter.
         Public Property CaptureOutputIndex As Integer = -1
         Public Property BitrateBps As Long = 20_000_000L
         Public Property GopSize As Integer = 60
@@ -283,6 +288,25 @@ Namespace DulukaEngine.Recording
     ''' Result of a recording session.
     ''' </summary>
     Public NotInheritable Class SessionResult
+        Public Property SourceAccepted As Long
+        Public Property SourceRejected As Long
+        Public Property SourceQueueDrops As Long
+        Public Property SourceSequenceGaps As Long
+        Public Property SourceDuplicateFrames As Long
+        Public Property SourceRecoveries As Long
+        Public Property SessionId As String = ""
+        Public Property FramesSubmitted As Long
+        Public Property EncoderPacketCount As Long
+        Public Property MuxedPacketCount As Long
+        Public Property PacketsQueuedForMux As Long
+        Public Property SyntheticFramesConsumed As Long
+        Public Property FlushedPackets As Long
+        Public Property EncoderErrors As Long
+        Public Property FinalizationState As String = "Created"
+        Public Property MediaVerificationRequired As Boolean
+        Public Property FullDecodeVerified As Boolean
+        Public Property DecodedFrameCount As Long
+        Public Property VideoIdentity As RecordingVideoIdentity
         Public Property OutputPath As String = ""
         Public Property RequestedDurationSec As Integer
         Public Property ActualDurationSec As Double
@@ -370,6 +394,9 @@ Namespace DulukaEngine.Recording
                 Dim audioOk As Boolean = Not AudioRequested OrElse
                     (AudioStreamFound AndAlso AudioDroppedBytes = 0)
                 Return FramesEncoded > 0 AndAlso
+                       EncoderErrors = 0 AndAlso
+                       (Not MediaVerificationRequired OrElse (FullDecodeVerified AndAlso
+                        DecodedFrameCount = EncoderPacketCount AndAlso EncoderPacketCount = FramesSubmitted)) AndAlso
                        NvencErrors = 0 AndAlso
                        MuxDroppedBytes = 0 AndAlso
                        MicDroppedBytes = 0 AndAlso
@@ -387,10 +414,25 @@ Namespace DulukaEngine.Recording
     ''' Engine status — safe to poll from any thread.
     ''' </summary>
     Public NotInheritable Class EngineStatus
+        Public Property SourceLifecycleState As String
+        Public Property VideoIdentity As RecordingVideoIdentity
         Public Property State As RecordingEngineState
         Public Property CurrentSessionId As String  ' Nothing if Idle
         Public Property FramesEncodedThisSession As Long
         Public Property LastSessionResult As SessionResult  ' Nothing if no session yet
+    End Class
+
+    ' Serializable device evidence, without COM objects or process-local handles.
+    ' Matching identities do not attest frame delivery or finalized media.
+    Public NotInheritable Class RecordingVideoIdentity
+        Public Property CaptureLuidLow As UInteger
+        Public Property CaptureLuidHigh As Integer
+        Public Property OutputIndex As Integer
+        Public Property CaptureVendorId As UInteger
+        Public Property EncoderLuidLow As UInteger
+        Public Property EncoderLuidHigh As Integer
+        Public Property EncoderVendorId As UInteger
+        Public Property EncoderProvider As String = ""
     End Class
 
 End Namespace

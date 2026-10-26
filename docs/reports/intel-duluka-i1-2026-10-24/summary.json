@@ -1,0 +1,15 @@
+{
+  "branch": "intel/duluka-capture",
+  "passed": 406,
+  "failed": 0,
+  "skipped": 33,
+  "regressionPassed": 400,
+  "retainedMediaAssertionsPassed": 6,
+  "liveCapture": false,
+  "audioDevices": false,
+  "nativeIntelReady": false,
+  "cbrStatus": "known_failed_configuration_retained",
+  "releaseRebuildExit": 0,
+  "releaseRebuildWarnings": 3,
+  "changedProjectFiles": 27
+}

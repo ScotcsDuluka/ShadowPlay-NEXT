@@ -24,6 +24,8 @@ An independent Windows overlay and game-capture platform in the middle of a full
 
 </div>
 
+> **Capture architecture (ACCEPTED):** [Session-Centric Recording Contract](docs/architecture/SESSION-CENTRIC-RECORDING-CONTRACT.md) — one Duluka recording session, independently configurable Desktop / Fullscreen Exclusive capture APIs and Encoder, shared audio timeline and verified MP4. Some selectable providers are future work; see the contract for current status.
+
 > [!IMPORTANT]
 > **Two generations. One evolving vision.** **NVIDIA ShadowPlay OBT3** is the existing legacy release. **ShadowPlay NEXT** is a different, heavily rebuilt development generation — **CBT1 is planned, not publicly released**. The target for **NEXT OBT1 is January 1, 2027** (01.01.2570 in the Thai Buddhist calendar). A target date is not a guarantee of availability.
 >
@@ -144,7 +146,32 @@ This is a **dated development snapshot**, not a compatibility matrix or release 
 
 **Keep these milestones separate:** source modification → focused test → build → deploy/restart → observed runtime → public release. Do not infer one from another. For a code-only README change, no engine restart is necessary.
 
-**Evidence:** [Launcher](Project/Launcher.Cef/README.md) · [OSC Adapter](Project/NVIDIA%20Adapter/OSC%20Adapter/README.md) · [DX9Ex producer IPC](Project/Overlay%20On-Screen%20Control/NVIDIA%20OSC/HOST-DX9EX-IPC-DIRECT-GPU-20261024.md) · [Capture relay](Project/NVIDIA%20Container/CAPTURE-DISPLAY-RELAY-CONTRACT-20261024.md) · [Gallery player](Project/Overlay%20On-Screen%20Control/NVIDIA%20NodeAPI/NODEAPI-GALLERY-PLAYER-SEEK-20261024.md) · [Security](Project/NVIDIA%20Container/SECURITY-STABILITY-20261024.md).
+**Evidence:** [Launcher](Project/Launcher.Cef/README.md) · [OSC Adapter/Hook source status](Project/NVIDIA%20Adapter/OSC%20Adapter/Duluka%20Hook/IMPLEMENTATION-STATUS.md) · DX9Ex producer IPC report (other worktree; unavailable here) · [MateBook Capture architecture](Project/NVIDIA%20Capture/README.md) · Gallery player report (other worktree; unavailable here) · Container security report (other worktree; unavailable here).
+
+---
+
+## HUAWEI-MateBook engineering update — 25 October 2026 (Intel development branch)
+
+This section describes the **local `intel/duluka-capture` worktree on HUAWEI-MateBook**, not the published `Stable` branch or AORUS-DESKTOP runtime. The [accepted Session-Centric Recording Contract](docs/architecture/SESSION-CENTRIC-RECORDING-CONTRACT.md) remains the authority: **one Duluka session, one clock/audio plan, independent video-source and encoder choices, one packet sink/mux**.
+
+| Milestone | Verified on MateBook | Not certified |
+|---|---|---|
+| Intel I1 / physical target | Intel UHD 8086:9B41, DXGI/CCD source-target identity and guarded routing tests. | Reading monitor metadata is not capturing desktop pixels. |
+| Intel I2 native QSV | Owned synthetic NV12 frames → native QSV H.264 → original RecordingSession/MP4 with full-decode VBR/CQP evidence. | CBR remains rejected; hardware support elsewhere is unknown. |
+| Intel I3 D3D11 staging | Test-owned D3D11 BGRA → CPU staging → NV12 → same session/QSV/mux; dated I3 suite **1,453 passed / 0 failed / 33 skipped**. | No live Desktop acquisition, device-transition or audio/AV-sync certification. |
+| Intel I3 borrowed-frame adapter | New generation-bound `BgraFrameAdapter` validates production-shaped D3D11 frame wrappers and preserves native device/COM ownership. Reported final regression **1,725 passed / 0 failed / 33 skipped** across six successful orchestration stages. | The production Desktop factory is still blocked by **`intel_native_live_input_not_verified`**. Latest composition scope did not rerun 13 historical synthetic-audio checks. |
+
+**Important:** These are synthetic-media and code/driver integration results, **not real-screen recording**, universal Intel GPU support or an installed ShadowPlay NEXT feature. No live pixels, speaker/microphone audio or game data were captured by this documentation update. [Intel Capture module map](Project/NVIDIA%20Capture/README.md) · [I3 frame adapter report](docs/reports/intel-duluka-i3-composition-2026-10-25/README.md) · [I3 synthetic transport report](docs/reports/intel-duluka-i3-2026-10-25/README.md).
+
+---
+
+**MateBook documentation index:** [Intel Capture subsystem](Project/NVIDIA%20Capture/README.md) · [Read/update audit for the MateBook worktree](docs/README-COVERAGE-MATEBOOK-20261025.md). The documentation inventory excludes vendored Intel libvpl dependency READMEs; it does not claim all reports were rebuilt in this edit.
+
+### MateBook I3-B / I3-C proof update — 25 October 2026
+
+The prior I3 and frame-adapter rows above remain **dated milestones**, not the latest work. On the independent `intel/duluka-capture` branch, **I3-B completed its synthetic session/lifecycle/color regression with 2,056 passed / 0 failed / 33 skipped**. A subsequent I3-C synthetic producer/one-session integration was independently checked by Agent C: **1,938 passed / 0 failed / 0 skipped** in its scoped rerun; acceptance is an **Agent C recommendation pending Main review**. The **B1 worker lifetime** guard has synthetic coverage, but a possible final-state race and B2–B8 still require separate review. The current source still rejects live Intel capture via `intel_native_live_input_not_verified`. Native QSV uses a private **ABI 3** bridge and BT.709 Limited/Full verification for the tested synthetic profiles; this is **not** live GPU/game capture or Intel support merged into AORUS.
+
+See [MateBook capture module](Project/NVIDIA%20Capture/README.md) and [two-worktree scope/evidence map](docs/WORKTREE-STATUS-20261025.md). The I3-B and I3-C reports exist only on the MateBook branch and must not be treated as deployed AORUS files.
 
 ---
 
@@ -238,7 +265,7 @@ Some examples from subsystem-specific validation records:
 Current focus includes **capture correctness and honest failure reporting**, **GPU adapter/LUID safety**, **host-to-hook synchronization**, **clean OSC motion and input**, and **regressions across game-specific conditions**.
 
 - [Recent code history](https://github.com/ScotcsDuluka/ShadowPlay-NEXT/commits/Stable)
-- [Build and deployment policy](docs/BUILD-DEPLOY-POLICY.md)
+- [Historical build protocol](docs/BUILD_PROTOCOL.md)
 - [Capture architecture notes](Project/NVIDIA%20Capture/ENGINE-REALTIME-ARCHITECTURE.md)
 - [Repository rebuild plan — proposal, not a completed migration](docs/REPOSITORY-REBUILD-PLAN.md)
 
@@ -276,7 +303,7 @@ This repository is developing quickly across several simultaneous workstreams. *
 5. Treat source, staged builds, installed runtime and public release artifacts separately.
 6. Open a focused Pull Request with reproduction steps and evidence.
 
-Large dependency or repository moves should follow a reviewed plan, not a bulk rename. See [Repository rebuild plan](docs/REPOSITORY-REBUILD-PLAN.md) and [Build/deploy policy](docs/BUILD-DEPLOY-POLICY.md).
+Large dependency or repository moves should follow a reviewed plan, not a bulk rename. See [Repository rebuild plan](docs/REPOSITORY-REBUILD-PLAN.md) and [Historical build protocol](docs/BUILD_PROTOCOL.md).
 
 **Do not submit proprietary NVIDIA assets, extracted binaries, credentials, private user data or unlicensed third-party materials.**
 

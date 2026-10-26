@@ -1,0 +1,15 @@
+{
+  "dotnet": "10.0.402",
+  "nativeAbi": 2,
+  "dispatcherSourceRevision": "778a66d6c6537f08eabb91955dbbf1bce3812894",
+  "nativeDllSha256": "2E3242CA09A548734F74B11FC482D8EF0D6F8D49CFF4D2452D446677217E858D",
+  "nativeDllUnchangedFromI2": true,
+  "dispatcherSha256": "75233A36F1C4FDC82C9CE2E0F8221881516A11C380611E135E31EF28A9F2BE96",
+  "dispatcherUnchangedFromI2": true,
+  "transportAssemblySha256": "00AA88F224CD7DD83F5BEC97EF6FE16A7D7DDF36516A547C5D216BF879828786",
+  "vorticeVersion": "3.6.2",
+  "nativeRuntimeVersion": "1.34",
+  "physicalLuid": "00000000:0000bf60",
+  "sourceAndEncoderIdentity": "see texture-staging-vbr-transport.json and texture-staging-cqp-transport.json",
+  "noSystemGpuSettingsChanged": true
+}

@@ -59,6 +59,9 @@ Namespace DulukaEngine.Video.Backends.Ddagrab
     Public NotInheritable Class D3D11VideoFrame
         Implements IVideoFrame
         Implements ID3D11VideoFrame
+        Implements ISourceStampedVideoFrame
+        Public ReadOnly Property SourceTarget As CaptureTarget Implements ISourceStampedVideoFrame.SourceTarget
+        Public ReadOnly Property SourceGeneration As Long Implements ISourceStampedVideoFrame.SourceGeneration
 
         ' ---- Frame metadata (immutable, cached) ----
         Private ReadOnly _origin As VideoFrameOrigin
@@ -67,9 +70,12 @@ Namespace DulukaEngine.Video.Backends.Ddagrab
         Private ReadOnly _diagnostics As FrameDiagnostics
 
         ' ---- Native resource (released on Dispose) ----
-        Private ReadOnly _stagingTexture As ID3D11Texture2D
+        ' IDisposable permits a device-free owned-resource fixture in the Friend constructor.
+        ' Public constructors still strictly require Vortice ID3D11Texture2D.
+        Private ReadOnly _stagingTexture As IDisposable
         Private _nativeTextureObj As Object  ' cached ID3D11Texture2D (Object type to avoid contract leak)
         Private ReadOnly _sharedHandle As IntPtr  ' IntPtr.Zero = direct path; non-zero = shared-handle path
+        Private ReadOnly _closeOwnedHandle As Action(Of IntPtr)
 
         <DllImport("kernel32.dll", SetLastError:=True)>
         Private Shared Function CloseHandle(hObject As IntPtr) As Boolean
@@ -80,6 +86,7 @@ Namespace DulukaEngine.Video.Backends.Ddagrab
         ' to increment _texturesDisposed counter regardless of who disposes the frame
         ' (backend on Dropped, sink on eviction, consumer after Encode).
         Private _onDisposed As Action
+        Private ReadOnly _callbackSync As New Object()
 
         ' ---- Disposal guard (0 = alive, 1 = disposed) ----
         Private _disposedState As Integer = 0
@@ -95,31 +102,56 @@ Namespace DulukaEngine.Video.Backends.Ddagrab
         ''' <param name="captureTimeTicks">Capture time in 100-ns ticks (P1-B.2 §16.3 Option β).</param>
         ''' <param name="presentationTimestampTicks">PTS in 100-ns ticks (pipeline contract).</param>
         Public Sub New(stagingTexture As ID3D11Texture2D,
+                       width As Integer, height As Integer, sequence As Long,
+                       captureTimeTicks As Long, presentationTimestampTicks As Long,
+                       Optional sharedHandle As IntPtr = Nothing)
+            Me.New(stagingTexture, width, height, sequence, captureTimeTicks, presentationTimestampTicks, sharedHandle, Nothing, 0)
+        End Sub
+        Public Sub New(stagingTexture As ID3D11Texture2D,
                        width As Integer,
                        height As Integer,
                        sequence As Long,
                        captureTimeTicks As Long,
                        presentationTimestampTicks As Long,
-                       Optional sharedHandle As IntPtr = Nothing)
-            If stagingTexture Is Nothing Then
-                Throw New ArgumentNullException(NameOf(stagingTexture))
-            End If
+                       sharedHandle As IntPtr,
+                       sourceTarget As CaptureTarget, sourceGeneration As Long)
+            Me.New(DirectCast(stagingTexture, IDisposable), width, height, sequence,
+                   captureTimeTicks, presentationTimestampTicks, sharedHandle,
+                   sourceTarget, sourceGeneration, Nothing)
+        End Sub
+
+        ' B4: test-only lease seam. The shipped public ABI still demands an
+        ' actual ID3D11Texture2D. Injected closers are never used by the worker.
+        Friend Sub New(ownedTexture As IDisposable, width As Integer, height As Integer,
+                       sequence As Long, captureTimeTicks As Long, presentationTimestampTicks As Long,
+                       sharedHandle As IntPtr, sourceTarget As CaptureTarget, sourceGeneration As Long,
+                       closeOwnedHandle As Action(Of IntPtr))
+            If ownedTexture Is Nothing Then Throw New ArgumentNullException(NameOf(ownedTexture))
             If width <= 0 Then Throw New ArgumentOutOfRangeException(NameOf(width))
             If height <= 0 Then Throw New ArgumentOutOfRangeException(NameOf(height))
 
-            _stagingTexture = stagingTexture
-            _nativeTextureObj = stagingTexture  ' store the actual Vortice object
-            _sharedHandle = sharedHandle  ' IntPtr.Zero for direct path
+            _stagingTexture = ownedTexture
+            Me.SourceTarget = sourceTarget : Me.SourceGeneration = sourceGeneration
+            _nativeTextureObj = ownedTexture
+            _sharedHandle = sharedHandle
+            _closeOwnedHandle = If(closeOwnedHandle, AddressOf CloseNativeHandle)
             _origin = VideoFrameOrigin.GpuD3D11Texture
             _pixelFormat = VideoPixelFormat.Bgra8
             _dimensions = New VideoFrameDimensions(width, height)
             _diagnostics = New FrameDiagnostics(sequence, captureTimeTicks, presentationTimestampTicks)
         End Sub
 
+        Private Shared Sub CloseNativeHandle(handle As IntPtr)
+            CloseHandle(handle)
+        End Sub
+
         ''' <summary>Set a callback to invoke when Dispose() runs (for metric tracking).</summary>
         Public WriteOnly Property OnDisposed As Action
             Set(value As Action)
-                _onDisposed = value
+                SyncLock _callbackSync
+                    If Volatile.Read(_disposedState) <> 0 Then Throw New ObjectDisposedException(NameOf(D3D11VideoFrame))
+                    _onDisposed = value
+                End SyncLock
             End Set
         End Property
 
@@ -203,7 +235,7 @@ Namespace DulukaEngine.Video.Backends.Ddagrab
             ' lifetime of the shared resource handle and must close it exactly once.
             If _sharedHandle <> IntPtr.Zero Then
                 Try
-                    CloseHandle(_sharedHandle)
+                    _closeOwnedHandle(_sharedHandle)
                 Catch
                     ' Swallow — never throw from Dispose.
                 End Try
@@ -216,8 +248,13 @@ Namespace DulukaEngine.Video.Backends.Ddagrab
             ' This lets DdagrabBackend increment _texturesDisposed regardless
             ' of who disposes the frame (backend on Dropped, sink on eviction,
             ' consumer after Encode). Fixes the leak_invariant metric bug.
+            Dim callback As Action
+            SyncLock _callbackSync
+                callback = _onDisposed
+                _onDisposed = Nothing
+            End SyncLock
             Try
-                _onDisposed?.Invoke()
+                callback?.Invoke()
             Catch
                 ' Swallow — never throw from Dispose.
             End Try

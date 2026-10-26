@@ -1,8 +1,14 @@
 # ScotcsDuluka Capture Engine Architecture
 
-> Canonical architecture definition for the Engine-Rebuild branch.
+> **Canonical recording decision (2026-10-24): [Session-Centric Recording Architecture — ACCEPTED](architecture/SESSION-CENTRIC-RECORDING-CONTRACT.md) ([ฉบับภาษาไทย](architecture/SESSION-CENTRIC-RECORDING-TH.md)).** Duluka owns one logical RecordingSession; Desktop and Exclusive Capture APIs plus Encoder are independently selectable after capability validation. OBS/NVIDIA keep their own engines. This contract overrides older diagrams where they disagree.
 >
-> This document describes the target architecture. A listed component is not implied to be fully implemented unless separately marked by implementation/status documentation.
+> This document preserves a historical component/status inventory for the Engine-Rebuild branch. A listed component is not implied to be fully implemented unless separately marked by current implementation/test evidence.
+
+## Intel development worktree evidence — 25 October 2026
+
+This historical map is **not** the current proof of Intel live recording. On HUAWEI-MateBook `intel/duluka-capture`, the canonical [Session-Centric Recording Contract](architecture/SESSION-CENTRIC-RECORDING-CONTRACT.md) governs **one Duluka SessionId/clock/packet sink/mux**, with independent capture-source and encoder choices subject to compatibility. [Current MateBook Capture README](../Project/NVIDIA%20Capture/README.md) links the I1/I2/I3 source evidence.
+
+The I3 synthetic D3D11 BGRA → staging CPU → NV12 → QSV → MP4 pipeline and subsequent guarded frame adapter were tested against **owned synthetic frames**. The adapter report recorded **1,725 passed / 0 failed / 33 skipped**; this is **not** a full live Desktop, Exclusive or audio-success claim. The `intel_native_live_input_not_verified` production gate, Intel CBR rejection and unspecified colorimetry remain. Do not upgrade the older `Native Backend Not Started` headings below as a blanket modern claim—those are historical snapshot labels predating scoped Intel work.
 
 ## Architecture
 

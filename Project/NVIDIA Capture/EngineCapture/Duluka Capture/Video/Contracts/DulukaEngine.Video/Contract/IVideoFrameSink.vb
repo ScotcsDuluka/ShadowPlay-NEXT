@@ -10,6 +10,12 @@ Namespace DulukaEngine.Video
     ''' returns Dropped instead. The backend examines the outcome and reacts
     ''' (dispose the refused frame, increment DroppedFrames).
     '''
+    ''' IMPORTANT OWNERSHIP RULE: A sink that returns Pushed or Replaced
+    ''' has accepted the frame and owns its disposal. It MUST NOT throw
+    ''' after taking ownership; an accept-then-throw result is ambiguous to
+    ''' the producer and cannot be made safe by blind producer disposal.
+    ''' A throw before acceptance leaves the frame producer-owned.
+    ''' This is a contract obligation, not proof that every sink obeys it.
     ''' The sink owns the bounded queue, its capacity, and the
     ''' BoundedHandoffPolicy (§15.4). The backend has zero knowledge of
     ''' these — it only observes PushOutcome.

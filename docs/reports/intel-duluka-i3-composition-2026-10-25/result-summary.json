@@ -1,0 +1,17 @@
+﻿{
+    "Machine":  "HUAWEI-MATEBOOK",
+    "Branch":  "intel/duluka-capture",
+    "Passed":  1725,
+    "Failed":  0,
+    "Skipped":  33,
+    "ExcludedAudioMuxAssertions":  13,
+    "I3Passed":  660,
+    "NewAdapterAssertions":  285,
+    "LiveEnabled":  false,
+    "ActualScreenPixelsRead":  false,
+    "AudioDevicesOpened":  false,
+    "ScopedBuildWarnings":  0,
+    "ScopedBuildErrors":  0,
+    "MainBuildWarnings":  3,
+    "MainBuildErrors":  0
+}

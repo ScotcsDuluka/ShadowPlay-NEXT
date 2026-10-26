@@ -55,7 +55,7 @@ Imports DulukaEngine.Audio.Wasapi
 
 Namespace DulukaEngine.Recording
 
-    Public NotInheritable Class CaptureSession
+    Partial Public NotInheritable Class CaptureSession
         Implements IDisposable
 
         ' ★ CFR PACING FIX (the 60fps bug): Thread.Sleep on Windows has a
@@ -77,10 +77,11 @@ Namespace DulukaEngine.Recording
         Private Shared Function timeEndPeriod(period As UInteger) As Integer
         End Function
 
-        Private ReadOnly _capture As DdagrabBackend
-        Private ReadOnly _encoder As NvencEncoderBackend
+        Private ReadOnly _capture As IVideoCaptureRuntime
+        Private ReadOnly _encoder As IEncoderBackend
         Private ReadOnly _config As SessionConfig
         Private ReadOnly _logger As EngineLogger
+        Public ReadOnly Property SessionId As String = Guid.NewGuid().ToString("N")
         Private _stopSignal As Boolean = False
         Private _stopRequestedTicks As Long = 0
         Private _disposed As Boolean = False
@@ -220,6 +221,13 @@ Namespace DulukaEngine.Recording
                       encoder As NvencEncoderBackend,
                       config As SessionConfig,
                       logger As EngineLogger)
+            Me.New(DirectCast(capture, IVideoCaptureRuntime), DirectCast(encoder, IEncoderBackend), config, logger)
+        End Sub
+
+        Public Sub New(capture As IVideoCaptureRuntime,
+                      encoder As IEncoderBackend,
+                      config As SessionConfig,
+                      logger As EngineLogger)
             _capture = capture
             _encoder = encoder
             _config = config
@@ -228,6 +236,7 @@ Namespace DulukaEngine.Recording
 
         Public Function Run() As SessionResult
             Dim result As New SessionResult() With {
+                .SessionId = SessionId,
                 .OutputPath = _config.OutputPath,
                 .RequestedDurationSec = _config.DurationSeconds,
                 .AudioRequested = _config.RequestsAnyAudio
@@ -267,6 +276,8 @@ Namespace DulukaEngine.Recording
             ' produce a header-less H.264 stream the mux cannot decode.
             Dim captureRunning As Boolean = False
             Dim encoderRunning As Boolean = False
+            Dim packets As New SessionPacketSink(_encoder, result,
+                Sub(data, count) _liveMux.FeedVideo(data, count))
 
             ' ★ M1: the CFR loop's retained frames (freshest pending + last
             ' displayed) were only disposed by the post-loop tail — an
@@ -848,23 +859,7 @@ Namespace DulukaEngine.Recording
                                 Dim packet As EncodedPacket = Nothing
                                 Dim encodeStartTicks As Long = Stopwatch.GetTimestamp()
                                 Try
-                                    If _encoder.Encode(encodeFrame, packet) AndAlso packet IsNot Nothing Then
-                                        ' ★ FORENSIC INSTRUMENTATION: Muxer feed timing for first 4 presentation ticks
-                                        If presentationTickCount <= 4 Then
-                                            Dim muxFeedTick As Long = Stopwatch.GetTimestamp()
-                                            Dim muxFeedQpc As Long = Stopwatch.GetTimestamp() ' Using Stopwatch as QPC equivalent
-                                            _logger.Info($"CaptureSession: CFR TICK {presentationTickCount} MUXER FEED:")
-                                            _logger.Info($"  muxFeedTick={muxFeedTick}")
-                                            _logger.Info($"  muxFeedQpc={muxFeedQpc}")
-                                            _logger.Info($"  packet.Metadata.PresentationTimestampTicks={packet.Metadata.PresentationTimestampTicks}")
-                                            _logger.Info($"  packet.Metadata.Sequence={packet.Metadata.Sequence}")
-                                        End If
-                                        
-                                        _liveMux?.FeedVideo(packet.Payload, packet.PayloadLength)
-                                        result.TotalVideoBytes += packet.PayloadLength
-                                        result.FramesEncoded += 1
-                                        packet.Dispose()
-                                    End If
+                                    packets.Submit(encodeFrame)
                                 Catch ex As Exception
                                     result.NvencErrors += 1
                                     _logger.Error($"[session] Encode error: {ex.Message}")
@@ -950,7 +945,7 @@ Namespace DulukaEngine.Recording
                 captureRunning = False   ' ★ M1: success path owns the stop — Finally must not re-stop
                 ' Capture-path evidence: distinguish real DXGI no-update periods,
                 ' handoff backpressure, and backend errors from CFR duplication.
-                _logger.Info($"[session] capture diagnostics: emitted={_capture.EmittedFrames}, pushed={_capture.FramesPushed}, dropped={_capture.DroppedFrames}, replaced={_capture.ReplacedFrames}, noFrame={_capture.NoFrameCount}, errors={_capture.ErrorCount}, accessLost={_capture.AccessLostCount}, textures={_capture.TexturesCreated}/{_capture.TexturesDisposed}")
+                _logger.Info($"[session] capture diagnostics: emitted={_capture.Diagnostics.EmittedFrames}, pushed={_capture.FramesPushed}, dropped={_capture.Diagnostics.DroppedFrames}, replaced={_capture.Diagnostics.ReplacedFrames}, noFrame={_capture.Diagnostics.NoFrameCount}, errors={_capture.Diagnostics.ErrorCount}, accessLost={_capture.AccessLostCount}, textures={_capture.TexturesCreated}/{_capture.TexturesDisposed}")
 
                 Dim avgEncodeMs As Double = If(result.FramesEncoded > 0, totalEncodeTicks * 1000.0 / Stopwatch.Frequency / result.FramesEncoded, 0.0)
                 Dim maxEncodeMs As Double = maxEncodeTicks * 1000.0 / Stopwatch.Frequency
@@ -989,11 +984,7 @@ Namespace DulukaEngine.Recording
                     If pendingFrame IsNot Nothing Then
                         Dim packetF As EncodedPacket = Nothing
                         Try
-                            If _encoder.Encode(pendingFrame, packetF) AndAlso packetF IsNot Nothing Then
-                                _liveMux?.FeedVideo(packetF.Payload, packetF.PayloadLength)
-                                result.TotalVideoBytes += packetF.PayloadLength
-                                result.FramesEncoded += 1
-                                packetF.Dispose()
+                            If packets.Submit(pendingFrame) Then
 
                                 ' Transfer ownership before tail-fill; finalFrame
                                 ' must never point at a disposed pending frame.
@@ -1010,18 +1001,14 @@ Namespace DulukaEngine.Recording
                     Dim actualSessionSeconds As Double = stopElapsedSeconds
                     Dim targetFrames As Long = CLng(Math.Ceiling(actualSessionSeconds * targetFps))
                     Dim fillBefore As Long = result.FramesEncoded
-                    While result.FramesEncoded < targetFrames AndAlso finalFrame IsNot Nothing
+                    While result.FramesSubmitted < targetFrames AndAlso finalFrame IsNot Nothing
                         Dim packetPad As EncodedPacket = Nothing
                         Try
-                            If Not _encoder.Encode(finalFrame, packetPad) OrElse packetPad Is Nothing Then
+                            If Not packets.Submit(finalFrame) Then
                                 result.NvencErrors += 1
                                 Exit While
                             End If
-                            _liveMux?.FeedVideo(packetPad.Payload, packetPad.PayloadLength)
-                            result.TotalVideoBytes += packetPad.PayloadLength
-                            result.FramesEncoded += 1
                             result.FramesDuplicated += 1
-                            packetPad.Dispose()
                         Catch
                             result.NvencErrors += 1
                             Exit While
@@ -1047,7 +1034,8 @@ Namespace DulukaEngine.Recording
                 lastFrame = Nothing
                 frameDisposer.CompleteAndWait()
 
-                _logger.Info("[session] GPU frame disposer drained; stopping encoder...")
+                _logger.Info("[session] frame disposer drained; draining encoder packets into session mux...")
+                packets.Drain()
                 _encoder.Stop()
                 encoderRunning = False   ' ★ M1: success path owns the stop — Finally must not re-stop
 
@@ -1528,6 +1516,7 @@ Namespace DulukaEngine.Recording
         End Function
 
         Public Sub [Stop]()
+            _activeSource?.Stop()
             Interlocked.CompareExchange(_stopRequestedTicks, Stopwatch.GetTimestamp(), 0)
             Threading.Volatile.Write(_stopSignal, True)
         End Sub

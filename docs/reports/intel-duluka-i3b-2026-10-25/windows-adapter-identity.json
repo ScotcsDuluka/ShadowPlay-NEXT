@@ -1,0 +1,12 @@
+[
+  {
+    "Name": "Parsec Virtual Display Adapter",
+    "PNPDeviceID": "ROOT\\DISPLAY\\0000",
+    "DriverVersion": "0.45.0.0"
+  },
+  {
+    "Name": "Intel(R) UHD Graphics",
+    "PNPDeviceID": "PCI\\VEN_8086&DEV_9B41&SUBSYS_125D152D&REV_02\\3&11583659&0&10",
+    "DriverVersion": "27.20.100.8984"
+  }
+]

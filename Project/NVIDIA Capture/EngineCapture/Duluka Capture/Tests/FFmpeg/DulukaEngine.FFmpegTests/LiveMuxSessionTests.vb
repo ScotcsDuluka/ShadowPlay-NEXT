@@ -120,8 +120,10 @@ Namespace DulukaEngine.FFmpegTests
 
         Private Function FindRepoFFmpeg() As String
             Dim dir As New IO.DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory)
-            For i As Integer = 1 To 8
+            For i As Integer = 1 To 16
                 If dir Is Nothing Then Return Nothing
+                Dim captureBundle = IO.Path.Combine(dir.FullName, "Project", "FFmpeg", "ffmpeg.exe")
+                If IO.File.Exists(captureBundle) Then Return captureBundle
                 ' gfe-rebuild layout: FFmpeg lives in Project\ShadowPlay\FFmpeg.
                 Dim candidate As String = IO.Path.Combine(dir.FullName, "ShadowPlay", "FFmpeg", "ffmpeg.exe")
                 If IO.File.Exists(candidate) Then Return candidate

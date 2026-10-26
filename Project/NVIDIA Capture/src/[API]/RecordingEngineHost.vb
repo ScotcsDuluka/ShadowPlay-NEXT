@@ -43,6 +43,7 @@ Partial Public Class UI_Engine
         Dim selected = CaptureDisplayCatalog.Resolve(
             AppLayout.Dir, CaptureDisplayCatalog.Enumerate())
         startup.CaptureOutputIndex = selected.OutputIndex
+        startup.CaptureTarget = selected.Target
     End Sub
 
     ' ─── RecordingEngine (Phase 12b) ─────────────────────────────────

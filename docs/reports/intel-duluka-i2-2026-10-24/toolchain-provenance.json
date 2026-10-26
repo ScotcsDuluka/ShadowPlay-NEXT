@@ -1,0 +1,27 @@
+{
+  "machine": "HUAWEI-MATEBOOK",
+  "branch": "intel/duluka-capture",
+  "dispatcherRevision": "778a66d6c6537f08eabb91955dbbf1bce3812894",
+  "dispatcherWorktreeClean": true,
+  "archives": [
+    {
+      "name": "llvm-mingw.zip",
+      "sha256": "B9B68A4D276E16FA25802AABA458E4638F64B3884C290AACCDC2D87083B6CA35"
+    },
+    {
+      "name": "cmake.zip",
+      "sha256": "6F531BD4BA31A7AA0C3511082B544D306DF50E7AECFBEEF8BDBC1DD770736993"
+    },
+    {
+      "name": "ninja.zip",
+      "sha256": "26A40FA8595694DEC2FAD4911E62D29E10525D2133C9A4230B66397774AE25BF"
+    }
+  ],
+  "nativeDllSha256": "2E3242CA09A548734F74B11FC482D8EF0D6F8D49CFF4D2452D446677217E858D",
+  "dispatcherDllSha256": "75233A36F1C4FDC82C9CE2E0F8221881516A11C380611E135E31EF28A9F2BE96",
+  "dotnet": "10.0.402",
+  "compiler": "clang version 22.1.8 (https://github.com/llvm/llvm-project.git ca7933e47d3a3451d81e72ac174dcb5aa28b59d1)",
+  "cmake": "cmake version 4.1.1",
+  "ninja": "1.13.1",
+  "ffmpeg": "ffmpeg version N-123522-gac4d50cb26-20260317 Copyright (c) 2000-2026 the FFmpeg developers"
+}

@@ -39,6 +39,9 @@ public static class BackendCatalog
 
     public static IReadOnlyList<EncoderEndpoint> Encoders { get; } =
     [
+        new("intel:qsv-h264", "Intel", "Quick Sync H.264 (native)",
+            FrameTransport.D3D11Texture, RuntimeBoundary.InProcess,
+            IntegrationStatus.Planned, "I1 composition only; native QSV implementation and device proof pending I2"),
         new("nvidia:nvenc-h264", "NVIDIA", "NVENC H.264 (native)",
             FrameTransport.D3D11Texture, RuntimeBoundary.InProcess,
             IntegrationStatus.SourcePresent, "DulukaEngine.Encoder.Nvenc code exists; device probe required"),

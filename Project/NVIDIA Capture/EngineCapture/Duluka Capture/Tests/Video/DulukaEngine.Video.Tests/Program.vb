@@ -23,6 +23,7 @@ Namespace DulukaEngine.Video.Tests
         Private ReadOnly _skips As New List(Of String)()
 
         Function Main(args As String()) As Integer
+            If args IsNot Nothing AndAlso Array.IndexOf(args, "--offline") >= 0 Then HardwareGate.UseOfflineMode()
             Console.WriteLine("==================================================")
             Console.WriteLine(" DulukaEngine.Video Contract Tests (P1-B.1)")
             Console.WriteLine(" Branch: Engine-Rebuild")

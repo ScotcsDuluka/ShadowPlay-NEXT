@@ -96,6 +96,7 @@
     </EmbeddedResource>
   </ItemGroup>
   <!-- Phase 12b: RecordingEngine + all transitive dependencies -->
+  <ItemGroup><Compile Remove="src\[API]\CaptureMediaInspector.vb" /></ItemGroup>
   <ItemGroup>
     <!-- Dependency projects consolidated away; reference built DulukaEngine
          assemblies directly (same source family, 2026-09-25). -->

@@ -14,6 +14,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\Video\Transport\DulukaEngine.Video.Transport.D3D11\DulukaEngine.Video.Transport.D3D11.csproj" />
+    <ProjectReference Include="..\Media\DulukaEngine.Media\DulukaEngine.Media.vbproj" />
+    <ProjectReference Include="..\..\Encoding\Intel\DulukaEngine.Encoder.Qsv\DulukaEngine.Encoder.Qsv.csproj" />
     <!-- Foundation -->
     <ProjectReference Include="..\..\Core\DulukaEngine\DulukaEngine.vbproj" />
     <!-- Video contract + ID3D11VideoFrame -->

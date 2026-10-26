@@ -1,0 +1,54 @@
+[
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Contracts/DulukaEngine.Video/Conversion/BgraToNv12Converter.vb",
+    "sha256": "8060813A6C7A8724243CE9D9BD0F48813259DF56DE28666FC87B3E53446C0703"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Transport/DulukaEngine.Video.Transport.D3D11/DulukaEngine.Video.Transport.D3D11.csproj",
+    "sha256": "1C9FC84A6623A56E118EBAC47F040A8FAE868A8932003F6882212A04ADAACF33"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Transport/DulukaEngine.Video.Transport.D3D11/BgraStagingTransport.cs",
+    "sha256": "E149FD859806E176619B8CADAF760DD39C9733A95712003E9608524CCF4C00F1"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Transport/DulukaEngine.Video.Transport.D3D11/README.md",
+    "sha256": "68D4FAECFE8CDD87EFEFC361713DB160CD999D95AD834990EC659963AF2A1190"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/QsvNative.Tests/I3PixelTransport.cs",
+    "sha256": "2E6FA5F890DDE5A06D9E74A4271F90F6E1D717AC16FF3CBBFA73C17118578BF8"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/QsvNative.Tests/I3D3D11Transport.cs",
+    "sha256": "2DBDD29AE277FAA758DBA1814FCECA9994A8CC213D07B078FB67310416564384"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/QsvNative.Tests/Program.cs",
+    "sha256": "7C3017DF5EE8FC7AF11A66B1C1F846961E202FD55459A6D591E7DB1CB4F73828"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/QsvNative.Tests/SessionTests.cs",
+    "sha256": "A4D65C017B697C1C469C40E5B0DF4B9AB8CCC55AA19631472388FFC2B68CFC3B"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/QsvNative.Tests/QsvNative.Tests.csproj",
+    "sha256": "EE7389C6E2123B83583579449DAF37851E7E57B0A4A53BED405BBC79C64DC45C"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/Invoke-IntelCaptureI2Regression.ps1",
+    "sha256": "2363A99899941988B0CE579C4CDF45E24399BAA5DC87683202BD86AEE8FF5A55"
+  },
+  {
+    "path": "Project/NVIDIA Capture/EngineCapture/Invoke-IntelCaptureI3Regression.ps1",
+    "sha256": "9F21EA74B3D33F26A23EC1FEA677C6887DFAC13DF81869AED7FEDD5C9318EB92"
+  },
+  {
+    "path": "docs/INTEL-DULUKA-CAPTURE-I3-SYNTHETIC-HANDOFF-2026-10-25.md",
+    "sha256": "7804FCD8D5206A621E28C0ADF2023C7ED7199016CBB7BD58AC1B312DC4049C78"
+  },
+  {
+    "path": "docs/reports/intel-duluka-i3-2026-10-25/README.md",
+    "sha256": "378A5A5B9C01BDC94F0FC9A22A4BA22E59D692B26EB5BBADA4E41471B5CF75D1"
+  }
+]

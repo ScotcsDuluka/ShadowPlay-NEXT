@@ -7,7 +7,8 @@ Imports System.Collections.Generic
 Imports System.IO
 Imports System.Linq
 Imports System.Text.Json
-Imports Vortice.DXGI
+Imports DulukaEngine.Video
+Imports DulukaEngine.Video.Backends.Ddagrab
 
 ' Read-only DXGI enumeration: NO D3D11 device, DuplicateOutput, or pixels.
 ' Capture owns one persistent primary-display selection for every workflow.
@@ -26,59 +27,30 @@ Public NotInheritable Class CaptureDisplayCatalog
         Public Property Primary As Boolean
         Public Property DeviceName As String = ""
         Public Property Label As String = ""
+        Public Property VendorId As UInteger
+        Public Property DeviceId As UInteger
+        Public Property Vendor As String = ""
+        <System.Text.Json.Serialization.JsonIgnore>
+        Public Property Target As CaptureTarget
     End Class
 
     Public NotInheritable Class Choice
         Public Property OutputIndex As Integer
         Public Property AdapterLuidLow As UInteger
         Public Property AdapterLuidHigh As Integer
+        Public Property MonitorDevicePath As String = ""
     End Class
 
     Public Shared Function Enumerate() As List(Of Display)
         Dim found As New List(Of Display)()
-        Using factory As IDXGIFactory1 = DXGI.CreateDXGIFactory1(Of IDXGIFactory1)()
-            Dim adapterIndex As UInteger = 0UI
-            Dim selected As IDXGIAdapter1 = Nothing
-            While adapterIndex < 32UI
-                Dim adapter As IDXGIAdapter1 = Nothing
-                If Not factory.EnumAdapters1(adapterIndex, adapter).Success Then Exit While
-                If adapter.Description1.VendorId = &H10DEUI Then
-                    selected = adapter
-                    Exit While
-                End If
-                adapter.Dispose()
-                adapterIndex += 1UI
-            End While
-            If selected Is Nothing Then Return found
-            Using selected
-                Dim identity = selected.Description1.Luid
-                Dim index As UInteger = 0UI
-                While index < 32UI
-                    Dim output As IDXGIOutput = Nothing
-                    If Not selected.EnumOutputs(index, output).Success Then Exit While
-                    Using output
-                        Dim description = output.Description
-                        If description.AttachedToDesktop Then
-                            Dim bounds = description.DesktopCoordinates
-                            found.Add(New Display With {
-                                .OutputIndex = CInt(index),
-                                .AdapterLuidLow = identity.LowPart,
-                                .AdapterLuidHigh = identity.HighPart,
-                                .DeviceName = description.DeviceName,
-                                .Width = bounds.Right - bounds.Left,
-                                .Height = bounds.Bottom - bounds.Top,
-                                .Left = bounds.Left,
-                                .Top = bounds.Top,
-                                .Primary = (bounds.Left = 0 AndAlso bounds.Top = 0),
-                                .Label = $"Display {found.Count + 1} - {bounds.Right - bounds.Left}x{bounds.Bottom - bounds.Top}" &
-                                         If(bounds.Left = 0 AndAlso bounds.Top = 0, " (Primary)", "")
-                            })
-                        End If
-                    End Using
-                    index += 1UI
-                End While
-            End Using
-        End Using
+        For Each target In DxgiDisplayInventory.Collect().Outputs.Where(Function(t) t.Eligible)
+            found.Add(New Display With {
+                .OutputIndex = target.OutputIndex, .AdapterLuidLow = target.Adapter.Low, .AdapterLuidHigh = target.Adapter.High,
+                .DeviceName = target.DeviceName, .Width = target.Width, .Height = target.Height,
+                .Left = target.Left, .Top = target.Top, .Primary = (target.Left = 0 AndAlso target.Top = 0),
+                .VendorId = target.Adapter.VendorId, .DeviceId = target.Adapter.DeviceId, .Vendor = target.Adapter.Vendor.ToString(),
+                .Target = target, .Label = $"Display {found.Count + 1} - {target.Width}x{target.Height} ({target.Adapter.Vendor})"})
+        Next
         Return found
     End Function
 
@@ -97,16 +69,25 @@ Public NotInheritable Class CaptureDisplayCatalog
             Dim low As JsonElement = Nothing
             Dim high As JsonElement = Nothing
             If Not json.TryGetProperty("schemaVersion", version) OrElse
-               version.ValueKind <> JsonValueKind.Number OrElse version.GetInt32() <> 1 OrElse
+               version.ValueKind <> JsonValueKind.Number OrElse (version.GetInt32() <> 1 AndAlso version.GetInt32() <> 2) OrElse
                Not json.TryGetProperty("outputIndex", outputIndex) OrElse
                Not json.TryGetProperty("adapterLuidLow", low) OrElse
                Not json.TryGetProperty("adapterLuidHigh", high) Then
                 Throw New InvalidDataException("invalid_display_selection")
             End If
+            Dim monitorPath As String = ""
+            If version.GetInt32() = 2 Then
+                Dim monitor As JsonElement
+                If Not json.TryGetProperty("monitorDevicePath", monitor) OrElse monitor.ValueKind <> JsonValueKind.String Then
+                    Throw New InvalidDataException("invalid_display_selection")
+                End If
+                monitorPath = monitor.GetString()
+                If String.IsNullOrWhiteSpace(monitorPath) Then Throw New InvalidDataException("invalid_display_selection")
+            End If
             Return New Choice With {
                 .OutputIndex = outputIndex.GetInt32(),
                 .AdapterLuidLow = low.GetUInt32(),
-                .AdapterLuidHigh = high.GetInt32()
+                .AdapterLuidHigh = high.GetInt32(), .MonitorDevicePath = monitorPath
             }
         End Using
     End Function
@@ -122,6 +103,10 @@ Public NotInheritable Class CaptureDisplayCatalog
                                             d.AdapterLuidLow = saved.AdapterLuidLow AndAlso
                                             d.AdapterLuidHigh = saved.AdapterLuidHigh)
         If match Is Nothing Then Throw New InvalidOperationException("capture_display_disconnected")
+        If saved.MonitorDevicePath.Length > 0 AndAlso (match.Target Is Nothing OrElse Not String.Equals(
+            saved.MonitorDevicePath, match.Target.MonitorDevicePath, StringComparison.OrdinalIgnoreCase)) Then
+            Throw New InvalidOperationException("capture_display_replaced")
+        End If
         Return match
     End Function
 
@@ -133,15 +118,16 @@ Public NotInheritable Class CaptureDisplayCatalog
                                              d.AdapterLuidLow = requested.AdapterLuidLow AndAlso
                                              d.AdapterLuidHigh = requested.AdapterLuidHigh)
         If exact Is Nothing Then Throw New ArgumentException("capture_display_not_found")
+        Dim monitorPath = If(exact.Target?.MonitorDevicePath, "")
         Dim pathValue = SelectionPath(root)
         Directory.CreateDirectory(Path.GetDirectoryName(pathValue))
         Dim temp = pathValue & "." & Guid.NewGuid().ToString("N") & ".tmp"
         Try
             File.WriteAllText(temp, JsonSerializer.Serialize(New With {
-                .schemaVersion = 1,
+                .schemaVersion = If(monitorPath.Length > 0, 2, 1),
                 .outputIndex = requested.OutputIndex,
                 .adapterLuidLow = requested.AdapterLuidLow,
-                .adapterLuidHigh = requested.AdapterLuidHigh
+                .adapterLuidHigh = requested.AdapterLuidHigh, .monitorDevicePath = monitorPath
             }))
             File.Move(temp, pathValue, True)
         Finally

@@ -1,4 +1,4 @@
-﻿Option Strict On
+Option Strict On
 Option Explicit On
 Option Infer On
 
@@ -86,6 +86,7 @@ Namespace DulukaEngine.FFmpegBackend
         Private ReadOnly _finalPath As String
         Private ReadOnly _fragPath As String
         Private ReadOnly _videoFps As Integer
+        Private ReadOnly _sessionCfr As Boolean
         Private ReadOnly _separateTracks As Boolean
         Private ReadOnly _sysVolume As Single
         Private ReadOnly _micVolume As Single
@@ -121,12 +122,14 @@ Namespace DulukaEngine.FFmpegBackend
                        systemVolume As Single,
                        micVolume As Single,
                        Optional log As Action(Of String) = Nothing,
-                       Optional onProcessStarted As Action(Of Process) = Nothing)
+                       Optional onProcessStarted As Action(Of Process) = Nothing,
+                       Optional sessionCfr As Boolean = False)
             _ffmpegPath = ffmpegPath
             _onProcessStarted = onProcessStarted
             _finalPath = finalOutputPath
             _fragPath = finalOutputPath & ".frag.mp4"
             _videoFps = Math.Max(1, videoFps)
+            _sessionCfr = sessionCfr
             ' ★ 17:19 FIX (video-only session died at first frame): when the
             ' session has NO system audio the caller used to pass the default
             ' 48000/2 regardless — LiveMux then created the sp_a pipe and put
@@ -251,6 +254,11 @@ Namespace DulukaEngine.FFmpegBackend
             End If
 
             sb.Append("-c:v copy ")
+            If _sessionCfr Then
+                ' Session validated one ordered no-B access unit per CFR slot.
+                ' Raw H.264 has no packet PTS: stamp that validated timeline.
+                sb.Append($"-bsf:v setts=prescale=1:time_base=1/{_videoFps * 1000}:pts=N*1000:dts=N*1000:duration=1000 ")
+            End If
             If _mic IsNot Nothing AndAlso _separateTracks Then
                 sb.Append("-c:a:0 aac -b:a:0 320k -ar:a:0 48000 ")
                 sb.Append("-c:a:1 aac -b:a:1 320k -ar:a:1 48000 ")
@@ -491,7 +499,7 @@ Namespace DulukaEngine.FFmpegBackend
             Try
                 Dim psi As New ProcessStartInfo With {
                     .FileName = _ffmpegPath,
-                    .Arguments = $"-y -hide_banner -loglevel error -i ""{_fragPath}"" -c copy -movflags +faststart ""{_finalPath}""",
+                    .Arguments = $"-y -hide_banner -loglevel error -i ""{_fragPath}"" -map 0 -c copy -movflags +faststart ""{_finalPath}""",
                     .UseShellExecute = False,
                     .RedirectStandardError = True,
                     .CreateNoWindow = True
@@ -697,6 +705,12 @@ Namespace DulukaEngine.FFmpegBackend
                     '    writer is still waiting on its event and proceeds.
                     Dim connectWait() As WaitHandle = {_connectedEvent, _stopWriter}
                     WaitHandle.WaitAny(connectWait, 30000)
+                    ' A fast owned-frame source can finish before FFmpeg opens
+                    ' this pipe. Stop means drain accepted bytes, not discard
+                    ' them before connection. Keep the existing bounded window.
+                    If Not _pipe.IsConnected AndAlso Interlocked.Read(_bytesQueued) > 0 Then
+                        _connectedEvent.WaitOne(3000)
+                    End If
                     If Not _pipe.IsConnected Then
                         DrainDiscardOnly()
                         Return

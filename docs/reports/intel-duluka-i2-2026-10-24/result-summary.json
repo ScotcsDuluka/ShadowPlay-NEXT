@@ -1,0 +1,16 @@
+{
+  "baselinePassed": 406,
+  "baselineFailed": 0,
+  "baselineSkipped": 33,
+  "nativeQsvPassed": 659,
+  "syntheticMuxPassed": 13,
+  "passed": 1078,
+  "failed": 0,
+  "skipped": 33,
+  "nativeReleaseBuild": "passed",
+  "captureReleaseBuild": "passed",
+  "screenPixelsRead": false,
+  "audioDevicesOpened": false,
+  "intelDesktopEnabled": false,
+  "cbr": "known_failure_rejected"
+}

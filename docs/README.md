@@ -20,6 +20,37 @@
 
 ## Build, deploy and validation
 
+### Historical MateBook Intel-worktree notes (2026-10-25; pre-unification)
+
+**Dual-worktree review (25 October, evening refresh):** [MateBook Intel branch vs AORUS Stable — proof levels, I3-B/I3-C and B1 blockers](WORKTREE-STATUS-20261025.md). I3-B **2,056/0/33** synthetic report is complete, and I3-C Agent C independently reran **1,938/0/0** synthetic checks; Agent C's acceptance recommendation is **not Main approval**. B1 worker quiescence and B2–B8 remain open, while Intel Live Desktop remains blocked. No file merge/deploy was performed.
+
+## HUAWEI-MateBook Intel Capture worktree — 25 October 2026
+
+**Important:** This directory is in `intel/duluka-capture`, **not** the published/AORUS `Stable` runtime. Its local Intel QSV updates are uncommitted, and other agents may be editing native Capture source concurrently. Preserve the original accepted session design and each report's dated scope.
+
+- [MateBook NVIDIA Capture module map](../Project/NVIDIA%20Capture/README.md) — Control/Media ownership, one session, source/encoder separation and live gate.
+- [Canonical Session-Centric Recording Contract](architecture/SESSION-CENTRIC-RECORDING-CONTRACT.md) · [ฉบับภาษาไทย](architecture/SESSION-CENTRIC-RECORDING-TH.md) — accepted architecture; independent Desktop/Exclusive API selections and selected encoder, one Duluka session/clock/mux.
+- [Intel architecture and rationale](INTEL-DULUKA-CAPTURE-ARCHITECTURE.md) · [I2 handoff](INTEL-DULUKA-CAPTURE-I2-HANDOFF.md) · [I3 handoff](INTEL-DULUKA-CAPTURE-I3-HANDOFF.md) — revision-scoped implementation evidence, not an override of the canonical contract.
+- [I1 regression evidence](reports/intel-duluka-i1-2026-10-24/README.md) · [I2 native QSV evidence](reports/intel-duluka-i2-2026-10-24/README.md) · [I3 synthetic staging](reports/intel-duluka-i3-2026-10-25/README.md) · [I3 borrowed-frame adapter](reports/intel-duluka-i3-composition-2026-10-25/README.md) · [I3-B 2,056/0/33 synthetic lifecycle/color](reports/intel-duluka-i3b-2026-10-25/README.md) · [I3-C Agent C 1,938/0/0 independent QA](reports/intel-duluka-i3c-2026-10-25/C-INDEPENDENT-QA.md). The latest I3-C synthetic acceptance is **Agent C's recommendation pending Main**; the live gate `intel_native_live_input_not_verified` remains closed.
+- [MateBook first-party README coverage](README-COVERAGE-MATEBOOK-20261025.md) — inventory and local documentation link validation, excluding vendored Intel libvpl and generated folders.
+
+**What this does not prove:** running an actual Intel Desktop/Fullscreen Exclusive recording, native QSV CBR, audio capture/AV synchronization, arbitrary HDR/color-managed playback or deployment to AORUS. I3-B verified BT.709 Limited/Full *synthetic H.264/MP4* color metadata only. Synthetic media tests and a connected default acquisition route are separate gates.
+
+## Start here (CURRENT — maintained, reflect the live tree)
+
+| File | What it is |
+|---|---|
+| `ARCHITECTURE.md` | Historical engine component inventory; **canonical Session-Centric Contract** in `architecture/` overrides inconsistent source/route descriptions |
+| `APP-LAYOUT.md` | Root-fixed product tree assembled by `scripts/layout.proj` / `build-all.ps1 -StageLayout` |
+| `BUILD_PROTOCOL.md` | Clean-build protocol followed by `scripts/build-all.ps1` |
+| `CONFIG_RUNTIME_CONTRACT.md` | v2.0 config↔runtime contract (writer inventory, FPS/rate-control authority) |
+| `CONFIG_OWNERSHIP_MATRIX.md` | Which config file owns which setting |
+| `PHASE-13-SHADOWPLAY-CLOCK.md` | Audio clock analysis behind the current A/V alignment design |
+
+**MateBook README sync validation (25 October evening):** 61 first-party README entries, **180 relative README links** checked (0 missing); 192 local links including the cross-worktree summary (0 missing); 0 unmatched triple-backtick fences and `git diff --check` PASS. This is a **documentation-only** audit, not a fresh Intel recording or source-regression run. See [complete local inventory](README-COVERAGE-MATEBOOK-20261025.md).
+
+## Reference (design specs & audit records of shipped phases — verify against code before relying)
+
 - **[Build/deployment policy](BUILD-DEPLOY-POLICY.md)** — prefer scoped targeted build/test, verify SHA-256, avoid hot-replacing loaded native DLLs.
 - [BUILD_PROTOCOL.md](BUILD_PROTOCOL.md) — older broad clean-build protocol; check actual current scripts before using any referenced paths.
 - [CONFIG_RUNTIME_CONTRACT.md](CONFIG_RUNTIME_CONTRACT.md) · [CONFIG_OWNERSHIP_MATRIX.md](CONFIG_OWNERSHIP_MATRIX.md) — ownership and runtime settings.

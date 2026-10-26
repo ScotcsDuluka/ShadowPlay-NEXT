@@ -1,0 +1,22 @@
+﻿[
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Transport/DulukaEngine.Video.Transport.D3D11/BgraFrameAdapter.cs",
+        "Hash":  "4752832B360DDFF9F7BE397CBA1D2801F1E650A341EADF04D1414D6C660A88ED"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/Duluka Capture/Video/Transport/DulukaEngine.Video.Transport.D3D11/BgraStagingTransport.cs",
+        "Hash":  "42854D6E09FABDF164ED7B5BC83644E75B242624F78FA97E12554D28EB7A28D1"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/QsvNative.Tests/I3FrameAdapter.cs",
+        "Hash":  "7E55BC0779966621E674D52FE87808EF559CFE6538C3649A4EB3DF2B33511A36"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/QsvNative.Tests/I3PixelTransport.cs",
+        "Hash":  "72F1C3913B4DD2D0F604073ABCB2254EF4BDED44EFEA8F2A9B5F7B18C0299D48"
+    },
+    {
+        "Path":  "Project/NVIDIA Capture/EngineCapture/QsvNative.Tests/Program.cs",
+        "Hash":  "F6C47F519A296FA311BED578764DE73E2489B99065CEB037E99A3DE6970C17F6"
+    }
+]

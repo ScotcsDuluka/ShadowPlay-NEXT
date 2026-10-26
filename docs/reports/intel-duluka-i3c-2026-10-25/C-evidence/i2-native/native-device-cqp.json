@@ -1,0 +1,13 @@
+{
+  "Requested": "00000000:0000bf60 vendor=8086 device=9b41",
+  "Actual": "00000000:0000bf60 vendor=8086 device=9b41",
+  "Runtime": "1.34",
+  "Implementation": 770,
+  "RateControl": "cqp",
+  "Input": "owned CPU NV12",
+  "Width": 320,
+  "Height": 180,
+  "Fps": 30,
+  "ScreenRead": false,
+  "AudioOpened": false
+}
