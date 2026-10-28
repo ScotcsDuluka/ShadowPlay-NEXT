@@ -27,6 +27,7 @@ internal sealed class CaptureWorkerGateway
     private readonly bool _allowDisplayCommands;
     private readonly bool _allowScreenshotCommands;
     private readonly Func<TimeSpan> _elapsedSinceStartup;
+    private readonly Func<string?> _workerWriteToken;
     private int _hasObservedReadyWorker;
     private int _commandInFlight;
     private int _startOutcomeUnresolved;
@@ -35,7 +36,8 @@ internal sealed class CaptureWorkerGateway
     internal CaptureWorkerGateway(HttpClient http, int port, bool enabled, bool allowRecordCommands,
         bool testMode = false, bool allowDisplayCommands = false,
         bool allowScreenshotCommands = false,
-        Func<TimeSpan>? elapsedSinceStartup = null)
+        Func<TimeSpan>? elapsedSinceStartup = null,
+        Func<string?>? workerWriteToken = null)
     {
         if (port < 1 || port > 65535) throw new ArgumentOutOfRangeException(nameof(port));
         _http = http;
@@ -47,6 +49,7 @@ internal sealed class CaptureWorkerGateway
         _allowScreenshotCommands = allowScreenshotCommands;
         var clock = Stopwatch.StartNew();
         _elapsedSinceStartup = elapsedSinceStartup ?? (() => clock.Elapsed);
+        _workerWriteToken = workerWriteToken ?? (() => null);
     }
 
     internal Probe Read(string endpoint)
@@ -65,6 +68,17 @@ internal sealed class CaptureWorkerGateway
         {
             using var cancellation = new CancellationTokenSource(timeout);
             using var message = new HttpRequestMessage(method, _root + path);
+            if (method != HttpMethod.Get)
+            {
+                string? token;
+                try { token = _workerWriteToken(); }
+                catch { return new(null, "worker_authorization_unavailable", 0,
+                    "Capture worker authorization is unavailable."); }
+                if (token == null || token.Length != 32 || !token.All(Uri.IsHexDigit))
+                    return new(null, "worker_authorization_unavailable", 0,
+                        "Capture worker authorization is unavailable.");
+                message.Headers.Add("X-ShadowPlay-Capture-Token", token);
+            }
             if (body != null)
                 message.Content = new StringContent(body, Encoding.UTF8, "application/json");
             using var reply = _http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead,
@@ -489,6 +503,7 @@ internal sealed class CaptureWorkerGateway
             startupPhase,
             startupGraceSeconds = 30,
             engineEvidenceAvailable = engines.Success,
+            workerRuntime = engines.Success ? engines.Data : null,
             runtimeReady = workerReady && (engineReady ||
                 (Bool(state.Data!.Value, "recording") &&
                  (Text(state.Data!.Value, "actualSessionBackend") is "Duluka" or "FFmpeg"))),
@@ -497,6 +512,12 @@ internal sealed class CaptureWorkerGateway
                 (IsString(state.Data!.Value, "actualSessionBackend") ? "current" : "legacy") : "unavailable",
             actualSessionBackend = state.Success && IsString(state.Data!.Value, "actualSessionBackend") ?
                 (string?)Text(state.Data!.Value, "actualSessionBackend") : null,
+            actualRunningEngine = state.Success ? Text(state.Data!.Value, "actualRunningEngine") : "",
+            lifecycleState = state.Success ? Text(state.Data!.Value, "lifecycleState") : "Unknown",
+            busy = state.Success ? (bool?)Bool(state.Data!.Value,
+                IsBool(state.Data!.Value, "busy") ? "busy" : "recording") : null,
+            isCapturing = state.Success && IsBool(state.Data!.Value, "isCapturing")
+                ? (bool?)Bool(state.Data!.Value, "isCapturing") : null,
             replay = new { availability = "Unavailable", commandSupported = false },
             screenshot = new { availability = "Unavailable", commandSupported = false },
             health = health.Data,
@@ -568,6 +589,8 @@ internal sealed class CaptureWorkerGateway
                 // native health flag falls or the /engines endpoint is missing.
                 if (!Bool(s, "recording")) return (409, new { code = "not_recording" });
                 backend = Text(s, "actualSessionBackend");
+                if (backend.Length == 0)
+                    backend = Text(Field(s, "runtimeTruth"), "lifecycleOwner");
                 if (backend is not ("Duluka" or "FFmpeg"))
                     return (409, new { code = "unsupported_capture_route" });
             }
@@ -582,7 +605,8 @@ internal sealed class CaptureWorkerGateway
                     if (start) Interlocked.Exchange(ref _startOutcomeUnresolved, 1);
                     else Interlocked.Exchange(ref _stopOutcomeUnresolved, 1);
                 }
-                return (result.Code == "timeout" ? 504 : 502, new
+                return (result.Code == "timeout" ? 504 :
+                    result.Code == "worker_authorization_unavailable" ? 503 : 502, new
                 {
                     code = result.Code,
                     message = result.Message,
@@ -605,8 +629,13 @@ internal sealed class CaptureWorkerGateway
             {
                 accepted = succeeded, action,
                 outcomeUnknown = false,
+                saved = start ? (bool?)null :
+                    (IsBool(worker, "saved") ? (bool?)Bool(worker, "saved") : null),
+                finalizationState = start ? "" : Text(worker, "finalizationState"),
+                mediaVerified = start ? (bool?)null :
+                    (IsBool(worker, "mediaVerified") ? (bool?)Bool(worker, "mediaVerified") : null),
                 workerResult = result.Data,
-                error = succeeded ? "" : error
+                error = succeeded && (start || Bool(worker, "saved") || !IsBool(worker, "saved")) ? "" : error
             });
         }
         finally { Volatile.Write(ref _commandInFlight, 0); }

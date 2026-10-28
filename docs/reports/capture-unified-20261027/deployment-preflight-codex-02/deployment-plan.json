@@ -1,0 +1,436 @@
+[
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\DulukaEngine.Audio.dll",
+    "relative": "NVIDIA Capture\\DulukaEngine.Audio.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\DulukaEngine.Audio.dll",
+    "sha256": "9B06B730269231989611751F5EA7519E9F935695856F374216D95ADF7C856E2F",
+    "beforeSha256": "C9EDD757E70A3158D02E2E1A13774A468EDAEA26E52F0F3DCFF784DA72E5A258"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\DulukaEngine.Audio.Wasapi.dll",
+    "relative": "NVIDIA Capture\\DulukaEngine.Audio.Wasapi.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\DulukaEngine.Audio.Wasapi.dll",
+    "sha256": "03BA611D254F86549EC94FDFC5F5806A5D68AC487F1D55BAE84854D27E8CF440",
+    "beforeSha256": "27F81FD6345601D2235FDE0C05284A22C94F5CBBFE453CE5FA478DDED3140C33"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\DulukaEngine.dll",
+    "relative": "NVIDIA Capture\\DulukaEngine.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\DulukaEngine.dll",
+    "sha256": "33F0ACDE4D4686EAC4EAD98805007A69CC4D6D54A4C22483D72B3F83B8AD253F",
+    "beforeSha256": "AC905BD25A5FAED803B5A5C4076025FD63AC132B12B2311438D3FF58AD8AAFBD"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\DulukaEngine.Encoder.dll",
+    "relative": "NVIDIA Capture\\DulukaEngine.Encoder.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\DulukaEngine.Encoder.dll",
+    "sha256": "5610C35E3DE0796B998E7E8204AC34D21034032AD261F323548B8EA659AF53F5",
+    "beforeSha256": "F5670185B93FCE0942ABBFFD00B1EC34649DE1481BEBFD93FD8548E22FFD11E5"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\DulukaEngine.Encoder.Nvenc.dll",
+    "relative": "NVIDIA Capture\\DulukaEngine.Encoder.Nvenc.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\DulukaEngine.Encoder.Nvenc.dll",
+    "sha256": "67A275E9709A98CA8E3B75930330DFF0C401FE72D3A9ECA86424294DBA471366",
+    "beforeSha256": "3E0AD7CB64C83D8ADB238D4D73DCF5ADE3E26040B09CC89E1B899D36A42B2E8C"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\DulukaEngine.Encoder.Qsv.dll",
+    "relative": "NVIDIA Capture\\DulukaEngine.Encoder.Qsv.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\DulukaEngine.Encoder.Qsv.dll",
+    "sha256": "B454AFAC00839D0B40169D56543AF48FE4C0317F7F94420B41B4C6DA697FA45B",
+    "beforeSha256": ""
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\DulukaEngine.FFmpegBackend.dll",
+    "relative": "NVIDIA Capture\\DulukaEngine.FFmpegBackend.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\DulukaEngine.FFmpegBackend.dll",
+    "sha256": "8A5497AB0354BA95F1B6A97D1E61AB97815AD9EB6A68844C2C9F7F350F3A1F74",
+    "beforeSha256": "C2A0AD39C9DB524352B2C5D375C9D07F731E59EF9D62CC9A99ECB3DDF7ED6454"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\DulukaEngine.Media.dll",
+    "relative": "NVIDIA Capture\\DulukaEngine.Media.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\DulukaEngine.Media.dll",
+    "sha256": "AEE6014F2C80FF32DEA251CE900BD94C91948C46AE8D45F10AEF88957DF9863B",
+    "beforeSha256": ""
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\DulukaEngine.Recording.dll",
+    "relative": "NVIDIA Capture\\DulukaEngine.Recording.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\DulukaEngine.Recording.dll",
+    "sha256": "A635114F0CB03D931068BA3166232BD0C906FE8C822B8C90DF2C100166DA4413",
+    "beforeSha256": "9463BD34191CB21600EE4E4DCAD303DE14802D2595D3F0DF06E28545209B9C49"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\DulukaEngine.Video.Ddagrab.dll",
+    "relative": "NVIDIA Capture\\DulukaEngine.Video.Ddagrab.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\DulukaEngine.Video.Ddagrab.dll",
+    "sha256": "735D5DFAD8FF2EAAF645DDA20AB8579FCD57B3772358F88FE8BC43797296F787",
+    "beforeSha256": "A50CB2E34232EE3C00F397DE54B90BF7D212EB259976FD58E7574B1FB5AA5415"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\DulukaEngine.Video.dll",
+    "relative": "NVIDIA Capture\\DulukaEngine.Video.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\DulukaEngine.Video.dll",
+    "sha256": "7FC9A1051657AFE5DE6D86853D1F0727A7FFAB54AE2357C3E69834428D8DB553",
+    "beforeSha256": "42240BEA6728860699BD3E72F78917D9BEDAB1D918BCA38B2FAC22EED5BA1479"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\DulukaEngine.Video.Transport.D3D11.dll",
+    "relative": "NVIDIA Capture\\DulukaEngine.Video.Transport.D3D11.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\DulukaEngine.Video.Transport.D3D11.dll",
+    "sha256": "91895E56C3ACCE077F00938F5B531FC318DB65DA49651D159F497810E6C1BA0B",
+    "beforeSha256": ""
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\DulukaQsvNative.dll",
+    "relative": "NVIDIA Capture\\DulukaQsvNative.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\DulukaQsvNative.dll",
+    "sha256": "986CB127AB280403D1098D6D3266ACAC63B3A6F936E37E923E1757B6B1E4B543",
+    "beforeSha256": ""
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\FFmpeg\\avcodec-62.dll",
+    "relative": "NVIDIA Capture\\FFmpeg\\avcodec-62.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\FFmpeg\\avcodec-62.dll",
+    "sha256": "9CDD384A69200BE86209D1BA160E3FDD21A1618925CA180775D912D8D78B9577",
+    "beforeSha256": "9CDD384A69200BE86209D1BA160E3FDD21A1618925CA180775D912D8D78B9577"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\FFmpeg\\avdevice-62.dll",
+    "relative": "NVIDIA Capture\\FFmpeg\\avdevice-62.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\FFmpeg\\avdevice-62.dll",
+    "sha256": "F2DA52853BD6890B3452E65553C69124D7CFB45A8D773E7575F7A0F37C425927",
+    "beforeSha256": "F2DA52853BD6890B3452E65553C69124D7CFB45A8D773E7575F7A0F37C425927"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\FFmpeg\\avfilter-11.dll",
+    "relative": "NVIDIA Capture\\FFmpeg\\avfilter-11.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\FFmpeg\\avfilter-11.dll",
+    "sha256": "B8279709A9BD09080F2CACCDF919C7602915F2CCD2CCF7B9CF669B633CFDE96A",
+    "beforeSha256": "B8279709A9BD09080F2CACCDF919C7602915F2CCD2CCF7B9CF669B633CFDE96A"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\FFmpeg\\avformat-62.dll",
+    "relative": "NVIDIA Capture\\FFmpeg\\avformat-62.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\FFmpeg\\avformat-62.dll",
+    "sha256": "A09883402D1439FD65D889F23CCDD7E82DA192143660461472BF3E30EFC7084D",
+    "beforeSha256": "A09883402D1439FD65D889F23CCDD7E82DA192143660461472BF3E30EFC7084D"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\FFmpeg\\avutil-60.dll",
+    "relative": "NVIDIA Capture\\FFmpeg\\avutil-60.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\FFmpeg\\avutil-60.dll",
+    "sha256": "3A1F6205E74ADFE138D0D058EEF1CB6F17214279AE26361D7E0F1D4A16C918D8",
+    "beforeSha256": "3A1F6205E74ADFE138D0D058EEF1CB6F17214279AE26361D7E0F1D4A16C918D8"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\FFmpeg\\ffmpeg.exe",
+    "relative": "NVIDIA Capture\\FFmpeg\\ffmpeg.exe",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\FFmpeg\\ffmpeg.exe",
+    "sha256": "6F4DA7763EE965FA53AAFA39F599A11C4FF7B31300E8FD57C090DF12CBD26427",
+    "beforeSha256": "6F4DA7763EE965FA53AAFA39F599A11C4FF7B31300E8FD57C090DF12CBD26427"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\FFmpeg\\ffprobe.exe",
+    "relative": "NVIDIA Capture\\FFmpeg\\ffprobe.exe",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\FFmpeg\\ffprobe.exe",
+    "sha256": "A30B5B4F3BB8565E3084F22919FB47DB98A8567764C24B1660FBB13CD9DE5C5D",
+    "beforeSha256": "A30B5B4F3BB8565E3084F22919FB47DB98A8567764C24B1660FBB13CD9DE5C5D"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\FFmpeg\\swresample-6.dll",
+    "relative": "NVIDIA Capture\\FFmpeg\\swresample-6.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\FFmpeg\\swresample-6.dll",
+    "sha256": "8E536AAF9C91EA19B2FE954EDADCE8FA7A04F3FE1E041BAA5954F0CEA01AC5F8",
+    "beforeSha256": "8E536AAF9C91EA19B2FE954EDADCE8FA7A04F3FE1E041BAA5954F0CEA01AC5F8"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\FFmpeg\\swscale-9.dll",
+    "relative": "NVIDIA Capture\\FFmpeg\\swscale-9.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\FFmpeg\\swscale-9.dll",
+    "sha256": "CEB2F144F63A9E636DD1C6CB184DDDBEA8928F7FECB38EFFCD4D5DC6DE71DF57",
+    "beforeSha256": "CEB2F144F63A9E636DD1C6CB184DDDBEA8928F7FECB38EFFCD4D5DC6DE71DF57"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\libvpl.dll",
+    "relative": "NVIDIA Capture\\libvpl.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\libvpl.dll",
+    "sha256": "75233A36F1C4FDC82C9CE2E0F8221881516A11C380611E135E31EF28A9F2BE96",
+    "beforeSha256": ""
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\libvpl-LICENSE.txt",
+    "relative": "NVIDIA Capture\\libvpl-LICENSE.txt",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\libvpl-LICENSE.txt",
+    "sha256": "6B53987F5DE35662CCBCF2753DC84A713068443ACB482FD6FD431FF7CF5DA9F9",
+    "beforeSha256": ""
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\Microsoft.Windows.SDK.NET.dll",
+    "relative": "NVIDIA Capture\\Microsoft.Windows.SDK.NET.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\Microsoft.Windows.SDK.NET.dll",
+    "sha256": "C633AB241CD09846C2AA409F0BEE2026962610404A7BF132C75CBD66B0E5A9F4",
+    "beforeSha256": "C633AB241CD09846C2AA409F0BEE2026962610404A7BF132C75CBD66B0E5A9F4"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\NAudio.Asio.dll",
+    "relative": "NVIDIA Capture\\NAudio.Asio.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\NAudio.Asio.dll",
+    "sha256": "035C653468AC70370F51FB5BB2001B4CF868E479846CCC8C7A09789AA22E2606",
+    "beforeSha256": "035C653468AC70370F51FB5BB2001B4CF868E479846CCC8C7A09789AA22E2606"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\NAudio.Core.dll",
+    "relative": "NVIDIA Capture\\NAudio.Core.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\NAudio.Core.dll",
+    "sha256": "4F8D8C4140146674B103C8A3C46FBC4C768A86C0012A167168E3F7DA2B3E5C09",
+    "beforeSha256": "4F8D8C4140146674B103C8A3C46FBC4C768A86C0012A167168E3F7DA2B3E5C09"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\NAudio.dll",
+    "relative": "NVIDIA Capture\\NAudio.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\NAudio.dll",
+    "sha256": "99F690CF6CDC829F815C06C27FCDA9BD18F85B475A8B1B00898FB669FE39F98C",
+    "beforeSha256": "99F690CF6CDC829F815C06C27FCDA9BD18F85B475A8B1B00898FB669FE39F98C"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\NAudio.Midi.dll",
+    "relative": "NVIDIA Capture\\NAudio.Midi.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\NAudio.Midi.dll",
+    "sha256": "7796A9EC97A1FF29E682855839845DA9FE26B6DDCC34ADDBB514CD73E7A9F02A",
+    "beforeSha256": "7796A9EC97A1FF29E682855839845DA9FE26B6DDCC34ADDBB514CD73E7A9F02A"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\NAudio.Wasapi.dll",
+    "relative": "NVIDIA Capture\\NAudio.Wasapi.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\NAudio.Wasapi.dll",
+    "sha256": "00C1B1644ED3423F930507085752EBEB7977E0A01CDD4F3766F303396C033BF9",
+    "beforeSha256": "00C1B1644ED3423F930507085752EBEB7977E0A01CDD4F3766F303396C033BF9"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\NAudio.WinForms.dll",
+    "relative": "NVIDIA Capture\\NAudio.WinForms.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\NAudio.WinForms.dll",
+    "sha256": "7029D547C9DA7FAD6D32B6FC4FB9120A52F596F6A1C86485AE050A2E971AE4B0",
+    "beforeSha256": "7029D547C9DA7FAD6D32B6FC4FB9120A52F596F6A1C86485AE050A2E971AE4B0"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\NAudio.WinMM.dll",
+    "relative": "NVIDIA Capture\\NAudio.WinMM.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\NAudio.WinMM.dll",
+    "sha256": "80807335EE64D5BB26A9DE0D1F966A902B5ADF32C53B853C8B871937D12B437B",
+    "beforeSha256": "80807335EE64D5BB26A9DE0D1F966A902B5ADF32C53B853C8B871937D12B437B"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\Newtonsoft.Json.dll",
+    "relative": "NVIDIA Capture\\Newtonsoft.Json.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\Newtonsoft.Json.dll",
+    "sha256": "A28C251DFE36D881E9E2462E171441B8B0EC156FE3F452602C9149B1B9EFE05B",
+    "beforeSha256": "A28C251DFE36D881E9E2462E171441B8B0EC156FE3F452602C9149B1B9EFE05B"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\NvCapture.deps.json",
+    "relative": "NVIDIA Capture\\NvCapture.deps.json",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\NvCapture.deps.json",
+    "sha256": "3116B828AC8679CE91803E71C49943DF2CF220470CCA64096A67DA4E0AF873A4",
+    "beforeSha256": "81430414DCD68B2FE954F6BA1BAF9A51721C2F1E6A0283E29663B885F11B8ECD"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\NvCapture.dll",
+    "relative": "NVIDIA Capture\\NvCapture.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\NvCapture.dll",
+    "sha256": "7FBCDCA93D03EC0F3E631ED48CAD5DDA1A46731CBC44930694F3E576F8CE3801",
+    "beforeSha256": "DE04FDBB1936B6A45FA1770574D0F574AD9F1C3AA03C12826FB6860EF2E1CE76"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\NvCapture.exe",
+    "relative": "NVIDIA Capture\\NvCapture.exe",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\NvCapture.exe",
+    "sha256": "BA18913C59FFEEE9059C5503B45A6491843EB8A8AAFF8471C752EE130B2CD1D7",
+    "beforeSha256": "C2EF9AE9BB769C1501DAEF7FE3971E4EBF90CF8A4499EF86D637DBAEE742D27E"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\NvCapture.runtimeconfig.json",
+    "relative": "NVIDIA Capture\\NvCapture.runtimeconfig.json",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\NvCapture.runtimeconfig.json",
+    "sha256": "96BC2946DFF8790400D652EC7F8DE7BB043E954980D59470C112788B68A1FBD3",
+    "beforeSha256": "96BC2946DFF8790400D652EC7F8DE7BB043E954980D59470C112788B68A1FBD3"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\qsv-native-package.json",
+    "relative": "NVIDIA Capture\\qsv-native-package.json",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\qsv-native-package.json",
+    "sha256": "7D84798F7549BEA320C034D3BC1015DA8F2C233E67CB68B6B2B9AD93A5F6CBBF",
+    "beforeSha256": ""
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\SharpGen.Runtime.COM.dll",
+    "relative": "NVIDIA Capture\\SharpGen.Runtime.COM.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\SharpGen.Runtime.COM.dll",
+    "sha256": "2686187B458ABA592E845D8C47F28C730EFCCA23EAE77E3950A5178A9846D9BA",
+    "beforeSha256": "2686187B458ABA592E845D8C47F28C730EFCCA23EAE77E3950A5178A9846D9BA"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\SharpGen.Runtime.dll",
+    "relative": "NVIDIA Capture\\SharpGen.Runtime.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\SharpGen.Runtime.dll",
+    "sha256": "0E6ACD59AB2173A6467626D69CF9F5B5B7651111FFEE6E30FB7818DE59335B4B",
+    "beforeSha256": "0E6ACD59AB2173A6467626D69CF9F5B5B7651111FFEE6E30FB7818DE59335B4B"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\Vortice.Direct3D11.dll",
+    "relative": "NVIDIA Capture\\Vortice.Direct3D11.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\Vortice.Direct3D11.dll",
+    "sha256": "64F27B64F36280851B87A6E65AC049165C45F36E942F416750055A93263DBFD3",
+    "beforeSha256": "64F27B64F36280851B87A6E65AC049165C45F36E942F416750055A93263DBFD3"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\Vortice.DirectX.dll",
+    "relative": "NVIDIA Capture\\Vortice.DirectX.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\Vortice.DirectX.dll",
+    "sha256": "E4D202A7E56F5365C7C8A646B2D949431A656314008738ED1A53868EE8959CE2",
+    "beforeSha256": "E4D202A7E56F5365C7C8A646B2D949431A656314008738ED1A53868EE8959CE2"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\Vortice.DXGI.dll",
+    "relative": "NVIDIA Capture\\Vortice.DXGI.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\Vortice.DXGI.dll",
+    "sha256": "7FBC745E749F1077B204E68ACF6DD54404D391EDCE4AD538C35AB0B23BECA1EF",
+    "beforeSha256": "7FBC745E749F1077B204E68ACF6DD54404D391EDCE4AD538C35AB0B23BECA1EF"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\Vortice.Mathematics.dll",
+    "relative": "NVIDIA Capture\\Vortice.Mathematics.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\Vortice.Mathematics.dll",
+    "sha256": "7E4AAAB7D1E0911513CAF6C171F5CFD414FB0D28427E55C4843DED46A2FD6CF6",
+    "beforeSha256": "7E4AAAB7D1E0911513CAF6C171F5CFD414FB0D28427E55C4843DED46A2FD6CF6"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Unified_Test\\codex-integration-20261027-a\\NVIDIA Capture\\WinRT.Runtime.dll",
+    "relative": "NVIDIA Capture\\WinRT.Runtime.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\WinRT.Runtime.dll",
+    "sha256": "BCF3A14E8712A90837FC5C0D8C8A24696AF2BD7F74E9767597EC81EDEDFB23DB",
+    "beforeSha256": "BCF3A14E8712A90837FC5C0D8C8A24696AF2BD7F74E9767597EC81EDEDFB23DB"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Integration_Test-20261027\\container-artifacts\\bin\\NvContainer\\release\\NvContainer.exe",
+    "relative": "NVIDIA Container\\NvContainer.exe",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Container\\NvContainer.exe",
+    "sha256": "4F10C708FD96112C0D5B4788C96ABE1581968F0605AC0F149EB8A2D749335FDA",
+    "beforeSha256": "8606D211EC659BEB26DAF2C3D1628CD0EA4AE1CFA83F7CBB7AB8915270807E78"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Integration_Test-20261027\\container-artifacts\\bin\\NvContainer\\release\\NvContainer.dll",
+    "relative": "NVIDIA Container\\NvContainer.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Container\\NvContainer.dll",
+    "sha256": "351C0CC477336BBAA00A142725A95C1312B3197F8608246CC488B741180BFF26",
+    "beforeSha256": "10C13880939A4F35BB60B7DF06472F9045D3B2A6549DA539D00B5B66C2CFD8A8"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Integration_Test-20261027\\container-artifacts\\bin\\NvContainer\\release\\NvContainer.deps.json",
+    "relative": "NVIDIA Container\\NvContainer.deps.json",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Container\\NvContainer.deps.json",
+    "sha256": "A3507698E0237F722AC09F6D7405830AA91AD4F61DB40412D2414EA0A6F0838E",
+    "beforeSha256": "A3507698E0237F722AC09F6D7405830AA91AD4F61DB40412D2414EA0A6F0838E"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Integration_Test-20261027\\container-artifacts\\bin\\NvContainer\\release\\NvContainer.runtimeconfig.json",
+    "relative": "NVIDIA Container\\NvContainer.runtimeconfig.json",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Container\\NvContainer.runtimeconfig.json",
+    "sha256": "96BC2946DFF8790400D652EC7F8DE7BB043E954980D59470C112788B68A1FBD3",
+    "beforeSha256": "96BC2946DFF8790400D652EC7F8DE7BB043E954980D59470C112788B68A1FBD3"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Integration_Test-20261027\\container-artifacts\\bin\\NvContainer\\release\\NvGraphics.Contracts.dll",
+    "relative": "NVIDIA Container\\NvGraphics.Contracts.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Container\\NvGraphics.Contracts.dll",
+    "sha256": "FD68E76DB7DB16CB25D1CD3EEB1057344521F6FBC4059CB9F23C11BB673D4024",
+    "beforeSha256": "CD6E2702C05E0A51B0B874921F99B6003C6A00B317F562F9D33089277EC2E702"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Integration_Test-20261027\\container-artifacts\\bin\\NvContainer\\release\\NvGraphics.dll",
+    "relative": "NVIDIA Container\\NvGraphics.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Container\\NvGraphics.dll",
+    "sha256": "C237259CD5DDE5D9BF6AD9AD6F7B83D950AA3EAB9E62FFAF754EDF5560FFA4F8",
+    "beforeSha256": "D9F8206C28BEC2FB20C3DFB57B566477DF774C5F91C11B359022245229AF72AD"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Integration_Test-20261027\\container-artifacts\\bin\\NvContainer\\release\\Microsoft.Windows.SDK.NET.dll",
+    "relative": "NVIDIA Container\\Microsoft.Windows.SDK.NET.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Container\\Microsoft.Windows.SDK.NET.dll",
+    "sha256": "C633AB241CD09846C2AA409F0BEE2026962610404A7BF132C75CBD66B0E5A9F4",
+    "beforeSha256": "C633AB241CD09846C2AA409F0BEE2026962610404A7BF132C75CBD66B0E5A9F4"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Integration_Test-20261027\\container-artifacts\\bin\\NvContainer\\release\\WinRT.Runtime.dll",
+    "relative": "NVIDIA Container\\WinRT.Runtime.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Container\\WinRT.Runtime.dll",
+    "sha256": "BCF3A14E8712A90837FC5C0D8C8A24696AF2BD7F74E9767597EC81EDEDFB23DB",
+    "beforeSha256": "BCF3A14E8712A90837FC5C0D8C8A24696AF2BD7F74E9767597EC81EDEDFB23DB"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Integration_Test-20261027\\container-artifacts\\bin\\NvContainer\\release\\System.Management.dll",
+    "relative": "NVIDIA Container\\System.Management.dll",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Container\\System.Management.dll",
+    "sha256": "7515A62492CB215CC7A5A7D7D8351148C2B540102DE0925DE6EECE5B2322941B",
+    "beforeSha256": "7515A62492CB215CC7A5A7D7D8351148C2B540102DE0925DE6EECE5B2322941B"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Node Bundle_Test\\20261027-master-01\\index.js",
+    "relative": "Overlay On-Screen Control\\NVIDIA NodeAPI\\index.js",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\Overlay On-Screen Control\\NVIDIA NodeAPI\\index.js",
+    "sha256": "0EF8F29DFBE594A2A0BAD25DE0075A0CD0657E88DBF3E6B17083321115FA3BD6",
+    "beforeSha256": "CC5E4B75C6CC92781544E5D1CC62345B67ACB9AF5AB033C68D6B14C5BB3ADACA"
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Node Bundle_Test\\20261027-master-01\\localApiSecurity.js",
+    "relative": "Overlay On-Screen Control\\NVIDIA NodeAPI\\localApiSecurity.js",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\Overlay On-Screen Control\\NVIDIA NodeAPI\\localApiSecurity.js",
+    "sha256": "95D1CA6722E09EEDA2670F6E62484947F9E0F45FDE7355EA4D5F14B6E4DCB674",
+    "beforeSha256": ""
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Node Bundle_Test\\20261027-master-01\\localGpuRequestGuard.js",
+    "relative": "Overlay On-Screen Control\\NVIDIA NodeAPI\\localGpuRequestGuard.js",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\Overlay On-Screen Control\\NVIDIA NodeAPI\\localGpuRequestGuard.js",
+    "sha256": "ACD3F6C35F93FBE80F2CAE967730764C513153BBF6D71B37A5F6FE39E84D5257",
+    "beforeSha256": ""
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Node Bundle_Test\\20261027-master-01\\shims\\capture-engine-status.js",
+    "relative": "Overlay On-Screen Control\\NVIDIA NodeAPI\\shims\\capture-engine-status.js",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\Overlay On-Screen Control\\NVIDIA NodeAPI\\shims\\capture-engine-status.js",
+    "sha256": "735AA200D76A9F87F406EE7DF8E4676970C8FE2B9EF876F8B22F07B63E5B6129",
+    "beforeSha256": ""
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Node Bundle_Test\\20261027-master-01\\shims\\capture-capabilities.js",
+    "relative": "Overlay On-Screen Control\\NVIDIA NodeAPI\\shims\\capture-capabilities.js",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\Overlay On-Screen Control\\NVIDIA NodeAPI\\shims\\capture-capabilities.js",
+    "sha256": "E82CC5217A49C4FA78FCE496E4351621F63836D2FD9A2B3501C2194F8B20B203",
+    "beforeSha256": ""
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Node Bundle_Test\\20261027-master-01\\shims\\capture-runtime-status.js",
+    "relative": "Overlay On-Screen Control\\NVIDIA NodeAPI\\shims\\capture-runtime-status.js",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\Overlay On-Screen Control\\NVIDIA NodeAPI\\shims\\capture-runtime-status.js",
+    "sha256": "9752C89319AD14618821738588E6A3BE1B93AD4A89C532A62155C2636DD604AE",
+    "beforeSha256": ""
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Node Bundle_Test\\20261027-master-01\\shims\\capture-display-routing.js",
+    "relative": "Overlay On-Screen Control\\NVIDIA NodeAPI\\shims\\capture-display-routing.js",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\Overlay On-Screen Control\\NVIDIA NodeAPI\\shims\\capture-display-routing.js",
+    "sha256": "5552C117FF8023BC9DE5C29D9C4929E373E4A61E6E29EF45D7BF202D61DA3869",
+    "beforeSha256": ""
+  },
+  {
+    "source": "C:\\My Project\\NVIDIA-Shadowplay\\build_test\\NVIDIA Capture Node Bundle_Test\\20261027-master-01\\nvcontainer.default-deny.candidate.json",
+    "relative": "NVIDIA Config\\nvcontainer.json",
+    "target": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Config\\nvcontainer.json",
+    "sha256": "FEB034FF6EAE23E4792EB6DBA73D666F0384875A329A1C1CACCBD5CE5CD4CDBE",
+    "beforeSha256": "7F244C3D02D70D14A338A137DDCEF0E75089977B0A6B3E26313FB3FD7253BB4F"
+  }
+]

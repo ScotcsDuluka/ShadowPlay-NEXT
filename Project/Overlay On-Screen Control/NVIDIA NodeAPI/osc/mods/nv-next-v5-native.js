@@ -233,9 +233,20 @@
     // The interval below observes blocked -> idle/open and retries once ready.
     if (!enabled() || motionBlocked() || raf !== null || !window.requestAnimationFrame) return;
     settleRemaining = 30;
+    var startedAt = window.performance && window.performance.now ? window.performance.now() : 0;
     function frame() {
       raf = null;
-      if (!enabled() || motionBlocked()) return;
+      if (!enabled()) return;
+      // Rapid toggling keeps Motion non-idle almost continuously. A counted
+      // loop starves and V5 silently stays native for seconds. Wait (bounded)
+      // for an idle frame instead of spending attempts while blocked.
+      if (motionBlocked()) {
+        if (window.performance && window.performance.now &&
+            window.performance.now() - startedAt <= 2000) {
+          raf = window.requestAnimationFrame(frame);
+        }
+        return;
+      }
       var root = getNativeRoot();
       var result = geometry(root, false);
       if (--settleRemaining <= 0) return;

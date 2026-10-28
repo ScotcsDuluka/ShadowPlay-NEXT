@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations"><ProjectConfiguration Include="Release|x64"><Configuration>Release</Configuration><Platform>x64</Platform></ProjectConfiguration></ItemGroup>
+  <PropertyGroup Label="Globals"><ProjectGuid>{2FC9FE4A-1C40-4EF6-A6CF-7AA8A112D116}</ProjectGuid><WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion></PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration"><ConfigurationType>Application</ConfigurationType><PlatformToolset>v145</PlatformToolset><UseDebugLibraries>false</UseDebugLibraries><CharacterSet>Unicode</CharacterSet></PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <PropertyGroup><TargetName>CefFrameDeliveryTest</TargetName><OutDir>$(ProjectDir)..\..\..\..\build_test\NVIDIA CefFrameDelivery_Test\build\</OutDir><IntDir>$(OutDir)obj\</IntDir></PropertyGroup>
+  <ItemDefinitionGroup><ClCompile><AdditionalIncludeDirectories>$(CEF_ROOT);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories><PreprocessorDefinitions>NDEBUG;WIN32;_WINDOWS;__STDC_CONSTANT_MACROS;__STDC_FORMAT_MACROS;%(PreprocessorDefinitions)</PreprocessorDefinitions><RuntimeLibrary>MultiThreaded</RuntimeLibrary><LanguageStandard>stdcpp20</LanguageStandard><WarningLevel>Level4</WarningLevel><AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions></ClCompile><Link><AdditionalLibraryDirectories>$(CEF_ROOT)\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories><AdditionalDependencies>$(ProjectDir)..\obj\wrapper73\libcef_dll_wrapper73.lib;libcef.lib;d3d11.lib;dxgi.lib;user32.lib;ws2_32.lib;shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies><SubSystem>Console</SubSystem></Link></ItemDefinitionGroup>
+  <ItemGroup><ClCompile Include="CefFrameDeliveryTest.cpp" /></ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>

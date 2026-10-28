@@ -133,6 +133,19 @@ static class Program
             Check(engine.CaptureGeometry.StartsWith("1920x1080"), "generic capture geometry preserved");
             Check(engine.GetStatus().VideoIdentity.CaptureLuidLow == target.Adapter.Low &&
                 engine.GetStatus().VideoIdentity.EncoderVendorId == (uint)GpuVendor.Nvidia, "status carries actual capture and encoder identities");
+            var oversized = new SessionConfig { OutputPath = Path.Combine(Path.GetTempPath(), "I1-never-created.mp4"),
+                AudioEnabled = false, MicEnabled = false, TargetFps = 30, DurationSeconds = 1, DiskHeadroomOverrideBytes = 1,
+                UseNativeResolution = false, RequestedWidth = 3840, RequestedHeight = 2160 };
+            var rejected = engine.StartSession(oversized);
+            Check(!rejected.Pass && rejected.ErrorMessage.Contains("requested encode resolution 3840x2160"),
+                "oversized manual session resolution returns the actual rejection");
+            Check(!oversized.UseNativeResolution && oversized.RequestedWidth == 3840 && oversized.RequestedHeight == 2160,
+                "oversized manual session resolution preserves the requested values");
+            Check(!fake.Capture.Started && fake.Encoders.Count == 1 && !fake.Encoders[0].Disposed,
+                "rejected resolution starts no capture and leaves encoder untouched");
+            Check(engine.GetStatus().State == RecordingEngineState.Idle && engine.GetStatus().CurrentSessionId is null &&
+                ReferenceEquals(engine.GetStatus().LastSessionResult, rejected),
+                "resolution rejection publishes the failed result and releases session state");
             fake.RebuildAdapter = Id(999, GpuVendor.Nvidia);
             var result = engine.StartSession(new SessionConfig { OutputPath = Path.Combine(Path.GetTempPath(), "I1-never-created.mp4"),
                 AudioEnabled = false, MicEnabled = false, TargetFps = 60, DurationSeconds = 1, DiskHeadroomOverrideBytes = 1 });

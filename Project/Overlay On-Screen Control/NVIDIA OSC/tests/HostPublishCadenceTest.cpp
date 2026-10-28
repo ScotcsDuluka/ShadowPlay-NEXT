@@ -3,6 +3,7 @@
 #include "../src/OscFramePublisher/Common/OscPublishCadence.h"
 #include "../src/OscFramePublisher/Common/OscD3D9CpuMirrorPolicy.h"
 #include "../src/OscFramePublisher/Common/OscHookTransportPolicy.h"
+#include "../src/OscModeFrameBoost.h"
 #ifdef NDEBUG
 #error "Cadence assertions must be enabled in Release tests"
 #endif
@@ -10,6 +11,35 @@
 #include <cstdint>
 #include <iostream>
 int main() {
+  osc::ModeFrameBoost boost;
+  assert(!boost.Active(0));
+  assert(boost.DesktopPresentLimit(0,75)==75);
+  assert(boost.CefLimit(0,30)==30);
+  boost.Start(100);
+  assert(boost.Active(100) && boost.Active(5099));
+  assert(!boost.Active(5100)); // exactly five seconds, not the old 10s burst
+  assert(boost.DesktopPresentLimit(5099,75)==240);
+  assert(boost.CefLimit(5099,15)==60);
+  assert(boost.CefLimit(5099,75,true)==240);
+  assert(boost.CefLimit(5100,75,true)==75);
+  assert(osc::ModeFrameBoost::PaintDelayMs(true)==4);
+  assert(osc::ModeFrameBoost::PaintDelayMs(false)==16);
+  assert(boost.DesktopPresentLimit(5100,75)==75);
+  assert(boost.CefLimit(5100,15)==15);
+  boost.Start(1000);
+  boost.Start(2000); // a new mode change restarts the five-second window
+  assert(boost.Active(6999) && !boost.Active(7000));
+  boost.Stop();
+  assert(!boost.Active(2001));
+  assert(boost.DesktopPresentLimit(2001,240)==240); // preserve Desktop setting
+  for (const int fps : {15,30,60,75,120,144,165,240}) {
+      assert(osc::CefDesktopFps(fps,true)==fps);
+      assert(osc::CefDesktopFps(fps,false)==(fps<60?fps:60));
+  }
+  assert(osc::CefHookFps(true)==240);
+  assert(osc::CefHookFps(false)==60);
+  assert(osc::CefDesktopFps(0,true)==60);
+  assert(osc::CefDesktopFps(241,true)==60);
   // D3D9 GPU is an opt-in WINDOWED DWM compositor, not D3D9Ex sharing
   // or a false promise about Fullscreen Exclusive.
   const auto* d3d9=osc::hook_transport::Find("d3d9");

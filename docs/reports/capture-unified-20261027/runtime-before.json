@@ -1,0 +1,20 @@
+[
+  {
+    "Name": "NvCapture.exe",
+    "ProcessId": 30016,
+    "ExecutablePath": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\NvCapture.exe",
+    "CommandLine": "\"C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\NvCapture.exe\" --rest"
+  },
+  {
+    "Name": "NvContainer.exe",
+    "ProcessId": 26152,
+    "ExecutablePath": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Container\\NvContainer.exe",
+    "CommandLine": "\"C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Container\\NvContainer.exe\""
+  },
+  {
+    "Name": "NvNode.exe",
+    "ProcessId": 41660,
+    "ExecutablePath": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\Overlay On-Screen Control\\NVIDIA NodeAPI\\NvNode.exe",
+    "CommandLine": "\"C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\Overlay On-Screen Control\\NVIDIA NodeAPI\\NvNode.exe\" \"C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\Overlay On-Screen Control\\NVIDIA NodeAPI\\index.js\""
+  }
+]

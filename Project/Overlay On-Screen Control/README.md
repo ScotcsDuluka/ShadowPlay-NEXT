@@ -1,6 +1,8 @@
 # Overlay On-Screen Control — OSC subsystem
 
-**Status: active development, 24 October 2026.**
+**Status: active development, 25 October 2026.**
+
+For the latest cross-service and CEF/Backend separation, see [OSC/Backend Full Architecture & Runtime Audit](../../docs/osc/OSC-BACKEND-FULL-ARCHITECTURE-AUDIT-20261025.md). New CEF pixel-delivery measurements have confirmed that GPU callbacks alone do not establish fresh frames above 60/s; a bounded CEF 73 source candidate is not yet compiled or deployed. [Native OSC Host status](NVIDIA%20OSC/README.md) and [UI v77 evidence](NVIDIA%20NodeAPI/osc/mods/CAPTURE-UI-REDESIGN-20261025.md) describe separate acceptance gates.
 
 This subsystem separates the native CEF/desktop Overlay Host from the OSC UI/backend. The two source owners and a game-facing adapter are distinct:
 

@@ -64,6 +64,11 @@ static partial class Program
             Console.WriteLine($"SESSION_CONTRACT_PASS passed={passed} failed=0 live_desktop=false audio_opened=false gpu_created=false");
             return 0;
         }
+        if(args.Contains("--native-source-fault-synthetic-only",StringComparer.OrdinalIgnoreCase)) {
+            NativeSourceFaultSynthetic();
+            Console.WriteLine($"NATIVE_SOURCE_FAULT_SYNTHETIC_PASS passed={passed} failed=0 live_desktop=false audio_opened=false gpu_created=false");
+            return 0;
+        }
         if(args.Contains("--session-media-synthetic-only",StringComparer.OrdinalIgnoreCase)) {
             SessionMediaSynthetic();
             Console.WriteLine($"SESSION_MEDIA_SYNTHETIC_PASS passed={passed} failed=0 live_desktop=false audio_opened=false gpu_created=false");

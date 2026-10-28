@@ -177,6 +177,27 @@ See [MateBook capture module](Project/NVIDIA%20Capture/README.md) and [two-workt
 
 **Browse the first-party documentation:** [documentation index](docs/README.md) · [README coverage inventory](docs/README-COVERAGE-20261024.md).
 
+## Engineering update — 25 October 2026
+
+The following **newer evidence supersedes older general-status statements** in this README. **Source, isolated tests, deployed runtime, visual CEF and measured game FPS are separate gates.**
+
+| Area | Latest verified evidence | Still open |
+|---|---|---|
+| **D3D9 live Hook** | The **external Windowed DWM/DirectComposition GPU overlay** was visibly confirmed in *Floating Point* x86; native D3D9 CPU/Hook fixture tests passed. The D3D9 **empty-CPU-frame fast skip** is a tested Source/Build candidate **not deployed**. | Game Present p50/p95/p99, 1% low, stutter root cause, fullscreen and safe lifecycle. Desktop compositor FPS cannot stand in for actual game FPS. |
+| **CEF 73 frame delivery** | Isolated accelerated-texture pixel proof showed about **60 fresh images/s** despite requests for 75/120/240; higher callback counts were duplicates. A test-only **unlimited** flag produced about 250 unique images/s but **does not obey limits**. A bounded internal CEF patch is applied to an isolated source checkout. | Compatible VS 2017 toolchain prerequisites blocked the candidate build. **No patched CEF runtime was built or installed**; this is not a 240-FPS product claim. |
+| **Capture UI v77** | Native OSC-style Video Capture / Advanced Capture layout adjustments and source/build asset verification; **32/32 targeted UI checks** recorded. Advanced CEF geometry was checked with no overlap in one viewport. | Video Capture page visual/geometry still needs acceptance. The Pipeline Design tab is **UI-only**; no new live encoder/API selection or recording implementation. |
+| **OSC / Backend topology** | Read-only audit identifies the CEF-native lane, NodeAPI, Container, Capture, Graphics, Gallery, Adapter/Hook and their independent status/evidence planes. | Route inventory is source-scoped: not all paths are live or authenticated, and a returned HTTP 200 does not certify game pixels or a final media file. |
+
+**Read current evidence:** [Duluka Hook map and handoff](Project/NVIDIA%20Adapter/OSC%20Adapter/Duluka%20Hook/README.md) · [DX9 live/stutter gates](Project/NVIDIA%20Adapter/OSC%20Adapter/Duluka%20Hook/docs/DX9-PERFORMANCE-VALIDATION-2026-10-25.md) · [CEF pixel measurement](Project/NVIDIA%20Adapter/OSC%20Adapter/Duluka%20Hook/docs/CEF-FRAME-DELIVERY-2026-10-25-v1.md) · [CEF build blocker](Project/NVIDIA%20Adapter/OSC%20Adapter/Duluka%20Hook/docs/CEF73-BUILD-PREPARATION-2026-10-25-v1.md) · [Capture UI v77](Project/Overlay%20On-Screen%20Control/NVIDIA%20NodeAPI/osc/mods/CAPTURE-UI-REDESIGN-20261025.md) · [OSC / Backend audit](docs/osc/OSC-BACKEND-FULL-ARCHITECTURE-AUDIT-20261025.md).
+
+---
+
+### Cross-machine engineering note — 25 October 2026 evening
+
+The other computer's `intel/duluka-capture` branch reports **2,056/0/33** Intel I3-B synthetic tests and **1,938/0/0** independent I3-C scoped QA tests (Agent C's synthetic acceptance recommendation only). This is **MateBook-only evidence**, not an AORUS `Stable` commit or a deployed NvCapture feature. Intel live source remains blocked by `intel_native_live_input_not_verified`; worker B1 lifecycle and B2–B8 issues remain open. [Independent worktree status](docs/WORKTREE-STATUS-20261025.md).
+
+---
+
 ## Architecture — the rebuild underneath
 
 This is a **conceptual ownership map**, not a claim that every transport is production-ready.

@@ -1,6 +1,82 @@
 // Late-attach implementation fallback, intentionally included after HookPresentEx.
 // This implementation detours code entrypoints (MinHook x86/x64), not a dummy
 // device's heap vtable. A cooperative owner may still register its own vtable.
+// If D3D9 cannot create a probe device during early Unity configuration,
+// capture subsequent real factory creations without touching dummy vtables.
+bool InstallLateD3D9FactoryEntryDetours()
+{
+    const HMODULE runtime = GetModuleHandleW(L"d3d9.dll");
+    if (!runtime)
+    {
+        Log("Late D3D9 factory fallback unavailable: d3d9.dll not loaded.");
+        return false;
+    }
+    void *create9 = reinterpret_cast<void *>(
+        GetProcAddress(runtime, "Direct3DCreate9"));
+    void *create9Ex = reinterpret_cast<void *>(
+        GetProcAddress(runtime, "Direct3DCreate9Ex"));
+    if (!create9)
+    {
+        Log("Late D3D9 factory fallback unavailable: missing Direct3DCreate9.");
+        return false;
+    }
+
+    const MH_STATUS initialization = MH_Initialize();
+    if (initialization != MH_OK &&
+        initialization != MH_ERROR_ALREADY_INITIALIZED)
+    {
+        Log("Late D3D9 factory fallback could not initialize MinHook.");
+        return false;
+    }
+
+    std::vector<void *> targets;
+    bool installed = MH_CreateHook(create9,
+        reinterpret_cast<void *>(&HookDirect3DCreate9),
+        reinterpret_cast<void **>(&g_originalDirect3DCreate9)) == MH_OK;
+    if (installed)
+        targets.push_back(create9);
+    if (installed && create9Ex)
+    {
+        installed = MH_CreateHook(create9Ex,
+            reinterpret_cast<void *>(&HookDirect3DCreate9Ex),
+            reinterpret_cast<void **>(&g_originalDirect3DCreate9Ex)) == MH_OK;
+        if (installed)
+            targets.push_back(create9Ex);
+    }
+    if (installed)
+    {
+        for (void *target : targets)
+        {
+            if (MH_QueueEnableHook(target) != MH_OK)
+            {
+                installed = false;
+                break;
+            }
+        }
+        if (installed)
+            installed = MH_ApplyQueued() == MH_OK;
+    }
+    if (!installed)
+    {
+        for (void *target : targets)
+        {
+            MH_DisableHook(target);
+            MH_RemoveHook(target);
+        }
+        if (initialization == MH_OK)
+            MH_Uninitialize();
+        g_originalDirect3DCreate9 = nullptr;
+        g_originalDirect3DCreate9Ex = nullptr;
+        Log("Late D3D9 factory-entry fallback detours failed; no partial hooks retained.");
+        return false;
+    }
+
+    g_codeDetourTargets = std::move(targets);
+    g_codeDetoursInstalled = true;
+    Log("Late D3D9 factory-entry detours installed; awaiting real game device.");
+    return true;
+}
+
 bool InstallLateD3D9CodeDetours()
 {
     HWND window = CreateWindowExW(0, L"STATIC", L"Duluka DX9 test device",
@@ -8,7 +84,7 @@ bool InstallLateD3D9CodeDetours()
     if (!window)
     {
         Log("Late D3D9 fallback could not create temporary window.");
-        return false;
+        return InstallLateD3D9FactoryEntryDetours();
     }
     D3DPRESENT_PARAMETERS parameters{};
     parameters.Windowed = TRUE;
@@ -22,16 +98,30 @@ bool InstallLateD3D9CodeDetours()
 
     IDirect3D9 *factory = Direct3DCreate9(D3D_SDK_VERSION);
     IDirect3DDevice9 *device = nullptr;
-    if (factory)
-        factory->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL,
-            window, D3DCREATE_SOFTWARE_VERTEXPROCESSING |
-            D3DCREATE_MULTITHREADED, &parameters, &device);
+    // Test-only fault injection validates the early Unity configuration path.
+    // Ordinary games never request this environment variable.
+    char dummyFailureFlag[4]{};
+    const bool simulateDummyFailure =
+        GetEnvironmentVariableA("DULUKA_D3D9_TEST_FAIL_DUMMY_DEVICE",
+            dummyFailureFlag, sizeof(dummyFailureFlag)) == 1 &&
+        dummyFailureFlag[0] == '1';
+    HRESULT dummyResult = E_FAIL;
+    if (factory && !simulateDummyFailure)
+        dummyResult = factory->CreateDevice(
+            D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, window,
+            D3DCREATE_SOFTWARE_VERTEXPROCESSING | D3DCREATE_MULTITHREADED,
+            &parameters, &device);
     if (!device)
     {
         if (factory) factory->Release();
         DestroyWindow(window);
-        Log("Late D3D9 fallback could not create temporary device.");
-        return false;
+        char reason[180]{};
+        sprintf_s(reason, sizeof(reason),
+            "Late D3D9 temporary device unavailable hr=0x%08lX; "
+            "attempting factory-entry fallback.",
+            static_cast<unsigned long>(dummyResult));
+        Log(reason);
+        return InstallLateD3D9FactoryEntryDetours();
     }
 
     IDirect3D9Ex *factoryEx = nullptr;

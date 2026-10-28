@@ -5,7 +5,7 @@
   var catalogEndpoint = '/DulukaCapture/v.1.0/engines';
   var panelId = 'nv-video-capture-options';
   var panelStackId = 'nv-video-capture-panels';
-  var panelVersion = '72';
+  var panelVersion = '75';
   var state = null;
   var statusNode = null;
   var captureFields = [];
@@ -316,59 +316,10 @@
     panelScope.captureUi = {};
     // Session-centric architecture UI is a local, non-persisted design draft.
     // No draft choice is sent to /settings or to a capture runtime.
-    panelScope.capturePlanOpen = false;
-    panelScope.capturePlanReady = true;
-    panelScope.capturePlan = {
-      desktopApi: 'dxgi', exclusiveApi: 'dxgi',
-      encoder: 'NVENC_H264', systemAudio: 'off', microphone: 'off', recovery: 'planned'
+    // The advanced screen is a real ui-router State, not a hidden clone.
+    panelScope.openAdvancedCapture = function () {
+      return injector.get('$state').go('main.osc-capture-advanced');
     };
-    panelScope.capturePlanDesktopChoices = [
-      { value: 'dxgi', label: 'DXGI Desktop Duplication (existing)' },
-      { value: 'wgc_monitor', label: 'WGC Monitor (not wired)', disabled: true },
-      { value: 'ffmpeg_ddagrab', label: 'FFmpeg ddagrab (separate engine)', disabled: true },
-      { value: 'ffmpeg_gdigrab', label: 'FFmpeg gdigrab (separate engine)', disabled: true }
-    ];
-    panelScope.capturePlanExclusiveChoices = [
-      { value: 'dxgi', label: 'DXGI (Exclusive unverified)' },
-      { value: 'wgc_monitor', label: 'WGC Monitor (not wired)', disabled: true },
-      { value: 'exclusive_source', label: 'Game Frame Source (not implemented)', disabled: true }
-    ];
-    panelScope.capturePlanEncoderChoices = [
-      { value: 'NVENC_H264', label: 'NVIDIA NVENC H.264 (existing)' },
-      { value: 'QuickSync_H264', label: 'Intel QSV Native (not wired)', disabled: true },
-      { value: 'AMF_H264', label: 'AMD AMF (not implemented)', disabled: true },
-      { value: 'software', label: 'Software (not wired)', disabled: true }
-    ];
-    panelScope.capturePlanAudioChoices = [
-      { value: 'off', label: 'Off' },
-      { value: 'duluka_wasapi', label: 'Duluka WASAPI (component exists)' },
-      { value: 'ffmpeg_audio', label: 'FFmpeg Audio (stub)', disabled: true }
-    ];
-    panelScope.capturePlanRecoveryChoices = [
-      { value: 'planned', label: 'Source recovery (planned)', disabled: true }
-    ];
-    panelScope.capturePlanSummary = '';
-    panelScope.onCapturePlanChange = function () {
-      var plan = panelScope.capturePlan;
-      function label(value, choices) {
-        var selected = choices.filter(function (choice) {
-          return choice.value === value;
-        })[0];
-        return selected ? selected.label : 'Unknown';
-      }
-      panelScope.capturePlanSummary =
-        'DRAFT ONLY  •  Desktop: ' +
-        label(plan.desktopApi, panelScope.capturePlanDesktopChoices) +
-        '  •  Exclusive: ' +
-        label(plan.exclusiveApi, panelScope.capturePlanExclusiveChoices) +
-        '  •  Encoder: ' +
-        label(plan.encoder, panelScope.capturePlanEncoderChoices) +
-        '  •  System: ' +
-        label(plan.systemAudio, panelScope.capturePlanAudioChoices) +
-        '  •  Mic: ' +
-        label(plan.microphone, panelScope.capturePlanAudioChoices);
-    };
-    panelScope.onCapturePlanChange();
     panelScope.captureSettingsReady = false;
     panelScope.captureDisplayReady = false;
     panelScope.captureDisplayChoices = [];
@@ -678,13 +629,15 @@
     destroyCaptureControls();
     row.classList.add('nv-video-engine-fields-row');
     captureFieldsRow = row;
+    // Undo ONLY the inline dimensions injected by old UI revisions.
+    // Leave genuine NVIDIA md-select sizing and unrelated inline styles alone.
     Array.prototype.forEach.call(row.children, function (field) {
-      if (!field.classList.contains('resolution') && !field.classList.contains('fps')) return;
-      field.style.flex = '1 1 calc(24% - 12px)';
-      field.style.minWidth = '190px';
-      field.style.maxWidth = 'none';
-      field.style.margin = '10px 6px';
-      field.style.boxSizing = 'border-box';
+      if (!field.classList.contains('resolution') &&
+          !field.classList.contains('fps')) return;
+      if (field.style.minWidth === '190px') field.style.removeProperty('min-width');
+      if (field.style.maxWidth === 'none') field.style.removeProperty('max-width');
+      if (field.style.margin === '10px 6px') field.style.removeProperty('margin');
+      if (field.style.flex === '1 1 calc(24% - 12px)') field.style.removeProperty('flex');
     });
     [
       {
@@ -706,13 +659,6 @@
         field.id, field.label, field.model, field.choices, field.changeHandler
       );
       fieldControl.wrap.id = field.id + '-field';
-      fieldControl.wrap.style.flex = field.id === 'nv-video-engine-api'
-        ? '1.15 1 calc(28% - 12px)'
-        : '1 1 calc(24% - 12px)';
-      fieldControl.wrap.style.minWidth = '190px';
-      fieldControl.wrap.style.maxWidth = 'none';
-      fieldControl.wrap.style.margin = '10px 6px';
-      fieldControl.wrap.style.boxSizing = 'border-box';
       row.appendChild(fieldControl.wrap);
       captureFields.push(fieldControl.wrap);
     });
@@ -741,25 +687,6 @@
     syncEncoderControls();
     panelScope.captureUi.captureCursor = Boolean(state.captureCursor);
     presetOptions();
-    var selectedPreset = panelScope.capturePresetChoices.filter(function (choice) {
-      return choice.value === Number(state.encoderPreset);
-    })[0];
-    var presetLabel = selectedPreset ? selectedPreset.label : '';
-    var captureApi = state.engineMode === 'Duluka'
-      ? 'DXGI Desktop Duplication (runtime: ddagrab)'
-      : state.apiCapture === 'ddagrab' ? 'ddagrab (built-in)' : state.apiCapture;
-    if (Number.isFinite(state.fps) && Number.isFinite(state.bitrateKbps) &&
-        typeof state.useNativeResolution === 'boolean' &&
-        Number.isFinite(state.width) && Number.isFinite(state.height)) {
-      var resolution = state.useNativeResolution ? 'native' : state.width + 'x' + state.height;
-      previewNode.textContent = 'Requested (config.json): ' + state.encoder + ' · ' +
-        state.fps + ' fps (live per record) · ' + state.bitrateKbps +
-        ' kbps (engine restart) · ' + resolution + ' (engine restart) · preset ' +
-        presetLabel + ' (engine restart) · Capture API: ' + captureApi;
-    } else {
-      previewNode.textContent = 'Engine: ' + state.engineMode + ' · ' + captureApi +
-        ' · ' + encoderNames[state.encoder] + ' · ' + presetLabel;
-    }
     schedulePanelDigest();
   }
 
@@ -789,74 +716,15 @@
     });
   }
 
-  function buildCapturePlanPanel() {
-    var plan = document.createElement('section');
-    plan.id = 'nv-video-session-plan';
-    plan.className = 'nv-video-plan';
-    plan.setAttribute('ng-show', 'capturePlanOpen');
-    var heading = document.createElement('div');
-    heading.className = 'nv-video-plan-heading';
-    heading.textContent = 'SESSION-CENTRIC PIPELINE  /  DESIGN PREVIEW';
-    plan.appendChild(heading);
-    var info = document.createElement('p');
-    info.className = 'nv-video-plan-info';
-    info.textContent = 'Preview capture routing. Changes here are not saved or applied.';
-    plan.appendChild(info);
-    var grid = document.createElement('div');
-    grid.className = 'nv-video-plan-grid';
-    [
-      ['nv-video-plan-desktop', 'Desktop Capture API', 'desktopApi', 'capturePlanDesktopChoices'],
-      ['nv-video-plan-exclusive', 'Exclusive Capture API', 'exclusiveApi', 'capturePlanExclusiveChoices'],
-      ['nv-video-plan-encoder', 'Video Encoder', 'encoder', 'capturePlanEncoderChoices'],
-      ['nv-video-plan-system-audio', 'System Audio', 'systemAudio', 'capturePlanAudioChoices'],
-      ['nv-video-plan-microphone', 'Microphone', 'microphone', 'capturePlanAudioChoices'],
-      ['nv-video-plan-recovery', 'Recovery Policy (planned)', 'recovery', 'capturePlanRecoveryChoices']
-    ].forEach(function (entry) {
-      var control = makeSelect(
-        entry[0], entry[1], 'capturePlan.' + entry[2], entry[3],
-        'onCapturePlanChange()', entry[2] === 'recovery'
-          ? 'true' : '!capturePlanReady'
-      );
-      control.wrap.classList.add('nv-video-plan-field');
-      grid.appendChild(control.wrap);
-    });
-    plan.appendChild(grid);
-    var summary = document.createElement('p');
-    summary.className = 'nv-video-plan-summary';
-    summary.setAttribute('role', 'status');
-    summary.setAttribute('title', '{{capturePlanSummary}}');
-    summary.textContent = '{{capturePlanSummary}}';
-    plan.appendChild(summary);
-    var reminder = document.createElement('p');
-    reminder.className = 'nv-video-plan-info';
-    reminder.textContent = 'Exclusive capture, QSV, FFmpeg audio and source recovery require runtime verification before activation.';
-    plan.appendChild(reminder);
-    return plan;
-  }
-
   function buildPanel(host) {
     var panel = document.createElement('section');
     panel.id = panelId;
     panel.className = 'nv-video-capture-panel';
 
-    var encoder = makeSelect(
-      'nv-video-engine-encoder',
-      'Codec Encoder',
-      'captureUi.encoder',
-      'captureEncoderChoices',
-      'onEncoderChange()'
-    );
     encoderChoices.forEach(function (choice) {
       encoderNames[choice[0]] = choice[1];
     });
-    var preset = makeSelect(
-      'nv-video-engine-preset',
-      'Encoder preset',
-      'captureUi.encoderPreset',
-      'capturePresetChoices',
-      'onPresetChange()'
-    );
-
+    // Main Video capture owns display, cursor and actual runtime status.
     var displaySection = makeSection('Display Capture:');
     var displaySelect = makeSelect(
       'nv-video-capture-display', 'Primary Capture display',
@@ -870,96 +738,15 @@
     displayStatusNode.textContent = '{{captureDisplayStatus}}';
     displaySection.appendChild(displayStatusNode);
 
-    var advancedSection = makeSection('Advanced:');
-    var advanced = document.createElement('div');
-    advanced.className = 'nv-video-engine-advanced';
-    var preview = document.createElement('div');
-    preview.className = 'nv-video-engine-preview';
-    var previewTitle = document.createElement('span');
-    previewTitle.className = 'nv-video-engine-preview-title';
-    previewTitle.textContent = 'Preview Build Arguments';
-    previewNode = document.createElement('code');
-    previewNode.className = 'nv-video-engine-preview-value';
-    preview.appendChild(previewTitle);
-    preview.appendChild(previewNode);
-    var actions = document.createElement('div');
-    actions.className = 'nv-video-engine-actions';
-    var reloadButton = document.createElement('md-button');
-    reloadButton.setAttribute('type', 'button');
-    reloadButton.className = 'md-raised md-primary nv-video-engine-action';
-    reloadButton.textContent = 'Reload';
-    reloadButton.addEventListener('click', function () {
-      // Reload both persisted settings and the read-only Container catalog.
-      panelScope.captureSettingsReady = false;
-      schedulePanelDigest();
-      statusNode.textContent = 'Loading…';
-      refreshCaptureDisplays();
-      readCaptureSettingsAndCatalog().then(function () {
-        statusNode.classList.remove('highlights-item-disabled');
-        statusNode.textContent = 'Ready';
-      }).catch(setUnavailableSettings);
-    });
-    var copyButton = document.createElement('md-button');
-    copyButton.setAttribute('type', 'button');
-    copyButton.className = 'md-raised md-primary nv-video-engine-action';
-    copyButton.textContent = 'Copy';
-    copyButton.addEventListener('click', function () {
-      if (!navigator.clipboard || !navigator.clipboard.writeText) {
-        statusNode.textContent = 'Clipboard access is unavailable';
-        statusNode.classList.add('highlights-item-disabled');
-        return;
-      }
-      navigator.clipboard.writeText(previewNode.textContent).then(function () {
-        statusNode.classList.remove('highlights-item-disabled');
-        statusNode.textContent = 'Copied';
-      }).catch(function () {
-        statusNode.textContent = 'Clipboard access is unavailable';
-        statusNode.classList.add('highlights-item-disabled');
-      });
-    });
-    actions.appendChild(reloadButton);
-    actions.appendChild(copyButton);
-    var previewPanel = document.createElement('div');
-    previewPanel.className = 'nv-video-engine-preview-panel';
-    previewPanel.appendChild(preview);
-    previewPanel.appendChild(actions);
-    var encoderFields = document.createElement('div');
-    encoderFields.className = 'nv-video-engine-advanced-fields';
-    encoderFields.appendChild(encoder.wrap);
-    var codecStatus = document.createElement('p');
-    codecStatus.className = 'nv-video-engine-codec-note';
-    codecStatus.setAttribute('role', 'status');
-    codecStatus.textContent = '{{captureCodecStatus}}';
-    // Helper text MUST be outside the md-select/encoder field stack.
-    // The earlier placement with negative margin overlaid the green
-    // Material select border and Encoder preset label in CEF.
-    encoderFields.appendChild(preset.wrap);
-    advanced.appendChild(previewPanel);
-    advanced.appendChild(encoderFields);
-    advancedSection.appendChild(advanced);
-    advancedSection.appendChild(codecStatus);
-    var viewTabs = document.createElement('div');
-    viewTabs.className = 'nv-video-plan-tabs';
-    function addViewTab(title, isPlan) {
-      var button = document.createElement('md-button');
-      button.className = 'nv-video-engine-toggle';
-      button.textContent = title;
-      button.setAttribute('type', 'button');
-      button.setAttribute('ng-click', 'capturePlanOpen = ' + (isPlan ? 'true' : 'false'));
-      button.setAttribute('ng-class', isPlan
-        ? "{'nv-video-engine-active': capturePlanOpen}"
-        : "{'nv-video-engine-active': !capturePlanOpen}");
-      button.setAttribute('aria-label', title);
-      viewTabs.appendChild(button);
-    }
-    addViewTab('Live Settings', false);
-    addViewTab('Pipeline Design', true);
-    panel.appendChild(viewTabs);
-    displaySection.setAttribute('ng-show', '!capturePlanOpen');
-    advancedSection.setAttribute('ng-show', '!capturePlanOpen');
+    // Main page stays lightweight: display, status and one OSC navigation button.
     panel.appendChild(displaySection);
-    panel.appendChild(advancedSection);
-    panel.appendChild(buildCapturePlanPanel());
+    var advancedButton = document.createElement('button');
+    advancedButton.setAttribute('type', 'button');
+    advancedButton.className = 'osc-button osc-button-gray nv-video-advanced-open-button';
+    advancedButton.textContent = 'Advanced Capture';
+    advancedButton.setAttribute('ng-click', 'openAdvancedCapture()');
+    advancedButton.setAttribute('hover-focus', '');
+    panel.appendChild(advancedButton);
 
     var footer = document.createElement('div');
     footer.className = 'nv-video-engine-row nv-video-engine-footer';
@@ -989,6 +776,109 @@
     compiler(panel)(panelScope);
   }
 
+  // Append to NVIDIA's *existing* settingsCustomize ng-repeat. The original
+  // Low/Medium/High/Custom controls, icons, handlers and CSS remain untouched.
+  // Extra aliases resolve to supported NVIDIA qualities; never POST unknown
+  // "Recommended" or "Maximum" quality identifiers to the native backend.
+  function installNativeQualityPresets(host) {
+    if (!host || !window.angular || !videoPage()) return false;
+    var element = host.querySelector('settings-customize');
+    if (!element) return false;
+    var ngElement = window.angular.element(element);
+    var directiveScope = typeof ngElement.isolateScope === 'function' ?
+      ngElement.isolateScope() : null;
+    var qualityController = (typeof ngElement.controller === 'function' &&
+      ngElement.controller('settingsCustomize')) ||
+      (directiveScope && directiveScope.customizeMenu);
+    // CEF can expose the ng-repeat child scope before the directive's
+    // controller lookup becomes available. Both refer to NVIDIA's SAME VM.
+    if (!qualityController && typeof element.querySelector === 'function') {
+      var nativeQualityItem = element.querySelector('.quality-list-item');
+      var childScope = nativeQualityItem &&
+        window.angular.element(nativeQualityItem).scope();
+      qualityController = childScope && childScope.customizeMenu;
+    }
+    if (!qualityController || !qualityController.Qualities ||
+        qualityController.feature !== 'Manual') return false;
+
+    // AppJS compiles the quality ng-repeat on an isolated Angular scope.
+    // The first attempt can run *before* our Capture panel has an injector;
+    // a model mutation alone is not enough to render two new NVIDIA <li>s.
+    function digestNativeQuality() {
+      if (directiveScope && typeof directiveScope.$evalAsync === 'function') {
+        directiveScope.$evalAsync();
+        return;
+      }
+      var appInjector = injector ||
+        (typeof ngElement.injector === 'function' && ngElement.injector()) ||
+        window.angular.element(document.documentElement).injector();
+      var root = appInjector && appInjector.get('$rootScope');
+      if (root && typeof root.$applyAsync === 'function') root.$applyAsync();
+    }
+    if (qualityController.__nvExtraQualityPresetsInstalled) {
+      var qualityList = typeof element.querySelector === 'function' &&
+        element.querySelector('.quality-list-box');
+      if (qualityList && qualityList.querySelectorAll('.quality-list-item').length < 6) {
+        digestNativeQuality();
+      }
+      return true;
+    }
+    var qualities = qualityController.Qualities;
+    if (!qualities.Medium || !qualities.High ||
+        typeof qualityController.selectQuality !== 'function' ||
+        typeof qualityController.isActiveQuality !== 'function') return false;
+
+    var recommended = {
+      id: 'NvRecommended',
+      title: 'l10n.oscCaptureRecommended',
+      icon: 'icon-highlights', // NVIDIA nvgcshare glyph uniE955
+      initialFocus: 'false',
+      supported: true
+    };
+    var maximum = {
+      id: 'NvMaximum',
+      title: 'l10n.oscCaptureMaximum',
+      icon: 'icon-high', // NVIDIA nvgcshare glyph uniE917
+      initialFocus: 'false',
+      supported: true
+    };
+    var selectOriginal = qualityController.selectQuality;
+    var activeOriginal = qualityController.isActiveQuality;
+    var selectedAlias = null;
+
+    function mappedQuality(choice) {
+      if (choice === recommended) return qualities.Medium;
+      if (choice === maximum) return qualities.High;
+      return choice;
+    }
+    qualityController.selectQuality = function (choice) {
+      var selected = mappedQuality(choice);
+      var alias = choice === recommended || choice === maximum ? choice : null;
+      var result = selectOriginal.call(qualityController, selected);
+      // Do not indicate a successful selection when the NVIDIA controller
+      // rejected it (initializing/disabled). Native quality owns persistence.
+      if (qualityController.settings &&
+          qualityController.settings.quality === selected) selectedAlias = alias;
+      return result;
+    };
+    qualityController.isActiveQuality = function (choice) {
+      var selected = qualityController.settings && qualityController.settings.quality;
+      if (choice === recommended || choice === maximum) {
+        return selectedAlias === choice && selected === mappedQuality(choice);
+      }
+      if (selectedAlias && choice === mappedQuality(selectedAlias) &&
+          selected === choice) return false;
+      return activeOriginal.call(qualityController, choice);
+    };
+    qualities.NvRecommended = recommended;
+    qualities.NvMaximum = maximum;
+    qualityController.__nvExtraQualityPresetsInstalled = true;
+    // ng-repeat reuses the original NVIDIA li template, icon font and focus.
+    // Always schedule the digest on the NVIDIA directive scope itself.
+    digestNativeQuality();
+    return true;
+  }
+
   function initialize() {
     clearLegacyPageLayout();
     if (!videoPage()) return;
@@ -997,6 +887,8 @@
     if (!window.angular) return;
     var resolutionRow = host.querySelector('.resolution-fps.layout-row');
     if (!resolutionRow) return;
+    // Enhance the original NVIDIA quality row, never create a second row.
+    installNativeQualityPresets(host);
     var existing = document.getElementById(panelId);
     if (existing && existing.getAttribute('data-nv-ui-version') === panelVersion &&
         hasSingleCaptureControlPair(resolutionRow)) return;
@@ -1019,16 +911,46 @@
     }).catch(setUnavailableSettings);
   }
 
-  var attempts = 0;
-  var timer = window.setInterval(function () {
-    initialize();
-    attempts += 1;
-    if (document.getElementById(panelId) || attempts >= 120) window.clearInterval(timer);
-  }, 500);
+  var timer = null;
+  function scheduleVideoPageInitialization(limit) {
+    if (timer) window.clearInterval(timer);
+    var attempts = 0;
+    // ui-router can update the URL before it has compiled NVIDIA's video DOM.
+    // Retry on Back/re-entry, not just at first OSC boot.
+    timer = window.setInterval(function () {
+      initialize();
+      attempts += 1;
+      // The native settingsCustomize controller may initialize after Video
+      // panel injection. Keep retrying until its existing ng-repeat owns all
+      // six presets, without rebuilding any original NVIDIA quality button.
+      var nativeHost = document.querySelector('nv-preferences-video #topLevel');
+      var installed = installNativeQualityPresets(nativeHost);
+      var qualityList = nativeHost && nativeHost.querySelector(
+        'settings-customize .quality-list-box');
+      var visibleCount = qualityList ?
+        qualityList.querySelectorAll('.quality-list-item').length : 0;
+      // Never stop only because the controller model has six keys;
+      // require six actually compiled native NVIDIA buttons in the DOM.
+      if ((document.getElementById(panelId) &&
+          installed && visibleCount >= 6) || attempts >= limit) {
+        window.clearInterval(timer);
+        timer = null;
+      }
+    }, 250);
+  }
+  scheduleVideoPageInitialization(120);
   window.addEventListener('hashchange', function () {
     clearLegacyPageLayout();
-    if (videoPage()) initialize();
+    if (videoPage()) scheduleVideoPageInitialization(40);
     else {
+      if (timer) {
+        window.clearInterval(timer);
+        timer = null;
+      }
+      if (runtimeStatusTimer) {
+        window.clearInterval(runtimeStatusTimer);
+        runtimeStatusTimer = null;
+      }
       destroyCaptureControls();
       if (panelScope) {
         panelScope.$destroy();

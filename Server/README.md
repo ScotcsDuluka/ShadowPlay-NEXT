@@ -19,6 +19,8 @@ ShadowPlay's Capture/OSC engine depends on Server uptime.
 Architecture discovery: see the C/4 + C/5 + C/6 v0.1 design (data model, server
 modules, security model). Implemented here: the **C/6 auth/security slice**.
 
+**CBT1 enrollment status update (late 24 October 2026):** General CBT1 applications remain **closed** under `Cbt1:Enabled=false`, while `Cbt1:InviteEnabled=true` enables an independently gated single-use invite workflow for **existing Duluka Account users**. The [CBT1 website](https://nv-cbt.pages.dev/) and local admin approval flow are documented under **CBT1 Invite-only rollout** below. Public native account registration is still disabled; an invite neither creates an account nor grants automatic approval. Do not conflate invite-only acceptance with unrestricted CBT1 signup or a released NEXT installer.
+
 ## Implemented (v0)
 
 - **GitHub OAuth** — Authorization Code + PKCE (S256) + one-time state (10 min TTL),

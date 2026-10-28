@@ -12,6 +12,7 @@ internal sealed class ContainerTestApi
     private readonly TcpListener _listener;
     private readonly Action<string> _log;
     private readonly Action<JsonElement> _publishEvents;
+    private readonly Func<JsonElement, bool> _publishHotkeyEvents;
     private readonly ObsRuntime _obsRuntime;
     private readonly Func<int, long, bool> _markNvGraphicsReady;
     private readonly Func<object> _getNvGraphicsStatus;
@@ -45,11 +46,12 @@ internal sealed class ContainerTestApi
         Func<bool, JsonElement, (int Status, object Response)> forwardRecordCommand,
         Func<(int Status, object Response)> getCaptureDisplays,
         Func<bool, JsonElement, (int Status, object Response)> forwardDisplayCommand,
-        Func<object> getCaptureContract)
+        Func<object> getCaptureContract, Func<JsonElement, bool> publishHotkeyEvents = null)
     {
         _enabled = enabled;
         _log = log;
         _publishEvents = publishEvents;
+        _publishHotkeyEvents = publishHotkeyEvents;
         _obsRuntime = obsRuntime;
         _markNvGraphicsReady = markNvGraphicsReady;
         _getNvGraphicsStatus = getNvGraphicsStatus;
@@ -289,14 +291,9 @@ internal sealed class ContainerTestApi
                         return;
                     }
 
-                    var events = new[]
-                    {
-                        new { name = "/ShadowPlay/v.1.0/Hotkey", data = new { hotkeyId, hotKeyName = name } }
-                    };
-                    using var eventsDocument = JsonDocument.Parse(JsonSerializer.Serialize(events));
-                    _publishEvents?.Invoke(eventsDocument.RootElement.Clone());
-                    _log("[hotkey] " + name + " -> OSC event " + hotkeyId);
-                    Write(stream, 200, new { handled = true, hotkeyId, testMode = _enabled });
+                    var result = HotkeyRequest.Dispatch(name, hotkeyId, request.Headers,
+                        _publishHotkeyEvents, _log, _enabled);
+                    Write(stream, result.Status, result.Response);
                     return;
                 }
 

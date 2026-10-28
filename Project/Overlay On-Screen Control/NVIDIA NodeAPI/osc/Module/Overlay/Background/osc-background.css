@@ -1,0 +1,44 @@
+/* BG-only extension. Layout/control files are owned by the other editor chat. */
+#nv-osc-background{position:fixed;top:0;right:0;bottom:0;left:0;z-index:0;overflow:hidden;pointer-events:none;background:linear-gradient(-45deg,#000,#0a0a0a,#0f1510,#0a0f0a);background-size:400% 400%;animation:nv-osc-bg-gradient var(--nv-osc-bg-gradient-duration,15s) ease infinite}
+#nv-osc-background .nv-osc-bg-glow,#nv-osc-background .nv-osc-bg-specks,#nv-osc-background canvas{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
+#nv-osc-background .nv-osc-bg-glow{background:radial-gradient(circle at 30% 40%,rgba(118,185,0,.08) 0%,transparent 60%),radial-gradient(circle at 70% 60%,rgba(0,212,255,.04) 0%,transparent 60%)}
+#nv-osc-background .nv-osc-bg-specks{background-image:radial-gradient(2px 2px at 20% 30%,rgba(118,185,0,.4),transparent),radial-gradient(2px 2px at 40% 70%,rgba(118,185,0,.3),transparent),radial-gradient(2px 2px at 80% 40%,rgba(0,212,255,.3),transparent),radial-gradient(2px 2px at 90% 80%,rgba(0,212,255,.2),transparent);background-size:200% 200%;animation:nv-osc-bg-float var(--nv-osc-bg-float-duration,20s) linear infinite}
+#nv-osc-background.nv-osc-bg-paused,#nv-osc-background.nv-osc-bg-paused .nv-osc-bg-specks{animation-play-state:paused}
+html.nv-osc-bg-website .nv-osc{background:transparent!important}
+/* Classic uses the same fixed full-screen surface as Website. Rendering it
+   on .nv-osc alone leaves its top-bar / native overlay edges transparent. */
+html.nv-osc-bg-classic #nv-osc-background{background:#000!important;background-size:auto!important;animation:none!important}
+html.nv-osc-bg-classic #nv-osc-background .nv-osc-bg-glow,html.nv-osc-bg-classic #nv-osc-background .nv-osc-bg-specks,html.nv-osc-bg-classic #nv-osc-background canvas{display:none!important}
+html.nv-osc-bg-classic .nv-osc{background:transparent!important}
+/* Fill the available lower screen while retaining the native menu's upper band. */
+.nv-live-editor{position:fixed!important;left:0!important;right:0!important;bottom:0!important;top:448px!important;width:auto!important;max-height:none!important;overflow:auto!important}
+.nv-osc-background-settings{display:block;margin-top:22px;padding-top:20px;border-top:1px solid #41484c}
+.nv-osc-bg-heading{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.nv-osc-bg-heading h3{font-size:16px!important;margin:0 0 6px!important}.nv-osc-bg-heading p{font-size:13px!important;color:#a8afb2}
+.nv-osc-bg-heading .osc-button{box-sizing:border-box;flex:0 0 168px;width:168px;min-width:168px;max-width:168px;height:38px;padding:0 12px;font-size:13px;margin:0 0 0 24px;border-width:3px!important;border-style:solid!important;border-color:transparent;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nv-osc-bg-heading .osc-button-gray:focus{border-color:#76b900}
+.nv-osc-bg-settings-grid{display:flex;flex-wrap:wrap;margin:0 -14px}.nv-osc-bg-field{flex:1 1 220px;min-width:180px;padding:0 14px;box-sizing:border-box}
+.nv-osc-bg-field label{display:flex;align-items:center;justify-content:space-between;color:#fff;font-size:14px;line-height:22px}
+.nv-osc-bg-field output{font-size:13px;color:#b9c1c5;margin-left:12px}.nv-osc-bg-field md-select{margin:6px 0 0}.nv-osc-bg-field md-slider{margin:0}
+.nv-osc-bg-switches{display:flex;align-items:center;flex-wrap:wrap}.nv-osc-bg-switches md-switch{margin:8px 36px 0 0;font-size:14px}
+.nv-osc-bg-error{color:#ffd599!important;font-size:13px!important;margin-top:10px!important}
+/* Native Animation controls share the existing scrollable Settings column.
+   Keep these dimensions local: they do not resize NVIDIA Main-menu tiles. */
+.nv-osc-motion-settings{display:block;box-sizing:border-box;min-width:0;padding:0 0 18px}
+.nv-osc-motion-settings *{box-sizing:border-box}
+.nv-osc-motion-settings .nv-osc-motion-heading{margin-bottom:10px}
+.nv-osc-motion-settings .nv-osc-motion-heading .osc-button{height:38px}
+.nv-osc-motion-bar{display:flex;align-items:center;flex-wrap:wrap;min-width:0;margin-bottom:4px}
+.nv-osc-motion-bar>md-switch{flex:0 0 auto;margin:0 26px 8px 0;min-height:38px}
+.nv-osc-motion-style{flex:0 1 240px;min-width:160px;max-width:100%;margin-bottom:8px}
+.nv-osc-motion-style>label{display:block;color:#fff;font-size:13px;line-height:18px}
+.nv-osc-motion-style>md-select{width:100%;min-width:0;margin:0;min-height:36px}
+.nv-osc-motion-parts{display:flex;align-items:center;flex-wrap:wrap;min-width:0;margin:0 0 12px}
+.nv-osc-motion-parts>md-switch{flex:0 0 auto;min-height:30px;margin:0 24px 6px 0;font-size:13px}
+.nv-osc-motion-settings md-switch .md-container{flex:0 0 36px}
+.nv-osc-motion-settings .nv-osc-motion-timing{margin-top:6px}
+.nv-osc-motion-settings .nv-osc-bg-field md-slider{min-width:0;width:100%;box-sizing:border-box}
+@media(max-width:720px){.nv-osc-motion-settings .nv-osc-motion-heading{align-items:flex-start;flex-wrap:wrap}.nv-osc-motion-settings .nv-osc-motion-heading .osc-button{margin:8px 0 0}.nv-osc-motion-style{flex-basis:100%}}
+@keyframes nv-osc-bg-gradient{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+@keyframes nv-osc-bg-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-20px)}}
+@media(prefers-reduced-motion:reduce){#nv-osc-background,#nv-osc-background .nv-osc-bg-specks{animation:none}}

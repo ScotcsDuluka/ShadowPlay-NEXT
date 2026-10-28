@@ -140,7 +140,7 @@ function fixture(options = {}) {
   const api = window.__dulukaOscMotion; assert(api, 'native adapter API must initialize');
   function emit(collection, type, ...args) { (collection[type] || []).slice().forEach(fn => fn(...args)); }
   return {
-    api, window, document, html, body, overlay, topbar, group, bar, tiles, content, nodes, media, frames, timers, clock, rootScope, asyncQueue,stored,
+    route: dependencies.$state, api, window, document, html, body, overlay, topbar, group, bar, tiles, content, nodes, media, frames, timers, clock, rootScope, asyncQueue,stored,
     emitDocument: (type, ...args) => emit(documentEvents, type, ...args), emitWindow: (type, ...args) => emit(windowEvents, type, ...args),
     emitRoute: (type, ...args) => emit(lifecycle, type, ...args), decorate: delegate => invoke(decorators.oscDisplayService, { $delegate: delegate }),
     flushAsync() { while (asyncQueue.length) asyncQueue.shift()(); }, clones: () => clones, paintCount: () => paintCount,
@@ -220,7 +220,10 @@ test('duplicate closes coalesce instead of dispatching multiple native close cal
   const f = fixture(); open(f); let first = 0, duplicate = 0; f.api.close(() => { first++; }); f.api.close(() => { duplicate++; }); f.clock.settle();
   assert.equal(first, 1); assert.equal(duplicate, 0); assertStopped(f);
 });
-test('rapid commands finish the running curve and settle the latest target without a stale native close', () => {
+test('rapid alternating presses chain through the engine: every curve plays its full ms before the queued intent plays', () => {
+  // User spec 2026-10-27: "เปิด > จบ ปิด > จบ > เปิด > จบ วนได้เรื่อยๆ" — the
+  // engine defers mid-curve commands and auto-reverses at the endpoint, so
+  // alternating presses chain full curves. The latest intent wins per curve.
   const f = fixture(); open(f); let discarded = 0; f.api.close(() => { discarded++; }); f.clock.advance(40);
   const before = json(f.api.getState()); f.api.open(); assert.deepEqual(json(f.api.getState().pose), before.pose);
   assert.equal(f.api.getState().target, 'closed'); assert.equal(f.api.getState().requestedTarget, 'open'); f.clock.settle();
@@ -228,9 +231,9 @@ test('rapid commands finish the running curve and settle the latest target witho
 });
 test('a long burst of opens and closes leaves only the final intent and no steady RAF polling', () => {
   const f = fixture(); let closes = 0; f.api.open();
-  for (let i = 0; i < 40; i++) { f.clock.advance(7); if (i % 2) f.api.open(); else f.api.close(() => { closes++; }); }
+  for (let i = 0; i < 40; i++) { f.clock.advance(7); if (i % 2) f.api.open(); else f.api.close(() => { closes++ }); }
   f.api.open(); f.clock.settle(); assert.equal(closes, 0); assert.equal(f.api.getState().pose.opacity, 1); assertStopped(f);
-  f.api.close(() => { closes++; }); f.clock.settle(); assert.equal(closes, 1); assertStopped(f);
+  f.api.close(() => { closes++ }); f.clock.settle(); assert.equal(closes, 1); assertStopped(f);
 });
 test('cancel releases deferred linking frames and drops obsolete close callbacks', () => {
   const f = fixture(); let closes = 0; f.api.prepareOpen(); f.api.playOpen(); f.api.cancel(); f.clock.settle(); assertStopped(f); assertNativeClean(f);
@@ -269,8 +272,25 @@ test('a reopened overlay suppresses stale close work already queued for Angular 
 });
 test('pending-close reopen does not toggle native open unless explicitly given a route', () => {
   const f = fixture(); let opens = 0, closes = 0; const delegate = f.decorate({ closeOSC() { closes++; }, openOSC() { opens++; } });
-  open(f); delegate.closeOSC(); f.clock.advance(48); delegate.openOSC(); f.clock.settle(); assert.equal(opens, 0); assert.equal(closes, 0); assertStopped(f);
+  open(f); f.route.current.name="main.main-menu"; delegate.closeOSC(); f.clock.advance(48); delegate.openOSC(); f.clock.settle(); assert.equal(opens, 0); assert.equal(closes, 0); assertStopped(f);
   delegate.closeOSC(); f.clock.advance(48); delegate.openOSC('main.gallery'); f.clock.settle(); assert.equal(opens, 1); assert.equal(closes, 0); assertStopped(f);
+});
+test('OPEN from base calls original NVIDIA route even if prior Motion close has not settled', () => {
+  const f = fixture();
+  let originalOpenCalls = 0, originalCloseCalls = 0;
+  const service = f.decorate({
+    closeOSC() { originalCloseCalls++; },
+    openOSC() { originalOpenCalls++; return 'nvidia-route-opened'; }
+  });
+  open(f);
+  service.closeOSC(); f.clock.advance(48);
+  assert.equal(f.api.getState().requestedTarget, 'closed');
+  assert.equal(f.route.current.name, 'base');
+  const result = service.openOSC();
+  assert.equal(originalOpenCalls, 1, 'Angular must receive original NVIDIA openOSC()');
+  assert.equal(result, 'nvidia-route-opened');
+  f.clock.settle();
+  assert.equal(originalCloseCalls, 0, 'stale close callback must be cancelled');
 });
 test('base-to-overlay entry waits for linking and in-overlay Gallery navigation does not replay', () => {
   const f = fixture(), base = { name: 'base' }, main = { name: 'base.main-menu' }, gallery = { name: 'base.gallery.files' };
@@ -358,8 +378,79 @@ test('V2 animation remains unchanged without V4 feature flag',()=>{
   open(f);assert.equal(count,0);
   f.api.cancel();f.clock.settle();assertNativeClean(f);
 });
+test('rapid reopen defers the opening animation until the V5 layout owner can reflow, then animates its geometry',()=>{
+  // Measured live 2026-10-27: a null preflight used to be ignored, so the
+  // entrance ran on stale native geometry and V5 applied mid-motion (~530 ms
+  // jump). The preflight must gate the capture like an uncapturable view.
+  const f=fixture({unified:true});let calls=0,ready=false;
+  f.window.__nvNextLayoutV5={
+    enabled:()=>true,
+    prepareForMotion(root){calls++;assert.equal(root,f.group);return ready?{width:1360,scale:1}:null;}
+  };
+  f.api.prepareOpen();f.api.playOpen();
+  f.clock.frame();f.clock.frame();
+  assert.equal(f.api.getState().phase,'preparing');
+  assert.equal(f.group.hasAttribute('data-nv-motion-group'),false,'must not capture while the owner cannot reflow');
+  f.clock.frame();f.clock.frame();
+  assert.ok(calls>=3,'preflight must be retried instead of animating stale geometry');
+  ready=true;f.clock.frame();
+  assert.equal(f.group.hasAttribute('data-nv-motion-group'),true,'capture runs once the owner reports geometry');
+  assert.equal(f.api.getState().phase,'opening');
+  f.clock.settle();assertStopped(f);assertNativeClean(f);
+});
+test('a layout owner that never becomes ready skips motion instead of animating replaced geometry',()=>{
+  const f=fixture({unified:true});let calls=0;
+  f.window.__nvNextLayoutV5={enabled:()=>true,prepareForMotion(){calls++;return null;}};
+  f.api.prepareOpen();f.api.playOpen();f.clock.settle();
+  assert.ok(calls>=1);
+  assert.equal(f.group.hasAttribute('data-nv-motion-group'),false,'no capture of geometry the owner never applied');
+  assert.equal(f.api.getState().phase,'idle');assertNativeClean(f);assertStopped(f);
+});
+test('stalled V5 preparation releases the queued close even if animation frames stop',()=>{
+  const f=fixture({unified:true});let closes=0;
+  f.window.__nvNextLayoutV5={enabled:()=>true,prepareForMotion(){return null;}};
+  f.api.prepareOpen();f.api.playOpen();f.clock.frame();f.clock.frame();
+  assert.equal(f.api.phase,'preparing');
+  f.api.close(()=>closes++);
+  f.clock.timersOnly(1749);assert.equal(closes,0);
+  f.clock.timersOnly(1);assert.equal(closes,1);
+  assert.equal(f.api.phase,'idle');assertNativeClean(f);assertStopped(f);
+});
+test('a mid-close reopen never cuts the running close; it completes then auto-reverses',()=>{
+  // Live symptom 2026-10-27 ("ปิดไม่จบ"): cancelling a running close whenever
+  // the V5 preflight was not ready snapped the menu back mid-exit. The curve
+  // must always finish; the engine then reverses to the latest intent.
+  const f=fixture({unified:true});let calls=0,ready=true;
+  f.window.__nvNextLayoutV5={enabled:()=>true,prepareForMotion(root){calls++;return ready?{width:1360,scale:1}:null;}};
+  f.api.prepareOpen();f.api.playOpen();
+  f.clock.frame();f.clock.frame();
+  assert.equal(f.api.getState().phase,'opening');
+  ready=false;f.api.close(()=>{});f.clock.frame();f.clock.frame();
+  assert.equal(f.api.getState().phase,'opening','the running curve must finish first');
+  f.api.open();
+  assert.equal(f.api.getState().requestedTarget,'open','the latest press replaces the queued intent');
+  f.clock.settle();
+  assert.equal(f.api.getState().target,'open');assertNativeClean(f);assertStopped(f);
+});
+test('a route change during a close cancels the transition so the next open starts fresh',()=>{
+  // Route changes cancel through the motion $stateChangeSuccess handler — the
+  // only sanctioned way a destroyed view stops being animated.
+  const f=fixture({unified:true});
+  f.window.__nvNextLayoutV5={enabled:()=>true,prepareForMotion(){return {width:1360,scale:1};}};
+  f.api.prepareOpen();f.api.playOpen();
+  f.clock.frame();f.clock.frame();
+  assert.equal(f.api.getState().phase,'opening');
+  f.api.close(()=>{});f.clock.frame();f.clock.frame();
+  assert.equal(f.api.getState().requestedTarget,'closed');
+  f.route.current.name='base';
+  f.emitRoute('$stateChangeSuccess',{},f.route.current);
+  f.clock.settle();
+  assert.equal(f.api.getState().phase,'idle');assertNativeClean(f);assertStopped(f);
+});
 
 test('Default delegates original NVIDIA open/close without OSC transforms or synthetic animation delays',()=>{
+  // unified:true supplies the real native menu node the V5 owner would find;
+  // the live page always has it once the route mounts.
   const f=fixture({motionSettings:{mode:'default'},unified:true}),calls=[];
   let preflights=0;
   f.window.__nvNextLayoutV5={enabled:()=>true,prepareForMotion(){preflights++;}};

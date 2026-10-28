@@ -1,0 +1,32 @@
+[
+  {
+    "url": "http://127.0.0.1:59077/health",
+    "status": 200,
+    "body": "{\"ok\":true,\"engine\":\"NvCapture\",\"ready\":true,\"recording\":false}"
+  },
+  {
+    "url": "http://127.0.0.1:59077/state",
+    "status": 200,
+    "body": "{\"ready\":true,\"nativeRuntimeReady\":true,\"failReason\":\"\",\"recording\":false,\"enabled\":false,\"actualSessionBackend\":\"\",\"elapsedSec\":0,\"outputPath\":\"\",\"lastFile\":\"\"}"
+  },
+  {
+    "url": "http://127.0.0.1:59077/engines",
+    "status": 200,
+    "body": "{\"schemaVersion\":2,\"readOnly\":true,\"configured\":{\"backend\":\"FFmpeg\",\"captureApi\":\"ddagrab\",\"encoder\":\"h264_nvenc\",\"allowed\":true,\"error\":\"\"},\"actualSessionBackend\":\"\",\"nativeRuntimeReady\":true,\"nativeRuntimeCodec\":\"NVENC_H264\",\"ffmpegBinary\":{\"binaryRunnable\":true,\"version\":\"ffmpeg version N-123522-gac4d50cb26-20260317 Copyright (c) 2000-2026 the FFmpeg developers\",\"captureApis\":[\"ddagrab\",\"gdigrab\",\"gfxcapture\"],\"encoders\":[\"av1_nvenc\",\"h264_amf\",\"h264_nvenc\",\"h264_qsv\",\"hevc_amf\",\"hevc_nvenc\",\"hevc_qsv\",\"libx264\",\"libx265\"],\"reason\":\"\",\"nvencSyntheticValidation\":{\"status\":\"not_run\",\"reason\":\"not_verified_for_this_binary\",\"gpuCount\":0,\"testedAtUtc\":\"\",\"results\":[]},\"hardwareEncoderVerified\":false},\"recording\":false,\"otherProvidersReady\":false}"
+  },
+  {
+    "url": "http://127.0.0.1:59012/v1/capture/status",
+    "status": 200,
+    "body": "{\"schemaVersion\":1,\"source\":\"NvCapture\",\"runtimeEnabled\":true,\"startOutcomeUnresolved\":false,\"stopOutcomeUnresolved\":false,\"availability\":\"Available\",\"workerReady\":true,\"startupPhase\":\"Ready\",\"startupGraceSeconds\":30,\"engineEvidenceAvailable\":true,\"runtimeReady\":false,\"recording\":false,\"stateContract\":\"current\",\"actualSessionBackend\":\"\",\"replay\":{\"availability\":\"Unavailable\",\"commandSupported\":false},\"screenshot\":{\"availability\":\"Unavailable\",\"commandSupported\":false},\"health\":{\"ok\":true,\"engine\":\"NvCapture\",\"ready\":true,\"recording\":false},\"state\":{\"ready\":true,\"nativeRuntimeReady\":true,\"failReason\":\"\",\"recording\":false,\"enabled\":false,\"actualSessionBackend\":\"\",\"elapsedSec\":0,\"outputPath\":\"\",\"lastFile\":\"\"},\"healthError\":null,\"stateError\":null}"
+  },
+  {
+    "url": "http://127.0.0.1:59011/DulukaCapture/v.1.0/status",
+    "status": 200,
+    "body": "{\"enabled\":true,\"ready\":true,\"recording\":false}"
+  },
+  {
+    "url": "http://127.0.0.1:59011/DulukaCapture/v.1.0/engines",
+    "status": 200,
+    "body": "{\"schemaVersion\":1,\"readOnly\":true,\"selectionLocked\":true,\"policyValid\":true,\"policyError\":\"\",\"captureRuntimeEnabled\":true,\"captureRuntimeReady\":true,\"availability\":\"Available\",\"workerTruthAvailable\":true,\"workerError\":\"\",\"actualSessionBackend\":\"\",\"recording\":false,\"selected\":{\"captureId\":\"duluka:dxgi\",\"encoderId\":\"nvidia:nvenc-h264\",\"policyOnly\":true},\"workerRuntime\":{\"schemaVersion\":2,\"readOnly\":true,\"configured\":{\"backend\":\"FFmpeg\",\"captureApi\":\"ddagrab\",\"encoder\":\"h264_nvenc\",\"allowed\":true,\"error\":\"\"},\"actualSessionBackend\":\"\",\"nativeRuntimeReady\":true,\"nativeRuntimeCodec\":\"NVENC_H264\",\"ffmpegBinary\":{\"binaryRunnable\":true,\"version\":\"ffmpeg version N-123522-gac4d50cb26-20260317 Copyright (c) 2000-2026 the FFmpeg developers\",\"captureApis\":[\"ddagrab\",\"gdigrab\",\"gfxcapture\"],\"encoders\":[\"av1_nvenc\",\"h264_amf\",\"h264_nvenc\",\"h264_qsv\",\"hevc_amf\",\"hevc_nvenc\",\"hevc_qsv\",\"libx264\",\"libx265\"],\"reason\":\"\",\"nvencSyntheticValidation\":{\"status\":\"not_run\",\"reason\":\"not_verified_for_this_binary\",\"gpuCount\":0,\"testedAtUtc\":\"\",\"results\":[]},\"hardwareEncoderVerified\":false},\"recording\":false,\"otherProvidersReady\":false},\"workflows\":{\"record\":{\"owner\":\"NvCapture\",\"transport\":\"capture_rest\",\"wired\":true,\"runtimeVerified\":false},\"replay\":{\"owner\":\"NvCapture\",\"transport\":\"not_verified\",\"wired\":false,\"runtimeVerified\":false},\"screenshot\":{\"owner\":\"NvCapture\",\"transport\":\"not_verified\",\"wired\":false,\"runtimeVerified\":false}},\"providers\":[{\"id\":\"Duluka\",\"captureApis\":[],\"encoders\":[\"NVENC_H264\"],\"codecs\":[\"NVENC_H264\"],\"routeWired\":true,\"capabilityVerified\":false,\"hardwareVerified\":false,\"capabilitySource\":\"capture_runtime\",\"runtimeReady\":true,\"note\":\"NvCapture reports an initialized native capture codec.\"},{\"id\":\"FFmpeg\",\"captureApis\":[\"ddagrab\",\"gdigrab\",\"gfxcapture\"],\"encoders\":[\"av1_nvenc\",\"h264_amf\",\"h264_nvenc\",\"h264_qsv\",\"hevc_amf\",\"hevc_nvenc\",\"hevc_qsv\",\"libx264\",\"libx265\"],\"codecs\":[],\"routeWired\":true,\"capabilityVerified\":true,\"capabilitySource\":\"capture_runtime\",\"runtimeReady\":false,\"hardwareVerified\":false,\"hardwareEncoderVerified\":false,\"note\":\"Capture-reported FFmpeg binary capabilities; hardware codecs still require a live start test.\"},{\"id\":\"OBS\",\"captureApis\":[],\"encoders\":[],\"codecs\":[],\"routeWired\":false,\"capabilityVerified\":false,\"hardwareVerified\":false,\"capabilitySource\":\"unimplemented\",\"runtimeReady\":false,\"note\":\"OBS integration does not implement the worker recording route.\"},{\"id\":\"NVIDIA\",\"captureApis\":[],\"encoders\":[],\"codecs\":[],\"routeWired\":false,\"capabilityVerified\":false,\"hardwareVerified\":false,\"capabilitySource\":\"unimplemented\",\"runtimeReady\":false,\"note\":\"NvFBC capture is not implemented in NvCapture.\"}]}"
+  }
+]

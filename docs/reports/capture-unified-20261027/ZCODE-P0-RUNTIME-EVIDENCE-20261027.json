@@ -1,0 +1,95 @@
+﻿{
+    "capturedAtUtc":  "2026-10-26T20:20:14.7612252Z",
+    "host":  "AORUS-DESKTOP",
+    "gitHead":  "e63b52544a1dd54e51e9d75f2099c808f8a2e392",
+    "branch":  "Stable",
+    "productionWorker":  {
+                             "health":  {
+                                            "ok":  true,
+                                            "engine":  "NvCapture",
+                                            "ready":  true,
+                                            "recording":  false
+                                        },
+                             "state":  {
+                                           "ready":  true,
+                                           "nativeRuntimeReady":  true,
+                                           "failReason":  "",
+                                           "recording":  false,
+                                           "enabled":  false,
+                                           "actualSessionBackend":  "",
+                                           "elapsedSec":  0,
+                                           "outputPath":  "",
+                                           "lastFile":  ""
+                                       }
+                         },
+    "controlPlane":  {
+                         "containerStatus":  {
+                                                 "schemaVersion":  1,
+                                                 "source":  "NvCapture",
+                                                 "runtimeEnabled":  true,
+                                                 "startOutcomeUnresolved":  false,
+                                                 "stopOutcomeUnresolved":  false,
+                                                 "availability":  "Available",
+                                                 "workerReady":  true,
+                                                 "startupPhase":  "Ready",
+                                                 "startupGraceSeconds":  30,
+                                                 "engineEvidenceAvailable":  true,
+                                                 "runtimeReady":  false,
+                                                 "recording":  false,
+                                                 "stateContract":  "current",
+                                                 "actualSessionBackend":  "",
+                                                 "replay":  {
+                                                                "availability":  "Unavailable",
+                                                                "commandSupported":  false
+                                                            },
+                                                 "screenshot":  {
+                                                                    "availability":  "Unavailable",
+                                                                    "commandSupported":  false
+                                                                },
+                                                 "health":  {
+                                                                "ok":  true,
+                                                                "engine":  "NvCapture",
+                                                                "ready":  true,
+                                                                "recording":  false
+                                                            },
+                                                 "state":  {
+                                                               "ready":  true,
+                                                               "nativeRuntimeReady":  true,
+                                                               "failReason":  "",
+                                                               "recording":  false,
+                                                               "enabled":  false,
+                                                               "actualSessionBackend":  "",
+                                                               "elapsedSec":  0,
+                                                               "outputPath":  "",
+                                                               "lastFile":  ""
+                                                           },
+                                                 "healthError":  null,
+                                                 "stateError":  null
+                                             },
+                         "nodeApiStatus":  {
+                                               "enabled":  true,
+                                               "ready":  true,
+                                               "recording":  false
+                                           }
+                     },
+    "deployedBinarySha256":  {
+                                 "NvCapture.dll":  "DE04FDBB1936B6A45FA1770574D0F574AD9F1C3AA03C12826FB6860EF2E1CE76",
+                                 "NvCapture.exe":  "C2EF9AE9BB769C1501DAEF7FE3971E4EBF90CF8A4499EF86D637DBAEE742D27E",
+                                 "NvContainer.dll":  "D17E2A56A815E83F64F18044C42CC3FF1C57C285768CF3EBC5305A219B962DF0",
+                                 "NvContainer.exe":  "D3A59BABFF6D19D3D080BA538D071773F333120B601DD2844FDEFA0FEAD4E709"
+                             },
+    "currentBuildSha256":  {
+                               "NvCapture.dll":  "5B687DEAB84E0601463D2F308B1F18CE4B3C4345095EB08FDFA0F56ECF549E75",
+                               "NvCapture.exe":  "BA18913C59FFEEE9059C5503B45A6491843EB8A8AAFF8471C752EE130B2CD1D7",
+                               "DulukaEngine.Recording.dll":  "96C8A559162305B0447A56B0E1C204C2C136840CFACCD55F9190C85DD0C50D74"
+                           },
+    "buildManifest":  {
+                          "sourceSha256":  "7AD1108BB5180E3F43EFA29A3DC96B809AD49F6E8C1B1DFAFF975997AD8D7F23",
+                          "buildUtc":  "2026-10-26T20:08:55.5295621Z",
+                          "nativeQsvPackaged":  false,
+                          "hardwareVerified":  false,
+                          "mediaVerified":  false,
+                          "deployed":  false,
+                          "stagedFileCount":  41
+                      }
+}

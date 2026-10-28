@@ -1,0 +1,77 @@
+<Solution>
+  <Folder Name="/Composition.Tests/">
+    <Project Path="Composition.Tests/CaptureComposition.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/" />
+  <Folder Name="/Duluka Capture/Audio/">
+    <Project Path="Duluka Capture/Audio/DulukaEngine.Audio.Wasapi/DulukaEngine.Audio.Wasapi.csproj" />
+    <Project Path="Duluka Capture/Audio/DulukaEngine.Audio/DulukaEngine.Audio.csproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/Core/">
+    <Project Path="Duluka Capture/Core/DulukaEngine/DulukaEngine.vbproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/Encoding/">
+    <Project Path="Duluka Capture/Encoding/DulukaEngine.Encoder/DulukaEngine.Encoder.vbproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/Encoding/Intel/">
+    <Project Path="Duluka Capture/Encoding/Intel/DulukaEngine.Encoder.Qsv/DulukaEngine.Encoder.Qsv.csproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/Encoding/NVENC/">
+    <Project Path="Duluka Capture/Encoding/NVENC/DulukaEngine.Encoder.Nvenc/DulukaEngine.Encoder.Nvenc.vbproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/Recording/">
+    <Project Path="Duluka Capture/Recording/DulukaEngine.Recording/DulukaEngine.Recording.vbproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/Recording/Backends/" />
+  <Folder Name="/Duluka Capture/Recording/Backends/FFmpeg/">
+    <Project Path="Duluka Capture/Recording/Backends/FFmpeg/DulukaEngine.FFmpegBackend/DulukaEngine.FFmpegBackend.vbproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/Recording/Media/">
+    <Project Path="Duluka Capture/Recording/Media/DulukaEngine.Media/DulukaEngine.Media.vbproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/Tests/" />
+  <Folder Name="/Duluka Capture/Tests/Configuration/">
+    <Project Path="Duluka Capture/Tests/Configuration/DulukaEngine.ConfigTests/DulukaEngine.ConfigTests.vbproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/Tests/Contracts/">
+    <Project Path="Duluka Capture/Tests/Contracts/DulukaEngine.FrameContractTests/DulukaEngine.FrameContractTests.vbproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/Tests/Core/">
+    <Project Path="Duluka Capture/Tests/Core/DulukaEngine.Tests/DulukaEngine.Tests.vbproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/Tests/Encoder/">
+    <Project Path="Duluka Capture/Tests/Encoder/DulukaEngine.Encoder.Tests/DulukaEngine.Encoder.Tests.vbproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/Tests/FFmpeg/">
+    <Project Path="Duluka Capture/Tests/FFmpeg/DulukaEngine.FFmpegTests/DulukaEngine.FFmpegTests.vbproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/Tests/Recording/">
+    <Project Path="Duluka Capture/Tests/Recording/DulukaEngine.Recording.Tests/DulukaEngine.Recording.Tests.vbproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/Tests/Video/">
+    <Project Path="Duluka Capture/Tests/Video/B1WorkerQuiescence.Tests/B1WorkerQuiescence.Tests.vbproj" />
+    <Project Path="Duluka Capture/Tests/Video/DulukaEngine.Video.Tests/DulukaEngine.Video.Tests.vbproj" />
+    <Project Path="Duluka Capture/Tests/Video/I3DFrame.Tests/I3DFrame.Tests.csproj" />
+    <Project Path="Duluka Capture/Tests/Video/I3DWorker.Tests/I3DWorker.Tests.vbproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/Tools/">
+    <Project Path="Duluka Capture/Tools/DulukaEngine.Recording.ConsoleDriver/DulukaEngine.Recording.ConsoleDriver.vbproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/Video/" />
+  <Folder Name="/Duluka Capture/Video/Contracts/">
+    <Project Path="Duluka Capture/Video/Contracts/DulukaEngine.Video/DulukaEngine.Video.vbproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/Video/DXGI Desktop Duplication/">
+    <Project Path="Duluka Capture/Video/DXGI Desktop Duplication/DulukaEngine.Video.DXGI/DulukaEngine.Video.DXGI.vbproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/Video/Transport/">
+    <Project Path="Duluka Capture/Video/Transport/DulukaEngine.Video.Transport.D3D11/DulukaEngine.Video.Transport.D3D11.csproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/Video/Windows Graphics Capture/">
+    <Project Path="Duluka Capture/Video/Windows Graphics Capture/WgcCapture/WgcCapture.csproj" />
+  </Folder>
+  <Project Path="AudioOffline.Tests/AudioOffline.Tests.csproj" />
+  <Project Path="DisplaySelection.Tests/DisplaySelection.Tests.vbproj" />
+  <Project Path="HardwareReadiness.Tests/HardwareReadiness.Tests.csproj" />
+  <Project Path="LegacyCompletion.Tests/LegacyCompletion.Tests.csproj" />
+</Solution>

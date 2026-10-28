@@ -44,6 +44,9 @@ namespace
     std::atomic<std::uint64_t> g_compositionMaxTicks{ 0 };
     std::atomic<std::uint64_t> g_cpuDraws{ 0 };
     std::atomic<std::uint64_t> g_gpuExDraws{ 0 };
+    // Count only confirmed empty CPU frames skipped AFTER D3D9 game GPU
+    // identity has already been published through the ordinary renderer path.
+    std::atomic<std::uint64_t> g_emptyFramePresentSkips{ 0 };
 
     void RecordPipelineInterval(const LARGE_INTEGER start,
         const LARGE_INTEGER end, std::atomic<std::uint64_t> &samples,
@@ -691,6 +694,43 @@ namespace
 }
 namespace duluka::d3d9
 {
+    // No new identity probing or D3D9 device state changes are allowed here.
+    // The FIRST Present must go through DrawOverlay to publish the real game
+    // adapter. Only skip subsequent COM backbuffer requests when the CPU
+    // mapping is stable and EXPLICITLY advertises frameNumber=0 (hidden).
+    // If a producer begins publishing, the next Present takes the old path.
+    static bool HasConfirmedEmptyCpuFrameLocked(IDirect3DDevice9 *device) noexcept
+    {
+        // Another renderer can replace the shared identity while this device
+        // stays cached. Let the ordinary path repair it before skipping work.
+        const auto adapterLuid = g_adapterLuid.load(std::memory_order_acquire);
+        if (!device || g_identityDevice != device ||
+            !adapterLuid || !g_consumerInfo ||
+            g_consumerInfo->magic != osc_frame_bridge::ConsumerAdapterMagic ||
+            g_consumerInfo->version != osc_frame_bridge::ConsumerAdapterVersion ||
+            InterlockedCompareExchange(&g_consumerInfo->ownerProcessId, 0, 0) !=
+                static_cast<LONG>(GetCurrentProcessId()) ||
+            static_cast<std::uint64_t>(InterlockedCompareExchange64(
+                &g_consumerInfo->adapterLuid, 0, 0)) != adapterLuid ||
+            InterlockedCompareExchange(&g_consumerInfo->renderApi, 0, 0) !=
+                static_cast<LONG>(osc_frame_bridge::ConsumerRenderApiD3D9) ||
+            !g_frame ||
+            g_frame->magic != osc_frame_bridge::D3D9FrameMagic ||
+            g_frame->version != osc_frame_bridge::D3D9FrameVersion ||
+            g_exGpuTexture || g_exPendingTexture ||
+            g_cachedFrameNumber || g_uploadedFrameNumber)
+            return false;
+        const LONG before = g_frame->sequence;
+        if (before & 1)
+            return false; // producer currently mutating frame metadata
+        MemoryBarrier();
+        const LONG producerPid = g_frame->ownerProcessId;
+        const auto frameNumber = g_frame->frameNumber;
+        MemoryBarrier();
+        return before == g_frame->sequence && producerPid > 0 &&
+            frameNumber == 0;
+    }
+
     void OnPresent(IDirect3DDevice9 *device)
     {
         if (!device) return;
@@ -699,6 +739,15 @@ namespace duluka::d3d9
         if (!lock.owns_lock())
         {
             g_busyFrameSkips.fetch_add(1, std::memory_order_relaxed);
+            return;
+        }
+        // GPU-only Windowed DComp has retired the CPU frame. In that precise
+        // state, querying even the game's backbuffer is unnecessary and can
+        // perturb D3D9 frame pacing. Do not repeat the earlier unsafe fastpath
+        // that called PublishConsumerAdapter while bypassing normal rendering.
+        if (HasConfirmedEmptyCpuFrameLocked(device))
+        {
+            g_emptyFramePresentSkips.fetch_add(1, std::memory_order_relaxed);
             return;
         }
         // Present may leave an offscreen render target bound. Compose to the
@@ -947,6 +996,17 @@ namespace duluka::d3d9
         if(g_consumerInfo){UnmapViewOfFile(g_consumerInfo);g_consumerInfo=nullptr;}
         if(g_consumerMapping){CloseHandle(g_consumerMapping);g_consumerMapping=nullptr;}
     }
+}
+
+#if defined(_M_IX86)
+#pragma comment(linker, "/EXPORT:NvOscAdapterGetD3D9EmptyFrameSkips=_NvOscAdapterGetD3D9EmptyFrameSkips@4")
+#endif
+extern "C" __declspec(dllexport) BOOL WINAPI NvOscAdapterGetD3D9EmptyFrameSkips(
+    std::uint64_t *skips) noexcept
+{
+    if (!skips) return FALSE;
+    *skips = g_emptyFramePresentSkips.load(std::memory_order_relaxed);
+    return TRUE;
 }
 
 #if defined(_M_IX86)

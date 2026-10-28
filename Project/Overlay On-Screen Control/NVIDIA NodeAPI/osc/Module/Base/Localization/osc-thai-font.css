@@ -1,0 +1,38 @@
+/*
+ * Global OSC language typography (CEF/Chromium 73 compatible).
+ *
+ * Every text surface under osc/index.html uses MiSansThai when th-TH is active,
+ * including Angular-generated menus, Material dialogs, notifications, and mods.
+ * Glyph icons are deliberately EXCLUDED. Do not apply font-family to ::before
+ * or ::after; NVIDIA's own icon rules retain nvgcshare and other glyph fonts.
+ *
+ * Selecting a non-Thai language removes the override automatically.
+ */
+@font-face {
+  font-family: 'MiSansThaiOSC';
+  src: url('/MiSansThai.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'MiSansThaiOSC';
+  src: url('/MiSansThai.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Apply globally rather than keeping an incomplete list of page selectors.
+ * Repeated :not(single-selector) works with Chromium 73 (CEF used by OSC).
+ * Exclusions cover NVIDIA md-icon/share-icon and alternate icon systems.
+ */
+html[lang="th"] body,
+html[lang="th"] body *:not(md-icon):not(i):not(svg):not(path):not(use):not(symbol):not(.share-icon):not(.nv-flex-icon):not(.osc-tile-icon):not(.material-icons):not(.nvgcshare):not([class^="icon-"]):not([class*=" icon-"]):not([class^="icon48"]):not([class*=" icon48"]):not([class^="glyphicon"]):not([class*=" glyphicon"]):not([class^="fa-"]):not([class*=" fa-"]) {
+  font-family: 'MiSansThaiOSC', 'Segoe UI', Arial, sans-serif !important;
+}
+
+/* Preserve original font for every icon. Existing NVIDIA CSS still controls
+ * icon font-family, glyphs, dimensions, animations, and pseudo-elements.
+ * In particular, DO NOT set font-family on .share-icon or md-icon here.
+ */

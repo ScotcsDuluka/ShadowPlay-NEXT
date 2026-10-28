@@ -58,12 +58,21 @@ Namespace DulukaEngine.Video.Backends.Ddagrab
         Implements IVideoCaptureBackend
         Implements IVideoBackendDiagnostics
         Implements IVideoCaptureRuntime
+        Implements IVideoCaptureTerminalHealth
 
         ' ---- backend state ----
         Private ReadOnly _sync As New Object()
         Private ReadOnly _logger As EngineLogger
 
         Private _state As DdagrabBackendState = DdagrabBackendState.Created
+        Private _terminalFault As String = ""
+        Public ReadOnly Property TerminalFault As String Implements IVideoCaptureTerminalHealth.TerminalFault
+            Get
+                SyncLock _sync
+                    Return _terminalFault
+                End SyncLock
+            End Get
+        End Property
         Private _disposed As Boolean = False
         ' B1: exactly one native cleanup owner. A Dispose timeout quarantines
         ' resources until the worker confirms quiescence at its exit tail.

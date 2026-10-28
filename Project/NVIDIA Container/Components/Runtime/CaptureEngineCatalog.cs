@@ -123,6 +123,18 @@ internal static class CaptureEngineCatalog
             // Configured live engine always comes from workerRuntime.configured.
             selected = configValid ? new { captureId = "duluka:dxgi",
                              encoderId = "nvidia:nvenc-h264", policyOnly = true } : null,
+            controllerPolicyMatchesWorker = hasWorker && configValid ?
+                (bool?)(Text(configured, "backend") == "Duluka" &&
+                    Text(configured, "captureApi") == "dxgi_desktop_duplication" &&
+                    Text(configured, "encoder") == "NVENC_H264") : null,
+            effectiveSelection = hasWorker ? (JsonElement?)configured : null,
+            requestedConfiguration = hasWorker && Field(worker, "requestedConfiguration").ValueKind == JsonValueKind.Object
+                ? (JsonElement?)Field(worker, "requestedConfiguration") : null,
+            savedConfiguration = hasWorker && Field(worker, "savedConfiguration").ValueKind == JsonValueKind.Object
+                ? (JsonElement?)Field(worker, "savedConfiguration") : null,
+            actualRunningEngine = hasWorker ? Text(worker, "actualRunningEngine") : "",
+            verification = hasWorker && Field(worker, "verification").ValueKind == JsonValueKind.Object
+                ? (JsonElement?)Field(worker, "verification") : null,
             workerRuntime = hasWorker ? workerRuntime : null,
             workflows = new
             {
@@ -176,7 +188,7 @@ internal static class CaptureEngineCatalog
                     encoders = Array.Empty<string>(), codecs = Array.Empty<string>(),
                     routeWired = false, capabilityVerified = false, hardwareVerified = false,
                     capabilitySource = "unimplemented", runtimeReady = false,
-                    note = "NvFBC capture is not implemented in NvCapture."
+                    note = "Installed NVIDIA recorder ownership is separate from native NVENC. Its recording status is not attested; NvFBC capture is not implemented."
                 }
             }
         };

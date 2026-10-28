@@ -1,0 +1,47 @@
+[
+  {
+    "Name": "NvGraphics.exe",
+    "ProcessId": 41824,
+    "ExecutablePath": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Graphics\\NvGraphics.exe"
+  },
+  {
+    "Name": "NvCapture.exe",
+    "ProcessId": 42992,
+    "ExecutablePath": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\NvCapture.exe"
+  },
+  {
+    "Name": "NVIDIA Web Helper.exe",
+    "ProcessId": 30728,
+    "ExecutablePath": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\Overlay On-Screen Control\\NVIDIA NodeAPI\\NVIDIA Web Helper.exe"
+  },
+  {
+    "Name": "nvsphelper.exe",
+    "ProcessId": 31116,
+    "ExecutablePath": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Container\\nvsphelper.exe"
+  },
+  {
+    "Name": "NvNode.exe",
+    "ProcessId": 17816,
+    "ExecutablePath": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\Overlay On-Screen Control\\NVIDIA NodeAPI\\NvNode.exe"
+  },
+  {
+    "Name": "NvContainer.exe",
+    "ProcessId": 9848,
+    "ExecutablePath": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Container\\NvContainer.exe"
+  },
+  {
+    "Name": "NVIDIA OSC.exe",
+    "ProcessId": 26380,
+    "ExecutablePath": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\Overlay On-Screen Control\\NVIDIA OSC\\NVIDIA OSC.exe"
+  },
+  {
+    "Name": "NVIDIA OSC.exe",
+    "ProcessId": 35080,
+    "ExecutablePath": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\Overlay On-Screen Control\\NVIDIA OSC\\NVIDIA OSC.exe"
+  },
+  {
+    "Name": "NVIDIA OSC.exe",
+    "ProcessId": 43508,
+    "ExecutablePath": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\Overlay On-Screen Control\\NVIDIA OSC\\NVIDIA OSC.exe"
+  }
+]

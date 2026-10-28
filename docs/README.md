@@ -1,6 +1,6 @@
 # ShadowPlay NEXT — documentation index
 
-**Refreshed: 24 October 2026.** The repo is changing quickly. This index points to **current ownership and source contracts** first; a dated test report is evidence of its **own revision only**, never proof of an entire deployed build.
+**Refreshed: 25 October 2026.** The repo is changing quickly. This index points to **current ownership and source contracts** first; a dated test report is evidence of its **own revision only**, never proof of an entire deployed build.
 
 ## Start here — current source ownership
 
@@ -9,14 +9,34 @@
 | Project overview | [English README](../README.md) · [README ภาษาไทย](../README.th.md) | CBT1 preparation does not mean a published NEXT installer. |
 | Project directory map | [PROJECT-MAP.md](../Project/PROJECT-MAP.md) | Source / staged Build / running program / GitHub may differ. |
 | Launcher / Core Modules | [Launcher](../Project/Launcher.Cef/README.md) · [read-only Server contract](../Project/Launcher.Cef/Modules/CORE-CATALOG-SERVER-CONTRACT.md) | 11 Core components are read-only; add-ons currently empty; Server catalog API not connected. |
-| NVIDIA Capture | [Capture](../Project/NVIDIA%20Capture/README.md) · [Duluka Capture](../Project/NVIDIA%20Capture/EngineCapture/Duluka%20Capture/README.md) | Worker availability and saved media require runtime proof. |
+| NVIDIA Capture | [Capture architecture — control/media diagrams](../Project/NVIDIA%20Capture/README.md) · [Duluka Capture source map](../Project/NVIDIA%20Capture/EngineCapture/Duluka%20Capture/README.md) | NvCapture owns media; Container relays only. Worker availability and saved files require runtime proof. |
 | NVIDIA Container | [Container](../Project/NVIDIA%20Container/README.md) · [Capture relay contract](../Project/NVIDIA%20Container/CAPTURE-DISPLAY-RELAY-CONTRACT-20261024.md) | Container is a relay/supervisor, not a frame/encoder owner. |
 | NVIDIA Graphics | [GPU profiles](../Project/NVIDIA%20Graphics/README.md) | Preference application differs from observed active renderer. |
 | Native game adapters | [Adapter map](../Project/NVIDIA%20Adapter/README.md) · [OSC Adapter](../Project/NVIDIA%20Adapter/OSC%20Adapter/README.md) | DX9Ex GPU IPC tests are not real-game performance proof. |
 | OSC | [OSC overview](../Project/Overlay%20On-Screen%20Control/README.md) · [Host](../Project/Overlay%20On-Screen%20Control/NVIDIA%20OSC/README.md) · [NodeAPI](../Project/Overlay%20On-Screen%20Control/NVIDIA%20NodeAPI/README.md) · [OSC UI](../Project/Overlay%20On-Screen%20Control/NVIDIA%20NodeAPI/osc/README.md) | CEF frame cadence and game Hook require separate checks. |
 | NVIDIA Config | [Config ownership](../Project/NVIDIA%20Config/README.md) · [CONFIG_OWNERSHIP_MATRIX.md](CONFIG_OWNERSHIP_MATRIX.md) | Never copy secrets into docs or assume a source flag is deployed. |
 | FFmpeg | [Integration directory](../Project/FFmpeg/README.md) | A directory or listed codec is not proof of working hardware encoding. |
-| Duluka Account / tester Portal | [Account Server](../Server/README.md) · [Launcher](../Project/Launcher.Cef/README.md) | Launcher opens an external HTTPS Portal; shared-mode public registration and CBT1 submission remain closed. This is **not** a Core module catalog API. |
+| Duluka Account / tester Portal | [Account Server](../Server/README.md) · [Launcher](../Project/Launcher.Cef/README.md) | Launcher opens an external HTTPS Portal; shared-mode public registration and general CBT1 submissions remain closed; existing-account invite-only submission uses a separate gate. This is **not** a Core module catalog API. |
+
+**Dual-worktree review (25 October):** [AORUS Stable vs MateBook Intel development branch — separate evidence and integration gates](WORKTREE-STATUS-20261025.md). The MateBook I3/I3B work is **not** part of the installed AORUS NVENC/Hook runtime. the MateBook I3-B synthetic suite now reports **2,056/0/33**, followed by I3-C independent synthetic QA **1,938/0/0** (Agent C acceptance recommendation only). B1 quiescence and B2–B8 remain open; live Intel capture stays blocked and no cross-machine merge/deploy was performed.
+
+## 25 October updates — current engineering gates
+
+- **[Duluka Hook source/runtime guide](../Project/NVIDIA%20Adapter/OSC%20Adapter/Duluka%20Hook/README.md)** — Floating Point x86 external D3D9 Windowed GPU *live visual* proof, while game FPS/stutter remains **unverified**; empty-CPU-frame short circuit is a **not-deployed candidate**.
+- **[CEF 73 GPU image delivery](../Project/NVIDIA%20Adapter/OSC%20Adapter/Duluka%20Hook/docs/CEF-FRAME-DELIVERY-2026-10-25-v1.md)** — requested 75/120/240 vs ~60 unique images/s in isolated GPU-pixel measurements, despite more callbacks. A temporary unlimited test reaches ~250 but does **not** obey FPS limits.
+- **[CEF 73 build preparation](../Project/NVIDIA%20Adapter/OSC%20Adapter/Duluka%20Hook/docs/CEF73-BUILD-PREPARATION-2026-10-25-v1.md)** — bounded source patch applied to isolated checkout; compatible VS 2017 toolchain unavailable; no patched CEF binary or production deployment.
+- **[Capture UI v77](../Project/Overlay%20On-Screen%20Control/NVIDIA%20NodeAPI/osc/mods/CAPTURE-UI-REDESIGN-20261025.md)** — Video/Advanced Settings restyling; 32/32 UI checks and partial Advanced CEF acceptance. Live recording/encoder work unchanged and Video Capture CEF geometry still needs acceptance.
+- **[OSC/Backend architecture audit](osc/OSC-BACKEND-FULL-ARCHITECTURE-AUDIT-20261025.md)** — native query/frame lane, NodeAPI, Container, Capture, Gallery and Adapter/Hook separated. [Source route inventory](osc/OSC-BACKEND-ROUTE-INVENTORY-20261025.md) is not a live API availability or authorization certificate.
+
+**Audit scope:** source docs were re-read against 25 October owner reports. Historical UI, Hook and old Capture snapshots remain intentionally dated. Consult [the README inventory](README-COVERAGE-20261024.md) for classification.
+
+## 24 October late updates — source vs runtime
+
+- **[CBT1 invite-only applications](../Server/README.md)**: single-use private codes for existing-account holders, manual admin approval; public account registration and general CBT1 submissions remain closed. [CBT1 website](https://nv-cbt.pages.dev/) is **not** a public NEXT installer or open registration promise.
+- **[Guided ReShade Manager](../Project/Overlay%20On-Screen%20Control/NVIDIA%20NodeAPI/NODEAPI-RESHADE-MANAGER-20261024.md)**: guarded official-Setup link and read-only evidence, no automatic installer/DLL mutation; live CEF click validation still required.
+- **[Hook Transport policy](../Project/Overlay%20On-Screen%20Control/NVIDIA%20OSC/README.md)**: D3D9 windowed GPU preview, D3D9Ex CPU mode selected despite experimental GPU mailbox tests; other native renderers have per-API gates.
+- **[Capture Pipeline Design](UI-CAPTURE-PIPELINE-SIZE-LOCK-20261024.md)**: size-locked preview only, **not** an active or persisted capture engine selector.
+- **ApplicationOntology** local source `C:\My Project\nv-ontology-pages\public\catalog.json` now reports **v1.2.9 / 23 entries**. Its public deployment has not been independently verified.
 
 ## Build, deploy and validation
 
@@ -56,7 +76,7 @@
 - [CONFIG_RUNTIME_CONTRACT.md](CONFIG_RUNTIME_CONTRACT.md) · [CONFIG_OWNERSHIP_MATRIX.md](CONFIG_OWNERSHIP_MATRIX.md) — ownership and runtime settings.
 - [README coverage inventory](README-COVERAGE-20261024.md) — index of first-party README-like files; distinguishes active guides, component notes, and historical experiments.
 
-**Latest README inventory audit (24 October 2026):** 64 indexed first-party files, 202 local Markdown link destinations checked (0 missing), 0 unbalanced fenced blocks; `git diff --check` passed. Launcher Account Portal/Quick UI focused source tests passed 9/9. This does **not** verify any public server login, CBT1 submission, deployed game Hook or recording pipeline.
+**Latest README inventory audit (25 October 2026):** 65 indexed first-party files, 277 local Markdown links checked (0 missing), 0 unbalanced triple-backtick fences. Four selected Source test files passed 50/50 checks (Capture Pipeline UI, Video Settings, Hook Settings, Launcher). This does **not** verify public server login, CBT1 submission, native CEF pixels, D3D9 game FPS or finalized media. The 24 October 33/33 results remain a dated earlier sample.
 
 **Documentation-only changes do not require a Build, deploy, process restart or game attachment.** For any code/runtime change, run the corresponding module tests and the release-specific acceptance gates. Do not merge/push unrelated dirty changes.
 

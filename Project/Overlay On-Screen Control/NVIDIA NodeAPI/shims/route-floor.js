@@ -40,6 +40,7 @@ const FPS = [60, 30];
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
+const hotkeyMonitorState = require('./hotkey-monitor-state').monitorState;
 const SETTINGS_FILE = process.env.NV_SHADOWPLAY_SETTINGS_FILE ||
   path.join(__dirname, '..', 'shadowplay-settings.json');
 const SETTINGS_DEFAULTS = {
@@ -912,7 +913,11 @@ module.exports = function routeFloor(app, io) {
                 message: 'Hotkey monitor requires a boolean enable field' });
               return;
             }
-            state.hotkeyMonitor = enable;
+            const status = hotkeyMonitorState.update(body);
+            if (status !== 200) {
+              res.status(status).json({ type: 'Error', codeText: 'STALE_HOTKEY_MONITOR_SESSION' });
+              return;
+            }
             res.status(200).json({});
             return;
           }

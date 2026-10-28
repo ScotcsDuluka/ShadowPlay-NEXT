@@ -233,8 +233,12 @@
     var list = node.querySelectorAll('video[src],source[src]');
     for (var i = 0; i < list.length; i++) rewrite(list[i]);
   }
+  // The host hot-loader can inject this script as well as index.html. Replace
+  // its previous observer so a reload does not leave multiple watchers active.
+  var previousObserver = window.__nvGalleryMediaObserver;
+  if (previousObserver) previousObserver.disconnect();
   scan(document.documentElement);
-  new MutationObserver(function (changes) {
+  var observer = new MutationObserver(function (changes) {
     for (var i = 0; i < changes.length; i++) {
       var change = changes[i];
       if (change.type === 'attributes') rewrite(change.target);
@@ -250,7 +254,9 @@
         }
       }
     }
-  }).observe(document.documentElement, {
+  });
+  observer.observe(document.documentElement, {
     childList: true, attributes: true, attributeFilter: ['src'], subtree: true
   });
+  window.__nvGalleryMediaObserver = observer;
 })();

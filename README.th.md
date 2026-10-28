@@ -177,6 +177,27 @@
 
 ระบบ QSV บน MateBook มี Private ABI **3** และผลตรวจ Color Metadata BT.709 Limited/Full สำหรับไฟล์ Synthetic ที่ทดสอบแล้ว แต่ **B1 Worker Lifecycle ยังมีประเด็น State Race ที่ต้องตรวจ และ B2–B8 ยังไม่ปิด**; ส่วน `intel_native_live_input_not_verified` ยังคงล็อก Live Desktop Capture ไว้ ไม่เกี่ยวกับการ Deploy NVENC บน AORUS ดู [Capture MateBook](Project/NVIDIA%20Capture/README.md) และ [สถานะสอง Worktree](docs/WORKTREE-STATUS-20261025.md)
 
+### AORUS historical source notes (2026-10-25)
+
+## อัปเดตสถานะวิศวกรรม — 25 ตุลาคม 2569
+
+ข้อมูลต่อไปนี้เป็น **หลักฐานใหม่กว่าตารางสถานะ 24 ตุลาคมด้านบน** โดยต้องแยก **Source / Build / Runtime / CEF จริง / FPS เกมจริง** ออกจากกัน
+
+| ระบบ | หลักฐานล่าสุด | สิ่งที่ยังไม่ผ่าน |
+|---|---|---|
+| **D3D9 Hook เกมจริง** | เห็นภาพ Overlay ผ่านเส้นทาง **Windowed GPU DWM/DirectComposition** ในเกม *Floating Point* x86 แล้ว และ Native Fixture ผ่าน ส่วนโค้ดลดงานบนเฟรม D3D9 CPU ว่างเป็นเพียง **Candidate ทดสอบผ่าน ยังไม่ได้ Deploy** | ยังไม่รับรอง Hook Mode 60 FPS นิ่ง ๆ; ต้องวัด Present p50/p95/p99, 1% low, อาการกระตุก, Fullscreen และวงจรปิด/ถอด Hook |
+| **CEF 73 Frame Delivery** | การอ่านพิกเซลจาก GPU Texture ใน Fixture พบภาพใหม่ราว **60 ภาพ/วินาที** แม้สั่ง 75/120/240 FPS; Callback มากขึ้นไม่ได้แปลว่าภาพใหม่เพิ่ม ส่วน Flag แบบ Unlimited ในการทดลองได้ราว 250 ภาพ/วินาที แต่คุมเพดานไม่ได้ | มี Patch แบบจำกัดอัตราที่ Checkout Source แยก แต่ **Build ไม่สำเร็จเพราะขาด Toolchain VS 2017 ที่เข้ากันได้** ยังไม่ได้สร้าง/ติดตั้ง CEF ที่ Patch และไม่ใช่หลักฐานว่าเกมรันได้ 240 FPS |
+| **Capture UI v77** | ปรับ Video Capture และ Advanced Capture ให้ใช้ NVIDIA Material components เดิม และแยก Preview/Live Controls; รายงานทดสอบ UI **32/32** พร้อมตรวจ Asset Source/Build ตรงกัน และตรวจ Geometry หน้า Advanced บน CEF บาง Viewport | หน้า Video Capture ยังไม่ผ่านภาพ/ตำแหน่งใน CEF ครบ; Pipeline Design ยังเป็น **UI Preview ไม่ได้บันทึกค่าหรือเปิด Encoder จริง** |
+| **OSC / Backend** | Audit แบบอ่านอย่างเดียวแยก Native CEF Host, NodeAPI, Container, Capture, Graphics, Gallery, Adapter และ Hook ตามเจ้าของจริง | การมี Route หรือ HTTP 200 ไม่ยืนยันผล GPU/Game Hook, การบันทึก MP4 หรือการผ่านสิทธิ์ของคำสั่งเขียน |
+
+**รายงานอ้างอิง:** [ผัง Hook และงาน Codex](Project/NVIDIA%20Adapter/OSC%20Adapter/Duluka%20Hook/README.md) · [แผนวัด DX9 กระตุก](Project/NVIDIA%20Adapter/OSC%20Adapter/Duluka%20Hook/docs/DX9-PERFORMANCE-VALIDATION-2026-10-25.md) · [ผลตรวจพิกเซล CEF](Project/NVIDIA%20Adapter/OSC%20Adapter/Duluka%20Hook/docs/CEF-FRAME-DELIVERY-2026-10-25-v1.md) · [CEF 73 Build Gate](Project/NVIDIA%20Adapter/OSC%20Adapter/Duluka%20Hook/docs/CEF73-BUILD-PREPARATION-2026-10-25-v1.md) · [Capture UI v77](Project/Overlay%20On-Screen%20Control/NVIDIA%20NodeAPI/osc/mods/CAPTURE-UI-REDESIGN-20261025.md) · [OSC / Backend Audit](docs/osc/OSC-BACKEND-FULL-ARCHITECTURE-AUDIT-20261025.md)
+
+---
+
+### สถานะ Capture ต่างเครื่อง — 25 ตุลาคม 2569 (รอบเย็น)
+
+ผลใหม่ของ **MateBook Branch `intel/duluka-capture`** คือ I3-B Synthetic **ผ่าน 2,056 / ล้มเหลว 0 / ข้าม 33** และผล QA ของ Agent C สำหรับ I3-C แบบ Synthetic **ผ่าน 1,938 / ล้มเหลว 0 / ข้าม 0** ซึ่งยังเป็นเพียงคำแนะนำให้รับงานในส่วน Synthetic เท่านั้น **ไม่ใช่ผลทดสอบหรือการ Deploy บน AORUS `Stable`**. Intel Live Capture ยังคงถูกล็อก และ B1/B2–B8 ยังมีงานค้าง อ่าน [สถานะทั้งสองเครื่อง](docs/WORKTREE-STATUS-20261025.md)
+
 ---
 
 ## สถาปัตยกรรมเบื้องหลัง Flagship ReBuild

@@ -1,5 +1,9 @@
 (function(angular){
   'use strict';
+  // Double-load (index tag + hot-loader) would register the customize state
+  // twice and kill Angular bootstrap with "State already defined".
+  if (window.__dulukaMainMenuLive) return;
+  window.__dulukaMainMenuLive = true;
   var storageKey='DulukaMainMenuLayoutV2';
   var items=[
     {key:'Screenshot',name:'screenshot-tile',label:'Screenshot',icon:'icon-screenshot'},

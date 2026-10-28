@@ -47,7 +47,8 @@ Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> responder
 CaptureWorkerGateway Make(
     Func<HttpRequestMessage,CancellationToken,Task<HttpResponseMessage>> fn,
     bool commands = false, bool testMode = false) =>
-    new(new HttpClient(new Stub(fn)), 59599, true, commands, testMode);
+    new(new HttpClient(new Stub(fn)), 59599, true, commands, testMode,
+        workerWriteToken: () => "0123456789abcdef0123456789abcdef");
 
 var good = Make(responder);
 var status = ToJson(good.Status());
@@ -96,6 +97,28 @@ Check("Commands default denied", denied.Status == 403 && posts == 0);
 var enabled = Make(responder, commands:true);
 Check("Explicit confirmation required", enabled.RecordCommand(true, noConfirm).Status == 400 && posts == 0);
 Check("Confirmed start forwarded only to mock", enabled.RecordCommand(true, confirm).Status == 200 && posts == 1);
+int authorizationPosts = posts;
+var noWorkerToken = new CaptureWorkerGateway(new HttpClient(new Stub(responder)),
+    59599, true, true);
+Check("Missing worker authorization never sends POST", noWorkerToken.RecordCommand(true, confirm).Status == 503 && posts == authorizationPosts);
+var invalidWorkerToken = new CaptureWorkerGateway(new HttpClient(new Stub(responder)),
+    59599, true, true, workerWriteToken: () => "invalid\r\nheader");
+Check("Invalid worker authorization never sends POST", invalidWorkerToken.RecordCommand(true, confirm).Status == 503 && posts == authorizationPosts);
+var unreadableWorkerToken = new CaptureWorkerGateway(new HttpClient(new Stub(responder)),
+    59599, true, true, workerWriteToken: () => throw new IOException("not exposed"));
+Check("Unreadable protected enrollment fails closed", unreadableWorkerToken.RecordCommand(true, confirm).Status == 503 && posts == authorizationPosts);
+bool writeHeaderPresent = false;
+bool readHeaderAbsent = true;
+var authenticatedWorker = Make((req, token) => {
+    if (req.Method == HttpMethod.Post)
+        writeHeaderPresent = req.Headers.TryGetValues("X-ShadowPlay-Capture-Token", out var values) &&
+            values.Single() == "0123456789abcdef0123456789abcdef";
+    else readHeaderAbsent &= !req.Headers.Contains("X-ShadowPlay-Capture-Token");
+    return responder(req, token);
+}, commands:true);
+authenticatedWorker.RecordCommand(true, confirm);
+Check("Protected worker credential attached only to mutation", writeHeaderPresent && readHeaderAbsent);
+posts = authorizationPosts;
 Check("Test mode blocks commands", Make(responder, commands:true, testMode:true)
     .RecordCommand(true, confirm).Status == 409 && posts == 1);
 Check("Stopping idle worker rejected", enabled.RecordCommand(false, confirm).Status == 409 && posts == 1);
@@ -108,6 +131,30 @@ var recording = Make((req, token) => {
     return responder(req, token);
 }, commands:true);
 Check("Active record stop forwarded", recording.RecordCommand(false, confirm).Status == 200 && posts == 2);
+int postsBeforePreparingStop = posts;
+var preparingState = recordingState.Replace("\"actualSessionBackend\":\"Duluka\"",
+    "\"actualSessionBackend\":\"\",\"runtimeTruth\":{\"lifecycleOwner\":\"Duluka\",\"actualRunningEngine\":\"\"}");
+var preparing = Make((req, token) => req.Method == HttpMethod.Get &&
+    req.RequestUri!.AbsolutePath == "/state"
+        ? Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) {Content = new StringContent(preparingState)})
+        : responder(req, token), commands:true);
+Check("Preparing session can be cancelled without inventing actual running engine",
+    preparing.RecordCommand(false, confirm).Status == 200 && posts == postsBeforePreparingStop + 1);
+posts = postsBeforePreparingStop;
+var partialStop = Make((req, token) => {
+    if (req.Method == HttpMethod.Post)
+        return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) {Content = new StringContent(
+            """{"stopped":true,"saved":false,"finalizationState":"Partial","mediaVerified":false,"error":"recording_not_verified_saved"}""")});
+    if (req.RequestUri!.AbsolutePath == "/state")
+        return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) {Content = new StringContent(recordingState)});
+    return responder(req, token);
+}, commands:true);
+var partialResult = ToJson(partialStop.RecordCommand(false, confirm).Body);
+Check("Lifecycle stop does not turn Partial into Saved",
+    partialResult.GetProperty("accepted").GetBoolean() &&
+    !partialResult.GetProperty("saved").GetBoolean() &&
+    partialResult.GetProperty("finalizationState").GetString() == "Partial" &&
+    partialResult.GetProperty("error").GetString() == "recording_not_verified_saved");
 var pending = Make((req, token) => {
     if (req.Method == HttpMethod.Post)
         return Task.FromException<HttpResponseMessage>(new TaskCanceledException());

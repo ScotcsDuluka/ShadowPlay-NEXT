@@ -1,0 +1,41 @@
+body[data-nv-route="preferences-overlays"] .preferences-root-panel {
+    width: 1040px !important;
+    max-width: calc(100% - 80px) !important;
+    margin: 40px auto !important;
+    padding: 28px 32px !important;
+    box-sizing: border-box;
+    border: 1px solid #383e43;
+    background: #252a2e;
+}
+
+body[data-nv-route="preferences-overlays"] .preferences-root-panel > .layout-row {
+    width: 100%;
+    max-width: 100%;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+}
+
+body[data-nv-route="preferences-overlays"] .overlays-toggle-column {
+    flex: 0 0 220px;
+    width: 220px;
+}
+
+body[data-nv-route="preferences-overlays"] .overlays-toggle-item {
+    width: 100%;
+    height: 54px;
+    margin: 0 0 10px;
+}
+
+body[data-nv-route="preferences-overlays"] .overlays-editor-column {
+    flex: 0 0 170px;
+    width: 170px;
+    margin: 0;
+}
+
+body[data-nv-route="preferences-overlays"] .overlays-preview-column {
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 0 0 0 24px;
+    border-left-color: #383e43;
+}

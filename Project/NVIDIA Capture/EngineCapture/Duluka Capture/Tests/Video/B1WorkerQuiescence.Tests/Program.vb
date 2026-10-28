@@ -19,8 +19,10 @@ Module Program
         Run("Blocked Dispose quarantines resources and worker", AddressOf BlockedDispose)
         Run("Normal completed worker cleans once", AddressOf NormalDispose)
         Run("Overlapping Stop and Dispose is bounded", AddressOf ConcurrentStopDispose)
-        Console.WriteLine($"B1 SUMMARY Passed={successes} Failed={3 - successes} Skipped=0")
-        Return If(successes = 3, 0, 1)
+        Run("Stop timeout latches non-quiescent fault", AddressOf StopTimeoutFault)
+        Run("Worker self-stop does not wait or report timeout", AddressOf WorkerSelfStop)
+        Console.WriteLine($"B1 SUMMARY Passed={successes} Failed={5 - successes} Skipped=0")
+        Return If(successes = 5, 0, 1)
     End Function
 
     Private Sub Run(name As String, test As Action)
@@ -52,12 +54,19 @@ Module Program
         Private ReadOnly ready As New ManualResetEventSlim(False)
         Private ReadOnly release As New ManualResetEventSlim(False)
         Public WorkerError As Exception
+        Public SelfStopMilliseconds As Long = -1
 
-        Public Sub New()
+        Public Sub New(Optional selfStop As Boolean = False)
             Dim exitMethod = GetType(DdagrabBackend).GetMethod("CompleteWorkerExit", BindingFlags.Instance Or BindingFlags.NonPublic)
             Check(exitMethod IsNot Nothing, "worker exit cleanup hook missing")
             Worker = New Thread(Sub()
                                     Try
+                                        If selfStop Then
+                                            Dim sw = Stopwatch.StartNew()
+                                            Backend.Stop()
+                                            sw.Stop()
+                                            SelfStopMilliseconds = sw.ElapsedMilliseconds
+                                        End If
                                         ready.Set()
                                         If Not release.Wait(TimeSpan.FromSeconds(20)) Then Throw New TimeoutException("fake worker fixture deadline")
                                         ' This is the SAME completion method used at WorkerLoop's real exit tail.
@@ -156,6 +165,31 @@ Module Program
             Check(f.Backend.CurrentState = DdagrabBackend.DdagrabBackendState.Disposed,
                   "Stop/Dispose final cleanup state missing")
             Check(f.CleanupClaims = 1, "Stop/Dispose should cleanup once")
+        End Using
+    End Sub
+
+    Private Sub StopTimeoutFault()
+        Using f As New FakeWorkerRig()
+            Dim sw = Stopwatch.StartNew()
+            f.Backend.Stop()
+            sw.Stop()
+            Dim health = DirectCast(f.Backend, IVideoCaptureTerminalHealth)
+            Check(sw.ElapsedMilliseconds >= 1500 AndAlso sw.ElapsedMilliseconds < 5000, "Stop did not respect its bounded wait")
+            Check(health.TerminalFault = "source_stop_timeout_not_quiescent", "Stop must latch non-quiescence")
+            Check(f.Backend.CurrentState = DdagrabBackend.DdagrabBackendState.Faulted, "Stop timeout must prevent reuse")
+            f.UnblockAndVerify()
+            Check(health.TerminalFault = "source_stop_timeout_not_quiescent", "late worker exit must not erase the fault")
+            f.Backend.Dispose()
+        End Using
+    End Sub
+
+    Private Sub WorkerSelfStop()
+        Using f As New FakeWorkerRig(selfStop:=True)
+            Check(f.SelfStopMilliseconds >= 0 AndAlso f.SelfStopMilliseconds < 1000, "worker self-stop must not wait for itself")
+            Check(String.IsNullOrEmpty(DirectCast(f.Backend, IVideoCaptureTerminalHealth).TerminalFault), "self-stop must not invent a timeout")
+            f.UnblockAndVerify()
+            Check(f.Backend.CurrentState = DdagrabBackend.DdagrabBackendState.Stopped, "worker exit should complete normal self-stop")
+            f.Backend.Dispose()
         End Using
     End Sub
 End Module

@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>ShadowPlay NEXT — 01.01.2027</title>
+  
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="CSS/index/style.css?v=4">
+  <link rel="stylesheet" href="CSS/index/role.css">
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="https://camo.githubusercontent.com/189f450c3c7997fd8f52d7b7278d18c04674aa747ff66745eaa21bb099ac2436/68747470733a2f2f63646e322e737465616d6772696464622e636f6d2f69636f6e2f65383835356233353238636230336431646566393830333232306264336362392f33322f34387834382e706e67">
+  
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <!-- Font Awesome (for icons used in architecture/modules) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  
+  <style>
+    /* Custom Fonts */
+    @font-face {
+      font-family: 'NvidiaIcons';
+      src: url('Assets/nvgcshare.woff2') format('woff2');
+      font-weight: normal;
+      font-style: normal;
+      font-display: block;
+    }
+    @font-face {
+      font-family: 'GeForce';
+      src: url('Assets/GeForce-Bold-Alt.woff2') format('woff2');
+      font-weight: bold;
+      font-style: normal;
+      font-display: swap;
+    }
+    
+    /* Icon Utility */
+    .icon-nvidia {
+      font-family: 'NvidiaIcons';
+      font-style: normal;
+      font-weight: normal;
+      font-variant: normal;
+      text-transform: none;
+      line-height: 1;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+  </style>
+<style>
+/* ═══ OBT3 COUNTDOWN — FULL-WIDTH HORIZONTAL ═══ */
+.obt3-banner{margin-top:2.2rem;width:100%;padding:0;position:relative;overflow:hidden;
+  background:linear-gradient(145deg,rgba(118,185,0,.10),rgba(8,9,8,.92) 45%,rgba(118,185,0,.06));
+  border:1px solid rgba(118,185,0,.4);
+  box-shadow:0 0 56px rgba(118,185,0,.16),inset 0 0 40px rgba(118,185,0,.04);
+  backdrop-filter:blur(9px)}
+/* corner brackets — 90° accents */
+.obt3-corner{position:absolute;width:20px;height:20px;border:2px solid #76b900;z-index:3}
+.obt3-corner.c1{top:-1px;left:-1px;border-right:0;border-bottom:0}
+.obt3-corner.c2{top:-1px;right:-1px;border-left:0;border-bottom:0}
+.obt3-corner.c3{bottom:-1px;left:-1px;border-right:0;border-top:0}
+.obt3-corner.c4{bottom:-1px;right:-1px;border-left:0;border-top:0}
+/* runway: moving dash strip across the top */
+.obt3-runway{height:3px;overflow:hidden;background:rgba(118,185,0,.10)}
+.obt3-runway span{display:block;height:100%;width:200%;
+  background:repeating-linear-gradient(90deg,#76b900 0 26px,transparent 26px 52px);
+  animation:obt3-run 2.6s linear infinite;opacity:.85}
+@keyframes obt3-run{to{transform:translateX(-52px)}}
+/* sheen sweep */
+.obt3-banner::before{content:"";position:absolute;top:0;left:-60%;width:40%;height:100%;z-index:2;
+  background:linear-gradient(100deg,transparent,rgba(118,185,0,.13),transparent);
+  animation:obt3-sheen 4.5s ease-in-out infinite;pointer-events:none}
+@keyframes obt3-sheen{0%,60%{left:-60%}100%{left:130%}}
+.obt3-inner{padding:1.3rem 1.8rem 1.1rem;position:relative;z-index:2}
+.obt3-head{display:flex;align-items:baseline;gap:.7rem;flex-wrap:wrap;margin-bottom:1.05rem}
+.obt3-tag{font-family:'GeForce','Inter',sans-serif;font-size:.75rem;letter-spacing:2px;color:#0a0a0a;
+  background:#76b900;padding:.18rem .6rem;font-weight:800}
+.obt3-title{font-family:'GeForce','Inter',sans-serif;font-size:1.18rem;letter-spacing:1.6px;color:#fff;font-weight:700}
+.obt3-sub{font-size:.85rem;color:rgba(255,255,255,.55);font-style:italic}
+.obt3-head .obt3-live{margin-left:auto}
+.obt3-live{color:#76b900;animation:obt3-blink 2s ease infinite;font-size:.7rem;letter-spacing:1.4px;font-weight:700}
+/* main row: full-width cells + button */
+.obt3-main{display:grid;grid-template-columns:1fr auto;gap:1.5rem;align-items:stretch}
+.obt3-timer{display:flex;align-items:stretch;gap:.5rem}
+.obt3-cell{display:flex;flex-direction:column;gap:.3rem;flex:1 1 0;min-width:0}
+.obt3-flip{font-family:'GeForce','Inter',sans-serif;font-variant-numeric:tabular-nums;
+  font-size:clamp(1.9rem,4.2vw,3rem);font-weight:800;width:100%;text-align:center;
+  padding:.32em .1em;color:#76b900;background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(0,0,0,.55));
+  border:1px solid rgba(118,185,0,.4);border-top:2px solid rgba(118,185,0,.55);
+  text-shadow:0 0 18px rgba(118,185,0,.65),0 0 46px rgba(118,185,0,.3);
+  transition:transform .16s ease,text-shadow .3s ease,background .3s ease;position:relative}
+.obt3-flip::after{content:"";position:absolute;left:10%;right:10%;top:50%;height:1px;background:rgba(118,185,0,.25)}
+.obt3-flip.obt3-tick{transform:translateY(-3px);color:#c6ff4a;
+  text-shadow:0 0 28px rgba(118,185,0,1),0 0 74px rgba(118,185,0,.55);
+  border-top-color:#c6ff4a}
+.obt3-label{font-size:.6rem;letter-spacing:2.6px;color:rgba(255,255,255,.45);font-family:'Inter',sans-serif;text-align:center}
+.obt3-colon{font-size:1.9rem;color:rgba(118,185,0,.7);font-weight:800;
+  animation:obt3-blink 1s steps(1) infinite;align-self:center;padding-bottom:1.15rem}
+@keyframes obt3-blink{50%{opacity:.25}}
+/* divider between timer and download */
+.obt3-divider{width:1px;background:linear-gradient(180deg,transparent,rgba(118,185,0,.55),transparent)}
+/* download block lives INSIDE the countdown */
+.obt3-dl{display:flex;align-items:center;gap:.95rem;padding:1.1rem 1.5rem;
+  background:linear-gradient(135deg,#8ed311,#5c9400);color:#0a0a0a;text-decoration:none;
+  position:relative;overflow:hidden;transition:transform .22s ease,box-shadow .3s ease;
+  box-shadow:0 0 0 rgba(118,185,0,0);animation:obt3-pulse 2.6s ease-in-out infinite}
+@keyframes obt3-pulse{0%,100%{box-shadow:0 0 22px rgba(118,185,0,.35)}50%{box-shadow:0 0 44px rgba(118,185,0,.6)}}
+.obt3-dl:hover{transform:translateY(-2px)}
+.obt3-dl::after{content:"";position:absolute;top:0;left:-80%;width:50%;height:100%;
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,.5),transparent);
+  transform:skewX(-18deg);animation:obt3-btnsheen 3.2s ease-in-out infinite}
+@keyframes obt3-btnsheen{0%,55%{left:-80%}100%{left:140%}}
+.obt3-dl-arrow{font-size:1.7rem;font-weight:900;animation:obt3-arrow 1.5s ease-in-out infinite;line-height:1}
+@keyframes obt3-arrow{0%,100%{transform:translateY(-2px)}50%{transform:translateY(4px)}}
+.obt3-dl-txt b{display:block;font-family:'GeForce','Inter',sans-serif;font-size:.98rem;
+  letter-spacing:1.2px;font-weight:800}
+.obt3-dl-txt small{display:block;font-size:.66rem;font-weight:700;letter-spacing:.5px;opacity:.78;margin-top:.15rem}
+/* progress + meta */
+.obt3-progress{height:6px;background:rgba(255,255,255,.07);overflow:hidden;margin-top:1.15rem;
+  background-image:repeating-linear-gradient(90deg,rgba(255,255,255,.05) 0 2px,transparent 2px 14px)}
+.obt3-progress-fill{height:100%;width:0%;
+  background:repeating-linear-gradient(90deg,#76b900 0 18px,#a3e635 18px 22px);
+  box-shadow:0 0 14px rgba(118,185,0,.85);transition:width 1s linear;
+  animation:obt3-stripes 1.2s linear infinite}
+@keyframes obt3-stripes{to{background-position:22px 0}}
+/* NEXT VERSION banner — dev-progress fill */
+#nextFill{width:0%;animation:nextFill 16s var(--ease-out-expo,cubic-bezier(.16,1,.3,1)) .6s forwards}
+@keyframes nextFill{to{width:68%}}
+/* nav: fit 10 menu items on one line */
+.nav-menu{gap:1.15rem}
+.nav-menu a{font-size:.86rem;white-space:nowrap}
+.obt3-meta{display:flex;justify-content:space-between;gap:.8rem;flex-wrap:wrap;margin-top:.55rem;
+  font-size:.68rem;letter-spacing:1px;color:rgba(255,255,255,.5)}
+.obt3-target{font-weight:700;color:rgba(118,185,0,.9)}
+@media(max-width:980px){
+  .obt3-main{grid-template-columns:1fr}
+  .obt3-divider{width:auto;height:1px;background:linear-gradient(90deg,transparent,rgba(118,185,0,.55),transparent)}
+  .obt3-dl{justify-content:center}
+}
+@media(max-width:640px){
+  .obt3-flip{font-size:1.55rem;padding:.28em .06em}
+  .obt3-colon{font-size:1.15rem;padding-bottom:1rem}
+  .obt3-inner{padding:1.1rem 1rem 1rem}
+  .obt3-timer{gap:.3rem}
+}
+</style></style>
+<style>
+/* ── ENGINE REGIME SWITCHER ── */
+.regime-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;max-width:980px;margin:0 auto 1.4rem}
+.rtab{position:relative;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.09);
+  border-radius:14px;padding:1rem 1.2rem;text-align:left;cursor:pointer;transition:all .25s;
+  font-family:inherit;color:inherit;display:flex;flex-direction:column;gap:.25rem}
+.rtab:hover{border-color:rgba(118,185,0,.45);transform:translateY(-2px)}
+.rtab.active{background:linear-gradient(150deg,rgba(118,185,0,.14),rgba(255,255,255,.02));
+  border-color:#76b900;box-shadow:0 0 34px rgba(118,185,0,.16)}
+.rtab-name{font-family:'GeForce','Inter',sans-serif;font-size:1.02rem;color:#fff;letter-spacing:.5px;
+  display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.rtab-sub{font-size:.72rem;color:rgba(255,255,255,.45);letter-spacing:.4px}
+.rtab-soon{font-size:.56rem;font-weight:800;letter-spacing:1.4px;background:#76b900;color:#000;
+  padding:.14rem .42rem;border-radius:4px}
+.regime-desc{text-align:center;font-size:.9rem;color:rgba(255,255,255,.55);margin-bottom:2.2rem;
+  font-style:italic}
+.regime-panel{animation:regFade .45s ease}
+@keyframes regFade{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@media(max-width:760px){.regime-tabs{grid-template-columns:1fr}}
+</style>
+<style>
+/* 90° SHARP CORNER OVERRIDE — must stay the LAST style block */
+*{border-radius:0!important}
+.member-avatar,.custom-cursor,.cursor-dot{border-radius:50%!important}
+</style>
+
+<meta name="description" content="ShadowPlay NEXT — launches 1 January 2027">
+<meta name="theme-color" content="#0a0f0a">
+<style id="launch-only-overrides">
+/* The original index.html design is intentionally retained. */
+.hero-section { min-height:100svh; padding-bottom:clamp(3rem,7vh,6rem); }
+.nav-menu { gap:clamp(.8rem,2vw,2.3rem); }
+#obt3-banner { scroll-margin-top:95px; }
+#obt3-banner .obt3-main { display:block; }
+#obt3-banner .obt3-dl {
+ display:grid; grid-template-columns:auto minmax(0,1fr) minmax(0,2.15fr);
+ align-items:center; gap:clamp(.6rem,2vw,2.1rem); padding:clamp(.85rem,1.5vw,1.4rem) clamp(.8rem,2vw,1.8rem);
+ cursor:default;
+}
+#obt3-banner .obt3-dl:hover{transform:none}
+.launch-copy { min-width:0; }
+.launch-copy b{display:block;font:800 clamp(.93rem,1.23vw,1.25rem)/1.2 GeForce,Inter,sans-serif;letter-spacing:.07em}
+.launch-copy small{display:block;margin-top:.3rem;font-size:clamp(.59rem,.73vw,.78rem);font-weight:700;line-height:1.4;opacity:.76}
+.launch-countdown{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));align-items:center;min-width:0;width:100%}
+.launch-counter{min-width:0;text-align:center;padding:.15rem .35rem;border-left:1px solid rgba(14,38,0,.26)}
+.launch-number{display:block;font:900 clamp(1.9rem,3.5vw,3.7rem)/1.04 GeForce,Inter,sans-serif;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.launch-unit{display:block;margin-top:.2rem;font-size:clamp(.54rem,.68vw,.72rem);font-weight:900;letter-spacing:.13em}
+.launch-target{font-size:.69rem;font-weight:800;letter-spacing:.07em;color:#76b900}
+.launch-meta-right{color:#7b8875;font-weight:700}
+#launchProgress { animation:none; }
+@media(max-width:980px) {
+ #obt3-banner .obt3-dl{grid-template-columns:auto minmax(0,1fr)}
+ .launch-countdown{grid-column:1/-1;padding-top:.65rem}
+}
+@media(max-width:640px) {
+ .hero-section{padding:calc(2.2rem + 60px) 1.1rem 3rem}
+ .hero-title{font-size:clamp(2.25rem,9vw,3.5rem);letter-spacing:-.03em}
+ #obt3-banner .obt3-inner{padding:1rem}
+ #obt3-banner .obt3-head{gap:.45rem .65rem}
+ #obt3-banner .obt3-title{font-size:clamp(.92rem,3.4vw,1.35rem)!important}
+ #obt3-banner .obt3-sub{display:none}
+ #obt3-banner .obt3-head .obt3-live{margin-left:0;width:100%}
+ #obt3-banner .obt3-dl{gap:.6rem}
+ #obt3-banner .obt3-dl-arrow{font-size:1.3rem}
+ .launch-counter{padding-inline:.1rem}
+ .launch-number{font-size:clamp(1.6rem,8vw,2.7rem)}
+ .launch-unit{font-size:.56rem;letter-spacing:.06em}
+ .launch-target,.launch-meta-right{font-size:.58rem}
+}
+@media(prefers-reduced-motion:reduce){
+ #obt3-banner .obt3-dl,#obt3-banner .obt3-dl::after,#obt3-banner .obt3-runway span{animation:none!important}
+}
+</style>
+</head>
+<body>
+  <div class="custom-cursor" id="cursor" aria-hidden="true"></div>
+  <div class="cursor-dot" id="cursorDot" aria-hidden="true"></div>
+  <canvas id="particles-canvas" aria-hidden="true"></canvas>
+
+  <!-- Original navigation and original hero presentation -->
+  <nav class="main-nav">
+    <a href="https://github.com/ScotcsDuluka/ShadowPlay-NEXT" target="_blank" rel="noopener noreferrer" class="nav-brand" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <span class="hero-badge">OPEN SOURCE PROJECT</span>
+    </a>
+    <ul class="nav-menu">
+      <li><a href="#obt3-banner" style="color:#76B900;font-weight:800">LAUNCH 01.01.2027 →</a></li>
+      <li><a href="https://github.com/ScotcsDuluka/ShadowPlay-NEXT" target="_blank" rel="noopener noreferrer">GitHub</a></li>
+      <li><a href="https://aorus-desktop.taile6314b.ts.net/portal" style="color:#76b900;font-weight:800">ACCOUNT ↗</a></li>
+      <li><a href="https://discord.gg/v5qUGVD3jZ" target="_blank" rel="noopener noreferrer">Discord Server</a></li>
+    </ul>
+    <button class="hamburger" id="hamburger" type="button" aria-label="Menu" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </nav>
+  <div class="mobile-menu" id="mobileMenu">
+    <a href="#obt3-banner">LAUNCH 01.01.2027</a>
+    <a href="https://github.com/ScotcsDuluka/ShadowPlay-NEXT" target="_blank" rel="noopener noreferrer">GitHub</a>
+    <a href="https://aorus-desktop.taile6314b.ts.net/portal">Duluka Account</a>
+    <a href="https://discord.gg/v5qUGVD3jZ" target="_blank" rel="noopener noreferrer">Discord Server</a>
+  </div>
+
+  <section class="hero-section animated-gradient-bg" id="hero">
+    <div class="hero-container">
+      <div style="position:relative;z-index:1">
+        <h1 class="hero-title">ShadowPlay NEXT</h1>
+        <h2 class="animated-text-gradient">Capture Every Moment</h2>
+        <h3 class="animated-text-gradient">A new generation begins 1 January 2027.</h3>
+
+        <!-- The exact original obt3-banner design; only content replaced. -->
+        <div id="obt3-banner" class="obt3-banner">
+          <span class="obt3-corner c1"></span><span class="obt3-corner c2"></span>
+          <span class="obt3-corner c3"></span><span class="obt3-corner c4"></span>
+          <div class="obt3-runway"><span></span></div>
+          <div class="obt3-inner">
+            <div class="obt3-head">
+              <span class="obt3-tag">FLAGSHIP PROJECT</span>
+              <span class="obt3-title">SHADOWPLAY NEXT IS COMING</span>
+              <span class="obt3-sub">the next chapter begins here</span>
+              <span class="obt3-live" id="launchStatus" role="status">LIVE COUNTDOWN</span>
+            </div>
+            <div class="obt3-main">
+              <div class="obt3-dl" role="timer" aria-label="Countdown to January 1, 2027 in Thailand">
+                <span class="obt3-dl-arrow" aria-hidden="true">✦</span>
+                <div class="launch-copy">
+                  <b>THE NEXT ERA STARTS IN</b>
+                  <small>Counting down to the project launch</small>
+                </div>
+                <div class="launch-countdown">
+                  <div class="launch-counter"><span class="launch-number" id="cdDays">00</span><span class="launch-unit">DAYS</span></div>
+                  <div class="launch-counter"><span class="launch-number" id="cdHours">00</span><span class="launch-unit">HOURS</span></div>
+                  <div class="launch-counter"><span class="launch-number" id="cdMins">00</span><span class="launch-unit">MINUTES</span></div>
+                  <div class="launch-counter"><span class="launch-number" id="cdSecs">00</span><span class="launch-unit">SECONDS</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="obt3-progress"><div class="obt3-progress-fill" id="launchProgress"></div></div>
+            <div class="obt3-meta">
+              <span class="launch-target">LAUNCH: 01 JAN 2027 · 00:00 ICT (UTC+7)</span>
+              <span class="launch-meta-right">SHADOWPLAY NEXT · THE NEW ERA</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+<script>
+(function() {
+  "use strict";
+  const deadline = Date.parse("2027-01-01T00:00:00+07:00");
+  const baseline = Date.parse("2026-10-22T00:00:00+07:00");
+  const fields = ["cdDays","cdHours","cdMins","cdSecs"].map(id => document.getElementById(id));
+  const status = document.getElementById("launchStatus");
+  const fill = document.getElementById("launchProgress");
+  function updateCountdown() {
+    const remaining = Math.max(0,deadline-Date.now());
+    const values = [Math.floor(remaining/86400000),Math.floor(remaining/3600000)%24,Math.floor(remaining/60000)%60,Math.floor(remaining/1000)%60];
+    values.forEach((v,i) => {fields[i].textContent=String(v).padStart(2,"0");});
+    fill.style.width = (100*Math.min(1,Math.max(0,(Date.now()-baseline)/(deadline-baseline)))).toFixed(2)+"%";
+    if (remaining===0) status.textContent="PROJECT LAUNCHED";
+  }
+  updateCountdown();
+  setInterval(updateCountdown,1000);
+
+  const hamburger=document.getElementById("hamburger");
+  const menu=document.getElementById("mobileMenu");
+  hamburger.addEventListener("click",() => {
+    const open=hamburger.getAttribute("aria-expanded")!=="true";
+    hamburger.setAttribute("aria-expanded",String(open));
+    hamburger.classList.toggle("active",open);
+    menu.classList.toggle("active",open);
+  });
+  menu.querySelectorAll("a").forEach(link => link.addEventListener("click",() => {
+    hamburger.setAttribute("aria-expanded","false");
+    hamburger.classList.remove("active");
+    menu.classList.remove("active");
+  }));
+
+  // Original floating green network particles, with fewer frames to avoid CPU spikes.
+  const fine=matchMedia("(hover: hover) and (pointer: fine)").matches;
+  const cursor=document.getElementById("cursor"), dot=document.getElementById("cursorDot");
+  if(fine) {
+    let mx=0,my=0,cx=0,cy=0,started=false;
+    document.addEventListener("pointermove",e=>{
+      mx=e.clientX;my=e.clientY;
+      if(!started){started=true;document.body.classList.add("custom-cursor-active");}
+    },{passive:true});
+    function animateCursor() {
+      if(started) {
+        cx+=(mx-cx)*.17;cy+=(my-cy)*.17;
+        cursor.style.left=cx+"px";cursor.style.top=cy+"px";
+        dot.style.left=mx+"px";dot.style.top=my+"px";
+      }
+      requestAnimationFrame(animateCursor);
+    }
+    requestAnimationFrame(animateCursor);
+    document.querySelectorAll("a,button").forEach(el=>{
+      el.addEventListener("pointerenter",()=>cursor.classList.add("hover"));
+      el.addEventListener("pointerleave",()=>cursor.classList.remove("hover"));
+    });
+  } else {cursor.style.display="none";dot.style.display="none";}
+
+  const canvas=document.getElementById("particles-canvas");
+  const ctx=canvas.getContext("2d");
+  if(!ctx || matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    canvas.style.display="none";return;
+  }
+  let points=[],width=0,height=0,last=0,frame=0;
+  function resize(){
+    const dpr=Math.min(devicePixelRatio||1,2);
+    width=innerWidth;height=innerHeight;
+    canvas.width=Math.ceil(width*dpr);canvas.height=Math.ceil(height*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    const n=width<768?20:46;
+    points=Array.from({length:n},()=>({
+      x:Math.random()*width,y:Math.random()*height,vx:(Math.random()-.5)*.65,
+      vy:(Math.random()-.5)*.65,r:.9+Math.random()*.6,a:.3+Math.random()*.55
+    }));
+  }
+  function draw(t){
+    frame=requestAnimationFrame(draw);
+    if(t-last<32)return;
+    last=t;ctx.clearRect(0,0,width,height);
+    for(let i=0;i<points.length;i++){
+      const p=points[i];p.x+=p.vx;p.y+=p.vy;
+      if(p.x<0||p.x>width)p.vx*=-1;
+      if(p.y<0||p.y>height)p.vy*=-1;
+      ctx.fillStyle="rgba(118,185,0,"+p.a+")";
+      ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,2*Math.PI);ctx.fill();
+      for(let j=i+1;j<points.length;j++){
+        const q=points[j],dx=p.x-q.x,dy=p.y-q.y,d2=dx*dx+dy*dy;
+        if(d2<14400){
+          ctx.strokeStyle="rgba(118,185,0,"+(.35*(1-Math.sqrt(d2)/120))+")";
+          ctx.lineWidth=.8;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(q.x,q.y);ctx.stroke();
+        }
+      }
+    }
+  }
+  resize();
+  addEventListener("resize",resize,{passive:true});
+  document.addEventListener("visibilitychange",()=>{
+    if(document.hidden){cancelAnimationFrame(frame);frame=0;}
+    else if(!frame)frame=requestAnimationFrame(draw);
+  });
+  frame=requestAnimationFrame(draw);
+})();
+</script>
+</body>
+</html>
