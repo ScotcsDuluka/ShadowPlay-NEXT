@@ -1,5 +1,11 @@
 {
-  "SessionId": "0ca1e42f6bbb4b499f06600680db294a",
+  "SourceAccepted": 0,
+  "SourceRejected": 0,
+  "SourceQueueDrops": 0,
+  "SourceSequenceGaps": 0,
+  "SourceDuplicateFrames": 0,
+  "SourceRecoveries": 0,
+  "SessionId": "961545a31c92431187895223e54dc545",
   "FramesSubmitted": 60,
   "EncoderPacketCount": 60,
   "MuxedPacketCount": 60,

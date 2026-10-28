@@ -237,15 +237,24 @@ Namespace DulukaEngine.FFmpegBackend
                 sb.Append($"-f s16le -ar {_micRate} -ac {_micChannels} -i ""\\.\pipe\{_mic.Name}"" ")
             End If
 
-            If _mic IsNot Nothing AndAlso Not _separateTracks Then
+            If hasSys AndAlso _mic IsNot Nothing AndAlso Not _separateTracks Then
                 ' amix single track (mirrors MuxCoordinator's mixed mode)
                 Dim sysFilter As String = BuildOneFilter(_sysVolume, True)
                 Dim micFilter As String = BuildOneFilter(_micVolume, True)
                 sb.Append($"-filter_complex ""[1:a]{sysFilter}[a0];[2:a]{micFilter}[a1];" &
                           "[a0][a1]amix=inputs=2:duration=longest:normalize=0[aout]"" ")
                 sb.Append("-map 0:v -map ""[aout]"" ")
-            ElseIf _mic IsNot Nothing Then
+                ' Both mix inputs are padded; cap their tail by the actual
+                ' video end so EOF can finalize instead of infinite silence.
+                sb.Append("-shortest ")
+            ElseIf hasSys AndAlso _mic IsNot Nothing Then
                 sb.Append("-map 0:v -map 1:a -map 2:a ")
+            ElseIf _mic IsNot Nothing Then
+                ' With system audio off, mic is input 1. Never create a
+                ' synthetic system stream or map a nonexistent input 2.
+                sb.Append("-map 0:v -map 1:a ")
+                Dim micFilter = BuildOneFilter(_micVolume, False)
+                If micFilter.Length > 0 Then sb.Append($"-filter:a ""{micFilter}"" ")
             ElseIf hasSys Then
                 sb.Append("-map 0:v -map 1:a ")
             Else
@@ -259,7 +268,7 @@ Namespace DulukaEngine.FFmpegBackend
                 ' Raw H.264 has no packet PTS: stamp that validated timeline.
                 sb.Append($"-bsf:v setts=prescale=1:time_base=1/{_videoFps * 1000}:pts=N*1000:dts=N*1000:duration=1000 ")
             End If
-            If _mic IsNot Nothing AndAlso _separateTracks Then
+            If hasSys AndAlso _mic IsNot Nothing AndAlso _separateTracks Then
                 sb.Append("-c:a:0 aac -b:a:0 320k -ar:a:0 48000 ")
                 sb.Append("-c:a:1 aac -b:a:1 320k -ar:a:1 48000 ")
             ElseIf hasSys OrElse _mic IsNot Nothing Then

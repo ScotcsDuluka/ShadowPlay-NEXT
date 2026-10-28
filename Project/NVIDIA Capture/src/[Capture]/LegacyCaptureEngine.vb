@@ -107,6 +107,93 @@ Partial Public Class LegacyCaptureEngine
     Private _stopCompleted As Integer = 0
     Private _muxCompleted As Integer = 0
 
+    ' Lifecycle completion is independent of Idle and of media inspection.
+    ' A playable partial after a killed/failed encoder is never a successful stop.
+    Public NotInheritable Class CompletionEvidence
+        Public ReadOnly Property OutputPath As String
+        Public ReadOnly Property Succeeded As Boolean
+        Public ReadOnly Property FailureReason As String
+        Public Sub New(outputPath As String, succeeded As Boolean, reason As String)
+            Me.OutputPath = outputPath
+            Me.Succeeded = succeeded
+            Me.FailureReason = reason
+        End Sub
+    End Class
+
+    Private _lastCompletion As CompletionEvidence
+    Private _completionOutputPath As String = ""
+    Private _completionFailure As String = ""
+    Private _completionVideoExit As Integer?
+    Private _completionMuxSucceeded As Boolean
+    Private _completionStderrExpected As Boolean
+    Private ReadOnly _completionStderrClosed As New Threading.ManualResetEventSlim(False)
+
+    Public ReadOnly Property LastCompletion As CompletionEvidence
+        Get
+            SyncLock _stateLock
+                Return _lastCompletion
+            End SyncLock
+        End Get
+    End Property
+    Public ReadOnly Property LastCompletionSucceeded As Boolean
+        Get
+            Dim completed As CompletionEvidence = LastCompletion
+            Return completed IsNot Nothing AndAlso completed.Succeeded
+        End Get
+    End Property
+    Public ReadOnly Property LastCompletedOutputPath As String
+        Get
+            Dim completed As CompletionEvidence = LastCompletion
+            Return If(completed Is Nothing, "", completed.OutputPath)
+        End Get
+    End Property
+
+    Private Sub BeginCompletion(outputPath As String, requiresMux As Boolean)
+        SyncLock _stateLock
+            _lastCompletion = Nothing
+            _completionOutputPath = Path.GetFullPath(outputPath)
+            _completionFailure = ""
+            _completionVideoExit = Nothing
+            _completionMuxSucceeded = Not requiresMux
+            _completionStderrExpected = False
+            _completionStderrClosed.Reset()
+        End SyncLock
+    End Sub
+    Private Sub FailCompletion(reason As String)
+        SyncLock _stateLock
+            If _lastCompletion Is Nothing AndAlso _completionFailure.Length = 0 Then _completionFailure = reason
+        End SyncLock
+    End Sub
+    Private Sub ObserveCompletionExit(proc As Process)
+        Try
+            If proc Is Nothing OrElse Not proc.HasExited Then
+                FailCompletion("ffmpeg_exit_unobserved")
+                Return
+            End If
+            SyncLock _stateLock
+                If _lastCompletion Is Nothing Then _completionVideoExit = proc.ExitCode
+            End SyncLock
+            If proc.ExitCode <> 0 Then FailCompletion("ffmpeg_nonzero_exit")
+            ' Receive the final error callbacks before freezing the outcome.
+            If _completionStderrExpected AndAlso Not _completionStderrClosed.Wait(2000) Then
+                FailCompletion("ffmpeg_stderr_completion_timeout")
+            End If
+        Catch
+            FailCompletion("ffmpeg_exit_unavailable")
+        End Try
+    End Sub
+    Private Sub CompleteRecording(outputValid As Boolean)
+        SyncLock _stateLock
+            If _lastCompletion IsNot Nothing Then Return
+            Dim reason As String = _completionFailure
+            If reason.Length = 0 AndAlso (Not _completionVideoExit.HasValue OrElse _completionVideoExit.Value <> 0) Then reason = "ffmpeg_exit_unverified"
+            If reason.Length = 0 AndAlso Not _completionMuxSucceeded Then reason = "ffmpeg_mux_not_successful"
+            If reason.Length = 0 AndAlso Not outputValid Then reason = "recording_output_invalid"
+            If reason.Length = 0 AndAlso Not String.Equals(_completionOutputPath, Path.GetFullPath(_outputFile), StringComparison.OrdinalIgnoreCase) Then reason = "recording_output_changed"
+            _lastCompletion = New CompletionEvidence(_completionOutputPath, reason.Length = 0, reason)
+        End SyncLock
+    End Sub
+
     ' ── Last-run diagnostics (for stress test runner) ──
     ' Set during Stop, retained for post-recording analysis.
     ' LastAudioDiagnostics: full GetDiagnostics() output (multiline string)
@@ -258,6 +345,7 @@ Partial Public Class LegacyCaptureEngine
                 Return False
             End If
             _state = CaptureState.Detecting
+            BeginCompletion(_outputFile, _settings.SystemAudioCapture OrElse _settings.MicCapture)
         End SyncLock
 
         Return Await Task.Run(Function()
@@ -391,6 +479,7 @@ Partial Public Class LegacyCaptureEngine
                                              Else
                                                  _ffmpegProcess = proc   ' publish — ownership settled
                                                  proc.BeginOutputReadLine()
+                                                  _completionStderrExpected = True
                                                  proc.BeginErrorReadLine()
                                                  _stopwatch = Stopwatch.StartNew()
                                                  System.Threading.Interlocked.Exchange(_stopCompleted, 0)
@@ -416,6 +505,7 @@ Partial Public Class LegacyCaptureEngine
                                          ' the LOCAL (Dispose cannot null it away) and the field
                                          ' (published after ownership) so both lifetimes are reaped.
                                          If Not startOk Then
+                                             FailCompletion("ffmpeg_start_failed")
                                              Try
                                                  If proc IsNot Nothing AndAlso Not proc.HasExited Then
                                                      proc.Kill()
@@ -441,6 +531,7 @@ Partial Public Class LegacyCaptureEngine
                                      End Try
                                      Return startOk
                                  Catch ex As Exception
+                                     FailCompletion("ffmpeg_start_failed")
                                      SetState(CaptureState.HasError)
                                      RaiseEvent ErrorOccurred("Start failed: " & ex.Message)
                                      LogDebug("Exception: " & ex.ToString())
@@ -524,6 +615,7 @@ Partial Public Class LegacyCaptureEngine
                                          WriteDebugLog(waitRetMsg)
 
                                          If Not _ffmpegProcess.HasExited Then
+                                             FailCompletion("ffmpeg_stop_forced")
                                              Dim killMsg As String = $"[FFmpeg] WaitForExit TIMEOUT → KILL PID={_ffmpegProcess.Id}"
                                              LogDebug(killMsg)
                                              WriteDebugLog(killMsg)
@@ -544,6 +636,8 @@ Partial Public Class LegacyCaptureEngine
                                          LogDebug(alreadyMsg)
                                          WriteDebugLog(alreadyMsg)
                                      End If
+
+                                     ObserveCompletionExit(_ffmpegProcess)
 
                                      ' ─── Step 2: Stop audio recorder (AFTER FFmpeg exited) ───
                                      ' Audio has been recording through the entire video duration.
@@ -581,6 +675,7 @@ Partial Public Class LegacyCaptureEngine
                                     ' (stop-after-failure, event already delivered by OnExited)
                                     ' returns the same truth the event branch announces.
                                     Dim outputOk As Boolean = IsOutputFileValid(_outputFile)
+                                     CompleteRecording(outputOk)
                                     If System.Threading.Interlocked.Exchange(_stopCompleted, 1) = 0 Then
                                         SetState(CaptureState.Idle)
                                         ' ★ Honesty fix: only announce a saved file that is
@@ -631,6 +726,8 @@ Partial Public Class LegacyCaptureEngine
                                      Return outputOk OrElse Not stopFromFailure
 
                                 Catch ex As Exception
+                                    FailCompletion("ffmpeg_stop_failed")
+                                    CompleteRecording(False)
                                     SetState(CaptureState.HasError)
                                     RaiseEvent ErrorOccurred("Stop failed: " & ex.Message)
                                     Return False
@@ -786,6 +883,7 @@ Partial Public Class LegacyCaptureEngine
                 muxProc.WaitForExit(60000) ' 60s max for mux (should be ~1-5s for stream copy + AAC)
 
                 If Not muxProc.HasExited Then
+                    FailCompletion("ffmpeg_mux_timeout")
                     LogDebug("[Mux] FFmpeg mux TIMEOUT — killing")
                     Try
                         muxProc.Kill()
@@ -815,6 +913,7 @@ Partial Public Class LegacyCaptureEngine
                 End If
 
                 If muxExitCode <> 0 Then
+                    FailCompletion("ffmpeg_mux_nonzero_exit")
                     ' The partial mux output has no moov atom and is unplayable;
                     ' the temp video is a complete stream-copy-ready h264 file,
                     ' so ship it video-only instead of leaving a broken mp4.
@@ -847,6 +946,9 @@ Partial Public Class LegacyCaptureEngine
                     ' Audio sidecars (and the rejected temp video) stay behind for inspection
                     Return
                 End If
+                SyncLock _stateLock
+                    _completionMuxSucceeded = True
+                End SyncLock
             End Using
 
             ' Mux succeeded — delete temp files
@@ -857,6 +959,7 @@ Partial Public Class LegacyCaptureEngine
             WriteDebugLog("[Mux] Temp files cleaned up")
 
         Catch ex As Exception
+            FailCompletion("ffmpeg_mux_failed")
             LogDebug("[Mux] Exception: " & ex.Message)
             WriteDebugLog("[Mux] Exception: " & ex.ToString())
         End Try
@@ -992,6 +1095,7 @@ Partial Public Class LegacyCaptureEngine
 
     Public Sub ForceStop()
         Try
+            FailCompletion("ffmpeg_force_stop")
             LogDebug("[FFmpeg] FORCE STOP")
             StopAudioWriter()
 
@@ -1007,6 +1111,7 @@ Partial Public Class LegacyCaptureEngine
             DeleteTempFile(_tempMicWav)
         Catch
         Finally
+            CompleteRecording(False)
             If _ffmpegProcess IsNot Nothing Then
                 _ffmpegProcess.Dispose()
                 _ffmpegProcess = Nothing
@@ -1027,7 +1132,10 @@ Partial Public Class LegacyCaptureEngine
     End Sub
 
     Private Sub OnStdErr(sender As Object, e As DataReceivedEventArgs)
-        If e.Data Is Nothing Then Return
+        If e.Data Is Nothing Then
+            If Object.ReferenceEquals(sender, _ffmpegProcess) Then _completionStderrClosed.Set()
+            Return
+        End If
 
         LogDebug("[stderr] " & e.Data)
         WriteDebugLog("[stderr] " & e.Data)
@@ -1191,6 +1299,7 @@ Partial Public Class LegacyCaptureEngine
             low.Contains("av_interleaved_write_header")
 
         If isError Then
+            If Object.ReferenceEquals(sender, _ffmpegProcess) Then FailCompletion("ffmpeg_fatal_stderr")
             RaiseEvent ErrorOccurred(e.Data)
             WriteDebugLog("[ERROR] " & e.Data)
         End If
@@ -1199,7 +1308,10 @@ Partial Public Class LegacyCaptureEngine
     Private Sub OnExited(sender As Object, e As EventArgs)
         Dim exitCode As String = "?"
         Dim pidStr As String = "?"
-        Dim proc As Process = _ffmpegProcess
+        Dim proc As Process = TryCast(sender, Process)
+        ' A queued exit callback from a disposed previous recording must not
+        ' observe/fail a newer session that reused this engine instance.
+        If proc Is Nothing OrElse Not Object.ReferenceEquals(proc, _ffmpegProcess) Then Return
         If proc IsNot Nothing Then
             Try
                 pidStr = proc.Id.ToString()
@@ -1237,6 +1349,7 @@ Partial Public Class LegacyCaptureEngine
             exitedDuringRecording = (_state = CaptureState.Recording)
         End SyncLock
         If exitedDuringRecording AndAlso Not _disposed Then
+            ObserveCompletionExit(proc)
             If _stopwatch IsNot Nothing Then _stopwatch.Stop()
 
             ' Step 1: Stop audio writer (finalize .wav files)
@@ -1250,10 +1363,12 @@ Partial Public Class LegacyCaptureEngine
                 End If
                 ' Step 3: Fire event exactly once
                 If System.Threading.Interlocked.Exchange(_stopCompleted, 1) = 0 Then
+                    Dim outputOk As Boolean = IsOutputFileValid(_outputFile)
+                    CompleteRecording(outputOk)
                     SetState(CaptureState.Idle)
                     ' ★ Honesty fix (mirrors StopRecordingAsync): announce only
                     ' usable output (exists AND non-empty — M2/W1 false-success gate).
-                    If IsOutputFileValid(_outputFile) Then
+                    If outputOk Then
                         RaiseEvent RecordingStopped(_outputFile)
                     Else
                         RaiseEvent ErrorOccurred("Recording not saved — output file missing or empty: " & _outputFile)
@@ -1261,6 +1376,8 @@ Partial Public Class LegacyCaptureEngine
                 End If
             ElseIf exitCode <> "?" Then
                 If System.Threading.Interlocked.Exchange(_stopCompleted, 1) = 0 Then
+                    FailCompletion("ffmpeg_nonzero_exit")
+                    CompleteRecording(False)
                     SetState(CaptureState.HasError)
                     RaiseEvent ErrorOccurred($"FFmpeg exited unexpectedly with code {exitCode}")
                 End If
@@ -1317,6 +1434,7 @@ Partial Public Class LegacyCaptureEngine
                      ", mic=" & _settings.MicCapture.ToString())
             WriteDebugLog("[Audio] AudioEngine started — shared WASAPI/device-clock timeline")
         Catch ex As Exception
+            FailCompletion("audio_capture_start_failed")
             LogDebug("[Audio] StartAudioRecorder exception: " & ex.Message)
             WriteDebugLog("[Audio] StartAudioRecorder exception: " & ex.ToString())
             _audioEngine = Nothing
@@ -1341,6 +1459,7 @@ Partial Public Class LegacyCaptureEngine
                 LogDebug("[Audio] AudioEngine stopped")
             End If
         Catch ex As Exception
+            FailCompletion("audio_capture_stop_failed")
             LogDebug("[Audio] AudioEngine stop exception: " & ex.Message)
         End Try
     End Sub

@@ -7,7 +7,10 @@ param(
     [int]$Port = 59477,
     [int]$Seconds = 3,
     [ValidateSet('FFmpeg', 'Duluka')]
-    [string]$Engine = 'FFmpeg'
+    [string]$Engine = 'FFmpeg',
+    [string]$ExecutablePath = '',
+    [string]$IsolatedRoot = '',
+    [string]$EvidenceDirectory = ''
 )
 $ErrorActionPreference = 'Stop'
 # Record modes, including FFmpeg/gdigrab, read ACTUAL desktop pixels.
@@ -25,16 +28,21 @@ if ($RunSmoke) {
     }
 }
 
-# Only run source builds in the feature worktree, never an installed Stable EXE.
+# Run an explicitly staged build or the source output, never an installed EXE.
 $capture = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $project = (Resolve-Path (Join-Path $capture '..')).Path
 $bin = Join-Path $capture 'bin\Release\net10.0-windows10.0.26100.0'
 $exe = Join-Path $bin 'NvCapture.exe'
+if ($ExecutablePath) {
+    $exe = [IO.Path]::GetFullPath($ExecutablePath)
+    $bin = Split-Path -Parent $exe
+}
 $ffmpeg = Join-Path $project 'FFmpeg\ffmpeg.exe'
 $probe = Join-Path $project 'FFmpeg\ffprobe.exe'
 # Per-port isolated root prevents simultaneous tests from rewriting one
 # another's config or claiming another test worker's output files.
 $root = Join-Path $capture ('bin\Release\IsolatedCaptureRoot-' + $Port)
+if ($IsolatedRoot) { $root = [IO.Path]::GetFullPath($IsolatedRoot) }
 $marker = Join-Path $root '.shadowplay-capture-isolated'
 $records = Join-Path $root 'Records'
 if ($Port -lt 59100 -or $Port -gt 59999) { throw 'Only isolated REST ports 59100-59999 are allowed.' }
@@ -105,6 +113,18 @@ if (-not $RunSmoke) {
     Write-Host 'Prepare-only mode. No NvCapture process or recording started.'
     exit 0
 }
+$secretPath = Join-Path $env:LOCALAPPDATA 'ShadowPlay NEXT\Secrets\pairing-current-user.dpapi'
+if (-not (Test-Path -LiteralPath $secretPath -PathType Leaf)) {
+    throw 'Protected Capture authorization is not enrolled; smoke cannot mutate the worker.'
+}
+Add-Type -AssemblyName System.Security
+$clearSecret = [Security.Cryptography.ProtectedData]::Unprotect(
+    [IO.File]::ReadAllBytes($secretPath), $null, [Security.Cryptography.DataProtectionScope]::CurrentUser)
+try { $token = [Text.Encoding]::ASCII.GetString($clearSecret) }
+finally { [Array]::Clear($clearSecret, 0, $clearSecret.Length) }
+if ($token -notmatch '^[0-9a-fA-F]{32}$') { throw 'Protected Capture authorization has invalid format.' }
+$writeHeaders = @{ 'X-ShadowPlay-Capture-Token' = $token }
+if ($EvidenceDirectory) { New-Item -ItemType Directory -Path $EvidenceDirectory -Force | Out-Null }
 $psi = New-Object Diagnostics.ProcessStartInfo
 $psi.FileName = $exe
 $psi.Arguments = '--capture-sandbox --rest'
@@ -134,19 +154,29 @@ try {
         throw "Isolated NvCapture not ready: $lastState"
     }
     $engines = Invoke-RestMethod -Uri "$base/engines" -TimeoutSec 8
+    if ($EvidenceDirectory) { $engines | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath (Join-Path $EvidenceDirectory 'engines-before.json') -Encoding UTF8 }
     if ($engines.configured.backend -ne $Engine) { throw "Wrong engine: $($engines.configured.backend)" }
     Write-Host "Isolated PID=$($child.Id) route=$($engines.configured.backend)"
-    $started = Invoke-RestMethod -Uri "$base/record/start" -Method POST -ContentType 'application/json' -Body '{}' -TimeoutSec 30
+    $started = Invoke-RestMethod -Uri "$base/record/start" -Method POST -Headers $writeHeaders -ContentType 'application/json' -Body '{}' -TimeoutSec 30
     if (-not $started.started) { throw "Start rejected: $($started.error) $($started.probeReason)" }
     if ($started.backend -ne $Engine) { throw "Incorrect actual backend $($started.backend)" }
     Write-Host "Start: backend=$($started.backend)"
     Start-Sleep -Seconds $Seconds
     $st = Invoke-RestMethod -Uri "$base/state" -TimeoutSec 5
+    if ($EvidenceDirectory) { $st | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath (Join-Path $EvidenceDirectory 'state-active.json') -Encoding UTF8 }
     if (-not $st.recording -or $st.actualSessionBackend -ne $Engine) {
-        throw 'Recorder lost its FFmpeg session'
+        throw 'Recorder lost its owned session'
     }
-    $stopped = Invoke-RestMethod -Uri "$base/record/stop" -Method POST -ContentType 'application/json' -Body '{}' -TimeoutSec 45
+    if ($Engine -eq 'Duluka' -and (-not $st.isCapturing -or $st.actualRunningEngine -ne 'Duluka' -or
+        $st.runtimeTruth.realFramesCaptured -lt 1 -or $st.runtimeTruth.framesEncoded -lt 1)) {
+        throw 'Native runtime did not prove real frame and encoded progress.'
+    }
+    $stopped = Invoke-RestMethod -Uri "$base/record/stop" -Method POST -Headers $writeHeaders -ContentType 'application/json' -Body '{}' -TimeoutSec 45
+    if ($EvidenceDirectory) { $stopped | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath (Join-Path $EvidenceDirectory 'stop-result.json') -Encoding UTF8 }
     if (-not $stopped.stopped) { throw "Stop not confirmed: $($stopped.error)" }
+    if (-not $stopped.saved -or $stopped.finalizationState -ne 'Saved' -or -not $stopped.mediaVerified) {
+        throw "Session was not verified Saved: $($stopped.finalizationState) $($stopped.error)"
+    }
     if (-not $stopped.media -or -not $stopped.media.verified -or
         $stopped.media.videoStreams -lt 1) {
         throw "Final MP4 media evidence missing: $($stopped.media.reason)"
@@ -174,6 +204,27 @@ try {
     if ($LASTEXITCODE -ne 0 -or -not ($metadata -match 'codec_name=h264')) {
         throw 'FFprobe could not verify H.264 output'
     }
+    $decodeLog = Join-Path $root 'full-decode.log'
+    $decode = New-Object Diagnostics.ProcessStartInfo
+    $decode.FileName = $ffmpeg
+    $decode.Arguments = '-nostdin -hide_banner -loglevel error -xerror -i "' + $target + '" -map 0:v:0 -f null -'
+    $decode.UseShellExecute = $false
+    $decode.CreateNoWindow = $true
+    $decode.RedirectStandardError = $true
+    $decoder = [Diagnostics.Process]::Start($decode)
+    try {
+        $errorRead = $decoder.StandardError.ReadToEndAsync()
+        if (-not $decoder.WaitForExit(30000)) { $decoder.Kill(); throw 'Full video decode exceeded 30 seconds.' }
+        $decodeErrors = $errorRead.GetAwaiter().GetResult()
+        [IO.File]::WriteAllText($decodeLog, $decodeErrors)
+        if ($decoder.ExitCode -ne 0 -or $decodeErrors.Trim().Length -gt 0) { throw 'Full video decode failed.' }
+    } finally { $decoder.Dispose() }
+    if ($EvidenceDirectory) {
+        @{ engine=$Engine; executable=$exe; executableSha256=(Get-FileHash -LiteralPath $exe).Hash;
+           start=$started; active=$st; stop=$stopped; file=$target; bytes=$size;
+           fullDecodePassed=$true; audioDevicesRequested=$false } |
+            ConvertTo-Json -Depth 20 | Set-Content -LiteralPath (Join-Path $EvidenceDirectory ($Engine.ToLowerInvariant()+'-desktop-smoke.json')) -Encoding UTF8
+    }
     Write-Host "SMOKE_PASS file=$target bytes=$size"
     Write-Output $metadata
 }
@@ -183,4 +234,6 @@ finally {
         try { $child.Kill(); $child.WaitForExit(4000) | Out-Null } catch {}
     }
     $child.Dispose()
+    $writeHeaders.Clear()
+    $token = $null
 }

@@ -495,6 +495,10 @@ Namespace DulukaEngine.Recording
                     .State = _state,
                     .VideoIdentity = VideoIdentity(),
                     .CurrentSessionId = If(_currentSession IsNot Nothing, _currentSession.SessionId, Nothing),
+                    .RealFramesCapturedThisSession = If(_currentSession Is Nothing, 0, _currentSession.RealFramesCapturedThisSession),
+                    .FramesSubmittedThisSession = If(_currentSession Is Nothing, 0, _currentSession.FramesSubmittedThisSession),
+                    .FramesEncodedThisSession = If(_currentSession Is Nothing, 0, _currentSession.FramesEncodedThisSession),
+                    .PacketsQueuedForMuxThisSession = If(_currentSession Is Nothing, 0, _currentSession.PacketsQueuedForMuxThisSession),
                     .LastSessionResult = _lastSessionResult
                 }
             End SyncLock

@@ -21,6 +21,11 @@ Namespace DulukaEngine.FFmpegTests
         Friend ReadOnly _skips As New List(Of String)()
 
         Function Main(args As String()) As Integer
+            If args.Length = 1 AndAlso args(0) = "--audio-intent-synthetic-only" Then
+                LiveMuxSessionTests.RunAudioIntentOnly()
+                Console.WriteLine($"SYNTHETIC_AUDIO_INTENT_RESULT passed={_passed} failed={_failed} skipped={_skipped}")
+                Return If(_failed = 0 AndAlso _passed = 5, 0, 1)
+            End If
             ' I2 shared-mux regression: lavfi test video/sine bytes only.
             ' Avoid unrelated pipeline integration entrypoints/device sources.
             If args.Length = 1 AndAlso args(0) = "--live-mux-synthetic-only" Then

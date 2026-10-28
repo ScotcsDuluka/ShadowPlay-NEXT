@@ -1,10 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><TargetFramework>net10.0-windows</TargetFramework><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings><AllowUnsafeBlocks>false</AllowUnsafeBlocks></PropertyGroup>
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings><AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+    <QsvNativePackageDirectory Condition="'$(QsvNativePackageDirectory)' == ''">$(MSBuildThisFileDirectory)..\Native\bin\package</QsvNativePackageDirectory>
+    <QsvNativeRequired Condition="'$(QsvNativeRequired)' == ''">false</QsvNativeRequired>
+  </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../DulukaEngine.Encoder/DulukaEngine.Encoder.vbproj" />
-    <None Include="../Native/bin/DulukaQsvNative.dll" Link="DulukaQsvNative.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('../Native/bin/DulukaQsvNative.dll')" />
-    <None Include="../Native/bin/dispatcher/libvpl.dll" Link="libvpl.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('../Native/bin/dispatcher/libvpl.dll')" />
-    <None Include="../Native/bin/libvpl-LICENSE.txt" Link="libvpl-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('../Native/bin/libvpl-LICENSE.txt')" />
-    <None Include="../Native/bin/runtime/*.dll" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="$(QsvNativePackageDirectory)\DulukaQsvNative.dll" Link="DulukaQsvNative.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('$(QsvNativePackageDirectory)\DulukaQsvNative.dll')" />
+    <None Include="$(QsvNativePackageDirectory)\libvpl.dll" Link="libvpl.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('$(QsvNativePackageDirectory)\libvpl.dll')" />
+    <None Include="$(QsvNativePackageDirectory)\libvpl-LICENSE.txt" Link="libvpl-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('$(QsvNativePackageDirectory)\libvpl-LICENSE.txt')" />
+    <None Include="$(QsvNativePackageDirectory)\qsv-native-package.json" Link="qsv-native-package.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('$(QsvNativePackageDirectory)\qsv-native-package.json')" />
   </ItemGroup>
+  <Target Name="ValidateQsvNativePackage" BeforeTargets="PrepareForBuild" Condition="'$(DesignTimeBuild)' != 'true'">
+    <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)..\Native\Test-NativeQsvPackage.ps1&quot; -PackageDirectory &quot;$(QsvNativePackageDirectory)&quot; -Required &quot;$(QsvNativeRequired)&quot; -ProbeAbi" />
+  </Target>
 </Project>

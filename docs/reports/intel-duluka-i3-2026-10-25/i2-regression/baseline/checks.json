@@ -1,62 +1,62 @@
-[
-  {
-    "name": "release-build",
-    "exitCode": 0,
-    "log": "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3-2026-10-25\\i2-regression\\baseline\\release-build.log"
-  },
-  {
-    "name": "hardware-dryrun",
-    "exitCode": 0,
-    "log": "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3-2026-10-25\\i2-regression\\baseline\\hardware-dryrun.log"
-  },
-  {
-    "name": "route-guards",
-    "exitCode": 0,
-    "log": "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3-2026-10-25\\i2-regression\\baseline\\route-guards.log"
-  },
-  {
-    "name": "display-selection",
-    "exitCode": 0,
-    "log": "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3-2026-10-25\\i2-regression\\baseline\\display-selection.log"
-  },
-  {
-    "name": "routing",
-    "exitCode": 0,
-    "log": "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3-2026-10-25\\i2-regression\\baseline\\routing.log"
-  },
-  {
-    "name": "configuration",
-    "exitCode": 0,
-    "log": "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3-2026-10-25\\i2-regression\\baseline\\configuration.log"
-  },
-  {
-    "name": "composition",
-    "exitCode": 0,
-    "log": "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3-2026-10-25\\i2-regression\\baseline\\composition.log"
-  },
-  {
-    "name": "dxgi-metadata",
-    "exitCode": 0,
-    "log": "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3-2026-10-25\\i2-regression\\baseline\\dxgi-metadata.log"
-  },
-  {
-    "name": "recovery",
-    "exitCode": 0,
-    "log": "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3-2026-10-25\\i2-regression\\baseline\\recovery.log"
-  },
-  {
-    "name": "video-contracts-offline",
-    "exitCode": 0,
-    "log": "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3-2026-10-25\\i2-regression\\baseline\\video-contracts-offline.log"
-  },
-  {
-    "name": "encoder-contracts",
-    "exitCode": 0,
-    "log": "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3-2026-10-25\\i2-regression\\baseline\\encoder-contracts.log"
-  },
-  {
-    "name": "session-result-contracts",
-    "exitCode": 0,
-    "log": "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3-2026-10-25\\i2-regression\\baseline\\session-result-contracts.log"
-  }
+﻿[
+    {
+        "name":  "release-build",
+        "exitCode":  0,
+        "log":  "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3-2026-10-25\\i2-regression\\baseline\\release-build.log"
+    },
+    {
+        "name":  "hardware-dryrun",
+        "exitCode":  0,
+        "log":  "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3-2026-10-25\\i2-regression\\baseline\\hardware-dryrun.log"
+    },
+    {
+        "name":  "route-guards",
+        "exitCode":  0,
+        "log":  "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3-2026-10-25\\i2-regression\\baseline\\route-guards.log"
+    },
+    {
+        "name":  "display-selection",
+        "exitCode":  0,
+        "log":  "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3-2026-10-25\\i2-regression\\baseline\\display-selection.log"
+    },
+    {
+        "name":  "routing",
+        "exitCode":  0,
+        "log":  "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3-2026-10-25\\i2-regression\\baseline\\routing.log"
+    },
+    {
+        "name":  "configuration",
+        "exitCode":  0,
+        "log":  "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3-2026-10-25\\i2-regression\\baseline\\configuration.log"
+    },
+    {
+        "name":  "composition",
+        "exitCode":  0,
+        "log":  "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3-2026-10-25\\i2-regression\\baseline\\composition.log"
+    },
+    {
+        "name":  "dxgi-metadata",
+        "exitCode":  0,
+        "log":  "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3-2026-10-25\\i2-regression\\baseline\\dxgi-metadata.log"
+    },
+    {
+        "name":  "recovery",
+        "exitCode":  0,
+        "log":  "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3-2026-10-25\\i2-regression\\baseline\\recovery.log"
+    },
+    {
+        "name":  "video-contracts-offline",
+        "exitCode":  0,
+        "log":  "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3-2026-10-25\\i2-regression\\baseline\\video-contracts-offline.log"
+    },
+    {
+        "name":  "encoder-contracts",
+        "exitCode":  0,
+        "log":  "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3-2026-10-25\\i2-regression\\baseline\\encoder-contracts.log"
+    },
+    {
+        "name":  "session-result-contracts",
+        "exitCode":  0,
+        "log":  "C:\\My Project\\NVIDIA-Shadowplay\\docs\\reports\\intel-duluka-i3-2026-10-25\\i2-regression\\baseline\\session-result-contracts.log"
+    }
 ]

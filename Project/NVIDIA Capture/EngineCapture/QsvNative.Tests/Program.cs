@@ -59,6 +59,22 @@ static partial class Program
             if(evidenceArg+1>=args.Length) throw new ArgumentException("evidence_directory_value_required");
             evidenceDirectory=Path.GetFullPath(args[evidenceArg+1]);
         }
+        if(args.Contains("--session-contract-only",StringComparer.OrdinalIgnoreCase)) {
+            SessionContracts();
+            Console.WriteLine($"SESSION_CONTRACT_PASS passed={passed} failed=0 live_desktop=false audio_opened=false gpu_created=false");
+            return 0;
+        }
+        if(args.Contains("--session-media-synthetic-only",StringComparer.OrdinalIgnoreCase)) {
+            SessionMediaSynthetic();
+            Console.WriteLine($"SESSION_MEDIA_SYNTHETIC_PASS passed={passed} failed=0 live_desktop=false audio_opened=false gpu_created=false");
+            return 0;
+        }
+        if(args.Length==7 && args[0]=="--verify-existing-media") {
+            var media=DulukaEngine.Media.SessionMediaVerifier.VerifyNative(args[1],SessionConfig("unused").FFmpegPath,
+                long.Parse(args[2]),int.Parse(args[3]),int.Parse(args[4]),int.Parse(args[5]),int.Parse(args[6]));
+            Console.WriteLine(JsonSerializer.Serialize(media,new JsonSerializerOptions{WriteIndented=true}));
+            return media.Verified?0:1;
+        }
         var target=DxgiDisplayInventory.Collect().Outputs.Single(t=>t.Eligible && t.Adapter.Vendor==GpuVendor.Intel);
         if(args.Contains("--i3c",StringComparer.OrdinalIgnoreCase)) {
             I3C(target);
