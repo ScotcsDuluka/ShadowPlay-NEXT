@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/Composition.Tests/">
+    <Project Path="Composition.Tests/CaptureComposition.Tests.csproj" />
+  </Folder>
   <Folder Name="/Duluka Capture/" />
   <Folder Name="/Duluka Capture/Audio/">
     <Project Path="Duluka Capture/Audio/DulukaEngine.Audio.Wasapi/DulukaEngine.Audio.Wasapi.csproj" />
@@ -47,6 +50,9 @@
   </Folder>
   <Folder Name="/Duluka Capture/Tests/Video/">
     <Project Path="Duluka Capture/Tests/Video/B1WorkerQuiescence.Tests/B1WorkerQuiescence.Tests.vbproj" />
+    <Project Path="Duluka Capture/Tests/Video/DulukaEngine.Video.Tests/DulukaEngine.Video.Tests.vbproj" />
+    <Project Path="Duluka Capture/Tests/Video/I3DFrame.Tests/I3DFrame.Tests.csproj" />
+    <Project Path="Duluka Capture/Tests/Video/I3DWorker.Tests/I3DWorker.Tests.vbproj" />
   </Folder>
   <Folder Name="/Duluka Capture/Tools/">
     <Project Path="Duluka Capture/Tools/DulukaEngine.Recording.ConsoleDriver/DulukaEngine.Recording.ConsoleDriver.vbproj" />
@@ -64,4 +70,8 @@
   <Folder Name="/Duluka Capture/Video/Windows Graphics Capture/">
     <Project Path="Duluka Capture/Video/Windows Graphics Capture/WgcCapture/WgcCapture.csproj" />
   </Folder>
+  <Project Path="AudioOffline.Tests/AudioOffline.Tests.csproj" />
+  <Project Path="DisplaySelection.Tests/DisplaySelection.Tests.vbproj" />
+  <Project Path="HardwareReadiness.Tests/HardwareReadiness.Tests.csproj" />
+  <Project Path="LegacyCompletion.Tests/LegacyCompletion.Tests.csproj" />
 </Solution>
