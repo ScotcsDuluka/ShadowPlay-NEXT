@@ -16,10 +16,40 @@
   <Folder Name="/Duluka Capture/Encoding/NVENC/">
     <Project Path="Duluka Capture/Encoding/NVENC/DulukaEngine.Encoder.Nvenc/DulukaEngine.Encoder.Nvenc.vbproj" />
   </Folder>
-  <Folder Name="/Duluka Capture/Recording/" />
+  <Folder Name="/Duluka Capture/Recording/">
+    <Project Path="Duluka Capture/Recording/DulukaEngine.Recording/DulukaEngine.Recording.vbproj" />
+  </Folder>
   <Folder Name="/Duluka Capture/Recording/Backends/" />
   <Folder Name="/Duluka Capture/Recording/Backends/FFmpeg/">
     <Project Path="Duluka Capture/Recording/Backends/FFmpeg/DulukaEngine.FFmpegBackend/DulukaEngine.FFmpegBackend.vbproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/Recording/Media/">
+    <Project Path="Duluka Capture/Recording/Media/DulukaEngine.Media/DulukaEngine.Media.vbproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/Tests/" />
+  <Folder Name="/Duluka Capture/Tests/Configuration/">
+    <Project Path="Duluka Capture/Tests/Configuration/DulukaEngine.ConfigTests/DulukaEngine.ConfigTests.vbproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/Tests/Contracts/">
+    <Project Path="Duluka Capture/Tests/Contracts/DulukaEngine.FrameContractTests/DulukaEngine.FrameContractTests.vbproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/Tests/Core/">
+    <Project Path="Duluka Capture/Tests/Core/DulukaEngine.Tests/DulukaEngine.Tests.vbproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/Tests/Encoder/">
+    <Project Path="Duluka Capture/Tests/Encoder/DulukaEngine.Encoder.Tests/DulukaEngine.Encoder.Tests.vbproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/Tests/FFmpeg/">
+    <Project Path="Duluka Capture/Tests/FFmpeg/DulukaEngine.FFmpegTests/DulukaEngine.FFmpegTests.vbproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/Tests/Recording/">
+    <Project Path="Duluka Capture/Tests/Recording/DulukaEngine.Recording.Tests/DulukaEngine.Recording.Tests.vbproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/Tests/Video/">
+    <Project Path="Duluka Capture/Tests/Video/B1WorkerQuiescence.Tests/B1WorkerQuiescence.Tests.vbproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/Tools/">
+    <Project Path="Duluka Capture/Tools/DulukaEngine.Recording.ConsoleDriver/DulukaEngine.Recording.ConsoleDriver.vbproj" />
   </Folder>
   <Folder Name="/Duluka Capture/Video/" />
   <Folder Name="/Duluka Capture/Video/Contracts/">
