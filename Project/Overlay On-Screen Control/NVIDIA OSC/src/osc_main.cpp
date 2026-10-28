@@ -1042,6 +1042,8 @@ static OscPresentResult DrawSharedTexture(ID3D11ShaderResourceView* srv,
     return PresentToSwap(w, h, true);
 }
 
+// Opt-in desktop-only A/B switches. Never touch global GPU or Windows VSync.
+static bool HasFlag(const wchar_t* name);
 static bool GpuCompositorInit(HWND hwnd, int w, int h) {
     UINT flags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
     D3D_FEATURE_LEVEL fl;
@@ -1104,13 +1106,16 @@ static bool GpuCompositorInit(HWND hwnd, int w, int h) {
             IDXGISwapChain2* swap2 = nullptr;
             if (SUCCEEDED(swap->QueryInterface(__uuidof(IDXGISwapChain2),
                     reinterpret_cast<void**>(&swap2)))) {
-                if (SUCCEEDED(swap2->SetMaximumFrameLatency(1)))
+                const UINT testLatency = HasFlag(L"desktop-latency2.test.flag") ? 2U : 1U;
+                if (SUCCEEDED(swap2->SetMaximumFrameLatency(testLatency)))
                     g_desktop_frame_latency_event = swap2->GetFrameLatencyWaitableObject();
+                Log("[desktop-ab] DXGI maximum frame latency requested=" +
+                    std::to_string(testLatency));
                 swap2->Release();
             }
         }
         Log(g_desktop_frame_latency_event ?
-            "[gpu] desktop frame pacing=DXGI waitable, maximum latency=1" :
+            "[gpu] desktop frame pacing=DXGI waitable" :
             "[gpu] desktop frame pacing=worker retry fallback");
         Log("[gpu] swapchain OK (premultiplied)");
     }
@@ -2457,7 +2462,8 @@ static void OscApplyCefFpsOnUi() {
     CEF_REQUIRE_UI_THREAD();
     if (g_browser && g_browser->GetHost()) {
         const int cefFps = g_game_focused.load(std::memory_order_acquire) ? 60 :
-            osc::CefDesktopFps(g_desktop_fps_limit.load(std::memory_order_acquire));
+            osc::CefDesktopFps(g_desktop_fps_limit.load(std::memory_order_acquire),
+                g_render_state.load(std::memory_order_acquire) == OscRmGpuShared);
         g_browser->GetHost()->SetWindowlessFrameRate(cefFps);
     }
 }
@@ -2489,7 +2495,8 @@ public:
                 SetEvent(g_desktop_present_frame_event);
         }
         Log("[fps-limit] saved Desktop limit=" + std::to_string(fps_) +
-            "; CEF ceiling=" + std::to_string(osc::CefDesktopFps(fps_)));
+            "; CEF ceiling=" + std::to_string(osc::CefDesktopFps(fps_,
+                g_render_state.load(std::memory_order_acquire) == OscRmGpuShared)));
         reply_(OscFpsStateOnUi());
     }
 private:
@@ -3825,7 +3832,7 @@ static void CreateBrowserNow() {
     CefBrowserSettings bs;
     bs.background_color = CefColorSetARGB(0, 0, 0, 0);
     bs.windowless_frame_rate = g_game_focused.load(std::memory_order_acquire) ? 60 :
-        osc::CefDesktopFps(g_cfg.max_fps);
+        osc::CefDesktopFps(g_cfg.max_fps, wi.shared_texture_enabled);
     Log("[cfg] Desktop frame limit=" + std::to_string(g_cfg.max_fps) +
         " fps; CEF requested=" + std::to_string(bs.windowless_frame_rate) +
         "; shared_texture=" + std::to_string(wi.shared_texture_enabled));
@@ -5058,6 +5065,9 @@ public:
         cmd->AppendSwitch("disable-background-timer-throttling");
         cmd->AppendSwitch("disable-renderer-backgrounding");
         cmd->AppendSwitch("disable-backgrounding-occluded-windows");
+        if (!g_game_focused.load(std::memory_order_acquire) &&
+            HasFlag(L"desktop-no-vsync.test.flag"))
+            cmd->AppendSwitch("disable-gpu-vsync");
     }
     CefRefPtr<CefRenderProcessHandler> GetRenderProcessHandler() override { return this; }
 
@@ -5128,6 +5138,11 @@ public:
     cmd->AppendSwitch("disable-background-timer-throttling");
     cmd->AppendSwitch("disable-renderer-backgrounding");
     cmd->AppendSwitch("disable-backgrounding-occluded-windows");
+    if (!g_game_focused.load(std::memory_order_acquire) &&
+        HasFlag(L"desktop-no-vsync.test.flag")) {
+        cmd->AppendSwitch("disable-gpu-vsync");
+        Log("[desktop-ab] CEF disable-gpu-vsync requested");
+    }
         // ★ ชุดที่พิสูจน์แล้วว่า "วาดได้ + renderer เสถียร" บนเครื่องนี้:
         //   no-pre-read + host-resolver-rules — ส่วน GPU เลื่อนขั้นเป็น ANGLE→D3D11
         //   เพื่อ 60fps (จากเดิม disable-gpu = raster ด้วย CPU อย่างเดียว = กระตุก)

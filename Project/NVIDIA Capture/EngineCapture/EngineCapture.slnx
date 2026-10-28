@@ -70,8 +70,25 @@
   <Folder Name="/Duluka Capture/Video/Windows Graphics Capture/">
     <Project Path="Duluka Capture/Video/Windows Graphics Capture/WgcCapture/WgcCapture.csproj" />
   </Folder>
+  <Folder Name="/MediaEvidence.Tests/">
+    <Project Path="MediaEvidence.Tests/CaptureMediaInspector.Tests.vbproj" />
+  </Folder>
+  <Folder Name="/Mux.Tests/">
+    <Project Path="Mux.Tests/CaptureMux.Tests.vbproj" />
+  </Folder>
+  <Folder Name="/RouteGuard.Tests/">
+    <Project Path="RouteGuard.Tests/CaptureRouteGuard.Tests.vbproj" />
+  </Folder>
+  <Folder Name="/Routing.Tests/">
+    <Project Path="Routing.Tests/ShadowPlay.Capture.Routing.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Routing/">
+    <Project Path="Routing/ShadowPlay.Capture.Routing.csproj" />
+  </Folder>
   <Project Path="AudioOffline.Tests/AudioOffline.Tests.csproj" />
   <Project Path="DisplaySelection.Tests/DisplaySelection.Tests.vbproj" />
   <Project Path="HardwareReadiness.Tests/HardwareReadiness.Tests.csproj" />
-  <Project Path="LegacyCompletion.Tests/LegacyCompletion.Tests.csproj" />
+  <Project Path="QsvNative.Tests/QsvNative.Tests.csproj" />
+  <Project Path="Recovery.Tests/Recovery.Tests.csproj" />
+  <Project Path="SessionRecovery.Tests/SessionRecovery.Tests.vbproj" />
 </Solution>

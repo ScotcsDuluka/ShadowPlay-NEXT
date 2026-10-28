@@ -63,10 +63,10 @@ test('80/20 visual contract remains scoped to original native Settings',()=>{
  assert.match(css,/\.nv-live-editor\.nv-freestyle-settings/);
  assert.match(css,/\.nv-freestyle-legacy\[open\]/);
  assert.doesNotMatch(css,/\b(?:clamp|min|max)\(/,'the real Chromium 73 runtime cannot parse these CSS functions');
- assert.ok(index.includes('/mods/nv-freestyle-settings.js'));
- assert.ok(index.includes('/mods/nv-freestyle-settings.css'));
- assert.ok(index.includes('/mods/launcher-language-sync.js'));
- assert.ok(index.includes('/mods/osc-motion.js'));
+ assert.ok(index.includes('/Module/MainMenu/FreestyleV5/nv-freestyle-settings.js'));
+ assert.ok(index.includes('/Module/MainMenu/FreestyleV5/nv-freestyle-settings.css'));
+ assert.ok(index.includes('/Module/Base/Localization/launcher-language-sync.js'));
+ assert.ok(index.includes('/Module/Overlay/Motion/osc-motion.js'));
 });
 test('header actions reserve native focus borders and fixed dimensions while interaction states only change paint',()=>{
  const css=read('mods/nv-freestyle-settings.css');

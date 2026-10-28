@@ -80,7 +80,16 @@ static partial class Program
             Console.WriteLine(JsonSerializer.Serialize(media,new JsonSerializerOptions{WriteIndented=true}));
             return media.Verified?0:1;
         }
-        var target=DxgiDisplayInventory.Collect().Outputs.Single(t=>t.Eligible && t.Adapter.Vendor==GpuVendor.Intel);
+        // Environment gate: this suite probes the REAL native QSV runtime and
+        // therefore requires a physical eligible Intel output. On machines
+        // without one it must SKIP truthfully (like Video.Tests HardwareGate),
+        // never crash with an enumeration exception.
+        var intelOutputs=DxgiDisplayInventory.Collect().Outputs.Where(t=>t.Eligible && t.Adapter.Vendor==GpuVendor.Intel).ToList();
+        if(intelOutputs.Count==0) {
+            Console.WriteLine("QSV_NATIVE_SKIP reason=no_eligible_intel_output screen_pixels_read=false audio_opened=false");
+            return 0;
+        }
+        var target=intelOutputs.Single(t=>t.Eligible && t.Adapter.Vendor==GpuVendor.Intel);
         if(args.Contains("--i3c",StringComparer.OrdinalIgnoreCase)) {
             I3C(target);
             return 0;

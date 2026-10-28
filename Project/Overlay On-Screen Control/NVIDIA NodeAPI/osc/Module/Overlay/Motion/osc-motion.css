@@ -7,25 +7,16 @@ html.nv-motion-active [data-nv-motion-group]{transform:var(--nv-motion-base,tran
 html.nv-motion-active [data-nv-motion-block]{transform:var(--nv-motion-base,translate3d(0,0,0)) scale(var(--nv-motion-scale,1))!important;transform-origin:left bottom!important;opacity:1!important;will-change:transform;animation:none!important}
 html.nv-motion-active [data-nv-motion-top]{transform:var(--nv-motion-base,translate3d(0,0,0)) translate3d(0,var(--nv-motion-y,0px),0)!important;opacity:1!important;will-change:transform;transition:none!important;animation:none!important}
 html.nv-motion-active.nv-motion-backgroundFade #nv-osc-background{opacity:var(--nv-motion-bg-alpha,.5)!important;transition:none!important}
-/* Fullscreen Classic backdrop fades via #nv-osc-background, not .nv-osc. */
-html.nv-motion-active.nv-motion-backgroundFade:not(.nv-osc-bg-website) .nv-osc{background:transparent!important}
+html.nv-motion-active.nv-motion-backgroundFade:not(.nv-osc-bg-website) .nv-osc{background:rgba(0,0,0,var(--nv-motion-bg-alpha,.5))!important}
 html.nv-motion-active .nv-flex-face{animation:none!important}
 html.nv-motion-opening .nv-osc md-menu,html.nv-motion-closing .nv-osc md-menu,html.nv-motion-active .md-open-menu-container{pointer-events:none!important}
 html.nv-motion-active .md-open-menu-container{opacity:0!important}
-/* Disabled OSC components stay present, including during view preparation. */
 html.nv-motion-osc:not(.nv-motion-mainMenuAnimation) .main-menu-container md-toolbar.list,
 html.nv-motion-osc:not(.nv-motion-mainMenuAnimation) .main-menu-container md-menu,
 html.nv-motion-osc:not(.nv-motion-mainMenuAnimation) .osc-content,
-html.nv-motion-osc:not(.nv-motion-topAnimation) nv-osc-top-bar .top-bar {
-  animation:none!important;transition:none!important;
-}
-html.nv-motion-osc:not(.nv-motion-backgroundFade) #nv-osc-background {transition:none!important;}
-/* Global off affects overlay transitions, not ambient background playback. */
-html.nv-motion-disabled .nv-osc,
-html.nv-motion-disabled .osc-content,
-html.nv-motion-disabled .main-menu-container md-toolbar.list,
-html.nv-motion-disabled .main-menu-container md-menu,
-html.nv-motion-disabled nv-osc-top-bar .top-bar {
-  animation:none!important;transition:none!important;
-}
-html.nv-motion-disabled #nv-osc-background {transition:none!important;}
+html.nv-motion-osc:not(.nv-motion-topAnimation) nv-osc-top-bar .top-bar{animation:none!important;transition:none!important}
+html.nv-motion-osc:not(.nv-motion-backgroundFade) #nv-osc-background{transition:none!important}
+html.nv-motion-disabled .nv-osc,html.nv-motion-disabled .osc-content,
+html.nv-motion-disabled .main-menu-container md-toolbar.list,html.nv-motion-disabled .main-menu-container md-menu,
+html.nv-motion-disabled nv-osc-top-bar .top-bar{animation:none!important;transition:none!important}
+html.nv-motion-disabled #nv-osc-background{transition:none!important}

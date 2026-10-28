@@ -142,11 +142,15 @@ test('invalid version, rollback and offline responses do not create updates', as
     assert.ok(h.warnings.length > 0);
 });
 
-test('OSC adapter forwards validated local catalog version and index loads update adapter', () => {
+test('OSC adapter forwards validated local catalog version and index boot-loads the OSC adapter', () => {
     const oscAdapter = fs.readFileSync(path.join(oscRoot, 'mods', 'notifier', 'OSC-Adapter.js'), 'utf8');
     const index = fs.readFileSync(path.join(oscRoot, 'index.html'), 'utf8');
     assert.match(oscAdapter, /eventAggregator\.trigger\('nv-ontology-local-catalog-version', event\.status\.catalogVersion\)/);
-    assert.match(index, /\/mods\/notifier\/Ontology-Update-Adapter\.js/);
+    // Ontology updates ride on the boot-loaded OSC adapter. The standalone
+    // Ontology-Update-Adapter.js is manifest-owned but not referenced by any
+    // loader (index.html, allowlist, or dynamic injection) since 2026-10-27.
+    assert.match(index, /\/Module\/Notifier\/OSC-Adapter\.js/);
+    assert.doesNotMatch(index, /Ontology-Update-Adapter/);
 });
 
 function readLocale(filename) {

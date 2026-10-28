@@ -12,7 +12,20 @@ inline bool IsValidDesktopFps(double fps) noexcept {
         fps <= DesktopFpsMax && std::floor(fps) == fps;
 }
 
-inline int CefDesktopFps(int fps) noexcept { return fps < 60 ? fps : 60; }
+// Preserve the stock CEF 73 60fps ceiling for CPU/legacy rendering.
+// The patched accelerated OSR shared-texture backend may request up to 240fps.
+// This is a request ceiling, not a measured frame delivery guarantee.
+inline constexpr int CefFrameRateMax(bool acceleratedSharedTexture) noexcept {
+    return acceleratedSharedTexture ? DesktopFpsMax : 60;
+}
+inline int CefDesktopFps(int fps, bool acceleratedSharedTexture = false) noexcept {
+    if (!IsValidDesktopFps(fps)) return 60;
+    const int ceiling = CefFrameRateMax(acceleratedSharedTexture);
+    return fps < ceiling ? fps : ceiling;
+}
+inline constexpr int CefHookFps(bool acceleratedSharedTexture) noexcept {
+    return CefFrameRateMax(acceleratedSharedTexture);
+}
 
 // Pace accepted Desktop Presents; CEF paints continue updating the latest image.
 class DesktopFpsLimiter {

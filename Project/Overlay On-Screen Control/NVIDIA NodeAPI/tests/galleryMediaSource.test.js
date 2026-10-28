@@ -135,7 +135,7 @@ function mock() {
 function tick() { return new Promise(resolve => setImmediate(resolve)); }
 test('the real OSC HTML includes Gallery MSE bridge exactly once', () => {
   const html = fs.readFileSync(path.join(osc,'index.html'),'utf8');
-  const count = (html.match(/src="\/mods\/gallery-media-source\.js\?v=/g) || []).length;
+  const count = (html.match(/src="\/Module\/Gallery\/Media\/gallery-media-source\.js\?v=/g) || []).length;
   assert.equal(count, 1);
 });
 test('repeated script injection replaces the observer and preserves playback', async () => {

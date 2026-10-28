@@ -13,7 +13,7 @@
     var startX=o.startX===undefined?-1722:o.startX,exitX=o.exitX===undefined?1722:o.exitX;
     function valid(value,min,max,fallback){return typeof value==='number'&&isFinite(value)?Math.max(min,Math.min(max,value)):fallback;}
     function validBezier(value){return Array.isArray(value)&&value.length===4&&value.every(function(n){return typeof n==='number'&&isFinite(n);})?[valid(value[0],0,1,0),valid(value[1],-2,3,0),valid(value[2],0,1,1),valid(value[3],-2,3,1)]:null;}
-    var baseDuration=valid(o.duration,100,1600,520),baseCurve=valid(o.curve,.4,4,2);
+    var baseDuration=valid(o.duration,50,2000,520),baseCurve=valid(o.curve,.4,4,2);
     var timing={open:{duration:baseDuration,curve:baseCurve},closed:{duration:baseDuration,curve:baseCurve}};
     var initialBezier=validBezier(o.bezier);if(initialBezier){timing.open.bezier=initialBezier.slice();timing.closed.bezier=initialBezier.slice();}
     var pose={x:startX,scale:.24,opacity:0,barY:-88,barOpacity:0,bgProgress:0};
@@ -37,7 +37,7 @@
       phase=next==='open'?'opening':'closing';
       var distance=Math.max(Math.abs(end.x-from.x)/Math.max(1,Math.abs(startX),Math.abs(exitX)),Math.abs(end.scale-from.scale)/.76,Math.abs(end.bgProgress-from.bgProgress),Math.abs(end.barOpacity-from.barOpacity));
       var selected=copy(timing[next==='open'?'open':'closed']);
-      var time=Math.max(90,Math.min(Math.max(1100,selected.duration),selected.duration*Math.sqrt(distance)));
+      var time=Math.max(50,Math.min(Math.max(1100,selected.duration),selected.duration*Math.sqrt(distance)));
       function finish(){if(token!==version)return;pose=end;progress=1;phase='idle';frame=null;paint();if(o.loopInputs&&requestedTarget!==next){go(requestedTarget);return;}if(o.onFinish)o.onFinish(next);}
       if(o.reducedMotion&&o.reducedMotion()){finish();return;}
       paint();
@@ -55,7 +55,7 @@
     function command(next){requestedTarget=next;if(o.loopInputs&&phase!=='idle')return;go(next);}
     function setTiming(value){
       value=value&&typeof value==='object'?value:{};var changed=false;
-      ['open','closed'].forEach(function(key){var input=value[key]&&typeof value[key]==='object'?value[key]:{},previous=timing[key];var next={duration:valid(input.duration,100,1600,previous.duration),curve:valid(input.curve,.4,4,previous.curve)};var bezier=validBezier(input.bezier);if(bezier)next.bezier=bezier;else if(previous.bezier&&!(typeof input.curve==='number'&&isFinite(input.curve)))next.bezier=previous.bezier.slice();if(next.duration!==previous.duration||next.curve!==previous.curve||JSON.stringify(next.bezier)!==JSON.stringify(previous.bezier))changed=true;timing[key]=next;});
+      ['open','closed'].forEach(function(key){var input=value[key]&&typeof value[key]==='object'?value[key]:{},previous=timing[key];var next={duration:valid(input.duration,50,2000,previous.duration),curve:valid(input.curve,.4,4,previous.curve)};var bezier=validBezier(input.bezier);if(bezier)next.bezier=bezier;else if(previous.bezier&&!(typeof input.curve==='number'&&isFinite(input.curve)))next.bezier=previous.bezier.slice();if(next.duration!==previous.duration||next.curve!==previous.curve||JSON.stringify(next.bezier)!==JSON.stringify(previous.bezier))changed=true;timing[key]=next;});
       if(changed&&phase!=='idle')go(target,true);else paint();return getTiming();
     }
     var api={open:function(){command('open');},close:function(){command('closed');},toggle:function(){command(requestedTarget==='open'?'closed':'open');},cancel:function(){invalidate();phase='idle';requestedTarget=target;paint();},getState:state,getTiming:getTiming,setTiming:setTiming};

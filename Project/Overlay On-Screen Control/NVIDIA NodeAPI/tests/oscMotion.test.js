@@ -310,7 +310,7 @@ test('failed or base transitions cancel deferred entrance and release nodes', ()
 
 test('the actual OSC page loads the selected engine and timing before its native adapter',()=>{
   const html=fs.readFileSync(path.join(__dirname,'../osc/index.html'),'utf8');
-  const assets=['/mods/osc-motion-engine.js','/mods/osc-motion-timing.js','/mods/osc-motion.js'];
+  const assets=['/Module/Overlay/Motion/osc-motion-engine.js','/Module/Overlay/Motion/osc-motion-timing.js','/Module/Overlay/Motion/osc-motion.js'];
   const positions=assets.map(asset=>html.indexOf('src="'+asset));
   assert(positions.every(i=>i>=0),'all motion scripts must be linked');
   assert(positions[0]<positions[1]&&positions[1]<positions[2],'motion script order must be engine -> timing -> adapter');

@@ -147,7 +147,7 @@ test('module is idempotent and settings route is loaded in OSC index',()=>{
   f.window.angular.module=()=>{throw Error('Module loaded twice');};
   vm.runInNewContext(source,f.context);
   const index=fs.readFileSync(path.join(__dirname,'../osc/index.html'),'utf8');
-  assert.match(index,/\/mods\/osc-hook-settings\.js/);
+  assert.match(index,/\/Module\/Settings\/Hook\/osc-hook-settings\.js/);
   const gpu=fs.readFileSync(path.join(__dirname,'../osc/mods/gpu-profiles.js'),'utf8');
   assert.match(gpu,/id:'hook-settings',name:'Hook Settings'/);
 });

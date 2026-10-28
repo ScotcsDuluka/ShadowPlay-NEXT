@@ -5,17 +5,28 @@ const root=path.resolve(__dirname,'../osc');
 function read(rel){return fs.readFileSync(path.join(root,rel),'utf8')}
 test('OSC loads NVIDIA archive Customize V2 without experimental V4/Group Editor UI',()=>{
  const index=read('index.html');
- assert.match(index, /src="\/mods\/main-menu-live\.js/);
- assert.match(index, /href="\/mods\/main-menu-live\.css/);
- for(const mod of ['main-menu-unified-native.js','main-menu-unified-native.css',
- 'main-menu-group-editor.js','main-menu-group-editor.css','main-menu-group-model.js']) {
+ assert.match(index, /src="\/Module\/MainMenu\/NVIDIA\/main-menu-live\.js/);
+ assert.match(index, /href="\/Module\/MainMenu\/NVIDIA\/main-menu-live\.css/);
+ const unmounted={
+  'main-menu-unified-native.js':'/Module/MainMenu/LegacyV4/main-menu-unified-native.js',
+  'main-menu-unified-native.css':'/Module/MainMenu/LegacyV4/main-menu-unified-native.css',
+  'main-menu-group-editor.js':'/Module/MainMenu/GroupEditor/main-menu-group-editor.js',
+  'main-menu-group-editor.css':'/Module/MainMenu/GroupEditor/main-menu-group-editor.css',
+  'main-menu-group-model.js':'/Module/MainMenu/GroupEditor/main-menu-group-model.js'};
+ for(const mod of Object.keys(unmounted)) {
    assert.equal(index.includes('/mods/'+mod),false,'Legacy experimental UI must stay unmounted: '+mod);
+   assert.equal(index.includes(unmounted[mod]),false,'Legacy experimental UI must stay unmounted: '+mod);
  }
 });
 test('source keeps supported newer infrastructure and NEXT model without changing default UI',()=>{
  const index=read('index.html');
- for(const mod of ['launcher-language-sync.js','osc-ui-localization.js',
- 'osc-motion.js','nv-layout-v5-core.js','nv-next-v5-native.js'])assert.ok(index.includes('/mods/'+mod),mod);
+ const mounted={
+  'launcher-language-sync.js':'/Module/Base/Localization/launcher-language-sync.js',
+  'osc-ui-localization.js':'/Module/Base/Localization/osc-ui-localization.js',
+  'osc-motion.js':'/Module/Overlay/Motion/osc-motion.js',
+  'nv-layout-v5-core.js':'/Module/MainMenu/FreestyleV5/nv-layout-v5-core.js',
+  'nv-next-v5-native.js':'/Module/MainMenu/FreestyleV5/nv-next-v5-native.js'};
+ for(const mod of Object.keys(mounted))assert.ok(index.includes(mounted[mod]),mod);
  const native=read('mods/nv-next-v5-native.js');
  assert.match(native,/DulukaNextNativeLayoutV5Enabled/);
  assert.match(native,/read\(FLAG\) === '1'/);

@@ -224,11 +224,16 @@ app.get('/nvcamera-test-mode.js', function (req, res) {
     res.end('window.NV_CONTAINER_TEST_MODE = ' + (containerTestMode ? 'true' : 'false') + ';');
 });
 
-// OSC CSS/JS mods in osc/mods — the host injects them when the page loads.
+// Mods system retired 2026-10-29: the production page loads every extension
+// from /Module/ (static bootstrap + Module/Core/late-extensions.js), and the
+// native host injection stays empty. Set OSC_ENABLE_LEGACY_MODS_LIST=1 to
+// restore the pre-cutover allowlist for rollback diagnostics.
+// See osc/Module/CUTOVER-20261029.md.
 app.get('/mods/list', function (req, res) {
+    res.setHeader('Cache-Control', 'no-store');
+    if (process.env.OSC_ENABLE_LEGACY_MODS_LIST !== '1') { res.json([]); return; }
     var dir = require('path').join(__dirname, 'osc', 'mods');
     var fs = require('fs');
-    res.setHeader('Cache-Control', 'no-store');
     fs.readdir(dir, function (err, files) {
         if (err) { res.json([]); return; }
         // Serve only the source-owned mod manifest. The Build tree may retain

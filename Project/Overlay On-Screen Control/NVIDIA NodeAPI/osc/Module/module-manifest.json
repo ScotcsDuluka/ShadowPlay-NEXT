@@ -218,7 +218,7 @@
       "module": "/Module/Gallery/Media/gallery-media-source.js",
       "owner": "gallery.media",
       "bytes": 10355,
-      "sha256": "8cae9e433809634fae1695157712a4ecdaa38d09dfc77ddcf4952ac2841211fc",
+      "sha256": "bb69b3b8b18a24505f54b6ff0d870bd99f141107ea29a3096702f14bb18f17df",
       "type": "js",
       "originallyIndexed": true
     },
@@ -560,7 +560,7 @@
       "module": "/Module/Overlay/Motion/osc-motion.css",
       "owner": "overlay.motion",
       "bytes": 1657,
-      "sha256": "6b6dc94b668fafdec3b34ea07a36e7e3394f9209376b984f2b7a10d08db4e230",
+      "sha256": "2e971c1cd0b00c68084abf0f0bc29486a9e94604f91494a05cd8ca7b2b8bb30d",
       "type": "css",
       "originallyIndexed": true
     },
@@ -569,7 +569,7 @@
       "module": "/Module/Overlay/Motion/osc-motion-engine.js",
       "owner": "overlay.motion",
       "bytes": 5964,
-      "sha256": "ca3724e5d20cf295f880cfe69374f310fd5d8da857fc8d8e1ee347954de40201",
+      "sha256": "d8ff75964da5f2cbf394c15593ac2e00f0ba3f0058f41fe2cef17dcdc670f12f",
       "type": "js",
       "originallyIndexed": true
     },
@@ -578,7 +578,7 @@
       "module": "/Module/Overlay/Motion/osc-motion.js",
       "owner": "overlay.motion",
       "bytes": 13666,
-      "sha256": "2f948af8dcf27b8a3c67a8f96a3793238928fd5a41135d84b336c44731eed0e6",
+      "sha256": "4f28e929cad3986f955337e7b67e991010372e2e2c96318e33a391f6f19f9090",
       "type": "js",
       "originallyIndexed": true
     },
@@ -699,5 +699,6 @@
       "type": "js",
       "originallyIndexed": false
     }
-  ]
+  ],
+  "legacyIndexSha": "870e57b246db7500303dbb0f214b212b37890cdb2d05405371d67f3c70644dfa"
 }

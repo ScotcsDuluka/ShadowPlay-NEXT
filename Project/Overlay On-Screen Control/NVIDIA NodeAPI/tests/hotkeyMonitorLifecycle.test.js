@@ -153,6 +153,6 @@ test('real monitor HTTP facade suppresses/resumes and rejects reordered sessions
 
 test('lifecycle mod is boot loaded once beside the native hotkey bridge', () => {
   const html = require('node:fs').readFileSync(require('node:path').join(__dirname, '../osc/index.html'), 'utf8');
-  assert.equal((html.match(/src="\/mods\/hotkey-monitor-lifecycle\.js\?/g) || []).length, 1);
-  assert.ok(html.indexOf('/mods/hotkey-live.js') < html.indexOf('/mods/hotkey-monitor-lifecycle.js'));
+  assert.equal((html.match(/src="\/Module\/Base\/Hotkey\/hotkey-monitor-lifecycle\.js\?/g) || []).length, 1);
+  assert.ok(html.indexOf('/Module/Base/Hotkey/hotkey-live.js') < html.indexOf('/Module/Base/Hotkey/hotkey-monitor-lifecycle.js'));
 });

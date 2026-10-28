@@ -63,8 +63,8 @@ test('Native NVIDIA UI route is registered once in HEAD before bootstrap',()=>{
   assert.match(routeJs,/controllerAs:\s*'captureAdvanced'/);
   assert.match(routeJs,/controller:\s*'OscAdvancedCaptureController'/);
   assert.match(routeJs,/\['\$http', '\$state', '\$scope', function/);
-  assert.equal(index.split('/mods/advanced-capture-route.js').length-1,1);
-  assert.equal(index.split('/mods/advanced-capture-route.css').length-1,1);
+  assert.equal(index.split('/Module/Settings/Capture/advanced-capture-route.js').length-1,1);
+  assert.equal(index.split('/Module/Settings/Capture/advanced-capture-route.css').length-1,1);
   assert.ok(index.indexOf('advanced-capture-route.js')<index.indexOf('</head>'));
   assert.match(routeJs,/class="osc-content nv-advanced-capture-route"/);
   assert.match(routeJs,/class="osc-bread-crumb"/);
