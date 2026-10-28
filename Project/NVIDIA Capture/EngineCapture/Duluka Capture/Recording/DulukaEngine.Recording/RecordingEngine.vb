@@ -308,26 +308,15 @@ Namespace DulukaEngine.Recording
                 End If
 
                 ' ★ phase 3: resolve the session's OWN encode dimensions
-                ' (native, or a requested NVENC downscale). An upscale attempt
-                ' fails closed to native with a loud log — NVENC cannot
-                ' upscale, and a silent resolution substitution is forbidden.
-                Dim sessionEncodeW As Integer
-                Dim sessionEncodeH As Integer
-                Try
-                    Dim sessionDims As Tuple(Of Integer, Integer) =
-                        EngineStartupConfig.ResolveEncodeDimensions(
-                            _capture.OutputWidth, _capture.OutputHeight,
-                            config.UseNativeResolution, config.RequestedWidth, config.RequestedHeight)
-                    sessionEncodeW = sessionDims.Item1
-                    sessionEncodeH = sessionDims.Item2
-                Catch ex As ArgumentException
-                    _logger.Warning($"[RecordingEngine] session resolution {config.RequestedWidth}x{config.RequestedHeight} exceeds capture {_capture.OutputWidth}x{_capture.OutputHeight} — falling back to native ({ex.Message})")
-                    sessionEncodeW = _capture.OutputWidth
-                    sessionEncodeH = _capture.OutputHeight
-                    config.UseNativeResolution = True
-                    config.RequestedWidth = 0
-                    config.RequestedHeight = 0
-                End Try
+                ' (native, or a requested NVENC downscale). A manual upscale
+                ' request is rejected without changing the user's selection or
+                ' starting a capture session; no silent native substitution.
+                Dim sessionDims As Tuple(Of Integer, Integer) =
+                    EngineStartupConfig.ResolveEncodeDimensions(
+                        _capture.OutputWidth, _capture.OutputHeight,
+                        config.UseNativeResolution, config.RequestedWidth, config.RequestedHeight)
+                Dim sessionEncodeW As Integer = sessionDims.Item1
+                Dim sessionEncodeH As Integer = sessionDims.Item2
                 config.EncodeWidth = sessionEncodeW
                 config.EncodeHeight = sessionEncodeH
 
@@ -495,6 +484,10 @@ Namespace DulukaEngine.Recording
                     .State = _state,
                     .VideoIdentity = VideoIdentity(),
                     .CurrentSessionId = If(_currentSession IsNot Nothing, _currentSession.SessionId, Nothing),
+                    .RealFramesCapturedThisSession = If(_currentSession Is Nothing, 0, _currentSession.RealFramesCapturedThisSession),
+                    .FramesSubmittedThisSession = If(_currentSession Is Nothing, 0, _currentSession.FramesSubmittedThisSession),
+                    .FramesEncodedThisSession = If(_currentSession Is Nothing, 0, _currentSession.FramesEncodedThisSession),
+                    .PacketsQueuedForMuxThisSession = If(_currentSession Is Nothing, 0, _currentSession.PacketsQueuedForMuxThisSession),
                     .LastSessionResult = _lastSessionResult
                 }
             End SyncLock

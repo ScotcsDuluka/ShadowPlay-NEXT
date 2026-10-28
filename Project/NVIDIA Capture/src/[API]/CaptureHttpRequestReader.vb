@@ -33,13 +33,21 @@ Public NotInheritable Class CaptureHttpRequestReader
                 Dim lines = currentHeader.Split({vbCr & vbLf}, StringSplitOptions.None)
                 If lines.Length = 0 Then Return Nothing
                 Dim reqLine = lines(0).Split(" "c)
-                If reqLine.Length < 2 Then Return Nothing
+                If reqLine.Length <> 3 OrElse Not reqLine(1).StartsWith("/", StringComparison.Ordinal) OrElse
+                   (reqLine(2) <> "HTTP/1.1" AndAlso reqLine(2) <> "HTTP/1.0") Then Return Nothing
                 Dim bodyLength As Integer = 0
-                For Each ln In lines
-                    If ln.StartsWith("content-length:", StringComparison.OrdinalIgnoreCase) Then
-                        If Not Integer.TryParse(ln.Substring(15).Trim(), bodyLength) Then Return Nothing
-                    End If
+                Dim headers As New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase)
+                For index As Integer = 1 To lines.Length - 1
+                    Dim ln = lines(index)
+                    Dim colon = ln.IndexOf(":"c)
+                    If colon <= 0 OrElse Char.IsWhiteSpace(ln(0)) Then Return Nothing
+                    Dim name = ln.Substring(0, colon).ToLowerInvariant()
+                    If name.Trim() <> name OrElse headers.ContainsKey("header:" & name) Then Return Nothing
+                    headers.Add("header:" & name, ln.Substring(colon + 1).Trim())
                 Next
+                If headers.ContainsKey("header:transfer-encoding") Then Return Nothing
+                If headers.ContainsKey("header:content-length") AndAlso
+                   Not Integer.TryParse(headers("header:content-length"), bodyLength) Then Return Nothing
                 Dim bodyStart = headerEnd + 4
                 If bodyLength < 0 OrElse bodyLength > MaxRequestBytes - bodyStart Then Return Nothing
                 Dim needed = bodyStart + bodyLength
@@ -49,11 +57,10 @@ Public NotInheritable Class CaptureHttpRequestReader
                     If count <= 0 Then Return Nothing
                     bytes.Write(buffer, 0, count)
                 End While
-                Return New Dictionary(Of String, String) From {
-                    {"method", reqLine(0)},
-                    {"path", reqLine(1)},
-                    {"body", Encoding.UTF8.GetString(bytes.GetBuffer(), bodyStart, bodyLength)}
-                }
+                headers.Add("method", reqLine(0))
+                headers.Add("path", reqLine(1))
+                headers.Add("body", New UTF8Encoding(False, True).GetString(bytes.GetBuffer(), bodyStart, bodyLength))
+                Return headers
             End Using
         Catch
             Return Nothing

@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 2,
+  "truthSchemaVersion": 1,
+  "readOnly": true,
+  "configured": {
+    "backend": "Duluka",
+    "captureApi": "dxgi_desktop_duplication",
+    "encoder": "NVENC_H264",
+    "allowed": true,
+    "error": ""
+  },
+  "requestedConfiguration": null,
+  "requestedConfigurationSource": "last_direct_rest_start_or_unobserved",
+  "savedConfiguration": {
+    "engine": "ddagrab",
+    "captureApi": "dxgi_desktop_duplication",
+    "encoder": "h264_nvenc",
+    "restOverrides": null
+  },
+  "selectedEngine": "Duluka",
+  "actualSessionBackend": "",
+  "actualRunningEngine": "",
+  "runtimeTruth": {
+    "lifecycleOwner": "",
+    "actualSessionBackend": "",
+    "actualRunningEngine": "",
+    "lifecycleState": "Idle",
+    "sessionId": "",
+    "busy": false,
+    "isCapturing": false,
+    "realFramesCaptured": 0,
+    "framesEncoded": 0,
+    "hardwareVerified": false,
+    "mediaVerified": false
+  },
+  "verification": {
+    "hardwareVerified": false,
+    "mediaVerified": false,
+    "scope": "current_session_unverified",
+    "nativeDeviceIdentity": {
+      "CaptureLuidLow": 78129,
+      "CaptureLuidHigh": 0,
+      "OutputIndex": 0,
+      "CaptureVendorId": 4318,
+      "EncoderLuidLow": 78129,
+      "EncoderLuidHigh": 0,
+      "EncoderVendorId": 4318,
+      "EncoderProvider": "nvidia:nvenc-h264"
+    }
+  },
+  "availableCapabilities": [
+    {
+      "engine": "Duluka",
+      "implemented": true,
+      "available": true,
+      "reason": "live_media_unverified"
+    },
+    {
+      "engine": "FFmpeg",
+      "implemented": true,
+      "available": false,
+      "reason": "binary_metadata_only_hardware_and_media_unverified"
+    },
+    {
+      "engine": "OBS",
+      "implemented": false,
+      "available": false,
+      "reason": "obs_capture_not_implemented"
+    },
+    {
+      "engine": "NVIDIA",
+      "implemented": false,
+      "available": false,
+      "reason": "external_recorder_status_unverified"
+    }
+  ],
+  "nativeRuntimeReady": true,
+  "nativeRuntimeCodec": "NVENC_H264",
+  "ffmpegBinary": {
+    "binaryRunnable": false,
+    "version": "",
+    "captureApis": [],
+    "encoders": [],
+    "reason": "ffmpeg_probe_pending",
+    "nvencSyntheticValidation": {
+      "status": "not_run",
+      "reason": "not_verified_for_this_binary",
+      "gpuCount": 0,
+      "testedAtUtc": "",
+      "results": []
+    },
+    "hardwareEncoderVerified": false
+  },
+  "recording": false,
+  "otherProvidersReady": false
+}

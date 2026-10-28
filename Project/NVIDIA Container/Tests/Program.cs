@@ -55,6 +55,12 @@ Check("Policy remains baseline, not live selection",
     withWorker.GetProperty("selected").GetProperty("policyOnly").GetBoolean());
 Check("Worker capability recognized independently of policy",
     withWorker.GetProperty("workerTruthAvailable").GetBoolean());
+Check("Controller policy mismatch is explicit",
+    !withWorker.GetProperty("controllerPolicyMatchesWorker").GetBoolean());
+Check("Effective selection is owned by worker configuration",
+    withWorker.GetProperty("effectiveSelection").GetProperty("backend").GetString() == "FFmpeg");
+Check("Policy or recording flag never invents actual running engine",
+    withWorker.GetProperty("actualRunningEngine").GetString() == "");
 Check("FFmpeg binary does not imply runtime ready",
     !withWorker.GetProperty("providers")[1].GetProperty("runtimeReady").GetBoolean());
 Check("Missing policy does not suppress verified worker data",

@@ -289,6 +289,7 @@ var httpServer = http.createServer(app);
 
     // NvContainer owns hotkey dispatch; it publishes the resulting OSC event here.
     var containerHotkeyEvents = require('./shims/container-hotkey-event.js');
+    var hotkeyRuntimeState = require('./shims/osc-runtime-state.js');
     app.post('/Backend/v.1.0/ContainerEvents', function (req, res) {
         var remote = req.socket && req.socket.remoteAddress;
         if (remote !== '127.0.0.1' && remote !== '::1' && remote !== '::ffff:127.0.0.1') {
@@ -316,12 +317,13 @@ var httpServer = http.createServer(app);
                     if (!event || !event.data) return;
                     if (event.name === '/ShadowPlay/v.1.0/Hotkey' &&
                         typeof event.data.hotkeyId === 'string') {
+                        if (hotkeyRuntimeState.hotkeyMonitor === false) return;
                         // The native HWND is the visibility owner, even when CEF
                         // is still at #/base. Do not also emit WindowState:
                         // the OSC Host will update the CEF route on its own.
                         var routed = containerHotkeyEvents.normalizeContainerHotkeyEvent(event);
                         if (routed.name === '/ShadowPlay/v.1.0/WindowState') {
-                            nativeToggles.push(containerHotkeyEvents.toggleNativeOsc());
+                            nativeToggles.push(containerHotkeyEvents.dispatchNativeOscToggle(event.data));
                         } else {
                             io.emit(routed.name, routed.data);
                             delivered++;
@@ -606,13 +608,13 @@ var httpServer = http.createServer(app);
         var m = (req.url || '').match(/hk=([A-Za-z0-9_]+)/);
         var name = m ? m[1] : 'OpenShare';
         if (typeof global.__nvFire === 'function') {
-            if (global.__nvFire(name) !== true) {
+            Promise.resolve().then(function () { return global.__nvFire(name); }).then(function (ok) {
+                res.writeHead(ok === true ? 200 : 503, { 'Content-Type': 'text/plain' });
+                res.end(ok === true ? 'fired ' + name : 'hotkey callback is not ready');
+            }).catch(function () {
                 res.writeHead(503, { 'Content-Type': 'text/plain' });
-                res.end('hotkey callback is not ready');
-                return;
-            }
-            res.writeHead(200, { 'Content-Type': 'text/plain' });
-            res.end('fired ' + name);
+                res.end('hotkey callback is unavailable');
+            });
         } else {
             res.writeHead(503, { 'Content-Type': 'text/plain' });
             res.end('fire not ready');

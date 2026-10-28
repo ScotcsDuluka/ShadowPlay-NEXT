@@ -1,0 +1,46 @@
+﻿<!-- Copyright (c) 2015-2016, NVIDIA CORPORATION.  All rights reserved.
+
+ * NVIDIA CORPORATION and its licensors retain all intellectual property
+ * and proprietary rights in and to this software, related documentation
+ * and any modifications thereto.  Any use, reproduction, disclosure or
+ * distribution of this software and related documentation without an express
+ * license agreement from NVIDIA CORPORATION is strictly prohibited.
+-->
+
+<!DOCTYPE html>
+<html ng-app="main" ng-csp ng-strict-di>
+
+
+<head>
+  <script src="/cefquery-shim.js"></script>
+  <script src="/Module/Core/module-map.js"></script>
+  <script src="/Module/Core/module-runtime.js?profile=without-v5&omit=mainmenu.freestyle-v5"></script>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="/Module/MainMenu/NVIDIA/main-menu-live.css?v=20261021-live">
+    <link rel="stylesheet" href="/Module/Notifier/notifier-system/notifier.css?v=20261013-0500">
+    <script type="text/javascript" src="vendor.js"></script>
+    <script type="text/javascript" src="common.js"></script><script type="text/javascript" src="app.js"></script><script type="text/javascript" src="/nvcamera-test-mode.js"></script><script type="text/javascript" src="/Module/GameFilter/Camera/nvcamera-test-mode.js"></script><script type="text/javascript" src="/Module/MainMenu/NVIDIA/main-menu-live.js?v=20261023-buildsync1"></script><script type="text/javascript" src="/Module/Settings/GPUProfiles/gpu-profiles-route.js?v=20261011-2003"></script><link rel="stylesheet" href="/Module/Overlay/Background/osc-background.css?v=20261021-background">
+<script src="/Module/Overlay/Background/osc-bg-webgl.js?v=20261022-bg-renderer"></script>
+<script src="/Module/Overlay/Background/osc-background.js?v=20261022-bg-renderer"></script>
+<link rel="stylesheet" href="/Module/Overlay/Motion/osc-motion.css?v=20261022-selected">
+<script src="/Module/Overlay/Motion/osc-motion-engine.js?v=20261022-selected"></script>
+<script src="/Module/Overlay/Motion/osc-motion-timing.js?v=20261022-selected"></script>
+<script src="/Module/Overlay/Motion/osc-motion.js?v=20261022-selected"></script>
+<script type="text/javascript" src="/Module/MainMenu/LegacyV4/main-menu-unified-model.js?v=20261022-v4"></script>
+<link rel="stylesheet" href="/Module/Base/Localization/osc-thai-font.css?v=20261022-global-text-icons-safe"><script src="/Module/Overlay/Renderer/osc-fps.js?v=20261022-fps"></script><script src="/Module/Overlay/Renderer/osc-renderer.js?v=20261022-renderer"></script><script src="/Module/Settings/Hook/osc-hook-settings.js?v=20261024-dx9-windowed-gpu5"></script><link rel="stylesheet" href="/Module/Settings/Capture/advanced-capture-route.css?v=20261025-v77"><script src="/Module/Settings/Capture/advanced-capture-route.js?v=20261025-v77"></script>
+</head>
+
+<body>
+    <div ui-view></div>
+
+    <script type="text/javascript" src="user-config.js"></script>
+    <script type="text/javascript" src="config.js"></script>
+    <script type="text/javascript" src="/Module/Base/Hotkey/hotkey-live.js?v=20261020"></script>
+<script type="text/javascript" src="/Module/Base/Hotkey/hotkey-monitor-lifecycle.js?v=20261026-session1"></script>
+    <script type="text/javascript" src="/Module/GameFilter/Ansel/ansel-game-filter.js?v=20261020"></script>
+    <script type="text/javascript" src="/Module/Notifier/notifier-system/notifier.js?v=20261013-0700"></script>
+    <script type="text/javascript" src="/Module/Notifier/OSC-Adapter.js?v=20261013-0700"></script>
+    <script type="text/javascript" src="/Module/Notifier/NvGraphics-Adapter.js?v=20261013-0700"></script>
+<script src="/Module/Base/Localization/launcher-language-sync.js?v=20261024-language-audit"></script><script src="/Module/Base/Localization/osc-ui-phrase-map.js?v=20261022-locales2"></script><script src="/Module/Base/Localization/osc-ui-localization.js?v=20261022-dynamic-l10n2"></script><script src="/Module/Gallery/Media/gallery-media-source.js?v=20261024-seek1"></script>
+</body>
+</html>

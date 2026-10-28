@@ -118,21 +118,18 @@ static class NvShadowPlayHelper
     static long _lastRetry = -100000;
     // ★ upgrade-retry: คีย์ที่ได้ fallback (+Shift) ไว้ก่อน — ลองเอาคีย์หลักคืนทุก 10 วิ
     static readonly Dictionary<string, Tuple<uint, uint>> UpgradableKeys = new Dictionary<string, Tuple<uint, uint>>();
-    static readonly Dictionary<string, uint> _awaitingKeyRelease = new Dictionary<string, uint>();
-    static readonly Dictionary<string, long> _lastHotkeyMessage = new Dictionary<string, long>();
-    const long HOTKEY_QUEUE_QUIET_MS = 150;
+    static readonly HotkeyMessageGate MessageGate = new HotkeyMessageGate();
+    static long _monitorGeneration;
     // Serialize callbacks: toggles must reach Container in keypress order.
     // A bounded queue prevents a disconnected Container from exhausting the ThreadPool.
     // Never replay stale toggles after a backend outage.
-    const long MAX_DISPATCH_AGE_MS = 2000;
-    static readonly BlockingCollection<Tuple<string, string, long>> DispatchQueue =
-        new BlockingCollection<Tuple<string, string, long>>(new ConcurrentQueue<Tuple<string, string, long>>(), 64);
-
-    static bool IsStaleDispatch(long queuedAt) => Environment.TickCount64 - queuedAt > MAX_DISPATCH_AGE_MS;
+    static readonly BlockingCollection<HotkeyDispatchRequest> DispatchQueue =
+        new BlockingCollection<HotkeyDispatchRequest>(new ConcurrentQueue<HotkeyDispatchRequest>(), 64);
 
     static void EnqueuePost(string url, string body = "{}")
     {
-        if (!DispatchQueue.TryAdd(Tuple.Create(url, body, Environment.TickCount64)))
+        if (!DispatchQueue.TryAdd(new HotkeyDispatchRequest(url, body, Environment.TickCount64,
+            DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), Interlocked.Read(ref _monitorGeneration))))
             Log("[hotkey] dispatch queue full; dropped request for " + url);
     }
 
@@ -142,12 +139,13 @@ static class NvShadowPlayHelper
         {
             foreach (var item in DispatchQueue.GetConsumingEnumerable())
             {
-                if (IsStaleDispatch(item.Item3) || Volatile.Read(ref _monitorDesired) == 0)
+                if (!item.CanDispatch(Environment.TickCount64, Interlocked.Read(ref _monitorGeneration),
+                    Volatile.Read(ref _monitorDesired) != 0))
                 {
-                    Log("[hotkey] stale queued request dropped: " + item.Item1);
+                    Log("[hotkey] stale queued request dropped id=" + item.RequestId);
                     continue;
                 }
-                Post(item.Item1, item.Item2);
+                Post(item);
             }
         }) { IsBackground = true, Name = "NvHotkeyDispatch" };
         worker.Start();
@@ -190,14 +188,14 @@ static class NvShadowPlayHelper
                 var enable = ReadMonitorEnabled();
                 if (enable.HasValue)
                 {
-                    Interlocked.Exchange(ref _monitorDesired, enable.Value ? 1 : 0);
+                    SetMonitorDesired(enable.Value);
                     lastSuccess = Environment.TickCount64;
                 }
                 else if (Environment.TickCount64 - lastSuccess > 10000)
                 {
                     // Backend has vanished: restore standalone shortcuts rather than
                     // leave a permanently muted Helper after an OSC crash.
-                    Interlocked.Exchange(ref _monitorDesired, 1);
+                    SetMonitorDesired(true);
                 }
                 Thread.Sleep(180);
             }
@@ -213,8 +211,7 @@ static class NvShadowPlayHelper
         Registered.Clear();
         FailedKeys.Clear();
         UpgradableKeys.Clear();
-        _awaitingKeyRelease.Clear();
-        _lastHotkeyMessage.Clear();
+        MessageGate.Clear();
         _registeredHotkeySignature = "";
         // Drop events already queued before editor was opened.
         while (DispatchQueue.TryTake(out _)) { }
@@ -232,6 +229,13 @@ static class NvShadowPlayHelper
             RegisterAll(); // Always load latest user bindings, including edits made while paused.
         }
         else SuspendAll();
+    }
+
+    static void SetMonitorDesired(bool enabled)
+    {
+        var desired = enabled ? 1 : 0;
+        if (Interlocked.Exchange(ref _monitorDesired, desired) != desired)
+            Interlocked.Increment(ref _monitorGeneration);
     }
 
     static void LoadConfig()
@@ -466,7 +470,7 @@ static class NvShadowPlayHelper
         LoadConfig();
         var initialMonitor = ReadMonitorEnabled();
         if (initialMonitor.HasValue)
-            Interlocked.Exchange(ref _monitorDesired, initialMonitor.Value ? 1 : 0);
+            SetMonitorDesired(initialMonitor.Value);
         StartDispatcher();
         StartMonitorProbe();
 
@@ -494,9 +498,9 @@ static class NvShadowPlayHelper
                 if (!Registered.TryGetValue(id, out var info)) continue;
                 string name = info.Item1;
                 string canonical = Canonical.TryGetValue(name, out var c) ? c : name;
-                _lastHotkeyMessage[canonical] = Environment.TickCount64;
-                if (_awaitingKeyRelease.ContainsKey(canonical)) continue;
-                _awaitingKeyRelease[canonical] = info.Item3;
+                // MOD_NOREPEAT is the OS key-down/release owner. Deduplicate only
+                // the same queued message; polling key-up can miss a rapid release.
+                if (!MessageGate.TryAccept(canonical, info.Item3, m.time)) continue;
                 if (canonical == "overlayfocus")
                 {
                     // Snapshot foreground identity at keypress time, not after an HTTP delay.
@@ -516,15 +520,6 @@ static class NvShadowPlayHelper
                         EnqueuePost(_fireUrl.Replace("{name}", Uri.EscapeDataString(canonical)));
                 }
             }
-            var released = new System.Collections.Generic.List<string>();
-            foreach (var pending in _awaitingKeyRelease)
-            {
-                bool queueQuiet = !_lastHotkeyMessage.TryGetValue(pending.Key, out var lastMessage) ||
-                                  Environment.TickCount64 - lastMessage >= HOTKEY_QUEUE_QUIET_MS;
-                bool keyUp = (GetAsyncKeyState((int)pending.Value) & 0x8000) == 0;
-                if (keyUp && queueQuiet) released.Add(pending.Key);
-            }
-            foreach (var key in released) _awaitingKeyRelease.Remove(key);
             if (_monitorRegistered && (FailedKeys.Count > 0 || UpgradableKeys.Count > 0) && Environment.TickCount64 - _lastRetry > 10000) {
                 _lastRetry = Environment.TickCount64;
                 // Try upgrading to the primary key while preserving the active fallback.
@@ -589,20 +584,22 @@ static class NvShadowPlayHelper
         }
     }
 
-    static void Post(string url, string body = "{}")
+    static void Post(HotkeyDispatchRequest item)
     {
         try
         {
-            var req = (HttpWebRequest)WebRequest.Create(url);
+            var req = (HttpWebRequest)WebRequest.Create(item.Url);
             req.Method = "POST"; req.ContentType = "application/json"; req.Proxy = null;
-            var bs = Encoding.UTF8.GetBytes(body);
+            req.Headers["X-OSC-Request-Id"] = item.RequestId;
+            req.Headers["X-OSC-Created-At"] = item.CreatedAtUnixMs.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            var bs = Encoding.UTF8.GetBytes(item.Body);
             req.ContentLength = bs.Length;
             req.Timeout = 3000;
             using (var s = req.GetRequestStream()) s.Write(bs, 0, bs.Length);
             using var r = (HttpWebResponse)req.GetResponse();
-            Log("[hotkey] " + url + " -> " + (int)r.StatusCode);
+            Log("[hotkey] id=" + item.RequestId + " -> " + (int)r.StatusCode);
         }
-        catch (Exception ex) { Log("[hotkey] " + url + " fail: " + ex.Message); }
+        catch (Exception ex) { Log("[hotkey] id=" + item.RequestId + " fail: " + ex.Message); }
     }
 
 }

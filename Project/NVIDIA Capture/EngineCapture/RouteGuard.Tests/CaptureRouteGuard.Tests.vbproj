@@ -12,5 +12,8 @@
     <Compile Include="../../src/[API]/FFmpegRuntimeProbe.vb" Link="FFmpegRuntimeProbe.vb" />
     <Compile Include="../../src/[API]/CaptureHttpRequestReader.vb" Link="CaptureHttpRequestReader.vb" />
     <Compile Include="../../src/[API]/CaptureIsolation.vb" Link="CaptureIsolation.vb" />
+    <Compile Include="../../src/[API]/CaptureRestAuthorization.vb" Link="CaptureRestAuthorization.vb" />
+    <Compile Include="../../src/[API]/CaptureRuntimeTruth.vb" Link="CaptureRuntimeTruth.vb" />
+    <Compile Include="../../src/[API]/CaptureRestSettingsPolicy.vb" Link="CaptureRestSettingsPolicy.vb" />
   </ItemGroup>
 </Project>

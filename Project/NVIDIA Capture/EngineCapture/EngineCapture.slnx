@@ -1,0 +1,37 @@
+<Solution>
+  <Folder Name="/Duluka Capture/" />
+  <Folder Name="/Duluka Capture/Audio/">
+    <Project Path="Duluka Capture/Audio/DulukaEngine.Audio.Wasapi/DulukaEngine.Audio.Wasapi.csproj" />
+    <Project Path="Duluka Capture/Audio/DulukaEngine.Audio/DulukaEngine.Audio.csproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/Core/">
+    <Project Path="Duluka Capture/Core/DulukaEngine/DulukaEngine.vbproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/Encoding/">
+    <Project Path="Duluka Capture/Encoding/DulukaEngine.Encoder/DulukaEngine.Encoder.vbproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/Encoding/Intel/">
+    <Project Path="Duluka Capture/Encoding/Intel/DulukaEngine.Encoder.Qsv/DulukaEngine.Encoder.Qsv.csproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/Encoding/NVENC/">
+    <Project Path="Duluka Capture/Encoding/NVENC/DulukaEngine.Encoder.Nvenc/DulukaEngine.Encoder.Nvenc.vbproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/Recording/" />
+  <Folder Name="/Duluka Capture/Recording/Backends/" />
+  <Folder Name="/Duluka Capture/Recording/Backends/FFmpeg/">
+    <Project Path="Duluka Capture/Recording/Backends/FFmpeg/DulukaEngine.FFmpegBackend/DulukaEngine.FFmpegBackend.vbproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/Video/" />
+  <Folder Name="/Duluka Capture/Video/Contracts/">
+    <Project Path="Duluka Capture/Video/Contracts/DulukaEngine.Video/DulukaEngine.Video.vbproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/Video/DXGI Desktop Duplication/">
+    <Project Path="Duluka Capture/Video/DXGI Desktop Duplication/DulukaEngine.Video.DXGI/DulukaEngine.Video.DXGI.vbproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/Video/Transport/">
+    <Project Path="Duluka Capture/Video/Transport/DulukaEngine.Video.Transport.D3D11/DulukaEngine.Video.Transport.D3D11.csproj" />
+  </Folder>
+  <Folder Name="/Duluka Capture/Video/Windows Graphics Capture/">
+    <Project Path="Duluka Capture/Video/Windows Graphics Capture/WgcCapture/WgcCapture.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,703 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-10-26T14:40:52.874Z",
+  "sourceRoot": "C:\\My Project\\NVIDIA-Shadowplay\\Project\\Overlay On-Screen Control\\NVIDIA NodeAPI\\osc",
+  "sourceIndexSha": "18f7faadda33c8287faaa452c9357b3a8df0abce94280eafd50466e3e33a73a6",
+  "productionIndexSha": "18f7faadda33c8287faaa452c9357b3a8df0abce94280eafd50466e3e33a73a6",
+  "strategy": "shadow-copy-v1: preserve source mods and production, route future generated profile pages only",
+  "moduleGroups": {
+    "base.ui": {
+      "routes": [
+        "base",
+        "main.*"
+      ],
+      "critical": false,
+      "dependencies": []
+    },
+    "base.hotkey": {
+      "routes": [
+        "*"
+      ],
+      "critical": false,
+      "dependencies": []
+    },
+    "base.localization": {
+      "routes": [
+        "*"
+      ],
+      "critical": false,
+      "dependencies": []
+    },
+    "mainmenu.nvidia": {
+      "routes": [
+        "main.main-menu"
+      ],
+      "critical": false,
+      "dependencies": []
+    },
+    "mainmenu.freestyle-v5": {
+      "routes": [
+        "main.main-menu"
+      ],
+      "critical": false,
+      "dependencies": [
+        "mainmenu.nvidia"
+      ],
+      "exclusiveGroup": "mainmenu.layout-runtime"
+    },
+    "mainmenu.legacy-v4": {
+      "routes": [
+        "main.main-menu"
+      ],
+      "critical": false,
+      "dependencies": [
+        "mainmenu.nvidia"
+      ],
+      "note": "Legacy model is loaded even with FreestyleV5. Mutual exclusion applies to layout activation, not script loading."
+    },
+    "mainmenu.group-editor": {
+      "routes": [
+        "main.main-menu"
+      ],
+      "critical": false,
+      "dependencies": [
+        "mainmenu.nvidia"
+      ]
+    },
+    "overlay.motion": {
+      "routes": [
+        "*"
+      ],
+      "critical": false,
+      "dependencies": [],
+      "optionalDependencies": [
+        "mainmenu.freestyle-v5"
+      ]
+    },
+    "overlay.background": {
+      "routes": [
+        "*"
+      ],
+      "critical": false,
+      "dependencies": []
+    },
+    "overlay.renderer": {
+      "routes": [
+        "*"
+      ],
+      "critical": false,
+      "dependencies": []
+    },
+    "settings.capture": {
+      "routes": [
+        "main.preferences.*"
+      ],
+      "critical": false,
+      "dependencies": []
+    },
+    "settings.hook": {
+      "routes": [
+        "main.preferences.*"
+      ],
+      "critical": false,
+      "dependencies": []
+    },
+    "settings.gpu-profiles": {
+      "routes": [
+        "main.preferences.*",
+        "main.main-menu"
+      ],
+      "critical": false,
+      "dependencies": []
+    },
+    "settings.gpu-status": {
+      "routes": [
+        "main.preferences.*"
+      ],
+      "critical": false,
+      "dependencies": []
+    },
+    "settings.notifications": {
+      "routes": [
+        "main.preferences.*"
+      ],
+      "critical": false,
+      "dependencies": []
+    },
+    "settings.reshade": {
+      "routes": [
+        "main.preferences.*"
+      ],
+      "critical": false,
+      "dependencies": []
+    },
+    "gallery.media": {
+      "routes": [
+        "main.gallery.*"
+      ],
+      "critical": false,
+      "dependencies": []
+    },
+    "gamefilter.ansel": {
+      "routes": [
+        "main.preferences.*"
+      ],
+      "critical": false,
+      "dependencies": []
+    },
+    "gamefilter.camera": {
+      "routes": [
+        "main.*"
+      ],
+      "critical": false,
+      "dependencies": []
+    },
+    "notifier": {
+      "routes": [
+        "*"
+      ],
+      "critical": false,
+      "dependencies": []
+    },
+    "feature.uncategorized": {
+      "routes": [
+        "*"
+      ],
+      "critical": false,
+      "dependencies": []
+    }
+  },
+  "assets": [
+    {
+      "source": "/mods/advanced-capture-route.css",
+      "module": "/Module/Settings/Capture/advanced-capture-route.css",
+      "owner": "settings.capture",
+      "bytes": 7117,
+      "sha256": "8d84fc8fdd17235f5fcebe1d991a59ec6cc45ebb3e1d5bff5682926ecadec356",
+      "type": "css",
+      "originallyIndexed": true
+    },
+    {
+      "source": "/mods/advanced-capture-route.js",
+      "module": "/Module/Settings/Capture/advanced-capture-route.js",
+      "owner": "settings.capture",
+      "bytes": 16814,
+      "sha256": "74b833337e68d52b3a8ebfecead1731d40754a84083d7886fcd6d201216cdca2",
+      "type": "js",
+      "originallyIndexed": true
+    },
+    {
+      "source": "/mods/ansel-game-filter.js",
+      "module": "/Module/GameFilter/Ansel/ansel-game-filter.js",
+      "owner": "gamefilter.ansel",
+      "bytes": 52950,
+      "sha256": "becfb95f720fd66848c02e6c7073d3d66592c4b5ff4cbf1e17b13febfd1cc7c5",
+      "type": "js",
+      "originallyIndexed": true
+    },
+    {
+      "source": "/mods/base.css",
+      "module": "/Module/Base/UI/base.css",
+      "owner": "base.ui",
+      "bytes": 10275,
+      "sha256": "8254ecf4bb30a857450cfebfdda0688f3c7e308c315e0b7f911124a9397520e8",
+      "type": "css",
+      "originallyIndexed": false
+    },
+    {
+      "source": "/mods/folder-browser-navigation.js",
+      "module": "/Module/Gallery/Media/folder-browser-navigation.js",
+      "owner": "gallery.media",
+      "bytes": 2242,
+      "sha256": "0898e6d460a01f9d2c15a9a53de37c9dc68d48df1b8c62d2d9c5787f3e4e9a84",
+      "type": "js",
+      "originallyIndexed": false
+    },
+    {
+      "source": "/mods/gallery-media-source.js",
+      "module": "/Module/Gallery/Media/gallery-media-source.js",
+      "owner": "gallery.media",
+      "bytes": 10355,
+      "sha256": "8cae9e433809634fae1695157712a4ecdaa38d09dfc77ddcf4952ac2841211fc",
+      "type": "js",
+      "originallyIndexed": true
+    },
+    {
+      "source": "/mods/gpu-profiles.css",
+      "module": "/Module/Settings/GPUProfiles/gpu-profiles.css",
+      "owner": "settings.gpu-profiles",
+      "bytes": 12561,
+      "sha256": "e5f9a3880e17f1aa272fb591263747e33e8f2cf348d1139a517f768dc28c2ddd",
+      "type": "css",
+      "originallyIndexed": false
+    },
+    {
+      "source": "/mods/gpu-profiles.js",
+      "module": "/Module/Settings/GPUProfiles/gpu-profiles.js",
+      "owner": "settings.gpu-profiles",
+      "bytes": 62725,
+      "sha256": "fa36abd91fba8d64216a5c76f5d37cfedc6411b524809b1546f2a24f455b012b",
+      "type": "js",
+      "originallyIndexed": false
+    },
+    {
+      "source": "/mods/gpu-profiles-route.js",
+      "module": "/Module/Settings/GPUProfiles/gpu-profiles-route.js",
+      "owner": "settings.gpu-profiles",
+      "bytes": 2763,
+      "sha256": "7af57b1f2e7917d72aac18dff59b0d955a1e4c7dd03a2c5d698b91b6672eec2f",
+      "type": "js",
+      "originallyIndexed": true
+    },
+    {
+      "source": "/mods/gpu-status-panel.css",
+      "module": "/Module/Settings/GPUStatus/gpu-status-panel.css",
+      "owner": "settings.gpu-status",
+      "bytes": 2005,
+      "sha256": "47c3ebc690c7519cce2fbef8d1204eed588703f4f8737ba0fa8f19c3fabec342",
+      "type": "css",
+      "originallyIndexed": false
+    },
+    {
+      "source": "/mods/gpu-status-panel.js",
+      "module": "/Module/Settings/GPUStatus/gpu-status-panel.js",
+      "owner": "settings.gpu-status",
+      "bytes": 19363,
+      "sha256": "48d62c9b9bfc96392f86e3560e03d4e7e70ee196da771ec37b98476547dcaa55",
+      "type": "js",
+      "originallyIndexed": false
+    },
+    {
+      "source": "/mods/hotkey-live.js",
+      "module": "/Module/Base/Hotkey/hotkey-live.js",
+      "owner": "base.hotkey",
+      "bytes": 3360,
+      "sha256": "5dc692959fde6ee1a0746c6fee1e29044d7b02219a6d8fa93e72d414f0096189",
+      "type": "js",
+      "originallyIndexed": true
+    },
+    {
+      "source": "/mods/hotkey-monitor-lifecycle.js",
+      "module": "/Module/Base/Hotkey/hotkey-monitor-lifecycle.js",
+      "owner": "base.hotkey",
+      "bytes": 2792,
+      "sha256": "19fc66771b2fcd6908de854bce5783c1febe8b256177e681ed07e49fa64e4424",
+      "type": "js",
+      "originallyIndexed": true
+    },
+    {
+      "source": "/mods/launcher-language-sync.js",
+      "module": "/Module/Base/Localization/launcher-language-sync.js",
+      "owner": "base.localization",
+      "bytes": 2628,
+      "sha256": "29458681732f295763e4978f7eefd949f986d81b22d79645a5413af2b6bea5cd",
+      "type": "js",
+      "originallyIndexed": true
+    },
+    {
+      "source": "/mods/main-menu-group-editor.css",
+      "module": "/Module/MainMenu/GroupEditor/main-menu-group-editor.css",
+      "owner": "mainmenu.group-editor",
+      "bytes": 8560,
+      "sha256": "d40b5b49f2220b37762c41cb0399b63189d49a0f9b68c5a4a14df768447e5b7a",
+      "type": "css",
+      "originallyIndexed": false
+    },
+    {
+      "source": "/mods/main-menu-group-editor.js",
+      "module": "/Module/MainMenu/GroupEditor/main-menu-group-editor.js",
+      "owner": "mainmenu.group-editor",
+      "bytes": 11551,
+      "sha256": "2c237776741c400f3c19474d6e3c555c5c77c62ed4dec915c43516bf7ac76ad1",
+      "type": "js",
+      "originallyIndexed": false
+    },
+    {
+      "source": "/mods/main-menu-group-model.js",
+      "module": "/Module/MainMenu/GroupEditor/main-menu-group-model.js",
+      "owner": "mainmenu.group-editor",
+      "bytes": 9354,
+      "sha256": "d59839ba9586268514d286c70c95c44508a34c965c7ede0c8cd158eacfad60dd",
+      "type": "js",
+      "originallyIndexed": false
+    },
+    {
+      "source": "/mods/main-menu-live.css",
+      "module": "/Module/MainMenu/NVIDIA/main-menu-live.css",
+      "owner": "mainmenu.nvidia",
+      "bytes": 10767,
+      "sha256": "03523b620825ed87d98fd4207f70c58a6dee91b40d5cfc0658f797692d1b65a0",
+      "type": "css",
+      "originallyIndexed": true
+    },
+    {
+      "source": "/mods/main-menu-live.js",
+      "module": "/Module/MainMenu/NVIDIA/main-menu-live.js",
+      "owner": "mainmenu.nvidia",
+      "bytes": 29681,
+      "sha256": "3e68ee4c28c9cf44d0b40fc5013ca0a1d38a59c5dae86e403868f86a7d323e24",
+      "type": "js",
+      "originallyIndexed": true
+    },
+    {
+      "source": "/mods/main-menu-unified-model.js",
+      "module": "/Module/MainMenu/LegacyV4/main-menu-unified-model.js",
+      "owner": "mainmenu.legacy-v4",
+      "bytes": 10349,
+      "sha256": "b9b06f070080d253663cd71b180d75996b77d49dd187cfd47146ec9a7121b0ce",
+      "type": "js",
+      "originallyIndexed": true
+    },
+    {
+      "source": "/mods/main-menu-unified-native.css",
+      "module": "/Module/MainMenu/LegacyV4/main-menu-unified-native.css",
+      "owner": "mainmenu.legacy-v4",
+      "bytes": 18349,
+      "sha256": "40771b82faf8d3991c364212282dda582c78b34e1d15adb65c5bdd32d5c0d26e",
+      "type": "css",
+      "originallyIndexed": false
+    },
+    {
+      "source": "/mods/main-menu-unified-native.js",
+      "module": "/Module/MainMenu/LegacyV4/main-menu-unified-native.js",
+      "owner": "mainmenu.legacy-v4",
+      "bytes": 33121,
+      "sha256": "1223d00b5afabe602d3b98b01c1cf681283668850a4ea85055e390d6468a3e0b",
+      "type": "js",
+      "originallyIndexed": false
+    },
+    {
+      "source": "/mods/notifications.css",
+      "module": "/Module/Settings/Notifications/notifications.css",
+      "owner": "settings.notifications",
+      "bytes": 5216,
+      "sha256": "06d62d1b6f24263f83ac2ffd7764e1d0b5aa364d6601a3372c7cc416455b5120",
+      "type": "css",
+      "originallyIndexed": false
+    },
+    {
+      "source": "/mods/notification-settings.js",
+      "module": "/Module/Settings/Notifications/notification-settings.js",
+      "owner": "settings.notifications",
+      "bytes": 20762,
+      "sha256": "b805c3a64423bc213a90d496c3a49029cbb9390597bc629c82cee403daa7f959",
+      "type": "js",
+      "originallyIndexed": false
+    },
+    {
+      "source": "/mods/notifier/notifier-system/notifier.css",
+      "module": "/Module/Notifier/notifier-system/notifier.css",
+      "owner": "notifier",
+      "bytes": 15538,
+      "sha256": "6736e0fe08fb7c3be2cff5ec7ecba89afaa64361920bd2b509be9818b382fb5f",
+      "type": "css",
+      "originallyIndexed": true
+    },
+    {
+      "source": "/mods/notifier/notifier-system/notifier.js",
+      "module": "/Module/Notifier/notifier-system/notifier.js",
+      "owner": "notifier",
+      "bytes": 49721,
+      "sha256": "64ea34164725446e46b0dd94fa8258927a163e1017b46d1fe98a7ee666f7963d",
+      "type": "js",
+      "originallyIndexed": true
+    },
+    {
+      "source": "/mods/notifier/NvGraphics-Adapter.js",
+      "module": "/Module/Notifier/NvGraphics-Adapter.js",
+      "owner": "notifier",
+      "bytes": 19628,
+      "sha256": "6d1cd5a2eabd8bad107922f8315eeb9cdf6c6d72abbd3810f11e061e552f2a0b",
+      "type": "js",
+      "originallyIndexed": true
+    },
+    {
+      "source": "/mods/notifier/NVIDIA.ico",
+      "module": "/Module/Notifier/NVIDIA.ico",
+      "owner": "notifier",
+      "bytes": 459046,
+      "sha256": "5c846499f2cc22eda2c1e6815fff4cfdcd23be93e1c9bb02cebbd1c74af27379",
+      "type": "ico",
+      "originallyIndexed": false
+    },
+    {
+      "source": "/mods/notifier/Ontology-Update-Adapter.js",
+      "module": "/Module/Notifier/Ontology-Update-Adapter.js",
+      "owner": "notifier",
+      "bytes": 6495,
+      "sha256": "1b29a2e53a67389309e4356ab4731912a5461c35810313981407497356cf206c",
+      "type": "js",
+      "originallyIndexed": true
+    },
+    {
+      "source": "/mods/notifier/OSC-Adapter.js",
+      "module": "/Module/Notifier/OSC-Adapter.js",
+      "owner": "notifier",
+      "bytes": 22123,
+      "sha256": "e79dbdf6932656fdb4bcea1f31117f664f90363d290f963430a68a115ceeeefd",
+      "type": "js",
+      "originallyIndexed": true
+    },
+    {
+      "source": "/mods/nvcamera-test-mode.js",
+      "module": "/Module/GameFilter/Camera/nvcamera-test-mode.js",
+      "owner": "gamefilter.camera",
+      "bytes": 2579,
+      "sha256": "16725e88208235375559abde8f6e45ec6356255de959034c98941f66ee24d975",
+      "type": "js",
+      "originallyIndexed": true
+    },
+    {
+      "source": "/mods/nv-freestyle-editor.css",
+      "module": "/Module/MainMenu/FreestyleV5/nv-freestyle-editor.css",
+      "owner": "mainmenu.freestyle-v5",
+      "bytes": 4661,
+      "sha256": "91e3ae4e4f5de256c3ec16dd30bc26a665a8b41af416a142c6e99d7b5fd8a3d6",
+      "type": "css",
+      "originallyIndexed": true
+    },
+    {
+      "source": "/mods/nv-freestyle-editor.js",
+      "module": "/Module/MainMenu/FreestyleV5/nv-freestyle-editor.js",
+      "owner": "mainmenu.freestyle-v5",
+      "bytes": 28808,
+      "sha256": "748aaddd96b012c394ef7e117bf2b6238a6e6d71317bacc864d5f4b5a8b3c127",
+      "type": "js",
+      "originallyIndexed": true
+    },
+    {
+      "source": "/mods/nv-freestyle-settings.css",
+      "module": "/Module/MainMenu/FreestyleV5/nv-freestyle-settings.css",
+      "owner": "mainmenu.freestyle-v5",
+      "bytes": 12709,
+      "sha256": "7199fb19d12bfacc24a8b7d089d97c4b36ebd2b0b7b5d9c1f0cb9b54dbe854ea",
+      "type": "css",
+      "originallyIndexed": true
+    },
+    {
+      "source": "/mods/nv-freestyle-settings.js",
+      "module": "/Module/MainMenu/FreestyleV5/nv-freestyle-settings.js",
+      "owner": "mainmenu.freestyle-v5",
+      "bytes": 6324,
+      "sha256": "0b36f4ac45f1a5af113074bc34eff14825cf2100cc40d542783f8d372950d980",
+      "type": "js",
+      "originallyIndexed": true
+    },
+    {
+      "source": "/mods/nv-layout-v5-core.js",
+      "module": "/Module/MainMenu/FreestyleV5/nv-layout-v5-core.js",
+      "owner": "mainmenu.freestyle-v5",
+      "bytes": 17209,
+      "sha256": "e288326aaa07150c457e2df380e54268a2acae330101d01842aea82aa89077fc",
+      "type": "js",
+      "originallyIndexed": true
+    },
+    {
+      "source": "/mods/nv-next-v5-native.css",
+      "module": "/Module/MainMenu/FreestyleV5/nv-next-v5-native.css",
+      "owner": "mainmenu.freestyle-v5",
+      "bytes": 2842,
+      "sha256": "132d9c4db0e8e3c1caa496c52ec048449981fda603bfa4aa332bf6da4e62e5d8",
+      "type": "css",
+      "originallyIndexed": false
+    },
+    {
+      "source": "/mods/nv-next-v5-native.js",
+      "module": "/Module/MainMenu/FreestyleV5/nv-next-v5-native.js",
+      "owner": "mainmenu.freestyle-v5",
+      "bytes": 15279,
+      "sha256": "8f1a2c747c650cd9daf5caa56254ce1463b2aa8a0cc98670339d2998e38136e0",
+      "type": "js",
+      "originallyIndexed": true
+    },
+    {
+      "source": "/mods/osc-background.css",
+      "module": "/Module/Overlay/Background/osc-background.css",
+      "owner": "overlay.background",
+      "bytes": 5325,
+      "sha256": "a2b1f8d710e5a71edd8b2236ff890d85013fce10607dcb28a270a88060a63853",
+      "type": "css",
+      "originallyIndexed": true
+    },
+    {
+      "source": "/mods/osc-background.js",
+      "module": "/Module/Overlay/Background/osc-background.js",
+      "owner": "overlay.background",
+      "bytes": 18244,
+      "sha256": "0299a0c8f5e01ea72f33b40a1f973411dda4f3f019f0865a58983dd48bf4470f",
+      "type": "js",
+      "originallyIndexed": true
+    },
+    {
+      "source": "/mods/osc-bg-webgl.js",
+      "module": "/Module/Overlay/Background/osc-bg-webgl.js",
+      "owner": "overlay.background",
+      "bytes": 3527,
+      "sha256": "7661974058c104f9003185d5ca13e13a024d22250c0efc526697ed9e193e5c8d",
+      "type": "js",
+      "originallyIndexed": true
+    },
+    {
+      "source": "/mods/osc-fps.js",
+      "module": "/Module/Overlay/Renderer/osc-fps.js",
+      "owner": "overlay.renderer",
+      "bytes": 5301,
+      "sha256": "5074d9b5fb658ede53de4a421bc1ac161ce4055f2482375f65ef29da20c5eb12",
+      "type": "js",
+      "originallyIndexed": true
+    },
+    {
+      "source": "/mods/osc-hook-settings.js",
+      "module": "/Module/Settings/Hook/osc-hook-settings.js",
+      "owner": "settings.hook",
+      "bytes": 14068,
+      "sha256": "cd315434f3d124716b471612ce11918f5ed56b0d5c43b3c5c0bed96d7127c89f",
+      "type": "js",
+      "originallyIndexed": true
+    },
+    {
+      "source": "/mods/osc-motion.css",
+      "module": "/Module/Overlay/Motion/osc-motion.css",
+      "owner": "overlay.motion",
+      "bytes": 1657,
+      "sha256": "6b6dc94b668fafdec3b34ea07a36e7e3394f9209376b984f2b7a10d08db4e230",
+      "type": "css",
+      "originallyIndexed": true
+    },
+    {
+      "source": "/mods/osc-motion-engine.js",
+      "module": "/Module/Overlay/Motion/osc-motion-engine.js",
+      "owner": "overlay.motion",
+      "bytes": 5964,
+      "sha256": "ca3724e5d20cf295f880cfe69374f310fd5d8da857fc8d8e1ee347954de40201",
+      "type": "js",
+      "originallyIndexed": true
+    },
+    {
+      "source": "/mods/osc-motion.js",
+      "module": "/Module/Overlay/Motion/osc-motion.js",
+      "owner": "overlay.motion",
+      "bytes": 13666,
+      "sha256": "2f948af8dcf27b8a3c67a8f96a3793238928fd5a41135d84b336c44731eed0e6",
+      "type": "js",
+      "originallyIndexed": true
+    },
+    {
+      "source": "/mods/osc-motion-timing.js",
+      "module": "/Module/Overlay/Motion/osc-motion-timing.js",
+      "owner": "overlay.motion",
+      "bytes": 2514,
+      "sha256": "ade40f83f0bf133869cbac8b14205bccfe47827e2aa2a82ab900dfc21bfe45e1",
+      "type": "js",
+      "originallyIndexed": true
+    },
+    {
+      "source": "/mods/osc-renderer.js",
+      "module": "/Module/Overlay/Renderer/osc-renderer.js",
+      "owner": "overlay.renderer",
+      "bytes": 10522,
+      "sha256": "6e2f47dc5131ece4a623b2fc5b15ac95c47e74536979f5abf9a806f474cc1293",
+      "type": "js",
+      "originallyIndexed": true
+    },
+    {
+      "source": "/mods/osc-thai-font.css",
+      "module": "/Module/Base/Localization/osc-thai-font.css",
+      "owner": "base.localization",
+      "bytes": 1710,
+      "sha256": "91ea36de49b48c8ab91c677ab29579cf664d9fcb84250da15e596bbcf98f00fa",
+      "type": "css",
+      "originallyIndexed": true
+    },
+    {
+      "source": "/mods/osc-ui-localization.js",
+      "module": "/Module/Base/Localization/osc-ui-localization.js",
+      "owner": "base.localization",
+      "bytes": 6782,
+      "sha256": "47d5022108f0cd942c091fca588e5ecd97421d35eaaef2204af95c48156d6a6c",
+      "type": "js",
+      "originallyIndexed": true
+    },
+    {
+      "source": "/mods/osc-ui-phrase-map.js",
+      "module": "/Module/Base/Localization/osc-ui-phrase-map.js",
+      "owner": "base.localization",
+      "bytes": 53488,
+      "sha256": "36ded748716962b47ebfc638ff943773fabcb8ce044c795c3bab726fcc0fa304",
+      "type": "js",
+      "originallyIndexed": true
+    },
+    {
+      "source": "/mods/overlays.css",
+      "module": "/Module/Base/UI/overlays.css",
+      "owner": "base.ui",
+      "bytes": 1073,
+      "sha256": "049ab412145552b14f706eb18ee580e765b1c55a22ad10e7c0da513acacbdcb6",
+      "type": "css",
+      "originallyIndexed": false
+    },
+    {
+      "source": "/mods/preferences.css",
+      "module": "/Module/Base/UI/preferences.css",
+      "owner": "base.ui",
+      "bytes": 1687,
+      "sha256": "7d95a35ead5f88d771641ef1bb11479ba34c13a46e6c0f007d706aaf5b7f7f23",
+      "type": "css",
+      "originallyIndexed": false
+    },
+    {
+      "source": "/mods/privacy-control.css",
+      "module": "/Module/Base/UI/privacy-control.css",
+      "owner": "base.ui",
+      "bytes": 106,
+      "sha256": "05a3ebd632cc23c19fc07f47d8115269e01162ac12171586d8e0eeab33b7c5a5",
+      "type": "css",
+      "originallyIndexed": false
+    },
+    {
+      "source": "/mods/providers.css",
+      "module": "/Module/Base/UI/providers.css",
+      "owner": "base.ui",
+      "bytes": 491,
+      "sha256": "2d5dcf70529c83ec719bfbd471a9896a775d1adb7e1fe6dc4ec75cc4774f46c6",
+      "type": "css",
+      "originallyIndexed": false
+    },
+    {
+      "source": "/mods/reshade-manager.css",
+      "module": "/Module/Settings/ReShade/reshade-manager.css",
+      "owner": "settings.reshade",
+      "bytes": 8504,
+      "sha256": "4695fb81a6ff774d526bed0fc2733cc8265a7b3be8873c2f90534827cdf2adcb",
+      "type": "css",
+      "originallyIndexed": false
+    },
+    {
+      "source": "/mods/reshade-manager.js",
+      "module": "/Module/Settings/ReShade/reshade-manager.js",
+      "owner": "settings.reshade",
+      "bytes": 15997,
+      "sha256": "835bda0fa9563bbb172b395faa440f5353d021f6d5253b8a264e60e7c1760d35",
+      "type": "js",
+      "originallyIndexed": false
+    },
+    {
+      "source": "/mods/video-capture-options.css",
+      "module": "/Module/Settings/Capture/video-capture-options.css",
+      "owner": "settings.capture",
+      "bytes": 12818,
+      "sha256": "77e58944b3a8ea6380b1feacd113063af60e530c9e3882fc4bd9a11cb0328ecc",
+      "type": "css",
+      "originallyIndexed": false
+    },
+    {
+      "source": "/mods/video-capture-options.js",
+      "module": "/Module/Settings/Capture/video-capture-options.js",
+      "owner": "settings.capture",
+      "bytes": 41867,
+      "sha256": "95c9262e7122a12a088dd6c68a78c6b21d8bc8b39de880d251dd7d24f3733970",
+      "type": "js",
+      "originallyIndexed": false
+    }
+  ]
+}

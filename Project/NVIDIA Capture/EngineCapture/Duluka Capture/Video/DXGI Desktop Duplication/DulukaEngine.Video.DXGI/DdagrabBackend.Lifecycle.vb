@@ -118,11 +118,15 @@ Namespace DulukaEngine.Video.Backends.Ddagrab
             Catch ex As Exception
                 ' A crash cannot silently authorize a new producer on the same device.
                 Interlocked.Increment(_errorCount)
+                SyncLock _sync
+                    If Not _disposed AndAlso run = _runId Then
+                        _terminalFault = If(TypeOf ex Is SourceFailureException,
+                            DirectCast(ex, SourceFailureException).Kind.ToString(), "InvalidFrame") & ":" & ex.Message
+                        _state = DdagrabBackendState.Faulted
+                    End If
+                End SyncLock
                 NotifySourceFault(If(TypeOf ex Is SourceFailureException,
                     DirectCast(ex, SourceFailureException).Kind, SourceFaultKind.InvalidFrame), run, SourceGeneration)
-                SyncLock _sync
-                    If Not _disposed AndAlso run = _runId Then _state = DdagrabBackendState.Faulted
-                End SyncLock
                 Try : _logger.Error("DdagrabBackend: worker fault; rebuild required", ex) : Catch : End Try
             Finally
                 CompleteWorkerExit()
@@ -144,7 +148,17 @@ Namespace DulukaEngine.Video.Backends.Ddagrab
             FinishLifecycle()
             ' Every overlapping Stop observes the same quiescence signal. A callback
             ' on the worker/initialization thread must never wait for itself.
-            If Not self Then _quiescent.Wait(TimeSpan.FromSeconds(2))
+            If Not self AndAlso Not _quiescent.Wait(TimeSpan.FromSeconds(2)) Then
+                SyncLock _sync
+                    ' Recheck under the lifecycle lock: a worker can exit just
+                    ' as the bounded wait expires. A still-owned worker makes
+                    ' recording success unsafe even if it later shuts down.
+                    If Not _quiescent.IsSet Then
+                        If String.IsNullOrEmpty(_terminalFault) Then _terminalFault = "source_stop_timeout_not_quiescent"
+                        If Not _disposed Then _state = DdagrabBackendState.Faulted
+                    End If
+                End SyncLock
+            End If
         End Sub
 
         Public Sub Dispose() Implements IDisposable.Dispose
@@ -237,6 +251,7 @@ Namespace DulukaEngine.Video.Backends.Ddagrab
             Catch
                 Interlocked.Increment(_errorCount)
                 SyncLock _sync
+                    _terminalFault = "source_fault_callback_failed"
                     _callbacksEnabled = False
                     _stopSignal = True
                     If Not _disposed Then _state = DdagrabBackendState.Faulted

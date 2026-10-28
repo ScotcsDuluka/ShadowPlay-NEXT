@@ -40,7 +40,8 @@ const exposed = source.replace(ending, `
     save: save,
     refreshStatus: refreshCaptureRuntimeStatus,
     refreshDisplays: refreshCaptureDisplays,
-    displayKey: captureDisplayKey
+    displayKey: captureDisplayKey,
+    installNativeQualityPresets: installNativeQualityPresets
   };
 })();
 `);
@@ -76,6 +77,7 @@ function startHarness() {
   vm.runInNewContext(exposed, ctx, { filename: 'video-capture-options.js' });
   return {
     hooks: win.__captureUiTest,
+    win,
     requests,
     respond(fn) { nextResponse = fn; }
   };
@@ -342,14 +344,15 @@ test('FFmpeg receives NVIDIA H264/HEVC and Intel QSV only when Capture reports c
   assert.equal(h.requests.length, 0);
 });
 
-test('the Codec helper renders AFTER both selects, never under the select underline', () => {
-  const css = fs.readFileSync(path.join(__dirname, '../osc/mods/video-capture-options.css'), 'utf8');
-  assert.match(source, /encoderFields\.appendChild\(preset\.wrap\);\s*advanced\.appendChild\(previewPanel\);\s*advanced\.appendChild\(encoderFields\);\s*advancedSection\.appendChild\(advanced\);\s*advancedSection\.appendChild\(codecStatus\);/);
-  const noteRule = css.match(/#nv-video-capture-options \.nv-video-engine-codec-note\s*\{([^}]*)\}/);
-  assert.ok(noteRule, 'specific CSS rule for helper note');
-  assert.match(noteRule[1], /position:\s*static/);
-  assert.match(noteRule[1], /margin:\s*4px 0 2px/);
-  assert.doesNotMatch(noteRule[1], /margin:\s*-/);
+test('codec and preset controls live in the native Advanced Capture route', () => {
+  const route = fs.readFileSync(
+    path.join(__dirname, '../osc/mods/advanced-capture-route.js'), 'utf8');
+  assert.match(source, /openAdvancedCapture = function/);
+  assert.match(source, /main\.osc-capture-advanced/);
+  assert.doesNotMatch(source, /panel\.appendChild\(advancedSection\)/);
+  assert.match(route, /captureAdvanced\.encoder/);
+  assert.match(route, /captureAdvanced\.preset/);
+  assert.match(route, /controllerAs:\s*'captureAdvanced'/);
 });
 
 test('Video Settings uses compact static sections, not a nested scrollbar', () => {
@@ -479,4 +482,73 @@ test('FFmpeg verification must never disable Duluka Native H264 route', () => {
   h.hooks.setCatalog(h.hooks.parseCatalog(body));
   assert.deepEqual(Array.from(h.hooks.allowed('Duluka')), ['NVENC_H264']);
   assert.equal(h.hooks.allowed('FFmpeg').includes('NVENC_H264'), false);
+});
+
+test('Recommended and Maximum extend the SAME NVIDIA four-preset row without new backend quality IDs', () => {
+  const h = startHarness();
+  h.hooks.prime();
+  const base = Object.fromEntries(['Low', 'Medium', 'High', 'Custom'].map(id => [id, {id, supported:true}]));
+  const calls = [];
+  const native = {
+    feature:'Manual', Qualities:base, settings:{quality:base.Low},
+    selectQuality(item){calls.push(item.id); this.settings.quality=item;},
+    isActiveQuality(item){return this.settings.quality === item;}
+  };
+  h.win.angular.element = () => ({
+    isolateScope(){return {customizeMenu:native};},
+    controller(){return native;}
+  });
+  const host={querySelector(){return {};}};
+  assert.equal(h.hooks.installNativeQualityPresets(host),true);
+  assert.deepEqual(Object.keys(native.Qualities),
+    ['Low','Medium','High','Custom','NvRecommended','NvMaximum']);
+  assert.equal(native.Qualities.NvRecommended.icon,'icon-highlights');
+  assert.equal(native.Qualities.NvMaximum.icon,'icon-high');
+  native.selectQuality(native.Qualities.NvRecommended);
+  assert.deepEqual(calls,['Medium']);
+  assert.equal(native.isActiveQuality(native.Qualities.NvRecommended),true);
+  assert.equal(native.isActiveQuality(native.Qualities.Medium),false);
+  native.selectQuality(native.Qualities.NvMaximum);
+  assert.deepEqual(calls,['Medium','High']);
+  assert.equal(native.isActiveQuality(native.Qualities.NvMaximum),true);
+  assert.equal(native.isActiveQuality(native.Qualities.High),false);
+  native.selectQuality(native.Qualities.Custom);
+  assert.equal(native.isActiveQuality(native.Qualities.Custom),true);
+  assert.equal(native.isActiveQuality(native.Qualities.NvMaximum),false);
+  assert.equal(h.hooks.installNativeQualityPresets(host),true);
+  assert.equal(Object.keys(native.Qualities).length,6);
+  assert.deepEqual(calls,['Medium','High','Custom']);
+});
+
+test('late NVIDIA isolate-scope digest paints the two extra presets without waiting for Capture injector', () => {
+  const h = startHarness();
+  // Deliberately DO NOT prime the Capture panel: injector is still null.
+  const qualities = Object.fromEntries(['Low','Medium','High','Custom']
+    .map(id => [id,{id,supported:true}]));
+  const native = {
+    feature:'Manual', Qualities:qualities, settings:{quality:qualities.Low},
+    selectQuality(choice){this.settings.quality=choice;},
+    isActiveQuality(choice){return this.settings.quality===choice;}
+  };
+  let paints = 0;
+  let visible = 4;
+  const list = { querySelectorAll() { return Array(visible).fill({}); } };
+  const nativeElement = {
+    querySelector(selector){return selector==='.quality-list-box' ? list : null;}
+  };
+  const scope = {
+    customizeMenu:native,
+    $evalAsync(){paints += 1; visible=6;}
+  };
+  h.win.angular.element = () => ({
+    isolateScope(){return scope;},
+    controller(){return native;}
+  });
+  const host = {querySelector(){return nativeElement;}};
+  assert.equal(h.hooks.installNativeQualityPresets(host),true);
+  assert.equal(paints,1,'native ng-repeat must be digested on the first install');
+  assert.equal(visible,6,'DOM must reflect six native buttons');
+  assert.equal(h.hooks.installNativeQualityPresets(host),true);
+  assert.equal(paints,1,'a completed native row needs no redundant digest');
+  assert.equal(Object.keys(qualities).length,6);
 });

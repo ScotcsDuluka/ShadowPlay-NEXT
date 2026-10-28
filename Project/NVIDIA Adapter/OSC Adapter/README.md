@@ -63,3 +63,14 @@ Run Host-only policy tests: `dotnet run --project tests/RenderApiPolicy.Tests.cs
 Run isolated x64→x86 native test: `& "./tests/verify-dx9-routing.ps1"`.
 For test results and required NVIDIA Container / Duluka Hook handoffs, see
 `AUTOHOOK-DX9-COORDINATION-20261024.md`. This is Source-only; NO live deploy.
+
+## Native Duluka Hook / Codex handoff (25 October 2026)
+
+Current Hook architecture, deployed-vs-candidate SHA-256 verification, DX9 stutter investigation, benchmarks, safety gates and executable Codex work order are indexed in:
+
+- [Duluka Hook README](<Duluka Hook/README.md>)
+- [Codex Hook handoff](<Duluka Hook/CODEX-HANDOFF.md>)
+- [Hook source/runtime evidence](<Duluka Hook/docs/HOOK-STATUS-EVIDENCE-2026-10-25.md>)
+- [DX9 frame pacing test plan](<Duluka Hook/docs/DX9-PERFORMANCE-VALIDATION-2026-10-25.md>)
+
+The preceding "Source-only" statement describes that historical 2026-10-24 Host routing work, **not** the current deployed Hook/OSC components. The 25 October evidence file records both installed runtime hashes and the **not-deployed** empty-frame short-circuit candidate.

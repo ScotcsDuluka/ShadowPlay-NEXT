@@ -18,6 +18,7 @@
 
 #include "../../../include/osc_frame_bridge.h"
 #include "../../../include/d3d9_timing_diagnostics.h"
+#include "../../../include/d3d9_present_sample_recorder.h"
 #include "../../../include/d3d9ex_gpu_mailbox.h"
 #include "MinHook.h"
 #include "../../Renderer/D3D9/D3D9Renderer.h"
@@ -38,6 +39,9 @@ bool ReShadeAddonDrawActive();
 #pragma comment(linker, "/EXPORT:NvOscAdapterUnbindD3D9ExGpuFrame=_NvOscAdapterUnbindD3D9ExGpuFrame@4")
 #pragma comment(linker, "/EXPORT:NvOscAdapterGetD3D9AdapterStatus=_NvOscAdapterGetD3D9AdapterStatus@16")
 #pragma comment(linker, "/EXPORT:NvOscAdapterGetD3D9TimingSnapshot=_NvOscAdapterGetD3D9TimingSnapshot@8")
+#pragma comment(linker, "/EXPORT:NvOscAdapterBeginD3D9PresentSamples=_NvOscAdapterBeginD3D9PresentSamples@4")
+#pragma comment(linker, "/EXPORT:NvOscAdapterStopD3D9PresentSamples=_NvOscAdapterStopD3D9PresentSamples@0")
+#pragma comment(linker, "/EXPORT:NvOscAdapterReadD3D9PresentSamples=_NvOscAdapterReadD3D9PresentSamples@16")
 #pragma comment(linker, "/EXPORT:NvOscAdapterStageD3D9ExGpuFrame=_NvOscAdapterStageD3D9ExGpuFrame@24")
 #pragma comment(linker, "/EXPORT:NvOscAdapterCommitD3D9ExGpuFrame=_NvOscAdapterCommitD3D9ExGpuFrame@12")
 #pragma comment(linker, "/EXPORT:NvOscAdapterDiscardD3D9ExPendingGpuFrame=_NvOscAdapterDiscardD3D9ExPendingGpuFrame@4")
@@ -93,6 +97,53 @@ namespace
     std::atomic<std::uint64_t> g_originalPresentTicks{ 0 };
     std::atomic<std::uint64_t> g_originalPresentMaxTicks{ 0 };
     std::atomic<std::uint64_t> g_originalPresentSamples{ 0 };
+
+    // Optional per-session diagnostics. CPU-only tests exercise this exact
+    // platform-neutral recorder; the cumulative diagnostic ABI stays unchanged.
+    using PresentSampleRecorder = duluka::diagnostics::D3D9PresentSampleRecorder;
+    using PresentSampleToken = PresentSampleRecorder::CallToken;
+
+    std::uint64_t ReadPresentSampleClock() noexcept
+    {
+        LARGE_INTEGER value{};
+        QueryPerformanceCounter(&value);
+        return static_cast<std::uint64_t>(value.QuadPart);
+    }
+    PresentSampleRecorder g_presentSampleRecorder{ ReadPresentSampleClock };
+
+    PresentSampleToken BeginPresentSample() noexcept
+    {
+        // The default/disabled path performs this single atomic load only.
+        const auto epoch = g_presentSampleRecorder.ActiveEpoch();
+        if (!epoch) return {};
+        return g_presentSampleRecorder.Enter(epoch, ReadPresentSampleClock());
+    }
+
+    void FinishPresentSample(const PresentSampleToken& token,
+        LARGE_INTEGER beforeOriginal, LARGE_INTEGER afterOriginal,
+        HRESULT result, std::uint32_t presentKind) noexcept
+    {
+        if (!token.epoch) return;
+        g_presentSampleRecorder.Finish(token,
+            static_cast<std::uint64_t>(beforeOriginal.QuadPart),
+            static_cast<std::uint64_t>(afterOriginal.QuadPart),
+            static_cast<std::int32_t>(result), GetCurrentThreadId(), presentKind);
+    }
+
+    BOOL PresentSampleResult(PresentSampleRecorder::Result result) noexcept
+    {
+        using Result = PresentSampleRecorder::Result;
+        switch (result)
+        {
+        case Result::Success: return TRUE;
+        case Result::InvalidParameter: SetLastError(ERROR_INVALID_PARAMETER); break;
+        case Result::Busy: SetLastError(ERROR_BUSY); break;
+        case Result::InvalidState: SetLastError(ERROR_INVALID_STATE); break;
+        case Result::EpochExhausted: SetLastError(ERROR_ARITHMETIC_OVERFLOW); break;
+        case Result::InsufficientBuffer: SetLastError(ERROR_INSUFFICIENT_BUFFER); break;
+        }
+        return FALSE;
+    }
 
     PresentFunction g_originalPresent = nullptr;
     ResetFunction g_originalReset = nullptr;
@@ -249,6 +300,7 @@ namespace
         HWND destinationWindow,
         const RGNDATA *dirtyRegion)
     {
+        const auto sampleToken = BeginPresentSample();
         g_presentCount.fetch_add(1, std::memory_order_relaxed);
         if (!ReShadeAddonDrawActive() &&
             osc_frame_bridge::IsGameOrNvidiaOverlayForeground(
@@ -269,6 +321,8 @@ namespace
         QueryPerformanceCounter(&presentEnd);
         RecordDuration(presentStart, presentEnd, g_originalPresentTicks,
             g_originalPresentMaxTicks, g_originalPresentSamples);
+        FinishPresentSample(sampleToken, presentStart, presentEnd, result,
+            duluka::diagnostics::D3D9PresentKind);
         // Poll cumulative timing through the diagnostic export from a
         // non-render thread. Never write logs while forwarding Present.
         return result;
@@ -282,6 +336,7 @@ namespace
         const RGNDATA *dirtyRegion,
         DWORD flags)
     {
+        const auto sampleToken = BeginPresentSample();
         g_presentCount.fetch_add(1, std::memory_order_relaxed);
         if (!ReShadeAddonDrawActive() &&
             osc_frame_bridge::IsGameOrNvidiaOverlayForeground(
@@ -302,10 +357,17 @@ namespace
         QueryPerformanceCounter(&presentEnd);
         RecordDuration(presentStart, presentEnd, g_originalPresentTicks,
             g_originalPresentMaxTicks, g_originalPresentSamples);
+        FinishPresentSample(sampleToken, presentStart, presentEnd, result,
+            duluka::diagnostics::D3D9PresentExKind);
         // Do not touch filesystem from the game's PresentEx callback.
         return result;
     }
 
+    // Forward declarations for the factory-entry fallback in the include.
+    // It is used only when the dummy Present device cannot be created.
+    IDirect3D9 *WINAPI HookDirect3DCreate9(UINT sdkVersion);
+    HRESULT WINAPI HookDirect3DCreate9Ex(
+        UINT sdkVersion, IDirect3D9Ex **direct3d);
     #include "LateD3D9Detours.inc"
     bool InstallHookedSlot(void **slot, void *hook, void *&original)
     {
@@ -887,6 +949,28 @@ extern "C" __declspec(dllexport) BOOL WINAPI NvOscAdapterGetD3D9TimingSnapshot(
         std::memory_order_relaxed);
     *output = snapshot;
     return TRUE;
+}
+
+// Optional same-process bounded session recorder. Control calls are expected
+// out of band; they never wait for a game thread or hold a lock over Present.
+extern "C" __declspec(dllexport) BOOL WINAPI NvOscAdapterBeginD3D9PresentSamples(
+    DWORD capacity)
+{
+    return PresentSampleResult(g_presentSampleRecorder.Begin(
+        capacity, QueryPerformanceFrequencyValue()));
+}
+
+extern "C" __declspec(dllexport) BOOL WINAPI NvOscAdapterStopD3D9PresentSamples()
+{
+    return PresentSampleResult(g_presentSampleRecorder.Stop());
+}
+
+extern "C" __declspec(dllexport) BOOL WINAPI NvOscAdapterReadD3D9PresentSamples(
+    duluka::diagnostics::D3D9PresentSamplesSnapshotV1* output, DWORD outputBytes,
+    duluka::diagnostics::D3D9PresentSampleV1* samples, DWORD sampleBytes)
+{
+    return PresentSampleResult(g_presentSampleRecorder.Read(
+        output, outputBytes, samples, sampleBytes));
 }
 
 extern "C" __declspec(dllexport) BOOL WINAPI NvOscAdapterGetD3D9Status(

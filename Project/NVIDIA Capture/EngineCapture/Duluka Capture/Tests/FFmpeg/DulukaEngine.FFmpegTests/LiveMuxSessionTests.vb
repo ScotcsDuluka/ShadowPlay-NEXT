@@ -72,6 +72,52 @@ Namespace DulukaEngine.FFmpegTests
 
         ' ───────────────────────────────────────────────────────────────
 
+        Friend Sub RunAudioIntentOnly()
+            If Not RuntimeInformation.IsOSPlatform(OSPlatform.Windows) Then Return
+            _ffmpeg = FindRepoFFmpeg()
+            If String.IsNullOrEmpty(_ffmpeg) OrElse Not SetupSandbox() Then Return
+            Console.WriteLine($"      [LM-AUDIO-INTENT] sandbox={_sandbox} synthetic_PCM_only=true")
+            RunTest("LM-INTENT: both audio switches off", Sub() Test_AudioIntent(False, False, False))
+            RunTest("LM-INTENT: system only", Sub() Test_AudioIntent(True, False, False))
+            RunTest("LM-INTENT: microphone only mixed preference", Sub() Test_AudioIntent(False, True, False))
+            RunTest("LM-INTENT: microphone only separate preference", Sub() Test_AudioIntent(False, True, True))
+            RunTest("LM-INTENT: both tracks mixed finish at video EOF", Sub() Test_AudioIntent(True, True, False))
+        End Sub
+
+        Private Sub Test_AudioIntent(systemOn As Boolean, micOn As Boolean, separate As Boolean)
+            Dim outPath = IO.Path.Combine(_sandbox, $"intent-{systemOn}-{micOn}-{separate}.mp4")
+            Using mux As New LiveMuxSession(_ffmpeg, outPath, 30,
+                If(systemOn, 48000, 0), If(systemOn, 2, 0), If(micOn, 48000, 0), If(micOn, 1, 0),
+                separate, 1.0F, 0.5F, AddressOf CollectLog, sessionCfr:=True)
+                Assert(mux.Start(), "synthetic mux did not start")
+                mux.BeginTimelines(0, 0)
+                Dim videoBytes = FeedVideoFile(mux)
+                Dim sysBytes As Long = 0
+                Dim micBytes As Long = 0
+                If systemOn Then sysBytes = FeedAudioSeconds(mux, 2.0)
+                If micOn Then
+                    Dim pcm(48000 * 2 * 2 - 1) As Byte
+                    For i = 0 To 48000 * 2 - 1
+                        Dim sample = CShort(Math.Sin(i * 900.0 * 2.0 * Math.PI / 48000.0) * 12000.0)
+                        pcm(i * 2) = CByte(sample And &HFF)
+                        pcm(i * 2 + 1) = CByte((sample >> 8) And &HFF)
+                    Next
+                    mux.FeedMicAudio(pcm, pcm.Length)
+                    micBytes = pcm.Length
+                End If
+                Dim res = mux.Stop(15000)
+                Assert(res.Succeeded AndAlso res.FFmpegExitCode = 0 AndAlso res.DroppedBytes = 0,
+                    "audio intent mux failed: " & res.ErrorMessage & " " & res.StderrTail)
+                Assert(res.VideoBytesFed = videoBytes AndAlso res.SystemBytesFed = sysBytes AndAlso res.MicBytesFed = micBytes,
+                    "disabled tracks must send zero bytes and enabled tracks must conserve PCM")
+                Dim probe = ProbeStreams(outPath)
+                Dim audioCount = probe.Split("Audio:", StringSplitOptions.None).Length - 1
+                Assert(audioCount = If(systemOn OrElse micOn, 1, 0), "wrong number of requested audio streams: " & probe)
+                Assert(RunGenerator("-nostdin -v error -xerror -i """ & outPath & """ -f null -"),
+                    "all generated audio/video streams must fully decode")
+            End Using
+        End Sub
+
         Friend Sub RunAll()
             If Not RuntimeInformation.IsOSPlatform(OSPlatform.Windows) Then
                 Console.WriteLine("(LiveMuxSession tests skipped — named pipes are Windows-only)")
@@ -119,6 +165,8 @@ Namespace DulukaEngine.FFmpegTests
         ' ───────────────────────────────────────────────────────────────
 
         Private Function FindRepoFFmpeg() As String
+            Dim fromWorkingDirectory = IO.Path.Combine(Environment.CurrentDirectory, "Project", "FFmpeg", "ffmpeg.exe")
+            If IO.File.Exists(fromWorkingDirectory) Then Return fromWorkingDirectory
             Dim dir As New IO.DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory)
             For i As Integer = 1 To 16
                 If dir Is Nothing Then Return Nothing

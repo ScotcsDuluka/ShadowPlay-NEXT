@@ -1,0 +1,14 @@
+[
+  {
+    "Path": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Capture\\NvCapture.exe",
+    "Hash": "C2EF9AE9BB769C1501DAEF7FE3971E4EBF90CF8A4499EF86D637DBAEE742D27E"
+  },
+  {
+    "Path": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\NVIDIA Container\\NvContainer.exe",
+    "Hash": "D3A59BABFF6D19D3D080BA538D071773F333120B601DD2844FDEFA0FEAD4E709"
+  },
+  {
+    "Path": "C:\\My Project\\NVIDIA-Shadowplay\\build\\NVIDIA ShadowPlay\\Overlay On-Screen Control\\NVIDIA NodeAPI\\NvNode.exe",
+    "Hash": "D61FEDC1C8CB8F46609AA7EDFA79B6E600F4E3DF4576E1A57B0058ADC2DF196B"
+  }
+]

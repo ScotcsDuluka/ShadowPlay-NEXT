@@ -1,0 +1,59 @@
+# Duluka Session / audio mux / media reliability
+
+Date: 2026-10-27 (Asia/Bangkok). Scope: local source and isolated synthetic tests. The session/media workstream did not start desktop duplication, a game, WASAPI loopback, a microphone, or a GPU device. Root-owned live acceptance is separate evidence.
+
+Canonical ownership remains SPN-ADR-2026-10-24-SESSION-001: one CaptureSession owns the timeline, encoder packet sink, mux, and authoritative result. No architecture contract was removed or weakened. No gate enabling native Intel desktop/audio/exclusive capture was changed.
+
+## Source defects and changes
+
+All paths below are relative to `Project/NVIDIA Capture/EngineCapture/`.
+
+| Finding | Implementation and evidence |
+| --- | --- |
+| Mic-only live mux referenced nonexistent system/mic input indices | `Duluka Capture/Recording/Backends/FFmpeg/DulukaEngine.FFmpegBackend/LiveMuxSession.vb:240`: two-track mix/map is selected only when system and microphone both exist. Mic-only uses actual input 1, one AAC encoder, and its requested volume. It never synthesizes an enabled system track. |
+| Two padded mix inputs could produce an unbounded silence tail at EOF | The existing mix's `apad` is bounded by `-shortest` against the video stream. Synthetic two-track mixed output terminates at video EOF and fully decodes. |
+| A source fault bypassed explicit encoder drain and killed the session mux in Dispose | `Duluka Capture/Recording/DulukaEngine.Recording/CaptureSession.OwnedFrames.vb:112`: drain accepted delayed output into the same mux before encoder Stop, finalize that mux once, and verify retained output. A verified shortened/faulted output is Partial; cancellation remains Cancelled. ErrorMessage retains the primary source error. |
+| Unsupported owned-frame audio escaped before creating an authoritative result | Audio intent is now reported on a failed SessionResult with its original SessionId. Rejection still happens before starting an encoder, mux or audio provider. |
+| Packet sink allowed repeated drain/submission after drain and did not assert flush conservation | `Duluka Capture/Recording/DulukaEngine.Recording/SessionPacketSink.vb`: one successful drain is idempotent; a faulted sink cannot be retried; strict CFR drain requires one completed access unit per accepted frame. Every returned packet is disposed by the session, including mux-feed failure. |
+| Same-output detached or changed-topology envelopes could enter the controlled router | `Duluka Capture/Recording/DulukaEngine.Recording/SessionFrameRouter.vb`: require current eligibility and topology on both routes and transitions; explicitly reject disposed NV12 frames and null transition targets. Optional color metadata uses a safe borrowed view rather than a mandatory cast. |
+| Native Run's Saved decision depended on stream text and file existence | `Duluka Capture/Recording/DulukaEngine.Recording/CaptureSession.vb:1449`: native Run now requires full video decode, exact decoded/frame/packet counts, output geometry/fps, duration, monotonic DTS, and the exact requested number of audio tracks before Saved. Mux failure stays an error. |
+| Result Pass could ignore queued/muxed counts or an unsuccessful terminal state | `Duluka Capture/Recording/DulukaEngine.Recording/RecordingDTOs.vb:398`: when media verification is required, submitted, encoded, queued, muxed and decoded counts must agree and be positive. Failed/Partial/Cancelled cannot pass. Legacy non-media-required DTO tests retain their compatibility floor. |
+| EngineStatus exposed an encoded counter that was never populated | `CaptureSession.vb:93` and `RecordingEngine.vb` GetStatus: publish independent real-source, submitted, encoded and mux-queued counters through atomic reads/writes. Native source state progresses from Preparing/AwaitingFirstRealFrame through Recording/Draining/Finalizing/Verifying to the terminal state. Test-owned input never increments the real desktop count. |
+
+`Duluka Capture/Recording/Media/DulukaEngine.Media/SessionMediaVerifier.vb` retains the strict no-B-frame CFR path for controlled owned frames and adds native verification with the requested audio stream count. The native path permits at most one actual container timestamp tick of average frame-duration rounding per frame. It checks detailed packet timing on bounded samples and uses complete aggregate frame/packet counts for longer native recordings, avoiding an unbounded JSON object per packet. A failing optional process-registration callback does not abandon the verifier-owned child. Probe/decode deadlines report MediaVerificationPending/VerificationPending with a reason instead of claiming the content failed.
+
+## Executed validation
+
+Build/test artifacts are isolated below `C:\My Project\_CaptureAuditSnapshots\20261027-014248`; production outputs were not used by these tests. Test commands were run with working directory `C:\My Project\NVIDIA-Shadowplay`.
+
+1. Release build of `QsvNative.Tests/QsvNative.Tests.csproj`, using `--artifacts-path C:\My Project\_CaptureAuditSnapshots\20261027-014248\session-media-build`: **0 warnings, 0 errors**. Log: [session-contract-build.log](session-contract-build.log).
+2. `dotnet C:\My Project\_CaptureAuditSnapshots\20261027-014248\session-media-build\bin\QsvNative.Tests\release\QsvNative.Tests.dll --session-contract-only`: **35 passed, 0 failed**. Log: [session-contract-run.log](session-contract-run.log). This entrypoint returns before display inventory or QSV initialization. Cases cover source eligibility/topology/generation/timeline/ownership, delayed output, terminal drain, delivery failure, conservation, pending verification, unsupported audio and cancellation before start.
+3. Same executable with `--session-media-synthetic-only --evidence-dir C:\My Project\_CaptureAuditSnapshots\20261027-014248\session-media-fixtures-v4`: **43 passed, 0 failed**. Log: [session-media-synthetic-run.log](session-media-synthetic-run.log). It generates testsrc2 and sine media with software H.264/AAC, checks exact frame/packet/stream expectations, rejects truncated media/wrong dimensions/missing or unrequested audio, and tests a throwing ownership hook. A 3,601-frame native fixture fully decodes and verifies beyond the controlled synthetic input budget; a rounded-container-cadence fixture validates the native rescaling rule while strict CFR acceptance still rejects that rounding. It then feeds real H.264 access units through a delayed fake encoder into the production CaptureSession + LiveMuxSession and verifies these outcomes:
+
+| Controlled input | Accepted / decoded / muxed | Outcome |
+| --- | --- | --- |
+| Complete one-second input | 30 / 30 / 30 | Saved, Pass=True |
+| Stale generation after three inputs | 3 / 3 / 3 | Partial, Pass=False; original stale-generation reason retained |
+| Source EOF at ten inputs | 10 / 10 / 10 | Partial, Pass=False |
+| Cancellation after ten inputs | 10 / 10 / 10 | Cancelled, Pass=False; verified retained footage |
+
+   Corresponding terminal DTOs are [complete](session-owned-complete-result.json), [source fault](session-owned-source-fault-result.json), [early EOF](session-owned-early-eof-result.json), and [cancelled](session-owned-cancelled-result.json). Every yielded source envelope and encoder output packet is disposed exactly once; each fixture drains once. Desktop Starts and real captured frame counts are zero.
+4. Release build of `Duluka Capture/Tests/FFmpeg/DulukaEngine.FFmpegTests/DulukaEngine.FFmpegTests.vbproj`, using a separate `audio-intent-build` artifact root: **0 warnings, 0 errors**. [Build log](audio-intent-build.log).
+5. `dotnet C:\My Project\_CaptureAuditSnapshots\20261027-014248\audio-intent-build\bin\DulukaEngine.FFmpegTests\release\DulukaEngine.FFmpegTests.dll --audio-intent-synthetic-only`: **5 passed, 0 failed, 0 skipped**. [Run log](audio-intent-synthetic-run.log). Both audio off, system only, mic only with mixed preference, mic only with separate preference, and both mixed each conserve enabled PCM bytes, send zero bytes for disabled tracks, produce the requested stream count, and fully decode every audio/video stream. Audio bytes are generated sine PCM; no audio device is opened.
+
+The first local compile attempts exposed a VB reserved identifier and missing members in the new fake capture fixture; both were corrected. Those attempt logs are retained in the external snapshot. No check was removed to obtain the passing runs. Existing hardware QSV tests were not run on this NVIDIA machine by this workstream. Existing QSV source-fault expectations were updated to accept a verified Partial instead of requiring loss of delayed output.
+
+## Retained NVIDIA smoke verification
+
+Root's first native video-only desktop smoke retained a valid 158-frame, 1680x1050 MP4 but the initial stricter verifier rejected its average rate string: `r_frame_rate=30/1`, `avg_frame_rate=189600000/6319937`, timebase `1/1200000`. The average duration difference is less than one actual container timestamp tick per frame. This is container rescaling, not missing/undecodable footage; the unrelated audio accounting default was not a Pass condition. Native cadence validation now uses the mathematically bounded tick rule, while exact frame/packet/duration and full-decode checks remain in force. Native expected dimensions come from the actual runtime encoder. The result log now includes submitted/encoded/queued/muxed/decoded counts and the media reason for future diagnosis.
+
+Read-only re-verification of that retained MP4 using `--verify-existing-media <retained-path> 158 1680 1050 30 0` returned Verified=True, DecodedFrames=158, Packets=158, VerificationPending=False, PacketTimelineVerified=True. [Verifier evidence](session-native-retained-smoke-verification.log). This proves the verifier fix against the original failed artifact; root owns the separate fresh end-to-end runtime retry.
+
+## Remaining boundaries
+
+- Native Intel owned-frame audio remains explicitly unavailable (`owned_frame_input_audio_not_implemented`). Reusing AudioEngineSession alone is insufficient: first-source QPC origin, owned synthetic timing, optional track lifecycle and full audio/media verification must share an explicit session clock. FFmpeg AudioSidecar is still a dormant stub and was not enabled.
+- Existing native Run uses the shared AudioEngineSession and existing device-clock/sidecar transport. Synthetic mux success proves track selection, byte transport, finalization and decoding, not real device timing, recorded sound, drift under load, or microphone/system capture readiness. Root's separately scoped live results determine runtime acceptance.
+- The controlled owned-frame fixture budget remains 3,600 frames. Native verification has no arbitrary frame-count cutoff and requires complete video decode/counts within bounded child-process deadlines. When a real deadline expires, output remains VerificationPending and cannot pass until verified; a cancellable background verification owner is not yet implemented. Long native acceptance does not claim a detailed per-packet timestamp scan when only complete aggregate counts were requested.
+- Automatic Desktop/Fullscreen Exclusive source selection, arbitrary game/API support, topology migration, placeholder generation and general gap recovery were not added. Existing controlled source-generation and timestamp checks fail closed when continuity cannot be proved.
+- The five audio-intent cases validate the mixed dual-input path, not the legacy three-input separate-track end-to-end regression or a long recording. Existing broader mux tests and NVIDIA live tests are reported by their owners; this report does not claim those ran here.
+- No live Intel gate, CBR exception, GPU selection, user audio preference, runtime config, AORUS deployment, commit or push was changed by this workstream.

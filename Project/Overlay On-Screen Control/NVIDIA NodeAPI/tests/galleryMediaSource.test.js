@@ -118,8 +118,9 @@ function mock() {
     document, fetch,
     location: {href:'http://127.0.0.1:59011/osc/index.html'},
     MutationObserver: class {
-      constructor(cb){this.cb=cb;observers.push(this);}
-      observe() {}
+      constructor(cb){this.cb=cb;this.active=false;observers.push(this);}
+      observe() { this.active=true; }
+      disconnect() { this.active=false; }
     }
   };
   context.URL.createObjectURL = object => {
@@ -128,13 +129,26 @@ function mock() {
   };
   context.URL.revokeObjectURL = () => {};
   vm.runInNewContext(source, context);
-  return {video, requests, media, observers, sourceNode};
+  return {video, requests, media, observers, sourceNode,
+    reload: () => vm.runInNewContext(source, context)};
 }
 function tick() { return new Promise(resolve => setImmediate(resolve)); }
 test('the real OSC HTML includes Gallery MSE bridge exactly once', () => {
   const html = fs.readFileSync(path.join(osc,'index.html'),'utf8');
   const count = (html.match(/src="\/mods\/gallery-media-source\.js\?v=/g) || []).length;
   assert.equal(count, 1);
+});
+test('repeated script injection replaces the observer and preserves playback', async () => {
+  const env = mock();
+  await tick(); await tick();
+  const playback = env.video.__nvSegmentPlayback;
+  env.reload();
+  assert.equal(env.observers.length, 2);
+  assert.equal(env.observers[0].active, false);
+  assert.equal(env.observers[1].active, true);
+  assert.equal(env.video.__nvSegmentPlayback, playback);
+  assert.equal(playback.disposed, false);
+  env.video.__nvSegmentPlayback.dispose();
 });
 test('seeking cancels obsolete segment and prioritizes new timeline', async () => {
   const env = mock();

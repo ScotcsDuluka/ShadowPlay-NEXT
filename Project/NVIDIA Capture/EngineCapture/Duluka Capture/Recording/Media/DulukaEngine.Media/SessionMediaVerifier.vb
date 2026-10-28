@@ -9,6 +9,8 @@ Namespace DulukaEngine.Media
         Public Property Reason As String = ""
         Public Property DecodedFrames As Long
         Public Property Packets As Long
+        Public Property VerificationPending As Boolean
+        Public Property PacketTimelineVerified As Boolean
     End Class
     Public NotInheritable Class SessionMediaVerifier
         Public Shared Function Verify(path As String, ffmpeg As String, frames As Long, width As Integer, height As Integer,
@@ -18,19 +20,52 @@ Namespace DulukaEngine.Media
         Public Shared Function VerifyWithColor(path As String, ffmpeg As String, frames As Long, width As Integer, height As Integer,
                                       fps As Integer, processStarted As Action(Of Process),
                                       expectedColor As DulukaEngine.Video.VideoColorDescriptor) As SessionMediaEvidence
+            Return VerifyCore(path, ffmpeg, frames, width, height, fps, processStarted, expectedColor, 0, True)
+        End Function
+        Public Shared Function VerifyNative(path As String, ffmpeg As String, frames As Long, width As Integer, height As Integer,
+                                      fps As Integer, audioStreams As Integer,
+                                      Optional processStarted As Action(Of Process) = Nothing) As SessionMediaEvidence
+            Return VerifyCore(path, ffmpeg, frames, width, height, fps, processStarted, Nothing, audioStreams, False)
+        End Function
+        Private Shared Function VerifyCore(path As String, ffmpeg As String, frames As Long, width As Integer, height As Integer,
+                                      fps As Integer, processStarted As Action(Of Process),
+                                      expectedColor As DulukaEngine.Video.VideoColorDescriptor, audioStreams As Integer,
+                                      strictCfr As Boolean) As SessionMediaEvidence
             Dim result As New SessionMediaEvidence()
             Try
-                If frames <= 0 OrElse fps <= 0 Then Throw New InvalidDataException("session_expected_frame_budget_required")
+                If frames <= 0 OrElse (strictCfr AndAlso frames > 3600) OrElse fps <= 0 OrElse width <= 0 OrElse height <= 0 Then
+                    Throw New InvalidDataException("session_expected_frame_budget_required")
+                End If
                 Dim probe = IO.Path.Combine(IO.Path.GetDirectoryName(IO.Path.GetFullPath(ffmpeg)), "ffprobe.exe")
                 Dim deep = Global.CaptureMediaInspector.InspectWithVideoDecode(path, probe, ffmpeg)
-                If Not deep.Verified OrElse Not deep.VideoDecodeVerified Then Throw New InvalidDataException("session_full_decode_failed:" & deep.Reason)
+                If Not deep.Verified OrElse Not deep.VideoDecodeVerified Then
+                    If deep.Reason = "ffprobe_timeout" OrElse deep.Reason = "ffmpeg_decode_timeout" Then
+                        result.VerificationPending = True
+                        result.Reason = "session_verification_pending:" & deep.Reason
+                        Return result
+                    End If
+                    Throw New InvalidDataException("session_full_decode_failed:" & deep.Reason)
+                End If
+                If deep.VideoStreams <> 1 OrElse deep.AudioStreams <> audioStreams Then
+                    Throw New InvalidDataException("session_requested_stream_count_mismatch")
+                End If
                 Dim psi As New ProcessStartInfo(probe) With {.UseShellExecute = False, .CreateNoWindow = True,
                     .RedirectStandardOutput = True, .RedirectStandardError = True}
-                For Each arg In {"-v", "error", "-count_frames", "-count_packets", "-show_streams", "-show_format", "-show_packets", "-of", "json", path}
+                ' Long native recordings need complete aggregate frame/packet
+                ' counts, not a JSON object per packet retained in memory.
+                Dim scanTimeline = strictCfr OrElse frames <= 3600
+                For Each arg In {"-v", "error", "-select_streams", "v:0", "-count_frames", "-count_packets", "-show_streams", "-show_format",
+                    "-show_entries", "stream=codec_type,codec_name,width,height,avg_frame_rate,nb_read_frames,nb_read_packets,nb_frames,time_base,color_range,color_space,color_transfer,color_primaries:format=duration" &
+                        If(scanTimeline, ":packet=pts,dts,duration", ""),
+                    "-of", "json", path}
                     psi.ArgumentList.Add(arg)
                 Next
+                If scanTimeline Then psi.ArgumentList.Insert(0, "-show_packets")
                 Using child = Process.Start(psi)
-                    processStarted?.Invoke(child)
+                    Try : processStarted?.Invoke(child) : Catch
+                        ' This verifier remains the owner even if the host's
+                        ' optional job-registration hook fails.
+                    End Try
                     Dim output = child.StandardOutput.ReadToEndAsync()
                     Dim errors = child.StandardError.ReadToEndAsync()
                     If Not child.WaitForExit(30000) Then
@@ -55,7 +90,7 @@ Namespace DulukaEngine.Media
                         End If
                         If video.GetProperty("codec_type").GetString() <> "video" OrElse video.GetProperty("codec_name").GetString() <> "h264" OrElse
                             video.GetProperty("width").GetInt32() <> width OrElse video.GetProperty("height").GetInt32() <> height OrElse
-                            video.GetProperty("avg_frame_rate").GetString() <> fps.ToString(Globalization.CultureInfo.InvariantCulture) & "/1" Then
+                            Not CadenceMatches(video, fps, strictCfr) Then
                             Throw New InvalidDataException("session_video_descriptor_mismatch")
                         End If
                         result.DecodedFrames = Long.Parse(video.GetProperty("nb_read_frames").GetString(), Globalization.CultureInfo.InvariantCulture)
@@ -64,6 +99,7 @@ Namespace DulukaEngine.Media
                         If declared <> frames OrElse result.DecodedFrames <> frames OrElse result.Packets <> frames Then
                             Throw New InvalidDataException("session_frame_packet_count_mismatch")
                         End If
+                        If scanTimeline Then
                         Dim timeBase = video.GetProperty("time_base").GetString().Split("/"c)
                         Dim numerator = Decimal.Parse(timeBase(0), Globalization.CultureInfo.InvariantCulture)
                         Dim denominator = Decimal.Parse(timeBase(1), Globalization.CultureInfo.InvariantCulture)
@@ -76,20 +112,45 @@ Namespace DulukaEngine.Media
                             Dim pts = packet.GetProperty("pts").GetInt64()
                             Dim dts = packet.GetProperty("dts").GetInt64()
                             Dim packetDuration = packet.GetProperty("duration").GetInt64()
-                            If pts <> dts OrElse CDec(pts) * numerator * fps <> CDec(i) * denominator OrElse
-                                CDec(packetDuration) * numerator * fps <> denominator Then
+                            If packetDuration <= 0 OrElse (strictCfr AndAlso (pts <> dts OrElse
+                                CDec(pts) * numerator * fps <> CDec(i) * denominator OrElse
+                                CDec(packetDuration) * numerator * fps <> denominator)) Then
                                 Throw New InvalidDataException("session_mp4_pts_dts_or_duration_mismatch")
                             End If
+                            If i > 0 AndAlso dts <= packets(i - 1).GetProperty("dts").GetInt64() Then
+                                Throw New InvalidDataException("session_mp4_dts_not_monotonic")
+                            End If
                         Next
+                        result.PacketTimelineVerified = True
+                        End If
                         Dim duration = Double.Parse(doc.RootElement.GetProperty("format").GetProperty("duration").GetString(), Globalization.CultureInfo.InvariantCulture)
-                        If Math.Abs(duration - CDbl(frames) / fps) > 1.0 / fps Then Throw New InvalidDataException("session_media_duration_mismatch")
+                        If Not Double.IsFinite(duration) OrElse duration <= 0 OrElse
+                            Math.Abs(duration - CDbl(frames) / fps) > 1.0 / fps Then Throw New InvalidDataException("session_media_duration_mismatch")
                     End Using
                 End Using
                 result.Verified = True
             Catch ex As Exception
                 result.Reason = ex.Message
+                result.VerificationPending = TypeOf ex Is TimeoutException
             End Try
             Return result
+        End Function
+        Private Shared Function CadenceMatches(video As JsonElement, fps As Integer, strictCfr As Boolean) As Boolean
+            Dim rate = video.GetProperty("avg_frame_rate").GetString()
+            If strictCfr Then Return rate = fps.ToString(Globalization.CultureInfo.InvariantCulture) & "/1"
+            Dim average = rate.Split("/"c)
+            Dim timeBase = video.GetProperty("time_base").GetString().Split("/"c)
+            If average.Length <> 2 OrElse timeBase.Length <> 2 Then Return False
+            Dim rateNumerator = Decimal.Parse(average(0), Globalization.CultureInfo.InvariantCulture)
+            Dim rateDenominator = Decimal.Parse(average(1), Globalization.CultureInfo.InvariantCulture)
+            Dim tickNumerator = Decimal.Parse(timeBase(0), Globalization.CultureInfo.InvariantCulture)
+            Dim tickDenominator = Decimal.Parse(timeBase(1), Globalization.CultureInfo.InvariantCulture)
+            If rateNumerator <= 0 OrElse rateDenominator <= 0 OrElse tickNumerator <= 0 OrElse tickDenominator <= 0 Then Return False
+            ' Native raw-H264 remux can round each sample's duration to the
+            ' container timebase. Permit at most ONE such tick per frame;
+            ' submitted/decoded counts and total duration remain exact gates.
+            Return Math.Abs(rateDenominator * fps - rateNumerator) * tickDenominator <=
+                rateNumerator * fps * tickNumerator
         End Function
     End Class
 End Namespace

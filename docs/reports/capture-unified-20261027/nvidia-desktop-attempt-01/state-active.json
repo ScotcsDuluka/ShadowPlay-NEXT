@@ -1,0 +1,28 @@
+{
+  "ready": true,
+  "nativeRuntimeReady": true,
+  "failReason": "",
+  "recording": true,
+  "enabled": true,
+  "actualSessionBackend": "Duluka",
+  "actualRunningEngine": "Duluka",
+  "busy": true,
+  "isCapturing": true,
+  "runtimeTruth": {
+    "lifecycleOwner": "Duluka",
+    "actualSessionBackend": "Duluka",
+    "actualRunningEngine": "Duluka",
+    "lifecycleState": "Recording",
+    "sessionId": "a057870530144c6597e385e39ce18b4c",
+    "busy": true,
+    "isCapturing": true,
+    "realFramesCaptured": 111,
+    "framesEncoded": 153,
+    "hardwareVerified": false,
+    "mediaVerified": false
+  },
+  "elapsedSec": 7,
+  "outputPath": "C:\\My Project\\_CaptureAuditSnapshots\\20261027-014248\\nvidia-smoke-v3\\Records\\NvCapture_sandbox_2569-10-27_020013_429.mp4",
+  "lastFile": "",
+  "lastRecordingResult": null
+}

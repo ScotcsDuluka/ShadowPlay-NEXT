@@ -1,0 +1,16 @@
+body[data-nv-route="preferences-connect"] .providers {
+    width: calc(100% - 80px) !important;
+    max-width: none !important;
+    margin: 40px !important;
+    box-sizing: border-box;
+}
+
+body[data-nv-route="preferences-connect"] .providers > .ng-scope,
+body[data-nv-route="preferences-connect"] .providers .provider-item {
+    width: 100% !important;
+    box-sizing: border-box;
+}
+
+body[data-nv-route="preferences-connect"] .providers .provider-item {
+    min-height: 56px;
+}

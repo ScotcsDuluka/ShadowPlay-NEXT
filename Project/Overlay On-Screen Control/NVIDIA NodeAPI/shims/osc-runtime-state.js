@@ -5,6 +5,7 @@ module.exports = {
   // explicitly suspends it via POST /ShadowPlay/v.1.0/Hotkey/Monitor.
   // A NodeAPI cold start must not strand Alt+Z in the disabled state.
   hotkeyMonitor: true,
+  hotkeyMonitorGeneration: 0,
   recordEnabled: false,
   recordRunning: false,
   irEnabled: false,

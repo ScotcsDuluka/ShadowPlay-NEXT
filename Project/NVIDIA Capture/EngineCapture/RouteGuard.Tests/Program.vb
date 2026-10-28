@@ -14,6 +14,7 @@ Module Program
     End Sub
 
     Sub Main()
+        ControlPlaneTests.Run()
         Dim d = CaptureBackendRoute.Decide("Duluka", "dxgi_desktop_duplication", "NVENC_H264")
         Check("Duluka DXGI H264", d.Allowed AndAlso d.Kind = "Duluka")
         Check("Native route truth", d.CaptureApi = "dxgi_desktop_duplication")

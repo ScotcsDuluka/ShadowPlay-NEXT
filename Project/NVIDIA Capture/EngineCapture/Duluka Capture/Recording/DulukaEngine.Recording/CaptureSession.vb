@@ -85,6 +85,58 @@ Namespace DulukaEngine.Recording
         Private _stopSignal As Boolean = False
         Private _stopRequestedTicks As Long = 0
         Private _disposed As Boolean = False
+        Private _realFramesCaptured As Long
+        Private _framesSubmitted As Long
+        Private _encoderPackets As Long
+        Private _packetsQueuedForMux As Long
+        Private _sessionLifecycleState As String = "Created"
+        Private _terminalVideoFault As String = ""
+        Private Function ObserveTerminalVideoFault() As Boolean
+            Dim health = TryCast(_capture, IVideoCaptureTerminalHealth)
+            If health IsNot Nothing AndAlso String.IsNullOrEmpty(_terminalVideoFault) Then
+                _terminalVideoFault = If(health.TerminalFault, "")
+            End If
+            Return Not String.IsNullOrEmpty(_terminalVideoFault)
+        End Function
+        Private Sub PreserveTerminalVideoFault(result As SessionResult)
+            If ObserveTerminalVideoFault() Then
+                Dim evidence = "session_video_source_fault:" & _terminalVideoFault
+                If String.IsNullOrWhiteSpace(result.ErrorMessage) Then
+                    result.ErrorMessage = evidence
+                ElseIf Not result.ErrorMessage.Contains(evidence) Then
+                    result.ErrorMessage &= ";" & evidence
+                End If
+            End If
+        End Sub
+        Public ReadOnly Property RealFramesCapturedThisSession As Long
+            Get
+                Return Interlocked.Read(_realFramesCaptured)
+            End Get
+        End Property
+        Public ReadOnly Property FramesSubmittedThisSession As Long
+            Get
+                Return Interlocked.Read(_framesSubmitted)
+            End Get
+        End Property
+        Public ReadOnly Property FramesEncodedThisSession As Long
+            Get
+                Return Interlocked.Read(_encoderPackets)
+            End Get
+        End Property
+        Public ReadOnly Property PacketsQueuedForMuxThisSession As Long
+            Get
+                Return Interlocked.Read(_packetsQueuedForMux)
+            End Get
+        End Property
+        Private Sub PublishPacketProgress(submitted As Long, encoded As Long, queued As Long)
+            Interlocked.Exchange(_framesSubmitted, submitted)
+            Interlocked.Exchange(_encoderPackets, encoded)
+            Interlocked.Exchange(_packetsQueuedForMux, queued)
+            If encoded > 0 AndAlso RealFramesCapturedThisSession > 0 AndAlso
+                Threading.Volatile.Read(_sessionLifecycleState) = "AwaitingFirstRealFrame" Then
+                Threading.Volatile.Write(_sessionLifecycleState, "Recording")
+            End If
+        End Sub
 
         ' Sync timeline (Stopwatch ticks)
         Private _systemStartTicks As Long = 0
@@ -235,11 +287,13 @@ Namespace DulukaEngine.Recording
         End Sub
 
         Public Function Run() As SessionResult
+            Threading.Volatile.Write(_sessionLifecycleState, "Preparing")
             Dim result As New SessionResult() With {
                 .SessionId = SessionId,
                 .OutputPath = _config.OutputPath,
                 .RequestedDurationSec = _config.DurationSeconds,
-                .AudioRequested = _config.RequestsAnyAudio
+                .AudioRequested = _config.RequestsAnyAudio,
+                .MediaVerificationRequired = True
             }
 
             ' ─── Temp file paths ─────────────────────────────────────────
@@ -277,7 +331,7 @@ Namespace DulukaEngine.Recording
             Dim captureRunning As Boolean = False
             Dim encoderRunning As Boolean = False
             Dim packets As New SessionPacketSink(_encoder, result,
-                Sub(data, count) _liveMux.FeedVideo(data, count))
+                Sub(data, count) _liveMux.FeedVideo(data, count), progress:=AddressOf PublishPacketProgress)
 
             ' ★ M1: the CFR loop's retained frames (freshest pending + last
             ' displayed) were only disposed by the post-loop tail — an
@@ -679,6 +733,7 @@ Namespace DulukaEngine.Recording
                 encoderRunning = True
                 _encoder.Start()
                 captureRunning = True
+                Threading.Volatile.Write(_sessionLifecycleState, "AwaitingFirstRealFrame")
                 _capture.Start(sink)
 
                 ' Audio/video mux timeline is already defined by the same T0.
@@ -742,6 +797,9 @@ Namespace DulukaEngine.Recording
                 Do While (Stopwatch.GetTimestamp() - _timelineStartTicks) < durationTicks AndAlso
                          Not Threading.Volatile.Read(_stopSignal) AndAlso
                          Not encoderFaulted
+                    ' Only a definitive backend fault ends capture. A static
+                    ' desktop and DXGI WaitTimeout remain normal no-update cases.
+                    If ObserveTerminalVideoFault() Then Exit Do
                     ' Pull only the next chronological source frame. Do NOT drain the whole
                     ' queue and keep the newest; that skips temporal history and can make
                     ' motion appear accelerated during capture bursts.
@@ -749,6 +807,7 @@ Namespace DulukaEngine.Recording
                         Dim far As FrameAcquisitionResult
                         If sink.TryTake(far) Then
                             result.FramesCaptured += 1
+                            Interlocked.Increment(_realFramesCaptured)
                             pendingFrame = far.Frame
                             pendingSeq = far.Sequence
                             
@@ -780,6 +839,7 @@ Namespace DulukaEngine.Recording
                         ' into tail-fill. Bound each burst so Stop() remains responsive.
                         Dim catchUpCount As Integer = 0
                         Do
+                            If ObserveTerminalVideoFault() Then Exit Do
                             If nextTick >= _timelineStartTicks + durationTicks Then Exit Do
 
                             Dim targetQpc100ns As Long = _timelineStartQpc100ns +
@@ -827,6 +887,7 @@ Namespace DulukaEngine.Recording
                                 Dim nextSource As FrameAcquisitionResult
                                 If sink.TryTake(nextSource) Then
                                     result.FramesCaptured += 1
+                                    Interlocked.Increment(_realFramesCaptured)
                                     pendingFrame = nextSource.Frame
                                     pendingSeq = nextSource.Sequence
                                 End If
@@ -943,6 +1004,9 @@ Namespace DulukaEngine.Recording
                 _logger.Info("[session] Stopping video capture...")
                 _capture.Stop()
                 captureRunning = False   ' ★ M1: success path owns the stop — Finally must not re-stop
+                ' The producer may have faulted concurrently with Stop. Its
+                ' latched terminal evidence remains valid through finalization.
+                PreserveTerminalVideoFault(result)
                 ' Capture-path evidence: distinguish real DXGI no-update periods,
                 ' handoff backpressure, and backend errors from CFR duplication.
                 _logger.Info($"[session] capture diagnostics: emitted={_capture.Diagnostics.EmittedFrames}, pushed={_capture.FramesPushed}, dropped={_capture.Diagnostics.DroppedFrames}, replaced={_capture.Diagnostics.ReplacedFrames}, noFrame={_capture.Diagnostics.NoFrameCount}, errors={_capture.Diagnostics.ErrorCount}, accessLost={_capture.AccessLostCount}, textures={_capture.TexturesCreated}/{_capture.TexturesDisposed}")
@@ -959,6 +1023,7 @@ Namespace DulukaEngine.Recording
                 Dim farDrain As FrameAcquisitionResult
                 While sink.TryTake(farDrain)
                     result.FramesCaptured += 1
+                    Interlocked.Increment(_realFramesCaptured)
                     Dim f As IVideoFrame = farDrain.Frame
                     If f Is Nothing Then Continue While
                     If farDrain.Sequence > pendingSeq Then
@@ -980,7 +1045,7 @@ Namespace DulukaEngine.Recording
                 If finalFrame Is Nothing Then finalFrame = lastFrame
 
 
-                If finalFrame IsNot Nothing Then
+                If finalFrame IsNot Nothing AndAlso Not ObserveTerminalVideoFault() Then
                     If pendingFrame IsNot Nothing Then
                         Dim packetF As EncodedPacket = Nothing
                         Try
@@ -1001,7 +1066,7 @@ Namespace DulukaEngine.Recording
                     Dim actualSessionSeconds As Double = stopElapsedSeconds
                     Dim targetFrames As Long = CLng(Math.Ceiling(actualSessionSeconds * targetFps))
                     Dim fillBefore As Long = result.FramesEncoded
-                    While result.FramesSubmitted < targetFrames AndAlso finalFrame IsNot Nothing
+                    While result.FramesSubmitted < targetFrames AndAlso finalFrame IsNot Nothing AndAlso Not ObserveTerminalVideoFault()
                         Dim packetPad As EncodedPacket = Nothing
                         Try
                             If Not packets.Submit(finalFrame) Then
@@ -1035,6 +1100,7 @@ Namespace DulukaEngine.Recording
                 frameDisposer.CompleteAndWait()
 
                 _logger.Info("[session] frame disposer drained; draining encoder packets into session mux...")
+                Threading.Volatile.Write(_sessionLifecycleState, "Draining")
                 packets.Drain()
                 _encoder.Stop()
                 encoderRunning = False   ' ★ M1: success path owns the stop — Finally must not re-stop
@@ -1191,6 +1257,7 @@ Namespace DulukaEngine.Recording
                 ' WrapFps evidence = the CONFIG fps the session actually ran at
                 ' (pacing + mux declared rate), no longer the display rate.
                 result.WrapFps = targetFps
+                Threading.Volatile.Write(_sessionLifecycleState, "Finalizing")
                 Dim liveRes As LiveMuxResult = _liveMux.[Stop](30000)
                 _logger.Info("[session] " & liveRes.ToString())
 
@@ -1203,6 +1270,7 @@ Namespace DulukaEngine.Recording
                 ' P1-B: a salvaged fragment keeps the partial file on disk but
                 ' the session stays an honest FAILURE (Pass excludes partials).
                 result.MuxPartialSalvaged = liveRes.PartialSalvaged
+                If Not liveRes.Succeeded Then result.ErrorMessage = "session_mux_finalize_failed:" & liveRes.ErrorMessage
                 If liveRes.PartialSalvaged Then
                     _logger.Warning("[session] partial recording salvaged from fragments — pass stays False")
                 End If
@@ -1400,15 +1468,38 @@ Namespace DulukaEngine.Recording
                     End Try
                 End If
 
+                Threading.Volatile.Write(_sessionLifecycleState, "Verifying")
+                Dim expectedAudioStreams As Integer = If(_config.RequestsAnyAudio, 1, 0)
+                If _config.AudioEnabled AndAlso _config.MicEnabled AndAlso _config.MicSeparateTracks Then expectedAudioStreams = 2
+                Dim actualEncoder = TryCast(_encoder, IEncoderRuntimeBackend)
+                Dim verificationWidth = If(actualEncoder Is Nothing, _config.EncodeWidth, actualEncoder.EncodeWidthOutput)
+                Dim verificationHeight = If(actualEncoder Is Nothing, _config.EncodeHeight, actualEncoder.EncodeHeightOutput)
+                Dim media = DulukaEngine.Media.SessionMediaVerifier.VerifyNative(_config.OutputPath, _config.FFmpegPath,
+                    result.FramesSubmitted, verificationWidth, verificationHeight, targetFps,
+                    expectedAudioStreams, _config.OnProcessStarted)
+                result.FullDecodeVerified = media.Verified
+                result.MediaVerificationPending = media.VerificationPending
+                result.MediaVerificationReason = media.Reason
+                result.DecodedFrameCount = media.DecodedFrames
+                result.MuxedPacketCount = media.Packets
+                If Not media.Verified AndAlso Not media.VerificationPending Then result.ErrorMessage = "session_media_verification_failed:" & media.Reason
+                PreserveTerminalVideoFault(result)
+                result.FinalizationState = If(result.Pass, "Saved", If(media.VerificationPending AndAlso String.IsNullOrWhiteSpace(result.ErrorMessage),
+                    "VerificationPending", If(result.FileExists AndAlso result.FramesEncoded > 0, "Partial", "Failed")))
+                Threading.Volatile.Write(_sessionLifecycleState, result.FinalizationState)
                 _logger.Info($"[session] Result: pass={result.Pass}, frames={result.FramesEncoded} " &
                              $"(captured={result.FramesCaptured}, dup={result.FramesDuplicated}), " &
                              $"video_bytes={result.TotalVideoBytes}, audio_bytes={result.AudioBytes}, " &
                              $"dropped={result.AudioDroppedBytes}, offset={result.SystemOffsetSec:0.000}s, " &
+                             $"submitted={result.FramesSubmitted}, encodedPackets={result.EncoderPacketCount}, queued={result.PacketsQueuedForMux}, muxed={result.MuxedPacketCount}, decoded={result.DecodedFrameCount}, mediaReason={result.MediaVerificationReason}, " &
                              $"cfrFps={result.WrapFps:0.###}, duration={result.MuxVideoDurationSec:0.000}s, " &
                              $"file_size={result.FileSize}")
 
             Catch ex As Exception
                 result.ErrorMessage = ex.Message
+                PreserveTerminalVideoFault(result)
+                result.FinalizationState = "Failed"
+                Threading.Volatile.Write(_sessionLifecycleState, "Failed")
                 _logger.Error($"[session] Failed: {ex.Message}", ex)
             Finally
                 Try : timeEndPeriod(1UI) : Catch : End Try

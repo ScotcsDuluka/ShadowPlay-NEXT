@@ -403,6 +403,11 @@ static class NvContainer
 
     static void PublishContainerEvents(JsonElement events)
     {
+        TryPublishContainerEvents(events);
+    }
+
+    static bool TryPublishContainerEvents(JsonElement events)
+    {
         try
         {
             var port = 59011;
@@ -414,15 +419,17 @@ static class NvContainer
             catch { }
             var json = JsonSerializer.Serialize(new { events });
             using var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var response = NodeApiHttp.PostAsync(
+            using var response = NodeApiHttp.PostAsync(
                 "http://127.0.0.1:" + port + "/Backend/v.1.0/ContainerEvents", content)
                 .GetAwaiter().GetResult();
             if (!response.IsSuccessStatusCode)
                 Log("[container-event] OSC delivery failed: HTTP " + (int)response.StatusCode);
+            return response.IsSuccessStatusCode;
         }
         catch (Exception ex)
         {
             Log("[container-event] OSC delivery failed: " + ex.Message);
+            return false;
         }
     }
 
@@ -878,13 +885,14 @@ static class NvContainer
                 CaptureRuntimeApiPort(), CaptureRuntimeEnabled(),
                 ConfigBool("captureRuntime", "allowRecordCommands", false), TestModeEnabled(),
                 ConfigBool("captureRuntime", "allowDisplayCommands", false),
-                ConfigBool("captureRuntime", "allowScreenshotCommands", false));
+                ConfigBool("captureRuntime", "allowScreenshotCommands", false),
+                workerWriteToken: () => PairingSecretStore.Read(PairingSecretStore.DefaultPath));
             TestApi = new ContainerTestApi(TestModeEnabled(), ControlApiPort(), Log,
                 PublishContainerEvents, ObsRuntime, MarkNvGraphicsReady, NvGraphicsStatus,
                 OpenNvGraphics, ApplicationOntologyClient, GameWatcher, OscAdapterLifecycle,
                 GetCaptureEngineCatalog, GetCaptureWorkerStatus, GetCaptureCapabilities,
                 ForwardCaptureRecordCommand, GetCaptureDisplays, ForwardCaptureDisplayCommand,
-                GetCaptureContract);
+                GetCaptureContract, TryPublishContainerEvents);
             TestApi.Start();
             Log("[test-api] test mode " + (TestModeEnabled() ? "enabled: capture/filter actions are simulated" : "disabled"));
             HoldPairing();

@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.26100.0</SupportedOSPlatformVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWindowsForms>true</UseWindowsForms>
+    <CaptureAssemblyDirectory Condition="'$(CaptureAssemblyPath)' != ''">$([System.IO.Path]::GetDirectoryName('$(CaptureAssemblyPath)'))</CaptureAssemblyDirectory>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Explicit validated stage only: never resolve stale source-bin DLLs. -->
+    <Reference Include="NvCapture">
+      <HintPath>$(CaptureAssemblyPath)</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Content Include="$(CaptureAssemblyDirectory)/*.dll" Exclude="$(CaptureAssemblyPath)">
+      <Link>%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="$(CaptureAssemblyDirectory)/runtimes/**/*">
+      <Link>runtimes/%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <Target Name="RequireValidatedCaptureAssembly" BeforeTargets="ResolveReferences">
+    <Error Condition="'$(CaptureAssemblyPath)' == '' Or !Exists('$(CaptureAssemblyPath)')"
+           Text="Pass -p:CaptureAssemblyPath=&lt;validated stage&gt;/NvCapture.dll. Source-bin fallback is prohibited." />
+  </Target>
+</Project>

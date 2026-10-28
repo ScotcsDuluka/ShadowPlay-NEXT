@@ -1,0 +1,56 @@
+
+body[data-nv-route="preferences"] .preferences-root-panel {
+    height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+
+    max-width: 380px !important;
+    min-width: 380px;
+    max-height: none !important;
+    min-height: 0 !important;
+}
+
+body[data-nv-route="preferences"] .preferences-item-container {
+    max-height: 100% !important;
+    min-height: 0 !important;
+}
+
+body[data-nv-route="preferences-keyboard-shortcuts"] .preferences-root-panel {
+    height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    max-height: none !important;
+    min-height: 0 !important;
+}
+
+body[data-nv-route="preferences-keyboard-shortcuts"] .keyboard-shortcuts-item-container {
+    flex: 1 1 auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
+}
+
+body[data-nv-route="preferences-keyboard-shortcuts"] .keyboard-shortcuts-block {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow: auto !important;
+}
+
+body[data-nv-route="preferences-highlights"] .settings-switch {
+    margin-left: auto !important;
+}
+
+body[data-nv-route="preferences-broadcast"] .preferences-root-panel {
+    flex: 1 1 auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    max-height: none !important;
+    min-height: 0 !important;
+}
+
+body[data-nv-route="preferences-broadcast"] .broadcast-block,
+body[data-nv-route="preferences-broadcast"] .broadcast-block.broadcast-block-disabled {
+    flex: 1 1 auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    overflow: auto !important;
+}

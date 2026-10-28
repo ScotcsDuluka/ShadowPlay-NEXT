@@ -305,6 +305,8 @@ Namespace DulukaEngine.Recording
         Public Property FinalizationState As String = "Created"
         Public Property MediaVerificationRequired As Boolean
         Public Property FullDecodeVerified As Boolean
+        Public Property MediaVerificationPending As Boolean
+        Public Property MediaVerificationReason As String = ""
         Public Property DecodedFrameCount As Long
         Public Property VideoIdentity As RecordingVideoIdentity
         Public Property OutputPath As String = ""
@@ -395,8 +397,12 @@ Namespace DulukaEngine.Recording
                     (AudioStreamFound AndAlso AudioDroppedBytes = 0)
                 Return FramesEncoded > 0 AndAlso
                        EncoderErrors = 0 AndAlso
+                       Not MediaVerificationPending AndAlso
                        (Not MediaVerificationRequired OrElse (FullDecodeVerified AndAlso
-                        DecodedFrameCount = EncoderPacketCount AndAlso EncoderPacketCount = FramesSubmitted)) AndAlso
+                        FramesSubmitted > 0 AndAlso DecodedFrameCount = EncoderPacketCount AndAlso
+                        EncoderPacketCount = FramesSubmitted AndAlso FramesEncoded = EncoderPacketCount AndAlso
+                        PacketsQueuedForMux = EncoderPacketCount AndAlso MuxedPacketCount = EncoderPacketCount)) AndAlso
+                       FinalizationState <> "Failed" AndAlso FinalizationState <> "Partial" AndAlso FinalizationState <> "Cancelled" AndAlso
                        NvencErrors = 0 AndAlso
                        MuxDroppedBytes = 0 AndAlso
                        MicDroppedBytes = 0 AndAlso
@@ -419,6 +425,9 @@ Namespace DulukaEngine.Recording
         Public Property State As RecordingEngineState
         Public Property CurrentSessionId As String  ' Nothing if Idle
         Public Property FramesEncodedThisSession As Long
+        Public Property RealFramesCapturedThisSession As Long
+        Public Property FramesSubmittedThisSession As Long
+        Public Property PacketsQueuedForMuxThisSession As Long
         Public Property LastSessionResult As SessionResult  ' Nothing if no session yet
     End Class
 

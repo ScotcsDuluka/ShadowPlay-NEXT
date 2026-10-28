@@ -15,6 +15,7 @@ static partial class Program
 {
     static string Repo()
     {
+        if(File.Exists(Path.Combine(Environment.CurrentDirectory,"AGENTS.md"))) return Environment.CurrentDirectory;
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         while(dir is not null && !File.Exists(Path.Combine(dir.FullName,"AGENTS.md"))) dir=dir.Parent;
         return dir?.FullName ?? throw new Exception("repository not found");
@@ -145,15 +146,42 @@ static partial class Program
         {
             engine.Initialize(Startup(target,"vbr")); var owned=new List<Nv12Frame>();
             var failed=engine.StartOwnedFrameSession(SessionConfig("native-fault-partial"),Inputs(target,owned,3));
-            Check(!failed.Pass && failed.FinalizationState=="Failed" && !failed.FullDecodeVerified,"stale-generation partial session cannot claim Saved");
+            Check(!failed.Pass && (failed.FinalizationState=="Failed" || failed.FinalizationState=="Partial"),"stale-generation partial session cannot claim Saved");
+            if(failed.FinalizationState=="Partial")
+                Check(failed.FullDecodeVerified && failed.DecodedFrameCount==failed.FramesSubmitted,
+                    "partial source fault drains accepted delayed packets and verifies retained footage");
             Check(failed.ErrorMessage.Contains("stale_source_generation"),"router rejects old source generation before encoding");
             Check(owned.All(f=>f.DisposeCount==1),"fault path returns all yielded source ownership");
             var recoveredFrames=new List<Nv12Frame>();
             var recovered=engine.StartOwnedFrameSession(SessionConfig("native-recovered"),Inputs(target,recoveredFrames));
             Check(recovered.Pass,"new session recovers from previous native pending-output fault: "+recovered.ErrorMessage);
             Check(recovered.SessionId!=failed.SessionId,"recovery uses new session identity without hidden mid-session restart");
-            Check(factory.Encoders.Count==2,"faulted native encoder replaced through original RecordingEngine factory");
+            // A stale *source* generation finalized as verified Partial; encoder
+            // drain/stop succeeded, so native QSV is healthy and reusable.
+            Check(factory.Encoders.Count==1 && factory.Encoders[0].CurrentState==EncoderState.Stopped,
+                "source-only Partial retains one reusable stopped native encoder");
             File.WriteAllText(Path.Combine(Evidence,"native-recovery-result.json"),JsonSerializer.Serialize(recovered,new JsonSerializerOptions{WriteIndented=true}));
+
+            // Exercise the distinct recovery rule: only an actually Faulted
+            // native encoder must be replaced through the original factory.
+            var retained=factory.Encoders[0];
+            retained.Start();
+            using(var injected=new Nv12Frame(0))
+            {
+                var sink=new SessionPacketSink(retained,new SessionResult(),
+                    (_,_)=>throw new IOException("injected_mux_failure"),30);
+                Check(sink.Submit(injected),"native fault fixture accepts its delayed frame");
+                Reject(()=>sink.Drain(),"injected_mux_failure","real native flush delivery failure propagates");
+            }
+            Check(retained.CurrentState==EncoderState.Faulted,
+                "failed native packet delivery leaves encoder terminally faulted");
+            var rebuiltFrames=new List<Nv12Frame>();
+            var rebuilt=engine.StartOwnedFrameSession(SessionConfig("native-rebuilt-after-encoder-fault"),Inputs(target,rebuiltFrames));
+            Check(rebuilt.Pass,"a new session rebuilds the truly faulted QSV encoder: "+rebuilt.ErrorMessage);
+            Check(factory.Encoders.Count==2 && !ReferenceEquals(factory.Encoders[0],factory.Encoders[1]),
+                "faulted native encoder replaced through original RecordingEngine factory");
+            Check(rebuiltFrames.Count==60 && rebuiltFrames.All(f=>f.IsDisposed && f.DisposeCount==1),
+                "rebuilt encoder session preserves exactly-once frame ownership");
         }
         for(int i=0;i<3;++i)
         {

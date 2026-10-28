@@ -4,7 +4,7 @@
 //   HotKey(...)            — hotkey registrations (name -> combo content)
 //   HotKeyMonitor(...)     — monitor enable state
 // The OS listener posts to the loopback fire endpoint. OpenShare is relayed
-// as WindowState/overlayToggle so the OSC page owns its visibility state;
+// to the same native visibility owner as the Container event lane;
 // other hotkeys use the regular /ShadowPlay/v.1.0/Hotkey event.
 'use strict'
 
@@ -96,6 +96,7 @@ function updateSettings(doReply, update, afterSave) {
 }
 
 function fire(name) {
+  if (state.hotkeyMonitor === false) return false;
   const data = Object.assign({ hotKeyName: name }, registered[name] || {}, {
     hotkeyId: hotkeyEventIds[name] || name,
   });
@@ -103,12 +104,7 @@ function fire(name) {
   try {
     console.log('[shim:hotkey] firing ' + name);
     if (isOpenShare) {
-      if (!oscWindowStateCallback) {
-        console.error('[shim:hotkey] OpenShare window-state callback is not ready');
-        return false;
-      }
-      oscWindowStateCallback({ windowMsg: 'overlayToggle' });
-      return true;
+      return require('./container-hotkey-event').dispatchNativeOscToggle();
     }
     // OpenShare uses only WindowState; sending a Hotkey event as well makes the
     // page process the same toggle through two independent socket channels.

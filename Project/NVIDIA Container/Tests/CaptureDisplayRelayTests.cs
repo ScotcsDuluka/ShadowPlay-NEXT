@@ -43,7 +43,8 @@ CaptureWorkerGateway Create(
     bool displayWrite = false, bool shotWrite = false, bool testMode = false) =>
     new(new HttpClient(new Fake(responder ?? handler)), 59990,
         enabled:true, allowRecordCommands:false, testMode:testMode,
-        allowDisplayCommands:displayWrite, allowScreenshotCommands:shotWrite);
+        allowDisplayCommands:displayWrite, allowScreenshotCommands:shotWrite,
+        workerWriteToken: () => "0123456789abcdef0123456789abcdef");
 var yes = JSON("""{"confirmed":true}""");
 var no = JSON("""{"confirmed":false}""");
 var chosen = JSON("""{"confirmed":true,"outputIndex":2,"adapterLuidLow":987,"adapterLuidHigh":-12}""");

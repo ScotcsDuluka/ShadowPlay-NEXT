@@ -4,10 +4,23 @@ param(
     [string]$Dest = '',
     [switch]$Clean,
     [switch]$NoBuild,
-    [switch]$Strict
+    [switch]$Strict,
+    [ValidateSet('All', 'Capture')]
+    [string]$Module = 'All',
+    [string]$QsvNativePackageDirectory = '',
+    [switch]$RequireNativeQsv
 )
 
 $ErrorActionPreference = 'Stop'
+
+if ($Module -eq 'Capture') {
+    if ($Clean) { throw 'Capture staging preserves existing files; choose a new -Dest instead of -Clean.' }
+    & (Join-Path $PSScriptRoot 'Build-CaptureUnified.ps1') -Dest $Dest -NoBuild:$NoBuild -QsvNativePackageDirectory $QsvNativePackageDirectory -RequireNativeQsv:$RequireNativeQsv
+    return
+}
+if ($QsvNativePackageDirectory -or $RequireNativeQsv) {
+    throw 'QSV package options require -Module Capture so native packaging is validated before staging.'
+}
 
 $Repo = Split-Path -Parent $PSScriptRoot
 $ProjectRoot = Join-Path $Repo 'Project'
@@ -247,7 +260,18 @@ if ($LASTEXITCODE -eq 2) {
 }
 Copy-RuntimeFiles (Join-Path $ProjectRoot ("NVIDIA Container\NVIDIA ShadowPlay Helper\bin\Release\{0}" -f $TargetFramework)) $containerOutput
 $captureOutput = Join-Path $BuildRoot 'NVIDIA Capture'
-Copy-RuntimeFiles (Join-Path $ProjectRoot ("NVIDIA Capture\bin\Release\{0}" -f $TargetFramework)) $captureOutput
+$captureSource = Join-Path $ProjectRoot ("NVIDIA Capture\bin\Release\{0}" -f $TargetFramework)
+Copy-RuntimeFiles $captureSource $captureOutput
+# The generic runtime copier intentionally excludes text files. Intel's MIT
+# dispatcher license is nevertheless mandatory whenever its DLL is staged.
+if (Test-Path -LiteralPath (Join-Path $captureSource 'DulukaQsvNative.dll')) {
+    Copy-FileSafe (Join-Path $captureSource 'libvpl-LICENSE.txt') (Join-Path $captureOutput 'libvpl-LICENSE.txt')
+    & (Join-Path $ProjectRoot 'NVIDIA Capture\EngineCapture\Duluka Capture\Encoding\Intel\Native\Test-NativeQsvPackage.ps1') -PackageDirectory $captureOutput -Required true -ProbeAbi
+} elseif ((Test-Path -LiteralPath (Join-Path $captureOutput 'DulukaQsvNative.dll')) -or
+          (Test-Path -LiteralPath (Join-Path $captureOutput 'libvpl.dll')) -or
+          (Test-Path -LiteralPath (Join-Path $captureOutput 'qsv-native-package.json'))) {
+    throw 'Stale native QSV content in destination; choose a new -Dest and rebuild the Capture module.'
+}
 $ffmpegSource = Join-Path $ProjectRoot 'FFmpeg'
 $ffmpegOutput = Join-Path $captureOutput 'FFmpeg'
 Ensure-Dir $ffmpegOutput

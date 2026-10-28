@@ -5,8 +5,7 @@
   var controller=null,prepared=false,wanted='closed',pendingClose=null,intent=0,linkFrame=null,linkAttempts=0,commitQueued=false;
   var records=[],group=null,blocks=[],header=null,geometry={enter:1,exit:1},paintCanvas=null,paintContext=null,paintTick=0;
   var suppressRender=false,forceInstant=false,dispatch=function(callback){callback();};
-  var transitionTimer=null,transitionTarget=null;
-  var backgroundSaved=null;
+  var transitionTimer=null,transitionTarget=null,backgroundSaved=null;
   var timing=window.__dulukaOscMotionTiming||{open:{duration:500,bezier:[0,.9524242401123044,.28,1]},closed:{duration:240,bezier:[.6681970923837989,.04272720336914062,.005,1]}};
   var settingsApi=window.__dulukaOscMotionSettings;
   var settings=settingsApi?settingsApi.get():{enabled:true,mode:'osc',backgroundFade:true,topAnimation:true,mainMenuAnimation:true,openDuration:500,closeDuration:240};
@@ -15,9 +14,7 @@
     root.classList.toggle('nv-motion-disabled',!settings.enabled);
     root.classList.toggle('nv-motion-osc',settings.enabled&&settings.mode==='osc');
     root.classList.toggle('nv-motion-default',settings.enabled&&settings.mode==='default');
-    ['backgroundFade','topAnimation','mainMenuAnimation'].forEach(function(name){
-      root.classList.toggle('nv-motion-'+name,settings.enabled&&settings.mode==='osc'&&settings[name]);
-    });
+    ['backgroundFade','topAnimation','mainMenuAnimation'].forEach(function(name){root.classList.toggle('nv-motion-'+name,settings.enabled&&settings.mode==='osc'&&settings[name]);});
   }
   settingClasses();
   function reduced(){return forceInstant||!!document.hidden||!!(media&&media.matches);}
@@ -28,46 +25,26 @@
     if(paintContext){paintContext.fillStyle=paintTick++%2?'#fff':'#000';paintContext.fillRect(0,0,1,1);}
   }
   function clearClasses(){['nv-motion-preparing','nv-motion-active','nv-motion-opening','nv-motion-closing'].forEach(function(name){root.classList.remove(name);});}
-  function clearTransitionTimer(){
-    if(transitionTimer!==null)window.clearTimeout(transitionTimer);
-    transitionTimer=null;transitionTarget=null;
-  }
+  function clearTransitionTimer(){if(transitionTimer!==null)window.clearTimeout(transitionTimer);transitionTimer=null;transitionTarget=null;}
   function boundTransition(current){
     if(current.phase==='idle'||!customMotion()||reduced()){clearTransitionTimer();return;}
     if(transitionTimer!==null&&transitionTarget===current.target)return;
     clearTransitionTimer();transitionTarget=current.target;
     var selected=timing[current.target==='open'?'open':'closed'];
-    // OSR can stop delivering RAF while the Host is hidden. A queued close
-    // must not wait forever or leave native input covered by Motion CSS.
-    transitionTimer=window.setTimeout(function(){
-      transitionTimer=null;transitionTarget=null;
-      if(controller&&controller.getState().phase!=='idle')settle();
-    },Math.max(50,selected.duration)+250);
+    transitionTimer=window.setTimeout(function(){transitionTimer=null;transitionTarget=null;if(controller&&controller.getState().phase!=='idle')settle();},Math.max(50,selected.duration)+250);
   }
-  function boundPreparation(){
+  function boundPreparation(delay){
     clearTransitionTimer();transitionTarget='preparing';
-    transitionTimer=window.setTimeout(function(){
-      transitionTimer=null;transitionTarget=null;
-      if(!prepared)return;
-      clearLinkFrame();prepared=false;releaseVisual();
-      if(wanted==='closed')commitClose();
-    },Math.max(750,timing.open.duration+250));
+    transitionTimer=window.setTimeout(function(){transitionTimer=null;transitionTarget=null;if(!prepared)return;clearLinkFrame();prepared=false;releaseVisual();if(wanted==='closed')commitClose();},delay||Math.max(750,timing.open.duration+250));
   }
   function writeBackground(value){
-    if(!backgroundSaved)backgroundSaved={value:root.style.getPropertyValue('--nv-motion-bg-alpha'),
-      priority:root.style.getPropertyPriority?root.style.getPropertyPriority('--nv-motion-bg-alpha'):''};
+    if(!backgroundSaved)backgroundSaved={value:root.style.getPropertyValue('--nv-motion-bg-alpha'),priority:root.style.getPropertyPriority?root.style.getPropertyPriority('--nv-motion-bg-alpha'):''};
     root.style.setProperty('--nv-motion-bg-alpha',String(value));
   }
   function releaseVisual(){
     clearTransitionTimer();
     records.forEach(function(record){Object.keys(record.saved).forEach(function(key){var old=record.saved[key];if(old.value)record.node.style.setProperty(key,old.value,old.priority);else record.node.style.removeProperty(key);});if(record.had)record.node.setAttribute(record.attribute,record.value);else record.node.removeAttribute(record.attribute);});records=[];
-    clearClasses();
-    if(backgroundSaved){
-      if(backgroundSaved.value)root.style.setProperty('--nv-motion-bg-alpha',backgroundSaved.value,backgroundSaved.priority);
-      else root.style.removeProperty('--nv-motion-bg-alpha');
-      backgroundSaved=null;
-    }
-    stopPaint();
+    clearClasses();if(backgroundSaved){if(backgroundSaved.value)root.style.setProperty('--nv-motion-bg-alpha',backgroundSaved.value,backgroundSaved.priority);else root.style.removeProperty('--nv-motion-bg-alpha');backgroundSaved=null;}stopPaint();
   }
   function mark(node,type){
     if(!node)return null;var attribute='data-nv-motion-'+type;
@@ -93,9 +70,7 @@
     var box=group?group.getBoundingClientRect():null,scale=group&&group.offsetWidth&&box.width?box.width/group.offsetWidth:1;
     if(!isFinite(scale)||scale<=0)scale=1;
     geometry={enter:Math.max(1,(right+2)/scale),exit:Math.max(1,((window.innerWidth||root.clientWidth||1)-left+2)/scale)};
-    groupRecord=settings.mainMenuAnimation?mark(group,'group'):null;
-    blockRecords=settings.mainMenuAnimation?blocks.map(function(node){return mark(node,'block');}):[];
-    headerRecord=settings.topAnimation?mark(header,'top'):null;return true;
+    groupRecord=settings.mainMenuAnimation?mark(group,'group'):null;blockRecords=settings.mainMenuAnimation?blocks.map(function(node){return mark(node,'block');}):[];headerRecord=settings.topAnimation?mark(header,'top'):null;return true;
   }
   function backgroundOpacity(){try{var settings=window.__dulukaOscBackground&&window.__dulukaOscBackground.get();if(settings&&typeof settings.opacity==='number'&&isFinite(settings.opacity))return Math.max(0,Math.min(1,settings.opacity/100));}catch(ignore){}return .5;}
   function render(pose,state){
@@ -135,22 +110,32 @@
   }
   function playOpen(){
     if(controller&&!prepared){open();return;}if(linkFrame!==null)return;if(!prepared)prepareOpen();linkAttempts=0;
+    var ownerWaitStart=null;
     function start(){
       linkFrame=null;
       if(!prepared)return;
-      // V4 needs to settle the native md-menu geometry BEFORE collect()
-      // captures screen rectangles for the opening animation. Otherwise
-      // controls use their old V2 coordinates during opening and jump at idle.
-      // This is a one-off preflight, never a reposition on animation frames.
+      // Layout owner (V5/V4) must own the menu's first frame: a null preflight
+      // means it cannot reflow yet, so wait (bounded) instead of animating
+      // native geometry that would snap when the owner applies at idle.
       var nextV5=window.__nvNextLayoutV5,unified=window.__dulukaUnifiedMainMenu;
       var nativeRoot=document.querySelector('nv-main-menu:not([data-customize-preview]) .main-menu-container');
-      if(nativeRoot&&nextV5&&nextV5.enabled&&nextV5.enabled()&&nextV5.prepareForMotion){
-        nextV5.prepareForMotion(nativeRoot);
-      }else if(nativeRoot&&unified&&unified.enabled&&unified.enabled()&&unified.prepareForMotion){
-        unified.prepareForMotion(nativeRoot);
+      var owner=nextV5&&nextV5.enabled&&nextV5.enabled()&&nextV5.prepareForMotion?nextV5:
+        unified&&unified.enabled&&unified.enabled()&&unified.prepareForMotion?unified:null;
+      var layoutReady=true,waitForMenu=false;
+      if(owner){
+        if(ownerWaitStart===null)boundPreparation(1750);
+        if(!nativeRoot)waitForMenu=true;
+        else layoutReady=owner.prepareForMotion(nativeRoot)!==null;
       }
-      // Default delegates the existing NVIDIA lifecycle/animations. Disabled
-      // mode also skips OSC transforms; its scoped CSS removes transitions.
+      // The menu mounts in ~150-250ms while a frame-count budget (4) expires in
+      // ~64ms — the owner never became ready inside it, so the entrance played
+      // native and V5 snapped in later. Wait up to 1.5s of wall time instead;
+      // only bail to the no-owner fallback after that.
+      if(waitForMenu||!layoutReady){
+        if(ownerWaitStart===null)ownerWaitStart=window.performance.now();
+        if(window.performance.now()-ownerWaitStart<1500){linkFrame=window.requestAnimationFrame(start);return;}
+        prepared=false;releaseVisual();if(wanted==='closed')commitClose();return;
+      }
       if(!customMotion()){prepared=false;releaseVisual();if(wanted==='closed')commitClose();return;}
       if(!collect()){if(++linkAttempts<4){boundPreparation();linkFrame=window.requestAnimationFrame(start);return;}prepared=false;releaseVisual();if(wanted==='closed')commitClose();return;}
       if(!makeController(false)){prepared=false;releaseVisual();if(wanted==='closed')commitClose();return;}
@@ -161,19 +146,13 @@
   }
   function open(){
     intent++;pendingClose=null;wanted='open';
-    // A completed close released its native snapshots. Re-link the current
-    // nodes instead of rendering through records from the previous cycle.
     if(controller&&controller.getState().phase==='idle'&&controller.getState().target==='closed')controller=null;
     if(controller){controller.open();return;}
     if(!prepared)prepareOpen();playOpen();
   }
   function close(callback){
     if(pendingClose&&wanted==='closed')return;intent++;wanted='closed';pendingClose=callback;
-    if(!customMotion()){
-      clearLinkFrame();prepared=false;
-      suppressRender=true;if(controller)controller.cancel();controller=null;suppressRender=false;
-      releaseVisual();commitClose();return;
-    }
+    if(!customMotion()){clearLinkFrame();prepared=false;suppressRender=true;if(controller)controller.cancel();controller=null;suppressRender=false;releaseVisual();commitClose();return;}
     if(prepared&&!controller){playOpen();return;}
     if(!controller){if(!collect()||!makeController(true)){releaseVisual();commitClose();return;}}
     else if(controller.getState().phase==='idle'&&controller.getState().target==='open')collect();
@@ -191,21 +170,22 @@
     var requested=controller?controller.getState().requestedTarget:wanted,linking=prepared;
     clearLinkFrame();prepared=false;suppressRender=true;if(controller)controller.cancel();controller=null;suppressRender=false;
     releaseVisual();settings=next;settingClasses();wanted=requested;
-    // Settle an interrupted transition at its current requested endpoint.
-    // Changing preferences never replays entry or leaves stale close work.
     if(wanted==='closed'){commitClose();return;}
-    if(linking){prepared=true;playOpen();}
-    else if(customMotion())makeController(true);
+    if(linking){prepared=true;playOpen();}else if(customMotion())makeController(true);
   });
   function guardActivation(event){var phase=api.phase;if(!customMotion()||reduced()||(phase!=='opening'&&phase!=='closing')||(event.type==='keydown'&&event.key!=='Enter'&&event.key!==' '&&event.keyCode!==13&&event.keyCode!==32))return;var target=event.target;if(target&&target.closest&&(target.closest('.nv-osc md-menu,.nv-osc .osc-button')||target.closest('md-menu-content'))){event.preventDefault();event.stopImmediatePropagation();}}
   document.addEventListener('click',guardActivation,true);document.addEventListener('keydown',guardActivation,true);document.addEventListener('visibilitychange',function(){if(document.hidden)settle();});window.addEventListener('pagehide',cancel);
   if(media&&media.addListener)media.addListener(function(){if(media.matches)settle();});
   if(!window.angular)return;
-  window.angular.module('main').config(['$provide',function($provide){$provide.decorator('oscDisplayService',['$delegate','$rootScope',function($delegate,$rootScope){
+  window.angular.module('main').config(['$provide',function($provide){$provide.decorator('oscDisplayService',['$delegate','$rootScope','$state',function($delegate,$rootScope,$state){
     if($delegate.__dulukaMotionWrapped)return $delegate;var originalClose=$delegate.closeOSC,originalOpen=$delegate.openOSC;
     dispatch=function(callback){$rootScope.$evalAsync(callback);};
-    $delegate.closeOSC=function(){var context=this,args=arguments;api.close(function(){originalClose.apply(context,args);});};
-    $delegate.openOSC=function(){var context=this,args=arguments,reopening=!!pendingClose||wanted==='closed'&&controller&&controller.getState().phase!=='idle';if(reopening){api.open();if(!args.length||!args[0])return;}return originalOpen.apply(context,args);};
+    function releaseNativeOpenPending(){var nv=window.__nvOscNativeVisibility;if(nv)nv.openPending=false;}
+    $delegate.closeOSC=function(){releaseNativeOpenPending();var context=this,args=arguments;api.close(function(){originalClose.apply(context,args);});};
+    $delegate.openOSC=function(){var context=this,args=arguments,reopening=!!pendingClose||wanted==='closed'&&controller&&controller.getState().phase!=='idle';if(reopening){api.open();
+      var nv=window.__nvOscNativeVisibility;
+      if(nv&&nv.openPending){var generation=nv.generation,tries=0,release=function(){var n=window.__nvOscNativeVisibility;if(!n||n.generation!==generation)return;var s=controller&&controller.getState();if(s&&s.phase==='idle'&&s.target==='open'){n.openPending=false;return;}if(++tries<40)window.setTimeout(release,50);};window.setTimeout(release,50);}
+      if((!args.length||!args[0])&&$state.current&&$state.current.name!=='base')return;}return originalOpen.apply(context,args);};
     $delegate.__dulukaMotionWrapped=true;return $delegate;
   }]);}]).run(['$rootScope','$timeout',function($rootScope,$timeout){
     var pending=null;function isOpen(value){return value&&value.name&&value.name!=='base';}

@@ -43,9 +43,13 @@ Namespace DulukaEngine.Recording
         End Sub
         Public Function Route(input As SessionFrameInput) As IVideoFrame
             If input Is Nothing OrElse input.Frame Is Nothing OrElse input.Target Is Nothing OrElse
-                Not _target.SameOutput(input.Target) Then Throw New InvalidOperationException("session_source_target_mismatch")
+                Not input.Target.Eligible OrElse Not _target.SameOutput(input.Target) OrElse
+                _target.TopologyId <> input.Target.TopologyId Then Throw New InvalidOperationException("session_source_target_mismatch")
             If input.Generation <> _generation Then Throw New InvalidOperationException("session_stale_source_generation")
             Dim f = input.Frame
+            If TypeOf f Is INv12VideoFrame AndAlso DirectCast(f, INv12VideoFrame).IsDisposed Then
+                Throw New InvalidOperationException("session_source_frame_disposed")
+            End If
             If f.Dimensions.Width <> _width OrElse f.Dimensions.Height <> _height Then
                 Throw New InvalidOperationException("session_source_surface_size_mismatch")
             End If
@@ -57,13 +61,14 @@ Namespace DulukaEngine.Recording
             Return f ' borrowed; enclosing input remains sole owner until Submit returns
         End Function
         Public Sub AuthorizeGeneration(previous As Long, nextGeneration As Long, current As CaptureTarget)
-            If previous <> _generation OrElse nextGeneration <= previous OrElse Not _target.SameOutput(current) OrElse
+            If current Is Nothing OrElse Not current.Eligible OrElse previous <> _generation OrElse
+                nextGeneration <= previous OrElse Not _target.SameOutput(current) OrElse
                 _target.TopologyId <> current.TopologyId Then Throw New InvalidOperationException("session_generation_transition_not_authorized")
             _generation = nextGeneration
             _lastSequence = -1 ' Source ordinal may reset; session time never does.
         End Sub
         Public Function RouteSource(input As SessionFrameInput) As IVideoFrame
-            If input Is Nothing OrElse input.Target Is Nothing OrElse Not _target.SameOutput(input.Target) OrElse
+            If input Is Nothing OrElse input.Target Is Nothing OrElse Not input.Target.Eligible OrElse Not _target.SameOutput(input.Target) OrElse
                 _target.TopologyId <> input.Target.TopologyId Then Throw New InvalidOperationException("session_source_target_mismatch")
             If input.Generation <> _generation Then Throw New InvalidOperationException("session_stale_source_generation")
             Dim frame = TryCast(input.Frame, INv12VideoFrame)
@@ -121,7 +126,7 @@ Namespace DulukaEngine.Recording
             End Property
             Public ReadOnly Property Color As VideoColorDescriptor Implements IColorVideoFrame.Color
                 Get
-                    Return DirectCast(_frame, IColorVideoFrame).Color
+                    Return TryCast(_frame, IColorVideoFrame)?.Color
                 End Get
             End Property
             Public Sub Dispose() Implements IDisposable.Dispose

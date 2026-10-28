@@ -2,7 +2,7 @@
 
 ## Current quick UI: Core READ-ONLY (24 October 2026)
 
-**Account Portal integration (source update):** The visible Launcher includes an **Account** button backed by the trusted-frame `LAUNCHER_OPEN_ACCOUNT_PORTAL` native command. It opens a fixed HTTPS Duluka Account Portal URL using the operating system's **external browser**; the Launcher does not collect passwords or own login sessions. The shared-account Portal currently disables new public registration and CBT1 submission. The external link and its source regression do **not** prove remote account login or enrollment acceptance. See [Duluka Account Server](../../Server/README.md).
+**Account Portal integration (source update):** The visible Launcher includes an **Account** button backed by the trusted-frame `LAUNCHER_OPEN_ACCOUNT_PORTAL` native command. It opens a fixed HTTPS Duluka Account Portal URL using the operating system's **external browser**; the Launcher does not collect passwords or own login sessions. The shared-account Portal disables general public account registration and general CBT1 applications; **existing users with a valid private invite code** can follow the separately enabled CBT1 invitation workflow described in the Server README. The external link and its source regression do **not** prove remote account login or enrollment acceptance. See [Duluka Account Server](../../Server/README.md).
 
 **This section supersedes the historical UI and Config Module descriptions below.** The current visible quick Launcher has **ShadowPlay ON/OFF**, **Core Modules** (11 built-in, suite-managed and *read-only*), and **Add-ons** (zero installed). The Core cards show local inventory/runtime telemetry but provide **no user editing, layout controls, per-Core settings/background customization, or independent enable/disable/uninstall**. Module-specific options, where supported, remain owned by the corresponding modules—not the Core catalog UI.
 
@@ -10,6 +10,8 @@ The Core catalog is currently a clearly labelled **bundled fallback**. A **Serve
 
 **Release gating:** CEF 73/no-sandbox security, current quick-mode end-to-end CEF behavior and module telemetry require version-specific validation. Earlier deployed UI screenshots and 11-card/config-button tests below are **dated observations, not a promise of today's visible controls**.
 
+
+**Current Core visual design (later 24 October update):** The 11 read-only Core cards use the existing Web Github-inspired GeForce typography and dark-green hero/runway/grid layout. Bundled metadata is labelled as fallback; local telemetry remains separate and there are no Core Config, layout or background editors. The owner handoff records **39/39** targeted Launcher regressions before final CSS-only polish, and SHA-256 verification of staged assets; a **pixel-level native CEF screenshot was not validated**. See [current vs superseded UI notes](Modules/MODULE-CONFIG-HANDOFF-20261024.md).
 
 ## Simple Launcher — three destinations (2026-10-24)
 

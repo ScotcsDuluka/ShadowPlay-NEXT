@@ -14,6 +14,27 @@ Native Host โหลดหน้า UI นั้นผ่าน CEF และ�
 
 `Project/NVIDIA Adapter/OSC Adapter/Duluka Hook/`
 
+## Render API / Hook Transport — สถานะตาม Source 24 ต.ค. 2569
+
+การเลือก Hook แบบ CPU/GPU ต้องยึด **Policy ใน Source** `src/OscFramePublisher/Common/OscHookTransportPolicy.h` ไม่ใช่ดูแค่ชื่อโฟลเดอร์หรือผลทดสอบ DX9Ex Mailbox:
+
+| API | CPU | GPU | ขอบเขตจริง |
+|---|---|---|---|
+| D3D9 | มี | มีแบบ **Opt-in Preview** | GPU เป็น **Windowed DWM / DirectComposition** เท่านั้น; Fullscreen Classic D3D9 ยังคงใช้ CPU Bridge |
+| D3D9Ex | มี | **ไม่เปิดใน Production Hook Transport Selector** | GPU Mailbox/Shared Texture มีผลทดสอบข้ามโปรเซส แต่ยังไม่ผ่านเงื่อนไข In-game Pump/Runtime |
+| D3D11 | ไม่มีโหมด CPU ให้เลือกโดยตรงใน Policy | มี | GPU Shared/CPU Mirror เป็นกลไกภายใน ไม่ใช่สวิตช์ CPU ที่เปิดให้เลือก |
+| D3D10 / D3D12 / Vulkan / OpenGL | ยังไม่รองรับ | ยังไม่รองรับ | มี API Probe หรือโฟลเดอร์ไม่ได้แปลว่ามี Native Renderer |
+
+**ย้ำ:** เปิด `auto` ในค่า Setting ได้แต่ไม่เท่ากับการยืนยัน Renderer หรือ Compatibility ของ API นั้น และตารางนี้คือความสามารถตาม Source ไม่ใช่หลักฐานว่ามีการ Deploy/Hook เกมจริงสำเร็จแล้ว
+
+## CEF 73 / DX9 FPS — หลักฐานวันที่ 25 ตุลาคม 2569
+
+ผลทดสอบ CEF 73 แบบแยกโปรเซสอ่าน **GPU Texture Pixel จริง** พบภาพใหม่ประมาณ **60 ภาพ/วินาที** แม้ขออัตรา 75/120/240; จำนวน Accelerated Callback ที่สูงกว่าไม่ได้แปลว่าได้เฟรมภาพใหม่ตามนั้น การทดลอง Unlimited แบบไม่จำกัดอัตราได้ราว 250 ภาพ/วินาที แต่ **ไม่สามารถรักษาเพดาน FPS และการกลับสู่ 75** จึงยังไม่ใช่โหมดสำหรับ Deploy
+
+มี Bounded CEF Source Patch อยู่ใน **Isolated Checkout** แต่ติดข้อกำหนด VS 2017 Build Tools ที่ยังไม่ผ่าน การ Build / เปลี่ยน CEF 73 ใน Runtime หลักยัง **ไม่สำเร็จและไม่ได้ Deploy** ผัง Hook ภาพขึ้นใน Floating Point x86 แบบ Windowed GPU แล้ว แต่ **ยังไม่รับรองเกม 60 FPS นิ่ง** หรือสรุปว่ารากปัญหากระตุกถูกแก้แล้ว
+
+อ่าน [ผลวัด Fresh GPU Pixel](../../NVIDIA%20Adapter/OSC%20Adapter/Duluka%20Hook/docs/CEF-FRAME-DELIVERY-2026-10-25-v1.md), [ข้อจำกัด CEF Candidate Build](../../NVIDIA%20Adapter/OSC%20Adapter/Duluka%20Hook/docs/CEF73-BUILD-PREPARATION-2026-10-25-v1.md), [แผนวัด DX9](../../NVIDIA%20Adapter/OSC%20Adapter/Duluka%20Hook/docs/DX9-PERFORMANCE-VALIDATION-2026-10-25.md) และ [OSC/Backend Audit](../../../docs/osc/OSC-BACKEND-FULL-ARCHITECTURE-AUDIT-20261025.md)
+
 ## ไฟล์ที่มีผลกับ EXE จริง
 
 | ไฟล์ | หน้าที่ |

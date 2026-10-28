@@ -5,6 +5,10 @@
 
 
 D3D9Hook.cpp owns D3D9/D3D9Ex factory import patching, device-vtable Present/PresentEx and Reset/ResetEx interception, hook removal, and exported test/status entry points. Frame-bridge reads, D3D9 texture/state-block resources, CPU texture upload and composition live in src/Renderer/D3D9/D3D9Renderer.cpp.
+## Current transport policy vs isolated D3D9Ex GPU experiments
+
+The native OSC Host's current `OscHookTransportPolicy.h` allows **D3D9 GPU only as an opt-in Windowed DWM / DirectComposition preview**; Fullscreen Classic D3D9 uses the CPU shared-memory bridge. The **D3D9Ex GPU mailbox exists and has isolated producer/receiver tests, but GPU is not offered by the current production transport selector for D3D9Ex** (CPU fallback instead). Do not treat exported GPU bind APIs or cross-process fixture passes as confirmation that D3D9Ex GPU is a selectable production mode. D3D10/12, Vulkan and OpenGL are not implemented native Hook renderer modes.
+
 ## DX9 late attachment boundary (verified 2026-10-23)
 
 Import/factory interception hooks devices created after the DLL is loaded.
