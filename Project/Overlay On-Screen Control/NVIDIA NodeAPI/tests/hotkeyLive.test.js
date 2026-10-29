@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict');
-const install=require('../osc/mods/hotkey-live');
+const install=require('../osc/Module/Base/Hotkey/hotkey-live.js');
 function deferred(){let resolve,reject;const promise=new Promise((r,j)=>{resolve=r;reject=j;});return{promise,resolve,reject};}
 function fixture(){
  const saved={Screenshot:[18,112],RecordToggle:[18,120]},writes=[];

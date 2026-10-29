@@ -42,8 +42,10 @@ bool SaveLauncherLanguage(const std::string& language) {
   if (GetFileAttributesW(locale_path.c_str()) == INVALID_FILE_ATTRIBUTES)
     return false;
 
+  // 2026-10-29: osc/mods was retired; the language state now lives at the
+  // osc root where the OSC static server exposes it as /launcher-language.json.
   const std::wstring target = launcherutil::JoinPath(
-      launcherutil::JoinPath(osc_root, L"mods"), L"launcher-language.json");
+      osc_root, L"launcher-language.json");
   const std::wstring temp = target + L".tmp";
   const std::string json = "{\"language\":\"" + language + "\"}\n";
   HANDLE file = CreateFileW(temp.c_str(), GENERIC_WRITE, 0, NULL,

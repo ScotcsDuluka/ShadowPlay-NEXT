@@ -367,7 +367,18 @@ function mainViewData() {
   };
 }
 
-module.exports = function routeFloor(app, io) {
+module.exports = function routeFloor(app, io, options) {
+  options = options || {};
+  app.use(function (req, res, next) {
+    if (options.captureBridgeRequested && req.method === 'POST' &&
+        req.path === '/ShadowPlay/v.1.0/Record/Enable' &&
+        (!options.captureStateSync || !options.captureStateSync.bridgeEnabled())) {
+      return res.status(503).json({ type: 'Error', code: -1,
+        codeText: 'capture_record_bridge_unavailable',
+        message: 'Capture command bridge is unavailable; recording command was not sent.' });
+    }
+    next();
+  });
   require('./performance-route.js')(app);
   // Local interface policy is independent of NVIDIA account/driver allowlists.
   // It unlocks navigation, without claiming unavailable engines completed work.
@@ -622,6 +633,26 @@ module.exports = function routeFloor(app, io) {
             return;
           }
           const changed = state.recordEnabled !== enabled;
+          if (options.captureStateSync && options.captureStateSync.bridgeEnabled() &&
+              options.captureStateSync.commandInFlight()) {
+            return res.status(409).json({ type: 'Error', code: -1,
+              codeText: 'capture_command_in_flight' });
+          }
+          // The optional Container bridge consumes explicit user edges only.
+          // It is disabled by default until the Capture legacy poller is
+          // disabled in the same rollout; never run two command drivers.
+          if (options.captureStateSync && options.captureStateSync.bridgeEnabled()) {
+            return options.captureStateSync.requestRecord(enabled, function (status, result) {
+              if (status < 200 || status >= 300) {
+                return res.status(status).json(Object.assign({ type: 'Error', code: -1,
+                  codeText: result.error || result.code || 'capture_record_command_failed' }, result));
+              }
+              state.recordEnabled = enabled;
+              // Keep the legacy OSC response field while retaining the
+              // Container's authoritative command result.
+              res.status(status).json(Object.assign({ status: enabled }, result));
+            });
+          }
           state.recordEnabled = enabled;
           // A desired-state toggle is NOT proof a recording started or saved.
           // Wait for Capture's actual result before publishing a notification.

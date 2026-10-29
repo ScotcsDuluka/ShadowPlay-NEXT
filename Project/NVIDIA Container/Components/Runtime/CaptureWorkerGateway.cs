@@ -24,6 +24,7 @@ internal sealed class CaptureWorkerGateway
     private readonly bool _enabled;
     private readonly bool _allowRecordCommands;
     private readonly bool _testMode;
+    private readonly bool _requireContainerRecordMode;
     private readonly bool _allowDisplayCommands;
     private readonly bool _allowScreenshotCommands;
     private readonly Func<TimeSpan> _elapsedSinceStartup;
@@ -37,7 +38,8 @@ internal sealed class CaptureWorkerGateway
         bool testMode = false, bool allowDisplayCommands = false,
         bool allowScreenshotCommands = false,
         Func<TimeSpan>? elapsedSinceStartup = null,
-        Func<string?>? workerWriteToken = null)
+        Func<string?>? workerWriteToken = null,
+        bool requireContainerRecordMode = false)
     {
         if (port < 1 || port > 65535) throw new ArgumentOutOfRangeException(nameof(port));
         _http = http;
@@ -45,6 +47,7 @@ internal sealed class CaptureWorkerGateway
         _enabled = enabled;
         _allowRecordCommands = allowRecordCommands;
         _testMode = testMode;
+        _requireContainerRecordMode = requireContainerRecordMode;
         _allowDisplayCommands = allowDisplayCommands;
         _allowScreenshotCommands = allowScreenshotCommands;
         var clock = Stopwatch.StartNew();
@@ -514,6 +517,11 @@ internal sealed class CaptureWorkerGateway
                 (string?)Text(state.Data!.Value, "actualSessionBackend") : null,
             actualRunningEngine = state.Success ? Text(state.Data!.Value, "actualRunningEngine") : "",
             lifecycleState = state.Success ? Text(state.Data!.Value, "lifecycleState") : "Unknown",
+            // Report only the worker's actual command mode. Older workers or
+            // unrecognized values remain unknown; never infer it from config.
+            recordCommandMode = state.Success &&
+                Text(state.Data!.Value, "recordCommandMode") is "container" or "legacy"
+                ? Text(state.Data!.Value, "recordCommandMode") : "unknown",
             busy = state.Success ? (bool?)Bool(state.Data!.Value,
                 IsBool(state.Data!.Value, "busy") ? "busy" : "recording") : null,
             isCapturing = state.Success && IsBool(state.Data!.Value, "isCapturing")
@@ -555,6 +563,9 @@ internal sealed class CaptureWorkerGateway
             if (!state.Success)
                 return (503, new { code = "capture_state_unavailable", reason = state.Code });
             var s = state.Data!.Value;
+            bool workerContainerMode = Text(s, "recordCommandMode") == "container";
+            if (start && _requireContainerRecordMode && !workerContainerMode)
+                return (503, new { code = "record_command_mode_unavailable" });
             string backend;
             if (start)
             {
@@ -595,12 +606,22 @@ internal sealed class CaptureWorkerGateway
                     return (409, new { code = "unsupported_capture_route" });
             }
             var action = start ? "start" : "stop";
-            var result = Exchange(HttpMethod.Post, "/record/" + action, "{}",
+            // A distinct route ensures even an old worker that ignores new
+            // headers cannot start if it replaced the worker after /state.
+            // Legacy stop remains available to safely end an existing session.
+            var commandPath = _requireContainerRecordMode && workerContainerMode
+                ? "/record/container/" + action : "/record/" + action;
+            var result = Exchange(HttpMethod.Post, commandPath, "{}",
                 TimeSpan.FromSeconds(start ? 19 : 35),
                 data => IsBool(data, start ? "started" : "stopped"));
             if (!result.Success)
             {
-                if (result.Code == "timeout")
+                // Once a POST is attempted, a broken connection, incomplete
+                // response or upstream error cannot prove the worker did not
+                // execute it. Only local authorization failure occurs before
+                // the request is sent. Preserve ambiguity and block retries.
+                bool outcomeUnknown = result.Code != "worker_authorization_unavailable";
+                if (outcomeUnknown)
                 {
                     if (start) Interlocked.Exchange(ref _startOutcomeUnresolved, 1);
                     else Interlocked.Exchange(ref _stopOutcomeUnresolved, 1);
@@ -610,7 +631,7 @@ internal sealed class CaptureWorkerGateway
                 {
                     code = result.Code,
                     message = result.Message,
-                    outcomeUnknown = result.Code == "timeout",
+                    outcomeUnknown,
                     retryRequiresFreshState = true
                 });
             }

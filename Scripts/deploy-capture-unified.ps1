@@ -7,6 +7,7 @@ param(
     [Parameter(Mandatory=$true)][string]$EvidenceDirectory,
     [string]$ConfigCandidate = '',
     [string]$ConfigBaselineSha256 = '',
+    [switch]$ContainerRecordControl,
     [switch]$Deploy
 )
 $ErrorActionPreference='Stop'
@@ -29,9 +30,9 @@ function ChildPath([string]$root,[string]$relative) {
 $liveConfig=ChildPath $productRoot 'NVIDIA Config\nvcontainer.json'
 if ([bool]$ConfigCandidate -ne [bool]$ConfigBaselineSha256) {throw 'capture_config_candidate_requires_baseline_hash'}
 if($ConfigCandidate) {
-    [void](Assert-CaptureDeployConfigCandidate -LiveConfig $liveConfig -Candidate $ConfigCandidate -ExpectedLiveSha256 $ConfigBaselineSha256)
+    [void](Assert-CaptureDeployConfigCandidate -LiveConfig $liveConfig -Candidate $ConfigCandidate -ExpectedLiveSha256 $ConfigBaselineSha256 -ContainerRecordControl:$ContainerRecordControl)
 } else {
-    [void](Assert-CaptureDeployConfig -ConfigPath $liveConfig)
+    [void](Assert-CaptureDeployConfig -ConfigPath $liveConfig -ContainerRecordControl:$ContainerRecordControl)
 }
 function Hash([string]$path) { if(Test-Path -LiteralPath $path -PathType Leaf){return (Get-FileHash -LiteralPath $path).Hash}; return '' }
 function AssertIdle {
@@ -61,13 +62,21 @@ foreach($name in @('NvContainer.exe','NvContainer.dll','NvContainer.deps.json','
 }
 $nodeRoot='Overlay On-Screen Control\NVIDIA NodeAPI'
 $nodeFiles=@(Get-CaptureNodeBundleFiles -NodeStage $NodeStage -RuntimeIndex (ChildPath $productRoot ($nodeRoot+'\index.js')))
+$nodeManifest=Get-Content -LiteralPath (Join-Path $NodeStage 'capture-node-manifest.json') -Raw | ConvertFrom-Json
+if($ContainerRecordControl) {
+    if($nodeManifest.schemaVersion -ne 2) {throw 'capture_container_control_requires_node_bundle_v2'}
+}
 foreach($file in $nodeFiles) {
     PlanFile (ChildPath $NodeStage $file.path) ($nodeRoot+'\'+$file.path) $file.sha256
+    if($nodeManifest.schemaVersion -eq 2 -and
+       $plan[$plan.Count-1].beforeSha256 -cne [string]$file.beforeSha256) {
+        throw ('capture_node_bundle_target_changed_during_plan: '+$file.path)
+    }
 }
 if($ConfigCandidate) {
     PlanFile ([IO.Path]::GetFullPath($ConfigCandidate)) 'NVIDIA Config\nvcontainer.json'
     if($plan[$plan.Count-1].beforeSha256 -ne $ConfigBaselineSha256) {throw 'capture_config_baseline_hash_mismatch'}
-    [void](Assert-CaptureDeployConfigCandidate -LiveConfig $liveConfig -Candidate $ConfigCandidate -ExpectedLiveSha256 $ConfigBaselineSha256)
+    [void](Assert-CaptureDeployConfigCandidate -LiveConfig $liveConfig -Candidate $ConfigCandidate -ExpectedLiveSha256 $ConfigBaselineSha256 -ContainerRecordControl:$ContainerRecordControl)
     if((Hash $ConfigCandidate) -ne $plan[$plan.Count-1].sha256) {throw 'capture_config_candidate_changed_during_plan'}
 }
 AssertIdle
@@ -120,7 +129,9 @@ try {
             $node=Invoke-RestMethod 'http://127.0.0.1:59011/DulukaCapture/v.1.0/status' -TimeoutSec 2
             $verdict=Test-CaptureDeployReadiness -Capture $capture -Gateway $gateway -GatewayEngines $gatewayEngines -GatewayDisplays $gatewayDisplays -Node $node -WorkerHealth $workerHealth -WorkerState $workerState
             $lastReadiness=($verdict.FailedChecks -join ',')
-            if($verdict.Ready){$ready=$true;break}
+            if($ContainerRecordControl -and $gateway.recordCommandMode -cne 'container') {
+                $lastReadiness='worker_command_mode_not_container'
+            } elseif($verdict.Ready){$ready=$true;break}
         } catch {
             $lastReadiness='runtime_endpoint_unavailable'
         }

@@ -12,16 +12,16 @@ const dest = path.join(repository, 'build', 'NVIDIA ShadowPlay',
   'Overlay On-Screen Control', 'NVIDIA NodeAPI', 'osc');
 const output = path.join(repository, 'build_test', 'Launcher Localization_Test');
 const mode = process.argv.includes('--deploy') ? 'deploy' : 'dry-run';
-const dirs = ['l10n', 'mods'];
+const dirs = ['l10n', 'Module'];
 const langs = fs.readdirSync(path.join(source,'l10n')).filter(x=>/^[a-z]{2}-[A-Z]{2,3}\.json$/.test(x)).sort();
 const files = [
   ...langs.map(x=>path.join('l10n',x)),
-  path.join('mods','launcher-language-sync.js'),
+  path.join('Module','Base','Localization','launcher-language-sync.js'),
   'index.html'
 ];
 const digest = p => crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex');
 const hashOfBuffer = data => crypto.createHash('sha256').update(data).digest('hex');
-const stateFile = path.join(dest,'mods','launcher-language.json');
+const stateFile = path.join(dest,'launcher-language.json');
 const stateHash = fs.existsSync(stateFile) ? digest(stateFile) : null;
 const check = cp.spawnSync(process.execPath, [path.join(__dirname,'locale-coverage.cjs')], {encoding:'utf8'});
 if (check.status !== 0) throw new Error('Locale coverage failed: '+check.stdout+' '+check.stderr);

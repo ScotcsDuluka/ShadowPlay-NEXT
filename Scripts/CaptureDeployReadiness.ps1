@@ -126,7 +126,7 @@ function Test-CaptureDisplayIdentity {
 # default-false fallback. This rollout must not silently enable write routes.
 function Assert-CaptureDeployConfig {
     [CmdletBinding()]
-    param([Parameter(Mandatory=$true)][string]$ConfigPath)
+    param([Parameter(Mandatory=$true)][string]$ConfigPath,[switch]$ContainerRecordControl)
     if(-not(Test-Path -LiteralPath $ConfigPath -PathType Leaf)) { throw 'capture_deploy_config_missing' }
     $raw=Get-Content -LiteralPath $ConfigPath -Raw
     # Fail on the observed top-level duplicate-key regression. This count also
@@ -137,6 +137,15 @@ function Assert-CaptureDeployConfig {
     if($null -eq $root -or $null -eq $root.captureRuntime) {throw 'capture_deploy_runtime_block_missing'}
     $cap=$root.captureRuntime
     if($cap.enabled -isnot [bool] -or $cap.enabled -ne $true) {throw 'capture_deploy_runtime_disabled'}
+    if($ContainerRecordControl) {
+        if(([regex]::Matches($raw,'"containerRecordControl"\s*:')).Count -ne 1 -or
+           $cap.containerRecordControl -isnot [bool] -or $cap.containerRecordControl -ne $true -or
+           $cap.allowRecordCommands -isnot [bool] -or $cap.allowRecordCommands -ne $true -or
+           $null -eq $root.testMode -or $root.testMode.enabled -isnot [bool] -or $root.testMode.enabled -ne $false) {
+            throw 'capture_deploy_container_record_control_invalid'
+        }
+        return $true
+    }
     foreach($flag in @('allowRecordCommands','allowDisplayCommands','allowScreenshotCommands')) {
         $prop=$cap.PSObject.Properties[$flag]
         if($null -eq $prop -or $prop.Value -isnot [bool] -or $prop.Value -ne $false) {
@@ -152,12 +161,17 @@ function Get-CaptureNodeBundleFiles {
     param([Parameter(Mandatory=$true)][string]$NodeStage,
           [Parameter(Mandatory=$true)][string]$RuntimeIndex)
     $manifest=Get-Content -LiteralPath (Join-Path $NodeStage 'capture-node-manifest.json') -Raw | ConvertFrom-Json
-    if($manifest.schemaVersion -ne 1 -or -not (Test-Path -LiteralPath $RuntimeIndex -PathType Leaf) -or
+    if($manifest.schemaVersion -notin @(1,2) -or -not (Test-Path -LiteralPath $RuntimeIndex -PathType Leaf) -or
        (Get-FileHash -LiteralPath $RuntimeIndex -Algorithm SHA256).Hash -ne $manifest.baseIndexSha256) {
         throw 'capture_node_bundle_base_index_changed'
     }
-    $required=@('index.js','localApiSecurity.js','localGpuRequestGuard.js','shims\capture-engine-status.js',
-      'shims\capture-capabilities.js','shims\capture-runtime-status.js','shims\capture-display-routing.js')
+    $required=if($manifest.schemaVersion -eq 2) {
+      @('index.js','shims\route-floor.js','shims\capture-state-sync.js','shims\capture-record-commands.js',
+        'shims\record-notification-policy.js','shims\record-runtime-truth.js')
+    } else {
+      @('index.js','localApiSecurity.js','localGpuRequestGuard.js','shims\capture-engine-status.js',
+        'shims\capture-capabilities.js','shims\capture-runtime-status.js','shims\capture-display-routing.js')
+    }
     $entries=@($manifest.files)
     if($entries.Count -ne $required.Count) {throw 'capture_node_bundle_file_set_invalid'}
     foreach($name in $required) {
@@ -168,6 +182,16 @@ function Get-CaptureNodeBundleFiles {
            (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ne $match[0].sha256) {
             throw ('capture_node_bundle_hash_mismatch: '+$name)
         }
+        if($manifest.schemaVersion -eq 2) {
+            $target=Join-Path (Split-Path -Parent $RuntimeIndex) $name
+            $present=Test-Path -LiteralPath $target -PathType Leaf
+            $before=$match[0].beforeSha256
+            if(([string]::IsNullOrEmpty($before) -and $present) -or
+               (-not [string]::IsNullOrEmpty($before) -and
+                 (-not $present -or (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash -ne $before))) {
+                throw ('capture_node_bundle_target_changed: '+$name)
+            }
+        }
     }
     return $entries
 }
@@ -175,13 +199,13 @@ function Get-CaptureNodeBundleFiles {
 function Assert-CaptureDeployConfigCandidate {
     param([Parameter(Mandatory=$true)][string]$LiveConfig,
           [Parameter(Mandatory=$true)][string]$Candidate,
-          [Parameter(Mandatory=$true)][string]$ExpectedLiveSha256)
+          [Parameter(Mandatory=$true)][string]$ExpectedLiveSha256,[switch]$ContainerRecordControl)
     if($ExpectedLiveSha256 -notmatch '^[0-9a-fA-F]{64}$' -or
        -not (Test-Path -LiteralPath $LiveConfig -PathType Leaf) -or
        (Get-FileHash -LiteralPath $LiveConfig -Algorithm SHA256).Hash -ne $ExpectedLiveSha256) {
         throw 'capture_config_baseline_hash_mismatch'
     }
-    [void](Assert-CaptureDeployConfig -ConfigPath $Candidate)
+    [void](Assert-CaptureDeployConfig -ConfigPath $Candidate -ContainerRecordControl:$ContainerRecordControl)
     $raw=Get-Content -LiteralPath $LiveConfig -Raw
     if(([regex]::Matches($raw,'"captureRuntime"\s*:')).Count -ne 1) {throw 'capture_config_baseline_duplicate_runtime'}
     try {
@@ -189,6 +213,18 @@ function Assert-CaptureDeployConfigCandidate {
         $after=Get-Content -LiteralPath $Candidate -Raw | ConvertFrom-Json -AsHashtable -ErrorAction Stop
     } catch {throw 'capture_config_candidate_invalid_json'}
     if($null -eq $before.captureRuntime -or $null -eq $after.captureRuntime) {throw 'capture_config_candidate_runtime_missing'}
+    if($ContainerRecordControl) {
+        # This authorized migration changes only the explicit mode flag.
+        # All existing permissions and every other setting remain untouched.
+        if(([regex]::Matches($raw,'"containerRecordControl"\s*:')).Count -gt 1) {throw 'capture_config_baseline_duplicate_mode'}
+        if($before.captureRuntime.Contains('containerRecordControl')) {
+            if($before.captureRuntime.containerRecordControl -isnot [bool]) {throw 'capture_config_baseline_mode_invalid'}
+            $after.captureRuntime.containerRecordControl=$before.captureRuntime.containerRecordControl
+        } else { [void]$after.captureRuntime.Remove('containerRecordControl') }
+        if(($before | ConvertTo-Json -Depth 100 -Compress) -cne ($after | ConvertTo-Json -Depth 100 -Compress)) {throw 'capture_config_candidate_other_change'}
+        if((Get-FileHash -LiteralPath $LiveConfig -Algorithm SHA256).Hash -ne $ExpectedLiveSha256) {throw 'capture_config_baseline_hash_mismatch'}
+        return $true
+    }
     foreach($flag in @('allowRecordCommands','allowDisplayCommands','allowScreenshotCommands')) {
         if($before.captureRuntime.Contains($flag) -or $after.captureRuntime[$flag] -isnot [bool] -or $after.captureRuntime[$flag] -ne $false) {
             throw ('capture_config_candidate_flag_invalid: '+$flag)
@@ -241,23 +277,49 @@ function Restore-CaptureDeploymentFiles {
 function Stop-CaptureDeploymentProcesses {
     param([string[]]$TargetPaths)
     $errors=[Collections.Generic.List[string]]::new()
+    function Get-LiveOwner($owner) {
+        $p=Get-Process -Id $owner.ProcessId -ErrorAction SilentlyContinue
+        if($null -eq $p) { return $null }
+        # PID reuse must never cause a different process to be stopped. The
+        # executable path and creation time are independently checked against
+        # the snapshot immediately before any stop request.
+        if([string]::IsNullOrEmpty($p.Path) -or $p.Path -ine $owner.ExecutablePath -or
+           $null -eq $owner.CreationDate -or
+           [Math]::Abs(($p.StartTime.ToUniversalTime() - $owner.CreationDate.ToUniversalTime()).TotalSeconds) -gt 1) {
+            throw ('process identity changed or unavailable pid='+$owner.ProcessId)
+        }
+        return $p
+    }
     foreach($path in $TargetPaths) {
         try {
             $owners=@(Get-CimInstance Win32_Process -ErrorAction Stop | Where-Object {$_.ExecutablePath -eq $path})
             foreach($owner in $owners) {
-                Stop-Process -Id $owner.ProcessId -ErrorAction Stop
-                try { Wait-Process -Id $owner.ProcessId -Timeout 8 -ErrorAction Stop }
-                catch {
-                    # Wait-Process can race with a process that already exited.
-                    $stillOwned=@(Get-CimInstance Win32_Process -ErrorAction Stop | Where-Object {$_.ProcessId -eq $owner.ProcessId -and $_.ExecutablePath -eq $path})
-                    if($stillOwned.Count -gt 0) { throw }
+                if($null -eq (Get-LiveOwner $owner)) { continue }
+                try {
+                    Stop-Process -Id $owner.ProcessId -ErrorAction Stop
+                    Wait-Process -Id $owner.ProcessId -Timeout 8 -ErrorAction Stop
+                } catch {
+                    $failure=$_
+                    # Stop/Wait can race with exit; retry OS process identity
+                    # for a bounded period, never suppress a still-live owner.
+                    for($attempt=0;$attempt -lt 10;$attempt++) {
+                        if($null -eq (Get-LiveOwner $owner)) { break }
+                        if($attempt -eq 9) { throw $failure }
+                        Start-Sleep -Milliseconds 100
+                    }
                 }
             }
         } catch { $errors.Add($path+': '+$_.Exception.Message) }
     }
     try {
         $remaining=@(Get-CimInstance Win32_Process -ErrorAction Stop | Where-Object {$_.ExecutablePath -in $TargetPaths})
-        foreach($owner in $remaining) { $errors.Add(('target still running: '+$owner.ExecutablePath+' pid='+$owner.ProcessId)) }
+        foreach($owner in $remaining) {
+            # CIM may briefly retain an exited process; verify its identity
+            # with the OS process table rather than treating stale CIM as live.
+            if($null -ne (Get-LiveOwner $owner)) {
+                $errors.Add(('target still running: '+$owner.ExecutablePath+' pid='+$owner.ProcessId))
+            }
+        }
     } catch { $errors.Add('process verification: '+$_.Exception.Message) }
     return @($errors)
 }

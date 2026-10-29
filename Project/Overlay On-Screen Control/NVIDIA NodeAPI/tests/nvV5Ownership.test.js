@@ -4,9 +4,13 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const M = require('../osc/mods/nv-layout-v5-core.js');
-const mods = path.join(__dirname, '../osc/mods');
-const source = name => fs.readFileSync(path.join(mods, name), 'utf8');
+const M = require('../osc/Module/MainMenu/OSCFreestyleV5/nv-layout-v5-core.js');
+const modFiles = {
+  'main-menu-live.js': 'Module/MainMenu/NVIDIA/main-menu-live.js',
+  'gpu-profiles.js': 'Module/Settings/GPUProfiles/gpu-profiles.js',
+  'nv-next-v5-native.js': 'Module/MainMenu/OSCFreestyleV5/nv-next-v5-native.js'
+};
+const source = name => fs.readFileSync(path.join(__dirname, '../osc', modFiles[name]), 'utf8');
 const names = {
   Screenshot: 'screenshot-tile', Mods: 'mods-tile', ManualRecord: 'manual-record-tile',
   Stream: 'stream-tile', InstantReplay: 'instant-replay-tile', Ansel: 'ansel-tile',

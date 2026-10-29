@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
-const css=fs.readFileSync(path.join(__dirname,'../osc/mods/main-menu-live.css'),'utf8');
+const css=fs.readFileSync(path.join(__dirname,'../osc/Module/MainMenu/NVIDIA/main-menu-live.css'),'utf8');
 
 test('Customize top band has a solid backdrop behind NVIDIA native menu rather than transparent desktop',()=>{
  const selector=/html\.nv-live-layout-editing[^{}]*body \[nv-main-menu-live-editor\]::before\s*\{([^}]*)\}/;

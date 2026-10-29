@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const installer = require('../shims/reshade-installer-route');
-const ui = require('../osc/mods/reshade-manager');
+const ui = require('../osc/Module/Settings/ReShade/reshade-manager.js');
 
 const exe = 'C:\\Games\\Example\\game.exe';
 function fakeIO(names, logText) {
@@ -55,15 +55,15 @@ test('UI helpers remain read-only and report the status contract', () => {
   assert.equal(ui.isGamePath(exe), true);
   assert.equal(ui.isGamePath('notepad.exe'), false);
   assert.equal(ui.isGamePath('\\\\server\\share\\game.exe'), false);
-  const script = fs.readFileSync(path.join(__dirname,'../osc/mods/reshade-manager.js'),'utf8');
+  const script = fs.readFileSync(path.join(__dirname,'../osc/Module/Settings/ReShade/reshade-manager.js'),'utf8');
   assert.match(script, /window\.confirm\(/);
   assert.match(script, /window\.open\(official/);
   assert.doesNotMatch(script, /(?:fs\.copyFile|unlinkSync|execFile|spawn\()/);
 });
 
 test('ReShade Manager compiles genuine Angular Material form components', () => {
-  const source = fs.readFileSync(path.join(__dirname,'../osc/mods/reshade-manager.js'),'utf8');
-  const styles = fs.readFileSync(path.join(__dirname,'../osc/mods/reshade-manager.css'),'utf8');
+  const source = fs.readFileSync(path.join(__dirname,'../osc/Module/Settings/ReShade/reshade-manager.js'),'utf8');
+  const styles = fs.readFileSync(path.join(__dirname,'../osc/Module/Settings/ReShade/reshade-manager.css'),'utf8');
   assert.match(source, /node\('md-input-container'/);
   assert.match(source, /node\('md-select'/);
   assert.match(source, /node\('md-option'/);
@@ -81,8 +81,8 @@ test('ReShade Manager compiles genuine Angular Material form components', () => 
 });
 
 test('ReShade Manager uses compact NVIDIA Settings proportions without numbered cards', () => {
-  const script = fs.readFileSync(path.join(__dirname, '../osc/mods/reshade-manager.js'), 'utf8');
-  const styles = fs.readFileSync(path.join(__dirname, '../osc/mods/reshade-manager.css'), 'utf8');
+  const script = fs.readFileSync(path.join(__dirname, '../osc/Module/Settings/ReShade/reshade-manager.js'), 'utf8');
+  const styles = fs.readFileSync(path.join(__dirname, '../osc/Module/Settings/ReShade/reshade-manager.css'), 'utf8');
   assert.doesNotMatch(script, /heading\.appendChild\(node\('span', 'nv-reshade-step'/);
   assert.match(script, /headingWrap\.insertBefore\(back, headingWrap\.firstChild\)/);
   assert.ok(styles.includes('#nv-reshade-manager .nv-reshade-section {'));
@@ -101,7 +101,7 @@ test('NodeAPI mounts safe installer route and OSC mod manifest', () => {
   assert.match(source, /reshade-installer-route\.js'\)\.mount\(app\)/);
   assert.match(source, /'reshade-manager\.js': true/);
   assert.match(source, /'reshade-manager\.css': true/);
-  const settings = fs.readFileSync(path.join(__dirname,'../osc/mods/gpu-status-panel.js'),'utf8');
+  const settings = fs.readFileSync(path.join(__dirname,'../osc/Module/Settings/GPUStatus/gpu-status-panel.js'),'utf8');
   assert.match(settings, /Open ReShade Manager/);
   assert.doesNotMatch(settings, /osc-button-disabled" disabled aria-describedby="nv-reshade-install-help"/);
 });

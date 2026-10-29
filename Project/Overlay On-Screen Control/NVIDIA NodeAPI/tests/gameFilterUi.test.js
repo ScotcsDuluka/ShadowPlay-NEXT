@@ -3,7 +3,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const source = fs.readFileSync(path.join(__dirname,'../osc/mods/ansel-game-filter.js'),'utf8');
+const source = fs.readFileSync(path.join(__dirname,'../osc/Module/GameFilter/Ansel/ansel-game-filter.js'),'utf8');
 const nvidiaBundle = fs.readFileSync(path.join(__dirname,'../osc/app.js'),'utf8');
 const guardedNvidiaPromise = 'return rn.promise.then(function(){return nn?nn.promise.then(function(){return nn=void 0,!0}):e.when(!0)})';
 assert(nvidiaBundle.includes(guardedNvidiaPromise),

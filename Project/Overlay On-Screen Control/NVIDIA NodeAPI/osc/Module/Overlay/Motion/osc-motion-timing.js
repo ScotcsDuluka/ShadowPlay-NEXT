@@ -6,7 +6,10 @@
     open:{bezier:[0,.9524242401123044,.27999999999999997,1],duration:500}
   };
   var key='DulukaOscMotionSettings',listeners=[],error='';
-  var defaults={enabled:true,mode:'osc',backgroundFade:true,topAnimation:true,
+  /* Owner directive 2026-10-29: motion-off is the factory default (the open
+   * animation's forced repaint shows as a corner artifact on the GPU shared
+   * texture path). Curves and durations keep the approved 500/240 values. */
+  var defaults={enabled:false,mode:'osc',backgroundFade:true,topAnimation:true,
     mainMenuAnimation:true,openDuration:500,closeDuration:240};
   function clone(value){return JSON.parse(JSON.stringify(value));}
   function normalize(input,base){

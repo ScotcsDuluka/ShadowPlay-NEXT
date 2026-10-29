@@ -67,6 +67,7 @@ $stages = @(
     @{ Name='CompositionTests';        Kind='proj'; Path='Composition.Tests\CaptureComposition.Tests.csproj'; Args=@() },
     @{ Name='DisplaySelectionTests';   Kind='proj'; Path='DisplaySelection.Tests\DisplaySelection.Tests.vbproj'; Args=@() },
     @{ Name='HardwareReadinessDxgiOnly'; Kind='proj'; Path='HardwareReadiness.Tests\HardwareReadiness.Tests.csproj'; Args=@('--dxgi-only') },
+    @{ Name='ExclusiveCaptureSlice';     Kind='proj'; Path='ExclusiveCapture.Tests\ExclusiveCapture.Tests.vbproj'; Args=@() },
     @{ Name='QsvNativeSessionContract'; Kind='proj'; Path='QsvNative.Tests\QsvNative.Tests.csproj'; Args=@('--session-contract-only') },
     @{ Name='QsvNativeSourceFault';    Kind='proj'; Path='QsvNative.Tests\QsvNative.Tests.csproj'; Args=@('--native-source-fault-synthetic-only') },
     @{ Name='QsvNativeSessionMedia';   Kind='proj'; Path='QsvNative.Tests\QsvNative.Tests.csproj'; Args=@('--session-media-synthetic-only') },

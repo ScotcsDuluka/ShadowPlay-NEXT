@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const modPath = path.join(__dirname, '../osc/mods');
+const modPath = path.join(__dirname, '../osc/Module/Overlay/Motion');
 const TIMING = {
   open: { duration: 500, bezier: [0, 0.9524242401123044, 0.27999999999999997, 1] },
   closed: { duration: 240, bezier: [0.6681970923837989, 0.04272720336914062, 0.00500000000000001, 1] },
@@ -131,7 +131,12 @@ function fixture(options = {}) {
     getComputedStyle(node) { return { display: 'block', visibility: 'visible', opacity: '1', transform: node.styles.transform || 'none', getPropertyValue: key => node.style.getPropertyValue(key) }; },
     addEventListener(type, fn) { (windowEvents[type] ||= []).push(fn); },
   };
-  const stored = new Map(options.motionSettings ? [['DulukaOscMotionSettings', JSON.stringify(options.motionSettings)]] : []);
+  // Behavior tests exercise the animation, so storage defaults to motion ON;
+  // the shipped factory default is motion OFF (owner directive 2026-10-29).
+  const stored = new Map([['DulukaOscMotionSettings', JSON.stringify(Object.assign({
+    enabled: true, mode: 'osc', backgroundFade: true, topAnimation: true,
+    mainMenuAnimation: true, openDuration: 500, closeDuration: 240,
+  }, options.motionSettings || {}))]]);
   window.localStorage = { getItem: key => stored.get(key) || null,
     setItem(key, value) { if(options.failStorage)throw Error('Storage full');stored.set(key,value); } };
   const context = { window, document, console, performance: window.performance, setTimeout: clock.setTimeout, clearTimeout: clock.clearTimeout };
@@ -338,8 +343,8 @@ test('OSC Motion keeps native blocks fully opaque while fading only the backgrou
 });
 
 test('Customize transitions are gated behind editing mode, not startup or OSC motion',()=>{
-  const css=fs.readFileSync(path.join(modPath,'main-menu-live.css'),'utf8');
-  const js=fs.readFileSync(path.join(modPath,'main-menu-live.js'),'utf8');
+  const css=fs.readFileSync(path.join(__dirname,'../osc/Module/MainMenu/NVIDIA/main-menu-live.css'),'utf8');
+  const js=fs.readFileSync(path.join(__dirname,'../osc/Module/MainMenu/NVIDIA/main-menu-live.js'),'utf8');
   assert.match(css,/\.main-menu-container md-menu-bar\{height:240px!important;transition:none\}/);
   assert.match(css,/\.nv-flex-face\{[^}]*animation:none\}/);
   assert.match(css,/html\.nv-live-layout-editing:not\(\.nv-motion-preparing\):not\(\.nv-motion-active\)[^\{]*md-menu-bar/);

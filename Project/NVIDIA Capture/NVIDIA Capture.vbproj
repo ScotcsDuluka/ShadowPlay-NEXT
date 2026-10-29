@@ -132,6 +132,14 @@
     <Compile Remove="EngineCapture\Mux.Tests\**\*.vb" />
     <Compile Remove="EngineCapture\SessionRecovery.Tests\**\*.vb" />
     <Compile Remove="EngineCapture\DisplaySelection.Tests\**\*.vb" />
+    <Compile Remove="EngineCapture\ExclusiveCapture.Tests\**\*.vb" />
+    <!-- Generated files of ANY nested project must never be swept into this
+         compilation: a nested obj carries AssemblyInfo attributes that
+         duplicate ours. Excluding these generically prevents the whole
+         failure class, independent of future folder names. -->
+    <Compile Remove="EngineCapture\**\obj\**\*.vb" />
+    <Compile Remove="EngineCapture\**\bin\**\*.vb" />
     <EmbeddedResource Remove="EngineCapture\Duluka Capture\**\*.resx" />
+    <EmbeddedResource Remove="EngineCapture\**\obj\**\*.resx" />
   </ItemGroup>
 </Project>

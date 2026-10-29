@@ -13,6 +13,9 @@ Namespace DulukaEngine.Media
         Public Property PacketTimelineVerified As Boolean
     End Class
     Public NotInheritable Class SessionMediaVerifier
+        ' AAC frame padding and small encoder priming are permitted only if
+        ' every requested audio stream has measured start/end timestamps.
+        Private Const MaxNativeAudioSkewMs As Double = 200.0R
         Public Shared Function Verify(path As String, ffmpeg As String, frames As Long, width As Integer, height As Integer,
                                       fps As Integer, Optional processStarted As Action(Of Process) = Nothing) As SessionMediaEvidence
             Return VerifyWithColor(path, ffmpeg, frames, width, height, fps, processStarted, Nothing)
@@ -48,6 +51,16 @@ Namespace DulukaEngine.Media
                 End If
                 If deep.VideoStreams <> 1 OrElse deep.AudioStreams <> audioStreams Then
                     Throw New InvalidDataException("session_requested_stream_count_mismatch")
+                End If
+                If audioStreams > 0 Then
+                    If Not deep.AudioTimingComplete OrElse Not deep.FirstAudioOffsetMs.HasValue OrElse
+                        Not deep.MaxAudioEndDriftMs.HasValue Then
+                        Throw New InvalidDataException("session_audio_timing_evidence_missing")
+                    End If
+                    If Math.Abs(deep.FirstAudioOffsetMs.Value) > MaxNativeAudioSkewMs OrElse
+                        deep.MaxAudioEndDriftMs.Value > MaxNativeAudioSkewMs Then
+                        Throw New InvalidDataException("session_audio_timing_mismatch")
+                    End If
                 End If
                 Dim psi As New ProcessStartInfo(probe) With {.UseShellExecute = False, .CreateNoWindow = True,
                     .RedirectStandardOutput = True, .RedirectStandardError = True}
@@ -124,8 +137,13 @@ Namespace DulukaEngine.Media
                         result.PacketTimelineVerified = True
                         End If
                         Dim duration = Double.Parse(doc.RootElement.GetProperty("format").GetProperty("duration").GetString(), Globalization.CultureInfo.InvariantCulture)
+                        ' format.duration is the longest track. For audio+video,
+                        ' validate each audio track above, then allow bounded AAC padding.
+                        ' Video-only/strict-CFR acceptance keeps the one-frame limit.
+                        Dim durationTolerance As Double = If(audioStreams > 0 AndAlso Not strictCfr,
+                            MaxNativeAudioSkewMs / 1000.0R, 1.0R / fps)
                         If Not Double.IsFinite(duration) OrElse duration <= 0 OrElse
-                            Math.Abs(duration - CDbl(frames) / fps) > 1.0 / fps Then Throw New InvalidDataException("session_media_duration_mismatch")
+                            Math.Abs(duration - CDbl(frames) / fps) > durationTolerance Then Throw New InvalidDataException("session_media_duration_mismatch")
                     End Using
                 End Using
                 result.Verified = True

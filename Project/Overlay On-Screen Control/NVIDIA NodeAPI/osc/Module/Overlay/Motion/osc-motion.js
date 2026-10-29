@@ -22,7 +22,7 @@
   function touchPaint(){
     if(!document.body||!document.createElement)return;
     if(!paintCanvas){paintCanvas=document.createElement('canvas');paintCanvas.width=paintCanvas.height=1;paintCanvas.setAttribute('aria-hidden','true');paintCanvas.setAttribute('data-nv-motion-repaint','');paintCanvas.style.cssText='position:fixed;left:0;top:0;width:1px;height:1px;pointer-events:none;opacity:.01;z-index:2147483647';document.body.appendChild(paintCanvas);paintContext=paintCanvas.getContext('2d');}
-    if(paintContext){paintContext.fillStyle=paintTick++%2?'#fff':'#000';paintContext.fillRect(0,0,1,1);}
+    if(paintContext){paintContext.fillStyle=paintTick++%2?'#010101':'#000';paintContext.fillRect(0,0,1,1);}
   }
   function clearClasses(){['nv-motion-preparing','nv-motion-active','nv-motion-opening','nv-motion-closing'].forEach(function(name){root.classList.remove(name);});}
   function clearTransitionTimer(){if(transitionTimer!==null)window.clearTimeout(transitionTimer);transitionTimer=null;transitionTarget=null;}

@@ -67,6 +67,10 @@ static size_t g_adapter_readback_write = 0;
 static size_t g_adapter_readback_read = 0;
 static LUID g_adapter_frame_target_luid{};
 static bool g_adapter_frame_target_selected = false;
+// [DX11-LATENCY] event-driven publish wake: a queued readback must not wait
+// up to one 4ms worker tick before the first completion poll.
+static HANDLE g_publish_wake_event = nullptr;
+static std::atomic<long> g_readback_pending{ 0 };
 static std::uint32_t g_adapter_frame_consumer_api = 0;
 static UINT g_adapter_frame_width = 0;
 static UINT g_adapter_frame_height = 0;
@@ -373,6 +377,9 @@ static void ReleaseAdapterFrameTexture() {
     }
     g_adapter_readback_write = 0;
     g_adapter_readback_read = 0;
+    // Every slot was just cleared; keep the wake/adaptive-cadence counter
+    // consistent with the visible slot state.
+    g_readback_pending.store(0, std::memory_order_release);
     if (g_adapter_frame_mutex) {
         g_adapter_frame_mutex->Release();
         g_adapter_frame_mutex = nullptr;
@@ -760,6 +767,7 @@ static bool PublishCompletedAdapterFrame(std::uint64_t& completedCefSerial) {
         slot.pending = false;
         slot.fullFrame = false;
         slot.dirtyBoxes.clear();
+        g_readback_pending.fetch_sub(1, std::memory_order_acq_rel);
         g_adapter_readback_read =
             (g_adapter_readback_read + 1) % AdapterReadbackSlotCount;
         return false;
@@ -772,82 +780,99 @@ static bool PublishCompletedAdapterFrame(std::uint64_t& completedCefSerial) {
     bool requestFullReadback = false;
     bool completedFullFrame = false;
     if (SUCCEEDED(mapResult)) {
-        const HRESULT acquireResult = g_adapter_frame_mutex->AcquireSync(0, 0);
-        if (acquireResult == S_OK) {
-            const auto* mappedBytes =
-                static_cast<const std::uint8_t*>(mapped.pData);
-            const std::uint64_t pixelFingerprint = slot.fullFrame
-                ? osc::frame_utilities::ComputeAdapterFrameFingerprint(mappedBytes, mapped.RowPitch,
-                    g_adapter_frame_width, g_adapter_frame_height)
-                : 0;
-            for (const D3D11_BOX& box : slot.dirtyBoxes) {
-                const std::size_t offset =
-                    static_cast<std::size_t>(box.top) * mapped.RowPitch +
-                    static_cast<std::size_t>(box.left) * 4;
-                g_adapter_frame_context->UpdateSubresource(
-                    g_adapter_frame_texture, 0, &box, mappedBytes + offset,
-                    mapped.RowPitch, 0);
-            }
-            bool d3d9Published =
-                g_adapter_frame_consumer_api !=
-                    osc_frame_bridge::ConsumerRenderApiD3D9;
-            if (!d3d9Published) {
-                D3D11_TEXTURE2D_DESC sourceDesc{};
-                slot.texture->GetDesc(&sourceDesc);
-                d3d9Published = osc::d3d9_frame_publisher::PublishD3D9FramePixels(mappedBytes,
+        const auto* mappedBytes =
+            static_cast<const std::uint8_t*>(mapped.pData);
+        if (g_adapter_frame_consumer_api ==
+                osc_frame_bridge::ConsumerRenderApiD3D9) {
+            // Classic D3D9 consumers read the CPU v1 BGRA mapping and cannot
+            // open a D3D11 NT shared texture. Publish straight from the mapped
+            // staging and skip the game-adapter keyed-mutex mirror entirely:
+            // it added per-frame GPU copies plus AcquireSync coupling to the
+            // game's Present thread, and a stuck keyed mutex used to freeze
+            // the CPU bridge even though no D3D9 receiver consumed the mirror.
+            D3D11_TEXTURE2D_DESC sourceDesc{};
+            slot.texture->GetDesc(&sourceDesc);
+            const bool d3d9Published =
+                osc::d3d9_frame_publisher::PublishD3D9FramePixels(mappedBytes,
                     mapped.RowPitch, slot.dirtyBoxes, sourceDesc.Width,
                     sourceDesc.Height, slot.fullFrame);
-                if (!d3d9Published) {
-                    PublisherLog("[d3d9-bridge] CPU frame publication failed");
-                } else if (g_adapter_frame_device && g_adapter_frame_context) {
-                    // DX9Ex is strictly opt-in: the trusted in-game receiver
-                    // must advertise Stage/Commit capability + matching LUID.
-                    // Reconstruct a COMPLETE image from the CPU v1 bridge:
-                    // staging dirty rectangles are not a full GPU frame.
-                    const auto* consumer = GetConsumerAdapterInfo();
-                    const DWORD gamePid = consumer && consumer->ownerProcessId > 0
-                        ? static_cast<DWORD>(consumer->ownerProcessId) : 0;
-                    if (!g_d3d9ex_cpu_only.load(std::memory_order_acquire) &&
-                        !PreferGpuPreviewToCpuGpuUpload() &&
-                        osc::d3d9ex_frame_publisher::CanPublish(
-                            gamePid, g_adapter_frame_target_luid)) {
-                        std::vector<std::uint8_t> fullPixels;
-                        UINT frameWidth = 0, frameHeight = 0;
-                        if (osc::d3d9_frame_publisher::SnapshotFullD3D9Frame(
-                                fullPixels, frameWidth, frameHeight)) {
-                            osc::d3d9ex_frame_publisher::TryPublish(
-                                g_adapter_frame_device, g_adapter_frame_context,
-                                fullPixels.data(), frameWidth * 4,
-                                frameWidth, frameHeight,
-                                g_adapter_frame_target_luid, gamePid);
-                        }
+            if (!d3d9Published) {
+                PublisherLog("[d3d9-bridge] CPU frame publication failed");
+            } else if (g_adapter_frame_device && g_adapter_frame_context) {
+                // DX9Ex is strictly opt-in: the trusted in-game receiver
+                // must advertise Stage/Commit capability + matching LUID.
+                // Reconstruct a COMPLETE image from the CPU v1 bridge:
+                // staging dirty rectangles are not a full GPU frame.
+                const auto* consumer = GetConsumerAdapterInfo();
+                const DWORD gamePid = consumer && consumer->ownerProcessId > 0
+                    ? static_cast<DWORD>(consumer->ownerProcessId) : 0;
+                if (!g_d3d9ex_cpu_only.load(std::memory_order_acquire) &&
+                    !PreferGpuPreviewToCpuGpuUpload() &&
+                    osc::d3d9ex_frame_publisher::CanPublish(
+                        gamePid, g_adapter_frame_target_luid)) {
+                    std::vector<std::uint8_t> fullPixels;
+                    UINT frameWidth = 0, frameHeight = 0;
+                    if (osc::d3d9_frame_publisher::SnapshotFullD3D9Frame(
+                            fullPixels, frameWidth, frameHeight)) {
+                        osc::d3d9ex_frame_publisher::TryPublish(
+                            g_adapter_frame_device, g_adapter_frame_context,
+                            fullPixels.data(), frameWidth * 4,
+                            frameWidth, frameHeight,
+                            g_adapter_frame_target_luid, gamePid);
                     }
                 }
             }
-            HostGpuContext()->Unmap(slot.texture, 0);
-            g_adapter_frame_context->Flush();
-            const HRESULT releaseResult = g_adapter_frame_mutex->ReleaseSync(0);
-            if (SUCCEEDED(releaseResult)) {
+            if (d3d9Published) {
                 published = true;
-                if (slot.fullFrame)
-                    osc::frame_utilities::LogAdapterFramePixelProof(pixelFingerprint);
-                if (!d3d9Published)
-                    requestFullReadback = true;
-                else if (slot.fullFrame)
-                    completedFullFrame = true;
+                if (slot.fullFrame) {
+                    osc::frame_utilities::LogAdapterFramePixelProof(
+                        osc::frame_utilities::ComputeAdapterFrameFingerprint(
+                            mappedBytes, mapped.RowPitch,
+                            g_adapter_frame_width, g_adapter_frame_height));
+                }
             } else {
                 requestFullReadback = true;
-                PublisherLog("[adapter-bridge] shared texture mutex release failed: " +
-                    std::to_string(static_cast<long>(releaseResult)));
             }
         } else {
-            HostGpuContext()->Unmap(slot.texture, 0);
-            if (acquireResult == WAIT_TIMEOUT)
-                return false;
-            requestFullReadback = true;
-            PublisherLog("[adapter-bridge] shared texture mutex acquire failed: " +
-                std::to_string(static_cast<long>(acquireResult)));
+            const HRESULT acquireResult = g_adapter_frame_mutex->AcquireSync(0, 0);
+            if (acquireResult == S_OK) {
+                const std::uint64_t pixelFingerprint = slot.fullFrame
+                    ? osc::frame_utilities::ComputeAdapterFrameFingerprint(mappedBytes,
+                        mapped.RowPitch, g_adapter_frame_width,
+                        g_adapter_frame_height)
+                    : 0;
+                for (const D3D11_BOX& box : slot.dirtyBoxes) {
+                    const std::size_t offset =
+                        static_cast<std::size_t>(box.top) * mapped.RowPitch +
+                        static_cast<std::size_t>(box.left) * 4;
+                    g_adapter_frame_context->UpdateSubresource(
+                        g_adapter_frame_texture, 0, &box, mappedBytes + offset,
+                        mapped.RowPitch, 0);
+                }
+                HostGpuContext()->Unmap(slot.texture, 0);
+                g_adapter_frame_context->Flush();
+                const HRESULT releaseResult = g_adapter_frame_mutex->ReleaseSync(0);
+                if (SUCCEEDED(releaseResult)) {
+                    published = true;
+                    if (slot.fullFrame)
+                        osc::frame_utilities::LogAdapterFramePixelProof(
+                            pixelFingerprint);
+                } else {
+                    requestFullReadback = true;
+                    PublisherLog("[adapter-bridge] shared texture mutex release failed: " +
+                        std::to_string(static_cast<long>(releaseResult)));
+                }
+            } else {
+                HostGpuContext()->Unmap(slot.texture, 0);
+                if (acquireResult == WAIT_TIMEOUT)
+                    return false;
+                requestFullReadback = true;
+                PublisherLog("[adapter-bridge] shared texture mutex acquire failed: " +
+                    std::to_string(static_cast<long>(acquireResult)));
+            }
         }
+        if (published && slot.fullFrame)
+            completedFullFrame = true;
     } else if (mapResult == DXGI_ERROR_WAS_STILL_DRAWING) {
         return false;
     } else {
@@ -871,6 +896,7 @@ static bool PublishCompletedAdapterFrame(std::uint64_t& completedCefSerial) {
         slot.fullFrame = false;
         slot.cefContentSerial = 0;
         slot.dirtyBoxes.clear();
+        g_readback_pending.fetch_sub(1, std::memory_order_acq_rel);
         g_adapter_readback_read =
             (g_adapter_readback_read + 1) % AdapterReadbackSlotCount;
     }
@@ -932,12 +958,19 @@ bool QueueFrameReadbackLocked(ID3D11Texture2D* sourceTexture,
         HostGpuContext()->CopySubresourceRegion(
             slot.texture, 0, box.left, box.top, 0, sourceTexture, 0, &box);
     HostGpuContext()->End(slot.completion);
-    HostGpuContext()->Flush();
+    // No Flush here: this runs inside the CEF UI callback on the shared
+    // immediate context, and a per-paint GPU flush stalled CEF compositing
+    // plus the desktop presenter. The publish worker flushes with bounded
+    // cadence (once per tick, only while readbacks are pending), which also
+    // guarantees forward progress for GetData(DONOTFLUSH) on this query.
     slot.cefContentSerial = g_cef_content_serial;
     slot.pending = true;
     g_adapter_readback_write =
         (g_adapter_readback_write + 1) % AdapterReadbackSlotCount;
     g_adapter_deferred_dirty_rects.clear();
+    g_readback_pending.fetch_add(1, std::memory_order_acq_rel);
+    if (g_publish_wake_event)
+        SetEvent(g_publish_wake_event);
     if (HostWindow())
         SetTimer(HostWindow(), 6, 16, nullptr);
     return true;
@@ -1094,9 +1127,16 @@ void PublishFrameLocked(ID3D11Texture2D* sourceTexture,
 // and throttled CEF's compositor to 1-11 fps whenever the game was
 // focused (112 fps when not). The worker owns all heavy steps now.
 static DWORD WINAPI OscPublishWorkerProc(LPVOID) {
+    HANDLE waits[2] = { g_publish_worker_stop_event, g_publish_wake_event };
     for (;;) {
-        const DWORD wait =
-            WaitForSingleObject(g_publish_worker_stop_event, 4);
+        // Adaptive cadence: a queued readback wakes this worker immediately
+        // (SetEvent on the queue path). While readbacks or the opt-in D3D9Ex
+        // preview are active, keep the 4ms completion tick; otherwise drop to
+        // a 15ms idle poll so a hidden/static overlay costs almost no CPU.
+        const bool workExpected = GpuPreviewEnabled() ||
+            g_readback_pending.load(std::memory_order_acquire) > 0;
+        const DWORD wait = WaitForMultipleObjects(2, waits, FALSE,
+            workExpected ? 4 : 15);
         if (wait == WAIT_OBJECT_0 || wait == WAIT_FAILED) break;
         // Poll pending GPU-completion and Stage/Commit acknowledgements
         // without ever executing D3D9Ex calls in the game's Present.
@@ -1169,6 +1209,13 @@ static DWORD WINAPI OscPublishWorkerProc(LPVOID) {
             g_publish_inflight.fetch_add(1, std::memory_order_acq_rel);
         }
 
+        // Submit the staging copies + completion queries queued by the CEF
+        // callback from THIS thread: the callback no longer flushes (a
+        // per-paint GPU flush on the shared immediate context stalled CEF
+        // compositing and the desktop presenter). Bounded: at most once per
+        // worker tick and only while readbacks are pending.
+        HostGpuContext()->Flush();
+
         std::uint64_t completedCefSerial = 0;
         const bool published = PublishCompletedAdapterFrame(completedCefSerial);
         {
@@ -1192,7 +1239,9 @@ static void StartPublishWorker() {
     if (!g_publish_worker_stop_event)
         g_publish_worker_stop_event =
             CreateEventW(nullptr, TRUE, FALSE, nullptr);
-    if (!g_publish_worker_stop_event) return;
+    if (!g_publish_wake_event)
+        g_publish_wake_event = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+    if (!g_publish_worker_stop_event || !g_publish_wake_event) return;
     g_publish_worker_thread = CreateThread(nullptr, 0,
         OscPublishWorkerProc, nullptr, 0, nullptr);
     if (g_publish_worker_thread)
@@ -1223,6 +1272,10 @@ static void StopPublishWorker() {
         if (g_publish_worker_stop_event) {
             CloseHandle(g_publish_worker_stop_event);
             g_publish_worker_stop_event = nullptr;
+        }
+        if (g_publish_wake_event) {
+            CloseHandle(g_publish_wake_event);
+            g_publish_wake_event = nullptr;
         }
     }
 }

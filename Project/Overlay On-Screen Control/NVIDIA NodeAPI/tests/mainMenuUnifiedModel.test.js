@@ -1,5 +1,5 @@
 'use strict';
-const test=require('node:test'),assert=require('node:assert/strict'),M=require('../osc/mods/main-menu-unified-model');
+const test=require('node:test'),assert=require('node:assert/strict'),M=require('../osc/Module/MainMenu/OSCFreestyleV5/main-menu-unified-model.js');
 const all=M.CONTROLS.map(c=>c.key);
 function used(s){return M.PANELS.flatMap(p=>s.panels[p].flatMap(b=>b.controls));}
 test('legacy native settings and side groups migrate with all twelve controls',()=>{

@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
-const css=fs.readFileSync(path.join(__dirname,'../osc/mods/main-menu-live.css'),'utf8');
+const css=fs.readFileSync(path.join(__dirname,'../osc/Module/MainMenu/NVIDIA/main-menu-live.css'),'utf8');
 test('Customize shows the genuine NVIDIA OSC top bar and preserves its native click handling',()=>{
  const rules=Array.from(css.matchAll(/html\.nv-live-layout-editing\s+nv-osc-top-bar\s+\.top-bar\s*\{([^}]*)\}/g),x=>x[1]);
  assert.equal(rules.length,1,'only one Customize top bar override is allowed');
@@ -12,7 +12,7 @@ test('Customize shows the genuine NVIDIA OSC top bar and preserves its native cl
  assert.doesNotMatch(rule,/visibility\s*:\s*hidden|pointer-events\s*:\s*none/);
 });
 test('Top bar still belongs to NVIDIA; motion initial hiding is preserved',()=>{
- const motion=fs.readFileSync(path.join(__dirname,'../osc/mods/osc-motion.css'),'utf8');
+ const motion=fs.readFileSync(path.join(__dirname,'../osc/Module/Overlay/Motion/osc-motion.css'),'utf8');
  assert.match(motion,/nv-motion-preparing\s+nv-osc-top-bar\s+\.top-bar\s*\{opacity:0!important\}/);
  assert.match(css,/html body \.nv-live-editor[^{]*\{[^}]*z-index:\s*75\s*!important/s);
 });

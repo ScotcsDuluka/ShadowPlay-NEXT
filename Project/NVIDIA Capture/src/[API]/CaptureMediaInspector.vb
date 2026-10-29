@@ -35,6 +35,9 @@ Public NotInheritable Class CaptureMediaInspector
         Public Property FirstAudioStartSec As Double?
         Public Property FirstAudioOffsetMs As Double?
         Public Property MaxAudioEndDriftMs As Double?
+        ''' <summary>Every declared audio track had a measurable start and end,
+        ''' and the video track has a measurable end. Missing timing fails closed.</summary>
+        Public Property AudioTimingComplete As Boolean
         Public Property AudioCodecs As String() = Array.Empty(Of String)()
         Public Property AudioChannels As Integer() = Array.Empty(Of Integer)()
         Public Property SyncBasis As String = "container_timestamps_only"
@@ -137,6 +140,8 @@ Public NotInheritable Class CaptureMediaInspector
                     data.MaxAudioEndDriftMs = Math.Round(
                         audioEnds.Max(Function(v) Math.Abs(v - videoEnd.Value)) * 1000.0, 3)
                 End If
+                data.AudioTimingComplete = data.AudioStreams > 0 AndAlso
+                    audioEnds.Count = data.AudioStreams AndAlso videoEnd.HasValue AndAlso firstAudio.HasValue
                 data.Verified = data.VideoStreams > 0 AndAlso
                     data.DurationSec.HasValue AndAlso data.DurationSec.Value > 0
                 If Not data.Verified Then

@@ -88,7 +88,7 @@ function createHarness() {
       return Promise.resolve({ok:true,json:()=>Promise.resolve(readOnlyReport)});
     throw new Error('Unexpected URL: '+url);
   };
-  const script = fs.readFileSync(path.join(__dirname,'../osc/mods/reshade-manager.js'),'utf8');
+  const script = fs.readFileSync(path.join(__dirname,'../osc/Module/Settings/ReShade/reshade-manager.js'),'utf8');
   vm.runInNewContext(script,{window,document,fetch,console},{filename:'reshade-manager.js'});
   const ui = window.NvReShadeManager;
   return {ui,scope,info,settings,get:predicate=>scan(settings,predicate)};

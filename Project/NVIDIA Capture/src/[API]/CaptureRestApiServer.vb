@@ -382,6 +382,7 @@ Partial Public Class UI_Engine
                     .failReason = If(_engineInitFailReason, ""),
                     .recording = active,
                     .enabled = active,
+                    .recordCommandMode = If(_containerRecordCommands, "container", "legacy"),
                     .actualSessionBackend = truth.actualSessionBackend,
                     .actualRunningEngine = truth.actualRunningEngine,
                     .busy = truth.busy, .isCapturing = truth.isCapturing,
@@ -393,7 +394,10 @@ Partial Public Class UI_Engine
                 })
             End If
 
-            If path = "/record/start" AndAlso method = "POST" Then
+            If path = "/record/container/start" AndAlso method = "POST" AndAlso Not _containerRecordCommands Then
+                Return "{""started"":false,""error"":""record_command_mode_mismatch""}"
+            End If
+            If (path = "/record/start" OrElse path = "/record/container/start") AndAlso method = "POST" Then
                 If Not _directRestCommandGate.Wait(0) Then
                     Return "{""started"":false,""error"":""direct_rest_command_busy""}"
                 End If
@@ -444,7 +448,10 @@ Partial Public Class UI_Engine
                 End Try
             End If
 
-            If path = "/record/stop" AndAlso method = "POST" Then
+            If path = "/record/container/stop" AndAlso method = "POST" AndAlso Not _containerRecordCommands Then
+                Return "{""stopped"":false,""error"":""record_command_mode_mismatch""}"
+            End If
+            If (path = "/record/stop" OrElse path = "/record/container/stop") AndAlso method = "POST" Then
                 If Not _directRestCommandGate.Wait(0) Then
                     Return "{""stopped"":false,""error"":""direct_rest_command_busy""}"
                 End If

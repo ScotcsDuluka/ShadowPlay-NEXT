@@ -171,6 +171,19 @@ Namespace DulukaEngine.Recording
                     _logger.Warning($"[RecordingEngine] capture method: requested='{requestedMethod}' → GAP: '{requestedMethod}' is not implemented in the New Engine (only production backend = ddagrab) — running DdagrabBackend. Gap recorded, NOT silently accepted.")
                 End If
 
+                ' ★ EXCLUSIVE API (SPN-ADR §C/§D): requested→selected→actual
+                ' truth line. Desktop Duplication IS the one implemented
+                ' verified native source for exclusive presentations; source
+                ' faults take the existing same-LUID recreate + generation
+                ' path and DxgiDisplayModeMonitor supervises the pinned
+                ' target (bounded poll, never per-frame). A game/present hook
+                ' source is NOT implemented — an unimplemented request fails
+                ' closed in the factory before any device is created.
+                Dim exclusiveMethod As String = If(startup.RequestedExclusiveCaptureMethod, "").Trim()
+                If exclusiveMethod.Length > 0 Then
+                    _logger.Info($"[RecordingEngine] exclusive capture API: requested='{exclusiveMethod.ToLowerInvariant()}' → selected={_composition.ExclusiveApi} ({_composition.ExclusiveApiReason}); verification=ExclusiveVerificationGate(real frames on pinned target), monitor=DxgiDisplayModeMonitor, game-hook source=not_implemented")
+                End If
+
                 ' ★ PHASE 1 (task §8): pixel format truth line.
                 ' Capture texture format is fixed by the Ddagrab backend (BGRA8).
                 ' Encoder/output pixel-format hints are kept separate from the
@@ -251,7 +264,8 @@ Namespace DulukaEngine.Recording
         End Function
 
         Private Function StartSessionCore(config As SessionConfig, frames As IEnumerable(Of SessionFrameInput),
-            Optional source As DulukaEngine.Video.Transport.D3D11.BgraSessionSource = Nothing) As SessionResult
+            Optional source As DulukaEngine.Video.Transport.D3D11.BgraSessionSource = Nothing,
+            Optional captureRebuildRetry As Boolean = True) As SessionResult
             If config Is Nothing Then Throw New ArgumentNullException(NameOf(config))
 
             ' ★ P1-A DISK HEADROOM GUARD (W1): refuse BEFORE any resource is
@@ -428,6 +442,18 @@ Namespace DulukaEngine.Recording
                 Else
                     result = If(frames Is Nothing, session.Run(), session.RunOwnedFrames(frames, 1))
                 End If
+            Catch ex As InvalidOperationException When captureRebuildRetry AndAlso
+                    ex.Message.Contains("start_requires_initialized_or_stopped")
+                ' The capture backend state machine has no path from Faulted
+                ' back to Initialized (DeviceRemoved churn exhausting its
+                ' rebuild budget bricks it for the process lifetime). The
+                ' encoder has a rebuild seam — the capture backend gets the
+                ' same treatment: fresh instance, identity re-verified, one
+                ' bounded retry so a record press never dead-ends on stale
+                ' backend state.
+                _logger.Warning("[RecordingEngine] capture backend not startable (Faulted) — rebuilding capture backend and retrying the session once")
+                RebuildCaptureBackend()
+                Return StartSessionCore(config, frames, source, False)
             Catch ex As Exception
                 _logger.Error($"RecordingEngine: session failed: {ex.Message}", ex)
                 result = New SessionResult() With {
@@ -492,6 +518,39 @@ Namespace DulukaEngine.Recording
                 }
             End SyncLock
         End Function
+
+        ''' <summary>
+        ''' A Faulted capture backend has no path back to Initialized in the
+        ''' backend state machine — the only recovery is a fresh backend
+        ''' instance. Mirrors the proven encoder-rebuild seam: dispose the
+        ''' stale backend, create via the factory, initialize, re-verify
+        ''' capture↔encoder adapter identity, swap under the lifecycle lock.
+        ''' </summary>
+        Private Sub RebuildCaptureBackend()
+            Dim stale As IVideoCaptureRuntime = Nothing
+            SyncLock _sync
+                stale = _capture
+                _capture = Nothing
+            End SyncLock
+            If stale IsNot Nothing Then
+                Try
+                    stale.Dispose()
+                Catch ex As Exception
+                    _logger.Warning($"[RecordingEngine] stale capture backend dispose: {ex.Message}")
+                End Try
+            End If
+            Dim fresh = _backendFactory.CreateCapture(_composition, If(_startupEcho?.CaptureCursor, True), _logger)
+            fresh.Initialize(New BackendContext(_logger))
+            SyncLock _sync
+                If _disposed OrElse _disposeRequested Then
+                    fresh.Dispose()
+                    Throw New ObjectDisposedException(NameOf(RecordingEngine))
+                End If
+                RecordingBackendFactory.RequireIdentity(_composition, fresh.ActualTarget, _encoder.ActualAdapter)
+                _capture = fresh
+            End SyncLock
+            _logger.Info($"[RecordingEngine] capture backend rebuilt after Faulted — {fresh.OutputWidth}x{fresh.OutputHeight} @ {fresh.OutputRefreshRate}Hz")
+        End Sub
 
         Private Function VideoIdentity() As RecordingVideoIdentity
             Dim capture = _capture?.ActualTarget

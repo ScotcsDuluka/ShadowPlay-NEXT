@@ -235,6 +235,10 @@ Partial Public Class UI_Engine
 
     Private _rest As ShadowPlayRestClient
     Private _restPoller As RestCommandPoller
+    ' Immutable for the worker lifetime so the reported mode and installed
+    ' handlers cannot disagree if the process environment changes later.
+    Private ReadOnly _containerRecordCommands As Boolean = CaptureRecordCommandMode.UseContainerRecordCommands(
+        Environment.GetEnvironmentVariable("NV_CAPTURE_CONTAINER_RECORD_COMMANDS"))
 
     Private Sub StartRestChannel()
         _rest = New ShadowPlayRestClient()
@@ -248,7 +252,11 @@ Partial Public Class UI_Engine
                                                         ' the previous process's Recording=true even while Capture is idle.
                                                         ' Reconcile the initial idle state before polling new requests;
                                                         ' never overwrite a genuinely active Capture session.
-                                                        If up AndAlso Not RestRecording() Then
+                                                        ' In Container command mode the UI reads actual truth
+                                                        ' through the gateway. A legacy false confirmation also
+                                                        ' clears NodeAPI desired state and can erase a new request
+                                                        ' that arrived while this worker was starting.
+                                                        If up AndAlso Not _containerRecordCommands AndAlso Not RestRecording() Then
                                                             _rest.ConfirmActual(False)
                                                             DebugLog("[REST] startup actual=Idle reconciliation sent")
                                                         End If
@@ -256,8 +264,12 @@ Partial Public Class UI_Engine
                                                         DebugLog("[REST] boot probe error -- poller keeps retrying")
                                                     End Try
                                                     _restPoller = New RestCommandPoller(_rest)
-                                                    AddHandler _restPoller.RecordStartRequested, AddressOf OnRestRecordStartRequested
-                                                    AddHandler _restPoller.RecordStopRequested, AddressOf OnRestRecordStopRequested
+                                                    If Not _containerRecordCommands Then
+                                                        AddHandler _restPoller.RecordStartRequested, AddressOf OnRestRecordStartRequested
+                                                        AddHandler _restPoller.RecordStopRequested, AddressOf OnRestRecordStopRequested
+                                                    Else
+                                                        DebugLog("[REST] legacy record-command poller disabled; Container owns record commands")
+                                                    End If
                                                     AddHandler _restPoller.InstantReplayStartRequested, AddressOf OnRestInstantReplayStartRequested
                                                     AddHandler _restPoller.InstantReplayStopRequested, AddressOf OnRestInstantReplayStopRequested
                                                     _restPoller.Start()

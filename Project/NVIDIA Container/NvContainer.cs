@@ -222,7 +222,8 @@ static class NvContainer
             return;
         }
         NvCaptureMissingPathLogged = false;
-        EnsureRunning(exe, "NvCapture", NvCaptureWorkingDirectory(), "--rest");
+        EnsureRunning(exe, "NvCapture", NvCaptureWorkingDirectory(), "--rest",
+            CaptureControlEnvironment.ForChild(ContainerRecordControlEnabled(), true));
         var ready = NvCaptureReady();
         if (!NvCaptureReadyStateKnown || NvCaptureLastReady != ready)
         {
@@ -582,7 +583,13 @@ static class NvContainer
         }
     }
 
-    static Process Spawn(string exe, string wd, string args = null)
+    static bool ContainerRecordControlEnabled() => CaptureControlEnvironment.Enabled(
+        ConfigBool("captureRuntime", "containerRecordControl", false),
+        ConfigBool("captureRuntime", "enabled", false),
+        ConfigBool("captureRuntime", "allowRecordCommands", false), TestModeEnabled());
+
+    static Process Spawn(string exe, string wd, string args = null,
+        IReadOnlyDictionary<string, string> environment = null)
     {
         try
         {
@@ -590,8 +597,10 @@ static class NvContainer
             {
                 Arguments = args ?? "",
                 WorkingDirectory = wd,
-                UseShellExecute = true,
+                UseShellExecute = environment == null,
             };
+            if (environment != null)
+                foreach (var setting in environment) psi.Environment[setting.Key] = setting.Value;
             var process = Process.Start(psi);
             if (process == null) Log("[spawn] FAIL " + Path.GetFileName(exe) + ": Process.Start returned null");
             else Log("[spawn] " + Path.GetFileName(exe) + " PID " + process.Id);
@@ -604,7 +613,8 @@ static class NvContainer
         }
     }
 
-    static void EnsureRunning(string exe, string processName, string wd, string args = null)
+    static void EnsureRunning(string exe, string processName, string wd, string args = null,
+        IReadOnlyDictionary<string, string> environment = null)
     {
         if (string.IsNullOrWhiteSpace(exe) || !File.Exists(exe))
         {
@@ -618,7 +628,7 @@ static class NvContainer
         {
             return;
         }
-        Spawn(exe, wd ?? Path.GetDirectoryName(exe), args);
+        Spawn(exe, wd ?? Path.GetDirectoryName(exe), args, environment);
     }
 
     // MainModule.FileName can fail across integrity levels or early process
@@ -886,7 +896,8 @@ static class NvContainer
                 ConfigBool("captureRuntime", "allowRecordCommands", false), TestModeEnabled(),
                 ConfigBool("captureRuntime", "allowDisplayCommands", false),
                 ConfigBool("captureRuntime", "allowScreenshotCommands", false),
-                workerWriteToken: () => PairingSecretStore.Read(PairingSecretStore.DefaultPath));
+                workerWriteToken: () => PairingSecretStore.Read(PairingSecretStore.DefaultPath),
+                requireContainerRecordMode: ContainerRecordControlEnabled());
             TestApi = new ContainerTestApi(TestModeEnabled(), ControlApiPort(), Log,
                 PublishContainerEvents, ObsRuntime, MarkNvGraphicsReady, NvGraphicsStatus,
                 OpenNvGraphics, ApplicationOntologyClient, GameWatcher, OscAdapterLifecycle,
@@ -909,7 +920,8 @@ static class NvContainer
 
             if (CefOverlayEnabled())
             {
-                EnsureRunning(host, "NVIDIA Web Helper", Child("webHelperWd"));
+                EnsureRunning(host, "NVIDIA Web Helper", Child("webHelperWd"), environment:
+                    CaptureControlEnvironment.ForChild(ContainerRecordControlEnabled(), false));
                 EnsureRunning(hk, "nvsphelper", Path.GetDirectoryName(hk));
                 EnsureRunning(osc, "NVIDIA OSC", Child("oscWd"));
             }
@@ -967,7 +979,8 @@ static class NvContainer
                     if (enabled)
                     {
                         Log("[overlay] CEF engine/system enabled — starting overlay services");
-                        EnsureRunning(host, "NVIDIA Web Helper", Child("webHelperWd"));
+                        EnsureRunning(host, "NVIDIA Web Helper", Child("webHelperWd"), environment:
+                            CaptureControlEnvironment.ForChild(ContainerRecordControlEnabled(), false));
                         EnsureRunning(hk, "nvsphelper", Path.GetDirectoryName(hk));
                         EnsureRunning(osc, "NVIDIA OSC", Child("oscWd"));
                     }
@@ -1001,7 +1014,8 @@ static class NvContainer
                         WipeOrphans();
                         spills++;
                         Log("[watchdog] Web Helper หาย (รอบที่ " + spills + ") — spawn ใหม่");
-                        Spawn(host, Child("webHelperWd") ?? Path.GetDirectoryName(host));
+                        Spawn(host, Child("webHelperWd") ?? Path.GetDirectoryName(host), environment:
+                            CaptureControlEnvironment.ForChild(ContainerRecordControlEnabled(), false));
                     }
                     else if (ProcessAtPathStartedRecently(host, 60))
                     {
@@ -1044,7 +1058,8 @@ static class NvContainer
                             if (!ProcessAtPathAlive(host))
                             {
                                 Thread.Sleep(1000);
-                                Spawn(host, Child("webHelperWd") ?? Path.GetDirectoryName(host));
+                                Spawn(host, Child("webHelperWd") ?? Path.GetDirectoryName(host), environment:
+                                    CaptureControlEnvironment.ForChild(ContainerRecordControlEnabled(), false));
                             }
                         }
                     }

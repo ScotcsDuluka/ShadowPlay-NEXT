@@ -30,6 +30,7 @@ Namespace DulukaEngine.Video.Backends.Ddagrab
             SyncLock _sync
                 run = _runId
             End SyncLock
+            Dim deviceRemovedRebuilds As Integer = 0
             Do While Not StopRequested()
                 SyncLock _sync
                     If _workerCrashRequested Then
@@ -70,17 +71,50 @@ Namespace DulukaEngine.Video.Backends.Ddagrab
                             End Try
                         End Sub,
                         Function(frame) PushOwnedFrame(frame, sequence, attemptTime, run, generation))
+                Catch ex As SharpGenException When ex.ResultCode.Code = ResultCode.DeviceRemoved.Code
+                    ' DXGI_ERROR_DEVICE_REMOVED killed the device mid-frame: a
+                    ' duplication rebuild on a dead device cannot succeed — the
+                    ' D3D11 device itself must be recreated (ADR §D recovery).
+                    ' The encoder owns its own device and re-opens per-frame
+                    ' shared handles, so a capture-side rebuild restores the
+                    ' pipeline without touching the encoder session.
+                    deviceRemovedRebuilds += 1
+                    If deviceRemovedRebuilds > MaxDeviceRemovedRebuilds Then Throw
+                    _logger.Warning($"DdagrabBackend: DeviceRemoved — full device+duplication rebuild ({deviceRemovedRebuilds}/{MaxDeviceRemovedRebuilds}): {ex.Message}")
+                    RecreateDeviceAndDuplication()
+                    Continue Do
+                Catch ex As SourceFailureException When ex.Message.Contains("887A0005") OrElse
+                                                        ex.Message.Contains("source_recreation_failed")
+                    ' Covers both the raw HRESULT path and the duplication
+                    ' recreation budget throw right after a device reset —
+                    ' both mean the same thing: rebuild and keep the session.
+                    deviceRemovedRebuilds += 1
+                    If deviceRemovedRebuilds > MaxDeviceRemovedRebuilds Then Throw
+                    _logger.Warning($"DdagrabBackend: device-level rebuild ({deviceRemovedRebuilds}/{MaxDeviceRemovedRebuilds}): {ex.Message}")
+                    RecreateDeviceAndDuplication()
+                    Continue Do
                 Finally
                     ' A failed acquisition may still have returned a COM wrapper.
                     resource?.Dispose()
                 End Try
-                If acquired Then Continue Do
+                If acquired Then
+                    deviceRemovedRebuilds = 0
+                    Continue Do
+                End If
                 If result = ResultCode.WaitTimeout Then
                     Interlocked.Increment(_noFrameCount)
                 ElseIf result = ResultCode.AccessLost Then
                     Interlocked.Increment(_accessLostCount)
                     NotifySourceFault(SourceFaultKind.AccessLost, run, generation)
                     RecreateDuplication()
+                ElseIf result = ResultCode.DeviceRemoved Then
+                    deviceRemovedRebuilds += 1
+                    If deviceRemovedRebuilds > MaxDeviceRemovedRebuilds Then
+                        Throw New SourceFailureException(SourceFaultKind.DeviceRemoved,
+                            $"acquire_failed:0x{result.Code:x8} rebuild_budget_exhausted")
+                    End If
+                    _logger.Warning($"DdagrabBackend: DeviceRemoved at acquire — full device+duplication rebuild ({deviceRemovedRebuilds}/{MaxDeviceRemovedRebuilds})")
+                    RecreateDeviceAndDuplication()
                 Else
                     Throw New SourceFailureException(ClassifyFailure(result.Code), $"acquire_failed:0x{result.Code:x8}")
                 End If
@@ -88,10 +122,71 @@ Namespace DulukaEngine.Video.Backends.Ddagrab
             Loop
         End Sub
 
+        Private Const MaxDeviceRemovedRebuilds As Integer = 5
+
+        ''' <summary>
+        ''' DeviceRemoved recovery: the D3D11 device is dead, so dispose the
+        ''' duplication, per-device scratch and the device itself, then re-run
+        ''' the full resource initialization (re-resolves the pinned target
+        ''' against the LIVE inventory — never silently retargets) and the
+        ''' duplication. Bounded by the caller's rebuild budget.
+        ''' </summary>
+        Private Sub RecreateDeviceAndDuplication()
+            DisposeDeviceResources()
+            Dim attempts As Integer = 0
+            Do
+                attempts += 1
+                Try
+                    InitializeResources(_context)
+                    RecreateDuplication()
+                    Exit Do
+                Catch ex As Exception When attempts < 3
+                    ' Transient driver state right after a device loss settles
+                    ' within a beat — bounded retry before giving up.
+                    _logger.Warning($"DdagrabBackend: device rebuild attempt {attempts} failed: {ex.Message}")
+                    Thread.Sleep(800)
+                    DisposeDeviceResources()
+                End Try
+            Loop
+            CompleteRecreation()
+            _logger.Info("DdagrabBackend: device+duplication rebuilt after DeviceRemoved — source generation " & SourceGeneration)
+        End Sub
+
+        Private Sub DisposeDeviceResources()
+            SyncLock _sync
+                Try : _duplication?.Dispose() : Catch : End Try
+                _duplication = Nothing
+                Try : _cursorStage?.Dispose() : Catch : End Try
+                _cursorStage = Nothing
+                Try : _output?.Dispose() : Catch : End Try
+                _output = Nothing
+                Try : _dxgiFactory?.Dispose() : Catch : End Try
+                _dxgiFactory = Nothing
+                Try : _deviceContext?.Dispose() : Catch : End Try
+                _deviceContext = Nothing
+                Try : _device?.Dispose() : Catch : End Try
+                _device = Nothing
+            End SyncLock
+        End Sub
+
         Private Function BuildOwnedFrame(resource As IDXGIResource, info As OutduplFrameInfo,
                                          sequence As Long, generation As Long) As IVideoFrame
-            Dim timestamp = ValidateSourceTimestamp(info.LastPresentTime)
-            If sequence Mod 60 = 0 Then _logger.Info($"DdagrabBackend: source QPC={info.LastPresentTime} sequence={sequence}")
+            ' DXGI reports LastPresentTime=0 when NOTHING has presented since the
+            ' duplication was created — the frame is still the CURRENT desktop
+            ' image and is the only frame a static desktop will ever produce.
+            ' Rejecting it made every session on an idle desktop die at frame 0.
+            ' Stamp the acquisition QPC instead (counted as a timestamp fallback,
+            ' never described as a real present-timestamp).
+            Dim qpc = info.LastPresentTime
+            Dim timestamp As Long
+            If qpc <= 0 Then
+                timestamp = QpcTicksTo100ns(Stopwatch.GetTimestamp())
+                Dim first = Interlocked.Increment(_timestampFallbackCount) = 1
+                If first Then _logger.Info($"DdagrabBackend: LastPresentTime=0 on frame {sequence} — acquisition-QPC fallback stamp {timestamp} (static desktop)")
+            Else
+                timestamp = ValidateSourceTimestamp(qpc)
+            End If
+            If sequence < 3 OrElse sequence Mod 60 = 0 Then _logger.Info($"DdagrabBackend: source QPC={info.LastPresentTime} sequence={sequence} ts100={timestamp}")
             Using desktop = resource.QueryInterface(Of ID3D11Texture2D)()
                 Return OwnedFrameBuilder.Build(AddressOf CreateFrameTexture,
                     Sub(texture)
@@ -127,7 +222,11 @@ Namespace DulukaEngine.Video.Backends.Ddagrab
         Friend Function ValidateSourceTimestamp(qpc As Long) As Long
             Dim timestamp = QpcTicksTo100ns(qpc)
             If qpc <= 0 OrElse qpc <= _lastSourceQpcTicks OrElse timestamp <= _lastSourceQpc100ns Then
-                Throw New SourceFailureException(SourceFaultKind.InvalidFrame, "source_nonmonotonic_or_missing_qpc")
+                ' Values in the message: first-frame rejections (LastPresentTime=0
+                ' on a static desktop, cross-boot QPC reuse, conversion drift) are
+                ' undiagnosable without the actual numbers.
+                Throw New SourceFailureException(SourceFaultKind.InvalidFrame,
+                    $"source_nonmonotonic_or_missing_qpc qpc={qpc} lastQpc={_lastSourceQpcTicks} ts100={timestamp} lastTs100={_lastSourceQpc100ns}")
             End If
             _lastSourceQpcTicks = qpc
             _lastSourceQpc100ns = timestamp

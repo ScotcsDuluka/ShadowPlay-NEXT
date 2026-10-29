@@ -5,9 +5,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const root = path.join(__dirname, '..', 'osc');
-const source = fs.readFileSync(path.join(root, 'mods', 'notifier', 'OSC-Adapter.js'), 'utf8');
-const router = fs.readFileSync(path.join(root, 'mods', 'notifier', 'notifier-system', 'notifier.js'), 'utf8');
-const css = fs.readFileSync(path.join(root, 'mods', 'notifier', 'notifier-system', 'notifier.css'), 'utf8');
+const source = fs.readFileSync(path.join(root, 'Module', 'Notifier', 'OSC-Adapter.js'), 'utf8');
+const router = fs.readFileSync(path.join(root, 'Module', 'Notifier', 'notifier-system', 'notifier.js'), 'utf8');
+const css = fs.readFileSync(path.join(root, 'Module', 'Notifier', 'notifier-system', 'notifier.css'), 'utf8');
 
 function setup() {
     const callbacks = {};

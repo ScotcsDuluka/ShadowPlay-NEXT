@@ -8,7 +8,7 @@
   if (!window.angular || !window.fetch) return;
   window.angular.module('main').run(['$translate', '$log', '$rootScope',
     function ($translate, $log, $rootScope) {
-      var fileUrl = '/mods/launcher-language.json';
+      var fileUrl = '/launcher-language.json';
       var lastPublished = '';
       var busy = false;
       var nextLanguage = '';

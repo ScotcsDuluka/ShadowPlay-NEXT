@@ -24,15 +24,15 @@ test('source keeps supported newer infrastructure and NEXT model without changin
   'launcher-language-sync.js':'/Module/Base/Localization/launcher-language-sync.js',
   'osc-ui-localization.js':'/Module/Base/Localization/osc-ui-localization.js',
   'osc-motion.js':'/Module/Overlay/Motion/osc-motion.js',
-  'nv-layout-v5-core.js':'/Module/MainMenu/FreestyleV5/nv-layout-v5-core.js',
-  'nv-next-v5-native.js':'/Module/MainMenu/FreestyleV5/nv-next-v5-native.js'};
+  'nv-layout-v5-core.js':'/Module/MainMenu/OSCFreestyleV5/nv-layout-v5-core.js',
+  'nv-next-v5-native.js':'/Module/MainMenu/OSCFreestyleV5/nv-next-v5-native.js'};
  for(const mod of Object.keys(mounted))assert.ok(index.includes(mounted[mod]),mod);
- const native=read('mods/nv-next-v5-native.js');
+ const native=read('Module/MainMenu/OSCFreestyleV5/nv-next-v5-native.js');
  assert.match(native,/DulukaNextNativeLayoutV5Enabled/);
  assert.match(native,/read\(FLAG\) === '1'/);
 });
 test('archive-style Customize uses original three-panel NVIDIA editor and native md-select',()=>{
- const src=read('mods/main-menu-live.js'),css=read('mods/main-menu-live.css');
+ const src=read('Module/MainMenu/NVIDIA/main-menu-live.js'),css=read('Module/MainMenu/NVIDIA/main-menu-live.css');
  assert.match(src,/nv-main-menu-live-editor/);
  assert.match(src,/ng-model="flexMenu\.desktopMonitor"/);
  assert.match(src,/class="nv-live-workspace"/);

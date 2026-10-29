@@ -7,7 +7,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const oscRoot = path.join(__dirname, '..', 'osc');
-const adapter = fs.readFileSync(path.join(oscRoot, 'mods', 'notifier', 'Ontology-Update-Adapter.js'), 'utf8');
+const adapter = fs.readFileSync(path.join(oscRoot, 'Module', 'Notifier', 'Ontology-Update-Adapter.js'), 'utf8');
 const STORAGE_KEY = 'nv-ontology-update-state-v1';
 
 function harness(savedStorage, translations) {
@@ -143,7 +143,7 @@ test('invalid version, rollback and offline responses do not create updates', as
 });
 
 test('OSC adapter forwards validated local catalog version and index boot-loads the OSC adapter', () => {
-    const oscAdapter = fs.readFileSync(path.join(oscRoot, 'mods', 'notifier', 'OSC-Adapter.js'), 'utf8');
+    const oscAdapter = fs.readFileSync(path.join(oscRoot, 'Module', 'Notifier', 'OSC-Adapter.js'), 'utf8');
     const index = fs.readFileSync(path.join(oscRoot, 'index.html'), 'utf8');
     assert.match(oscAdapter, /eventAggregator\.trigger\('nv-ontology-local-catalog-version', event\.status\.catalogVersion\)/);
     // Ontology updates ride on the boot-loaded OSC adapter. The standalone

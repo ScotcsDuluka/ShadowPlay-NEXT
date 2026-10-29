@@ -28,6 +28,12 @@ Namespace DulukaEngine.Recording
     Public NotInheritable Class CaptureCompositionPlan
         Public ReadOnly Property Target As CaptureTarget
         Public ReadOnly Property Provider As EncoderProvider
+        ' ── Exclusive Capture API (SPN-ADR §C/§D): independent selection. ──
+        ' "" = no explicit request (desktop route authoritative). A resolved
+        ' value names the verified native source the exclusive route uses;
+        ' the selection is evidence until ExclusiveVerificationGate passes.
+        Public ReadOnly Property ExclusiveApi As String
+        Public ReadOnly Property ExclusiveApiReason As String
         Public ReadOnly Property RuntimeWired As Boolean
             Get
                 Return Provider.Implemented
@@ -38,8 +44,10 @@ Namespace DulukaEngine.Recording
                 Return If(RuntimeWired, "hardware_initialization_required", "intel_native_live_input_not_verified")
             End Get
         End Property
-        Public Sub New(target As CaptureTarget, provider As EncoderProvider)
+        Public Sub New(target As CaptureTarget, provider As EncoderProvider,
+                       Optional exclusiveApi As String = "", Optional exclusiveApiReason As String = "")
             Me.Target = target : Me.Provider = provider
+            Me.ExclusiveApi = exclusiveApi : Me.ExclusiveApiReason = exclusiveApiReason
         End Sub
         Public Sub RequireWired()
             If Not RuntimeWired Then Throw New NotSupportedException(Reason)
@@ -91,7 +99,12 @@ Namespace DulukaEngine.Recording
             If provider Is Nothing OrElse provider.Vendor <> target.Adapter.Vendor Then
                 Throw New InvalidOperationException("encoder_capture_vendor_mismatch")
             End If
-            Return New CaptureCompositionPlan(target, provider)
+            ' ── Exclusive Capture API resolution (independent from desktop). ──
+            ' Fail-closed: only the implemented verified native source is
+            ' accepted; anything else throws with a precise reason — never a
+            ' silent substitution. The DISPLAY boundary never changes here.
+            Dim exclusive = ExclusiveCapturePolicy.Resolve(startup.RequestedExclusiveCaptureMethod)
+            Return New CaptureCompositionPlan(target, provider, exclusive.Item1, exclusive.Item2)
         End Function
         Public Sub ValidateTarget(plan As CaptureCompositionPlan) Implements IRecordingBackendFactory.ValidateTarget
             If plan Is Nothing Then Throw New InvalidOperationException("capture_plan_unavailable")

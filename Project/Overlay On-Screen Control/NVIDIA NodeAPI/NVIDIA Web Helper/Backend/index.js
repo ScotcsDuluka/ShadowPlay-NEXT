@@ -149,6 +149,30 @@ require('./routes/duluka')(app, ctx);
 require('./routes/families')(app, ctx);     // QuietMode2/Nis2/DeepDVC/Feedback/abHub/gfeupdate/GameShare
 require('./routes/gallery')(app, ctx);      // /Gallery HTTP (GetFolderListing/EnumerateDrives/...)
 
+// ── Capture data plane (SPN-ADR control plane) ─────────────────────────
+// OSC UI → NodeAPI :59011 → NvContainer :59012 (single data broker) →
+// NvCapture :59077 (recording owner). Read-only status/catalog/display
+// routes + confirmed-gated record commands + bounded-poll socket sync.
+// Everything stays OFF unless NV_CAPTURE_RUNTIME_ENABLED=1; the Container
+// gateway keeps its own authorization (captureRuntime.allowRecordCommands).
+const captureGatewayOptions = {
+    port: Number(process.env.NV_CONTAINER_CONTROL_API_PORT || 59012),
+    enabled: process.env.NV_CAPTURE_RUNTIME_ENABLED === '1'
+};
+require('./shims/capture-engine-status')(app, captureGatewayOptions);   // /engines (+ displays/select/screenshot)
+require('./shims/capture-runtime-status')(app, captureGatewayOptions);  // /status (GET + legacy read-only POST)
+require('./shims/capture-capabilities')(app, captureGatewayOptions);    // /capabilities
+require('./shims/capture-record-commands')(app, captureGatewayOptions); // /record/start|stop ({"confirmed":true} only)
+ctx.captureStateSync = require('./shims/capture-state-sync')(app, Object.assign({
+    socket: socket,
+    // Preserve the pre-existing settings event on /state in this lineage.
+    // Runtime updates have their own channel; HTTP /state is unchanged.
+    channel: '/DulukaCapture/v.1.0/runtime-state',
+    // The Record route passes explicit commands directly; polling its state
+    // here would create a second command driver and replay stale values.
+    desiredBridge: process.env.NV_CAPTURE_DESIRED_BRIDGE === '1'
+}, captureGatewayOptions));
+
 // OUR LANE: cefQuery — หน้าส่ง {command} มาทาง POST /cefquery (cefquery-shim.js)
 // QUERY_WIN_NODE_INFO = หน้าต้องใช้ก่อนวาดเมนู (route resolve localNodeInfo)
 app.post('/cefquery', function (req, res) {

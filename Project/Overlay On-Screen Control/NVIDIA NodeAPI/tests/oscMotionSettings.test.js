@@ -1,9 +1,9 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
-const source=fs.readFileSync(path.join(__dirname,'../osc/mods/osc-motion-timing.js'),'utf8');
+const source=fs.readFileSync(path.join(__dirname,'../osc/Module/Overlay/Motion/osc-motion-timing.js'),'utf8');
 const plain=value=>JSON.parse(JSON.stringify(value));
-const defaults={enabled:true,mode:'osc',backgroundFade:true,topAnimation:true,
+const defaults={enabled:false,mode:'osc',backgroundFade:true,topAnimation:true,
   mainMenuAnimation:true,openDuration:500,closeDuration:240};
 function fixture(raw){
   const values=new Map([['DulukaNextNativeLayoutV5','USER LAYOUT'],['DulukaNextNativeLayoutV5Enabled','1']]);
@@ -17,7 +17,7 @@ function fixture(raw){
 }
 test('animation defaults expose defensive copies and do not write user storage on load',()=>{
   const f=fixture();assert.deepEqual(plain(f.api.get()),defaults);assert.equal(f.writes.length,0);
-  const copy=f.api.get();copy.enabled=false;assert.equal(f.api.get().enabled,true);
+  const copy=f.api.get();copy.enabled=true;assert.equal(f.api.get().enabled,false);
   assert.equal(f.values.get('DulukaNextNativeLayoutV5'),'USER LAYOUT');
   assert.equal(f.api.error,'');
 });
@@ -44,12 +44,12 @@ test('failed persistence rolls back settings and compatibility timing without no
 test('partial updates preserve other fields and subscriber errors or mutations cannot corrupt preferences',()=>{
   const f=fixture();let count=0;
   f.api.subscribe(()=>{throw Error('A UI observer failed');});
-  const unsubscribe=f.api.subscribe(next=>{count++;next.enabled=false;});
+  const unsubscribe=f.api.subscribe(next=>{count++;next.enabled=true;});
   assert.equal(f.api.set({openDuration:49,closeDuration:999.7,mode:'default'}),true);
   assert.deepEqual(plain(f.api.get()),{...defaults,openDuration:50,closeDuration:1000,mode:'default'});
   assert.equal(count,1);unsubscribe();
   f.api.set({mode:'osc',topAnimation:false});assert.equal(count,1);
-  assert.equal(f.api.get().topAnimation,false);assert.equal(f.api.get().enabled,true);
+  assert.equal(f.api.get().topAnimation,false);assert.equal(f.api.get().enabled,false);
   assert(f.writes.every(([key])=>key==='DulukaOscMotionSettings'));
 });
 test('Reset restores500/240 and approved curves after a custom engine configuration',()=>{

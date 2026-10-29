@@ -1,7 +1,7 @@
 'use strict';
 
 const assert = require('assert');
-const { createFilterSettingsModel, filterSettingsTemplate } = require('../osc/mods/gpu-status-panel');
+const { createFilterSettingsModel, filterSettingsTemplate } = require('../osc/Module/Settings/GPUStatus/gpu-status-panel.js');
 
 const endpoint = '/Duluka/v.1.0/GameFilter/Settings';
 const enabled = { mode: 'reshade', allowConnection: true, connectionManager: true, bridgeEnabled: true };

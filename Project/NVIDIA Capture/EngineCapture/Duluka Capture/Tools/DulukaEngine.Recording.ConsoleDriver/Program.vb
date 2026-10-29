@@ -57,6 +57,7 @@ Module Program
         Dim outArg As String = "videocheck.mp4"
         Dim checkSec As Integer = 8
         Dim mismatchSessionFps As Integer = 0
+        Dim noAudio As Boolean = False
         For i As Integer = 0 To args.Length - 2
             If args(i) = "--ffmpeg" Then ffmpegPath = args(i + 1)
             If args(i) = "--quick" Then quick = True
@@ -66,6 +67,7 @@ Module Program
             If args(i) = "--out" Then outArg = args(i + 1)
             If args(i) = "--seconds" Then Integer.TryParse(args(i + 1), checkSec)
             If args(i) = "--mismatch-fps" Then Integer.TryParse(args(i + 1), mismatchSessionFps)
+            If args(i) = "--no-audio" Then noAudio = True
         Next
 
         If ffmpegPath = "ffmpeg" Then
@@ -81,7 +83,7 @@ Module Program
 
         ' ── PHASE 1 VIDEO RUNTIME VALIDATION driver (canonical config chain) ──
         If videoCheck Then
-            Return RunVideoCheck(configArg, outArg, checkSec, ffmpegPath, mismatchSessionFps)
+            Return RunVideoCheck(configArg, outArg, checkSec, ffmpegPath, mismatchSessionFps, noAudio)
         End If
 
         Console.WriteLine("============================================================")
@@ -369,7 +371,7 @@ Module Program
     ' config variants and ffprobe-asserts the produced MP4. This driver
     ' only runs the REAL pipeline and echoes the effective startup values
     ' — no config invented here, no result faked.
-    Private Function RunVideoCheck(configPath As String, outPath As String, seconds As Integer, ffmpegPath As String, mismatchSessionFps As Integer) As Integer
+    Private Function RunVideoCheck(configPath As String, outPath As String, seconds As Integer, ffmpegPath As String, mismatchSessionFps As Integer, noAudio As Boolean) As Integer
         Console.WriteLine("============================================================")
         Console.WriteLine(" PHASE 1 VIDEO — Windows real-record validation (--videocheck)")
         Console.WriteLine("============================================================")
@@ -427,6 +429,9 @@ Module Program
 
             ' ── session config from a FRESH reload (CT-4 contract) → real record ──
             Dim sessionCfg As SessionConfig = NextRecordingConfig.BuildSessionConfig(outPath, ffmpegPath, Nothing, cfg)
+            ' --no-audio: bounded validation scope is VIDEO-ONLY. No system-audio
+            ' loopback or microphone is opened regardless of stored config truth.
+            If noAudio Then sessionCfg.AudioEnabled = False
             sessionCfg.DurationSeconds = seconds
             If mismatchSessionFps > 0 Then sessionCfg.TargetFps = mismatchSessionFps
             Dim r As SessionResult = engine.StartSession(sessionCfg)

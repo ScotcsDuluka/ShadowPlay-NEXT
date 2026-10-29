@@ -4,8 +4,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const M = require('../osc/mods/nv-layout-v5-core.js');
-const source = fs.readFileSync(path.join(__dirname, '../osc/mods/nv-freestyle-editor.js'), 'utf8');
+const M = require('../osc/Module/MainMenu/OSCFreestyleV5/nv-layout-v5-core.js');
+const source = fs.readFileSync(path.join(__dirname, '../osc/Module/MainMenu/OSCFreestyleV5/nv-freestyle-editor.js'), 'utf8');
 
 // Only the DOM surface used by the actual editor is represented here. Angular's
 // existing shell is deliberately retained, and a synthetic click is an error.

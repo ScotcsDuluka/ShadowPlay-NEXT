@@ -2,10 +2,10 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const root=path.join(__dirname,'../osc');
-const mainJs=fs.readFileSync(path.join(root,'mods/video-capture-options.js'),'utf8');
-const routeJs=fs.readFileSync(path.join(root,'mods/advanced-capture-route.js'),'utf8');
-const mainCss=fs.readFileSync(path.join(root,'mods/video-capture-options.css'),'utf8');
-const routeCss=fs.readFileSync(path.join(root,'mods/advanced-capture-route.css'),'utf8');
+const mainJs=fs.readFileSync(path.join(root,'Module/Settings/Capture/video-capture-options.js'),'utf8');
+const routeJs=fs.readFileSync(path.join(root,'Module/Settings/Capture/advanced-capture-route.js'),'utf8');
+const mainCss=fs.readFileSync(path.join(root,'Module/Settings/Capture/video-capture-options.css'),'utf8');
+const routeCss=fs.readFileSync(path.join(root,'Module/Settings/Capture/advanced-capture-route.css'),'utf8');
 const index=fs.readFileSync(path.join(root,'index.html'),'utf8');
 const settings={engineMode:'Duluka',apiCapture:'dxgi_desktop_duplication',
   quality:'Custom',encoder:'NVENC_H264',encoderPreset:4,captureCursor:true,

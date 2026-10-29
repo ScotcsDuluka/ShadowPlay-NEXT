@@ -467,6 +467,14 @@ Partial Public Class UI_Engine
             _recordingTask = Task.Run(Function() _recordingEngine.StartSession(config))
             WatchSessionEnd(_recordingTask, sessionId)
 
+            ' ★ Actual(true) at start: the completion watcher only confirms
+            ' Actual(false) — without publishing the START edge the OSC page
+            ' never sees recording=true, the record button never flips, and
+            ' the saved toast is swallowed (no true→false transition).
+            If _headless AndAlso _rest IsNot Nothing Then
+                Try : _rest.ConfirmActual(True) : Catch : End Try
+            End If
+
             ' Respond immediately — recording has started
             ' UI update on UI thread
             Me.Invoke(Sub()
@@ -562,10 +570,13 @@ Partial Public Class UI_Engine
                             End Try
                         Case SessionEndAction.[Error]
                             Dim why As String = SessionEndBroadcastPolicy.DescribeFailure(result, faultMessage)
+                            ' Headless workers have no tcp bus: the failure reason
+                            ' must reach the log even when no one is listening,
+                            ' or a start_failed stays undebuggable forever.
+                            DebugLog($"[RecordingEngine] session end (unowned ending): {why}")
                             Try
                                 If tcp IsNot Nothing AndAlso tcp.IsConnected Then
                                     tcp.Send("engine_recording_error", why)
-                                    DebugLog($"[RecordingEngine] session end broadcast (unowned ending): {why}")
                                 End If
                             Catch
                             End Try

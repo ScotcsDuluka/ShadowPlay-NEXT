@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
-const source=fs.readFileSync(path.join(__dirname,'../osc/mods/osc-fps.js'),'utf8');
+const source=fs.readFileSync(path.join(__dirname,'../osc/Module/Overlay/Renderer/osc-fps.js'),'utf8');
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
 function fixture(handler) {
   const states={},controllers={},routes=[],requests=[],listeners={};

@@ -4,7 +4,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
 const vm=require('node:vm');
-const source=fs.readFileSync(path.join(__dirname,'../osc/mods/osc-hook-settings.js'),'utf8');
+const source=fs.readFileSync(path.join(__dirname,'../osc/Module/Settings/Hook/osc-hook-settings.js'),'utf8');
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
 const specs=[
  {id:'d3d9',mode:'auto',implemented:true,gpuAvailable:true,cpuAvailable:true,normalRoute:'cpu-or-windowed-gpu-dcomp-preview'},
@@ -148,7 +148,7 @@ test('module is idempotent and settings route is loaded in OSC index',()=>{
   vm.runInNewContext(source,f.context);
   const index=fs.readFileSync(path.join(__dirname,'../osc/index.html'),'utf8');
   assert.match(index,/\/Module\/Settings\/Hook\/osc-hook-settings\.js/);
-  const gpu=fs.readFileSync(path.join(__dirname,'../osc/mods/gpu-profiles.js'),'utf8');
+  const gpu=fs.readFileSync(path.join(__dirname,'../osc/Module/Settings/GPUProfiles/gpu-profiles.js'),'utf8');
   assert.match(gpu,/id:'hook-settings',name:'Hook Settings'/);
 });
 test('English and Thai translations contain every per-API mode key',()=>{

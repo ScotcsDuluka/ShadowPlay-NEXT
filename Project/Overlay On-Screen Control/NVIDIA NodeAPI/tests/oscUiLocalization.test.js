@@ -5,8 +5,8 @@ const fs=require('node:fs');
 const path=require('node:path');
 const vm=require('node:vm');
 const osc=path.join(__dirname,'..','osc');
-const mapScript=fs.readFileSync(path.join(osc,'mods','osc-ui-phrase-map.js'),'utf8');
-const runtime=fs.readFileSync(path.join(osc,'mods','osc-ui-localization.js'),'utf8');
+const mapScript=fs.readFileSync(path.join(osc,'Module','Base','Localization','osc-ui-phrase-map.js'),'utf8');
+const runtime=fs.readFileSync(path.join(osc,'Module','Base','Localization','osc-ui-localization.js'),'utf8');
 const thai=JSON.parse(fs.readFileSync(path.join(osc,'l10n','th-TH.json'),'utf8').replace(/^\uFEFF/,''));
 
 function element(name,attrs={}) {

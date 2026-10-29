@@ -87,6 +87,7 @@
   </Folder>
   <Project Path="AudioOffline.Tests/AudioOffline.Tests.csproj" />
   <Project Path="DisplaySelection.Tests/DisplaySelection.Tests.vbproj" />
+  <Project Path="ExclusiveCapture.Tests/ExclusiveCapture.Tests.vbproj" />
   <Project Path="HardwareReadiness.Tests/HardwareReadiness.Tests.csproj" />
   <Project Path="QsvNative.Tests/QsvNative.Tests.csproj" />
   <Project Path="Recovery.Tests/Recovery.Tests.csproj" />

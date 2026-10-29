@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
-const mods=path.join(__dirname,'../osc/mods'),liveSource=fs.readFileSync(path.join(mods,'main-menu-live.js'),'utf8'),gpuSource=fs.readFileSync(path.join(mods,'gpu-profiles.js'),'utf8');
-const V5=require('../osc/mods/nv-layout-v5-core.js');
+const liveSource=fs.readFileSync(path.join(__dirname,'../osc/Module/MainMenu/NVIDIA/main-menu-live.js'),'utf8'),gpuSource=fs.readFileSync(path.join(__dirname,'../osc/Module/Settings/GPUProfiles/gpu-profiles.js'),'utf8');
+const V5=require('../osc/Module/MainMenu/OSCFreestyleV5/nv-layout-v5-core.js');
 const plain=value=>JSON.parse(JSON.stringify(value));
 function live(window={},document={}){
  const states={},decorators={},directives={},values={};
@@ -239,7 +239,7 @@ test('native Customize remove buttons use the NVIDIA E91A app close glyph',()=>{
   assert.equal((output.match(/share-icon icon-app_close/g)||[]).length,3,'Left, Right and Center remove buttons must use NVIDIA icon-app_close');
   assert(!output.includes('>×</button>'),'remove controls must not render the Unicode multiplication sign');
   assert(output.includes("ng-if=\"key!=='Settings'\"")||output.includes("key!=='Settings'"),'Settings remains protected from removal');
-  const css=fs.readFileSync(path.join(mods,'main-menu-live.css'),'utf8');
+  const css=fs.readFileSync(path.join(__dirname,'../osc/Module/MainMenu/NVIDIA/main-menu-live.css'),'utf8');
   assert(css.includes('.nv-live-remove .share-icon'));
   assert(gpuSource.includes('nv-settings-menu-tile'));
 });
@@ -256,7 +256,7 @@ test('compact Controls tray is a single horizontal row with NVIDIA E909 collapse
  assert(liveSource.includes('self.libraryCollapsed=false'),'default tray is open');
  assert(liveSource.includes("tray.scrollLeft+=event.deltaY"),'wheel scrolls the horizontal tray');
  assert(output.includes('flexMenu.extraRows()'),'legacy side-row offset still exists');
- const css=fs.readFileSync(path.join(mods,'main-menu-live.css'),'utf8');
+ const css=fs.readFileSync(path.join(__dirname,'../osc/Module/MainMenu/NVIDIA/main-menu-live.css'),'utf8');
  assert.match(css,/\.nv-live-workspace\s*\{\s*display:grid/);
  assert.match(css,/\.nv-live-library\s*\{\s*grid-column:1\s*\/\s*-1/);
  assert.match(css,/\.nv-live-library \.nv-live-palette\s*\{[^}]*flex-wrap:nowrap/);

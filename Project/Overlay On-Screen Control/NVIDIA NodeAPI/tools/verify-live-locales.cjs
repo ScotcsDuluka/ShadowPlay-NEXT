@@ -11,7 +11,7 @@ const hash = b=>crypto.createHash('sha256').update(b).digest('hex');
 const reload = process.argv.includes('--reload-safe');
 const localeFiles = fs.readdirSync(path.join(installed,'l10n'))
   .filter(n=>/^[a-z]{2}-[A-Z]{2,3}\.json$/.test(n)).sort();
-const files = ['index.html','mods/launcher-language-sync.js']
+const files = ['index.html','Module/Base/Localization/launcher-language-sync.js']
   .concat(localeFiles.map(n=>'l10n/'+n));
 async function main(){
   for(const rel of files){

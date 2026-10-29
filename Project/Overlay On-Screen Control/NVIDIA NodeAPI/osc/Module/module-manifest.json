@@ -45,25 +45,6 @@
       ],
       "exclusiveGroup": "mainmenu.layout-runtime"
     },
-    "mainmenu.legacy-v4": {
-      "routes": [
-        "main.main-menu"
-      ],
-      "critical": false,
-      "dependencies": [
-        "mainmenu.nvidia"
-      ],
-      "note": "Legacy model is loaded even with FreestyleV5. Mutual exclusion applies to layout activation, not script loading."
-    },
-    "mainmenu.group-editor": {
-      "routes": [
-        "main.main-menu"
-      ],
-      "critical": false,
-      "dependencies": [
-        "mainmenu.nvidia"
-      ]
-    },
     "overlay.motion": {
       "routes": [
         "*"
@@ -290,36 +271,9 @@
       "module": "/Module/Base/Localization/launcher-language-sync.js",
       "owner": "base.localization",
       "bytes": 2628,
-      "sha256": "29458681732f295763e4978f7eefd949f986d81b22d79645a5413af2b6bea5cd",
+      "sha256": "93bd5ce27b432211bdcbd667a4968356907ca28f887d3c1a26ec8dcb19076962",
       "type": "js",
       "originallyIndexed": true
-    },
-    {
-      "source": "/mods/main-menu-group-editor.css",
-      "module": "/Module/MainMenu/GroupEditor/main-menu-group-editor.css",
-      "owner": "mainmenu.group-editor",
-      "bytes": 8560,
-      "sha256": "d40b5b49f2220b37762c41cb0399b63189d49a0f9b68c5a4a14df768447e5b7a",
-      "type": "css",
-      "originallyIndexed": false
-    },
-    {
-      "source": "/mods/main-menu-group-editor.js",
-      "module": "/Module/MainMenu/GroupEditor/main-menu-group-editor.js",
-      "owner": "mainmenu.group-editor",
-      "bytes": 11551,
-      "sha256": "2c237776741c400f3c19474d6e3c555c5c77c62ed4dec915c43516bf7ac76ad1",
-      "type": "js",
-      "originallyIndexed": false
-    },
-    {
-      "source": "/mods/main-menu-group-model.js",
-      "module": "/Module/MainMenu/GroupEditor/main-menu-group-model.js",
-      "owner": "mainmenu.group-editor",
-      "bytes": 9354,
-      "sha256": "d59839ba9586268514d286c70c95c44508a34c965c7ede0c8cd158eacfad60dd",
-      "type": "js",
-      "originallyIndexed": false
     },
     {
       "source": "/mods/main-menu-live.css",
@@ -341,30 +295,12 @@
     },
     {
       "source": "/mods/main-menu-unified-model.js",
-      "module": "/Module/MainMenu/LegacyV4/main-menu-unified-model.js",
-      "owner": "mainmenu.legacy-v4",
+      "module": "/Module/MainMenu/OSCFreestyleV5/main-menu-unified-model.js",
+      "owner": "mainmenu.freestyle-v5",
       "bytes": 10349,
       "sha256": "b9b06f070080d253663cd71b180d75996b77d49dd187cfd47146ec9a7121b0ce",
       "type": "js",
       "originallyIndexed": true
-    },
-    {
-      "source": "/mods/main-menu-unified-native.css",
-      "module": "/Module/MainMenu/LegacyV4/main-menu-unified-native.css",
-      "owner": "mainmenu.legacy-v4",
-      "bytes": 18349,
-      "sha256": "40771b82faf8d3991c364212282dda582c78b34e1d15adb65c5bdd32d5c0d26e",
-      "type": "css",
-      "originallyIndexed": false
-    },
-    {
-      "source": "/mods/main-menu-unified-native.js",
-      "module": "/Module/MainMenu/LegacyV4/main-menu-unified-native.js",
-      "owner": "mainmenu.legacy-v4",
-      "bytes": 33121,
-      "sha256": "1223d00b5afabe602d3b98b01c1cf681283668850a4ea85055e390d6468a3e0b",
-      "type": "js",
-      "originallyIndexed": false
     },
     {
       "source": "/mods/notifications.css",
@@ -449,7 +385,7 @@
     },
     {
       "source": "/mods/nv-freestyle-editor.css",
-      "module": "/Module/MainMenu/FreestyleV5/nv-freestyle-editor.css",
+      "module": "/Module/MainMenu/OSCFreestyleV5/nv-freestyle-editor.css",
       "owner": "mainmenu.freestyle-v5",
       "bytes": 4661,
       "sha256": "91e3ae4e4f5de256c3ec16dd30bc26a665a8b41af416a142c6e99d7b5fd8a3d6",
@@ -458,7 +394,7 @@
     },
     {
       "source": "/mods/nv-freestyle-editor.js",
-      "module": "/Module/MainMenu/FreestyleV5/nv-freestyle-editor.js",
+      "module": "/Module/MainMenu/OSCFreestyleV5/nv-freestyle-editor.js",
       "owner": "mainmenu.freestyle-v5",
       "bytes": 28808,
       "sha256": "748aaddd96b012c394ef7e117bf2b6238a6e6d71317bacc864d5f4b5a8b3c127",
@@ -467,7 +403,7 @@
     },
     {
       "source": "/mods/nv-freestyle-settings.css",
-      "module": "/Module/MainMenu/FreestyleV5/nv-freestyle-settings.css",
+      "module": "/Module/MainMenu/OSCFreestyleV5/nv-freestyle-settings.css",
       "owner": "mainmenu.freestyle-v5",
       "bytes": 12709,
       "sha256": "7199fb19d12bfacc24a8b7d089d97c4b36ebd2b0b7b5d9c1f0cb9b54dbe854ea",
@@ -476,7 +412,7 @@
     },
     {
       "source": "/mods/nv-freestyle-settings.js",
-      "module": "/Module/MainMenu/FreestyleV5/nv-freestyle-settings.js",
+      "module": "/Module/MainMenu/OSCFreestyleV5/nv-freestyle-settings.js",
       "owner": "mainmenu.freestyle-v5",
       "bytes": 6324,
       "sha256": "0b36f4ac45f1a5af113074bc34eff14825cf2100cc40d542783f8d372950d980",
@@ -485,7 +421,7 @@
     },
     {
       "source": "/mods/nv-layout-v5-core.js",
-      "module": "/Module/MainMenu/FreestyleV5/nv-layout-v5-core.js",
+      "module": "/Module/MainMenu/OSCFreestyleV5/nv-layout-v5-core.js",
       "owner": "mainmenu.freestyle-v5",
       "bytes": 17209,
       "sha256": "e288326aaa07150c457e2df380e54268a2acae330101d01842aea82aa89077fc",
@@ -494,7 +430,7 @@
     },
     {
       "source": "/mods/nv-next-v5-native.css",
-      "module": "/Module/MainMenu/FreestyleV5/nv-next-v5-native.css",
+      "module": "/Module/MainMenu/OSCFreestyleV5/nv-next-v5-native.css",
       "owner": "mainmenu.freestyle-v5",
       "bytes": 2842,
       "sha256": "132d9c4db0e8e3c1caa496c52ec048449981fda603bfa4aa332bf6da4e62e5d8",
@@ -503,10 +439,10 @@
     },
     {
       "source": "/mods/nv-next-v5-native.js",
-      "module": "/Module/MainMenu/FreestyleV5/nv-next-v5-native.js",
+      "module": "/Module/MainMenu/OSCFreestyleV5/nv-next-v5-native.js",
       "owner": "mainmenu.freestyle-v5",
       "bytes": 15279,
-      "sha256": "8f1a2c747c650cd9daf5caa56254ce1463b2aa8a0cc98670339d2998e38136e0",
+      "sha256": "31705fccaf63a196c834d59ea993e99a912fae5b7b487c94941dc05d5089d15d",
       "type": "js",
       "originallyIndexed": true
     },
@@ -524,7 +460,7 @@
       "module": "/Module/Overlay/Background/osc-background.js",
       "owner": "overlay.background",
       "bytes": 18244,
-      "sha256": "0299a0c8f5e01ea72f33b40a1f973411dda4f3f019f0865a58983dd48bf4470f",
+      "sha256": "325ce9dc41736315b4de03fdef0551ec007e3f7623c4b092c682c2f80feee0dd",
       "type": "js",
       "originallyIndexed": true
     },
@@ -578,7 +514,7 @@
       "module": "/Module/Overlay/Motion/osc-motion.js",
       "owner": "overlay.motion",
       "bytes": 13666,
-      "sha256": "4f28e929cad3986f955337e7b67e991010372e2e2c96318e33a391f6f19f9090",
+      "sha256": "f84add197f655ef36c1b27e9a7fe335d7c64df62094f5350b97e0c4cf700a73d",
       "type": "js",
       "originallyIndexed": true
     },
@@ -587,7 +523,7 @@
       "module": "/Module/Overlay/Motion/osc-motion-timing.js",
       "owner": "overlay.motion",
       "bytes": 2514,
-      "sha256": "ade40f83f0bf133869cbac8b14205bccfe47827e2aa2a82ab900dfc21bfe45e1",
+      "sha256": "f16c21903cfa1844ea54c3f00786b6da35cc40dea8f8dee73132b9ccaada692f",
       "type": "js",
       "originallyIndexed": true
     },

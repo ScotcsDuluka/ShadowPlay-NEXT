@@ -54,6 +54,12 @@ var good = Make(responder);
 var status = ToJson(good.Status());
 Check("Ready GET health and state", status.GetProperty("availability").GetString() == "Available");
 Check("Idle state is not simulated recording", status.GetProperty("recording").ValueKind == JsonValueKind.False);
+Check("Missing worker command mode stays unknown", status.GetProperty("recordCommandMode").GetString() == "unknown");
+var containerMode = Make((req, token) => req.Method == HttpMethod.Get && req.RequestUri!.AbsolutePath == "/state"
+    ? Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(
+        state.Replace("\"elapsedSec\":0", "\"elapsedSec\":0,\"recordCommandMode\":\"container\"")) })
+    : responder(req, token));
+Check("Worker command mode is relayed", ToJson(containerMode.Status()).GetProperty("recordCommandMode").GetString() == "container");
 Check("Replay not invented", !status.GetProperty("replay").GetProperty("commandSupported").GetBoolean());
 var catalog = ToJson(good.Engines(args[0]));
 Check("Engine v2 accepted", catalog.GetProperty("workerTruthAvailable").GetBoolean());
@@ -92,6 +98,38 @@ Check("Incomplete JSON never ready", !ToJson(malformed.Engines(args[0]))
 
 var confirm = JsonDocument.Parse("""{"confirmed":true}""").RootElement.Clone();
 var noConfirm = JsonDocument.Parse("""{"confirmed":false}""").RootElement.Clone();
+var guardedPaths = new System.Collections.Generic.List<string>();
+var guardedState = state;
+var guarded = new CaptureWorkerGateway(new HttpClient(new Stub((req, token) => {
+    if (req.Method == HttpMethod.Post) guardedPaths.Add(req.RequestUri!.AbsolutePath);
+    if (req.Method == HttpMethod.Get && req.RequestUri!.AbsolutePath == "/state")
+        return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(guardedState) });
+    return responder(req, token);
+})), 59599, true, true, workerWriteToken: () => "0123456789abcdef0123456789abcdef",
+    requireContainerRecordMode: true);
+Check("Guarded start rejects missing mode", guarded.RecordCommand(true, confirm).Status == 503 && guardedPaths.Count == 0);
+guardedState = state.Replace("\"elapsedSec\":0", "\"elapsedSec\":0,\"recordCommandMode\":\"legacy\"");
+Check("Guarded start rejects legacy mode", guarded.RecordCommand(true, confirm).Status == 503 && guardedPaths.Count == 0);
+guardedState = state.Replace("\"elapsedSec\":0", "\"elapsedSec\":0,\"recordCommandMode\":\"container\"");
+Check("Guarded start uses versioned path", guarded.RecordCommand(true, confirm).Status == 200 && guardedPaths.Single() == "/record/container/start");
+guardedPaths.Clear();
+guardedState = """{"ready":true,"recording":true,"actualSessionBackend":"Duluka","recordCommandMode":"legacy","elapsedSec":0}""";
+Check("Guarded mode can stop legacy active session", guarded.RecordCommand(false, confirm).Status == 200 && guardedPaths.Single() == "/record/stop");
+var restartedPaths = new System.Collections.Generic.List<string>();
+var restarted = new CaptureWorkerGateway(new HttpClient(new Stub((req, token) => {
+    if (req.Method == HttpMethod.Post) {
+        restartedPaths.Add(req.RequestUri!.AbsolutePath);
+        return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound) { Content = new StringContent("{}") });
+    }
+    if (req.RequestUri!.AbsolutePath == "/state")
+        return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(
+            state.Replace("\"elapsedSec\":0", "\"elapsedSec\":0,\"recordCommandMode\":\"container\"")) });
+    return responder(req, token);
+})), 59599, true, true, workerWriteToken: () => "0123456789abcdef0123456789abcdef",
+    requireContainerRecordMode: true);
+Check("Old worker after status cannot receive legacy start", restarted.RecordCommand(true, confirm).Status != 200 &&
+    restartedPaths.Single() == "/record/container/start");
+posts = 0;
 var denied = good.RecordCommand(true, confirm);
 Check("Commands default denied", denied.Status == 403 && posts == 0);
 var enabled = Make(responder, commands:true);
@@ -167,6 +205,14 @@ Check("POST timeout is unknown outcome",
 Check("Ambiguous transport timeout blocks blind retries",
     pending.RecordCommand(true, confirm).Status == 409 &&
     ToJson(pending.Status()).GetProperty("startOutcomeUnresolved").GetBoolean());
+var disconnected = Make((req, token) => req.Method == HttpMethod.Post
+    ? Task.FromException<HttpResponseMessage>(new HttpRequestException("connection lost"))
+    : responder(req, token), commands:true);
+var lostReply = disconnected.RecordCommand(true, confirm);
+Check("Lost POST response is an unknown outcome",
+    lostReply.Status == 502 && ToJson(lostReply.Body).GetProperty("outcomeUnknown").GetBoolean());
+Check("Lost POST response blocks repeated start",
+    disconnected.RecordCommand(true, confirm).Status == 409);
 var workerPending = Make((req, token) => {
     if (req.Method == HttpMethod.Post)
         return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) {

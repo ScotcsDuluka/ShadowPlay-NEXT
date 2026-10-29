@@ -24,7 +24,71 @@ dotnet build EngineCapture.slnx -c Release
 
 ---
 
-## 2. ชั้นระบบ: ADR component → ไฟล์จริง
+## 2. ผังทำงาน (อนุมัติโดยเจ้าของ 2026-10-29) และการแมปเป็นไฟล์จริง
+
+**ผังเป้าหมาย — ทำ Duluka Native ก่อน, Intel หยุดชั่วคราว (paused), AMF = future:** ผังนี้ยังไม่ใช่ pipeline ที่ใช้งานจริงทั้งหมด ดูสถานะด้านล่าง
+
+```mermaid
+flowchart TB
+    OSC["ShadowPlay NEXT / OSC"]
+    ENGINE{"Recording Engine"}
+
+    OSC --> ENGINE
+    ENGINE --> DULUKA["Duluka Native 100%"]
+    ENGINE --> FF["FFmpeg Standalone"]
+    ENGINE --> OBS["OBS"]
+    ENGINE --> NVIDIA["NVIDIA"]
+
+    subgraph NATIVE["DULUKA NATIVE PIPELINE"]
+        SESSION["RecordingSession<br/>SessionId / Clock / Lifecycle"]
+        SOURCE{"Capture Source"}
+        DESKTOP["Desktop API<br/>DXGI / Windows Native"]
+        EXCLUSIVE["Exclusive API<br/>Verified Native Source"]
+        ROUTER["Native Frame Router"]
+        COMPOSE["Native Composition"]
+        ENCODER{"Native Encoder"}
+        QSV["Intel QSV"]
+        NVENC["NVIDIA NVENC"]
+        AMF["AMD AMF - Future"]
+        AUDIO["Native WASAPI<br/>System Audio / Mic"]
+        MUX["Native MP4 Muxer"]
+        VERIFY["MediaInspector"]
+        MP4["Verified MP4"]
+
+        SESSION --> SOURCE
+        SOURCE --> DESKTOP & EXCLUSIVE
+        DESKTOP & EXCLUSIVE --> ROUTER
+        ROUTER --> COMPOSE --> ENCODER
+        ENCODER --> QSV & NVENC & AMF
+        QSV & NVENC & AMF --> MUX
+        SESSION --> AUDIO --> MUX
+        MUX --> VERIFY --> MP4
+    end
+
+    DULUKA --> SESSION
+
+    classDef native fill:#213b29,stroke:#76b900,color:#fff
+    classDef separate fill:#26354c,stroke:#6aa8ff,color:#fff
+    class DULUKA,SESSION,MP4 native
+    class FF,OBS,NVIDIA separate
+```
+
+**สถานะจริงของแต่ละบล็อกในผัง (2026-10-29):**
+
+| บล็อกผัง | สถานะ | หมายเหตุ |
+| --- | --- | --- |
+| RecordingSession / Router / Composition | ✅ Wired | `CaptureSession.vb`, `SessionFrameRouter.vb` |
+| Desktop API — DXGI | ✅ Wired + **live real-frame verified 2026-10-29** | ฉากทดสอบควบคุม: จอจริง→DXGI→NVENC→MP4 12s, 720/720 packet muxed+decoded, video-only |
+| Desktop API — Windows Native (WGC) | ⚠️ มีโค้ด **ยังไม่ wire** | `WgcCapture/WgcFrameSource.cs` ไม่มีใครอ้าง |
+| Exclusive API (Verified Native Source) | 🟡 **ระบบเลือก+ตรวจ+monitor พร้อมแล้ว (2026-10-29)** — `ExclusiveCapturePolicy` (fail-closed, เฉพาะ DXGI ที่ implement), `ExclusiveVerificationGate` (ต้องพิสูจน์เฟรมจริงบน target ปักหมุด), `DxgiDisplayModeMonitor` (bounded poll อ่านอย่างเดียว) — tests 24/24; **source แบบ game-hook ยังไม่มี** และการยืนยันต่อเกมจริงแต่ละ API ยังต้องทดสอบ (ตาม ADR §J) |
+| Encoder NVENC | ✅ Wired, พิสูจน์ synthetic + E2E จริง | 1080 Ti บนเครื่องนี้ |
+| Encoder Intel QSV | ⏸️ **หยุดชั่วคราว** — มีโค้ด NV12 path, fail-closed | งานต่ออยู่ใน `GLM-HANDOFF-INTEL-I2-20261029.md` |
+| Encoder AMD AMF | 🔮 Future ตามผัง | ไม่มีโค้ด |
+| Native WASAPI (System/Mic) | ✅ มีจริง (AudioEngineSession) | FFmpeg AudioSidecar ยังเป็น stub ตามสัญญา |
+| Native MP4 Muxer | ❌ ยังไม่ wired | `CaptureSession` ใช้ FFmpeg `LiveMuxSession` จริง จึงยังไม่ผ่าน Native 100% |
+| MediaInspector / MediaVerifier | ⚠️ Wired, ยังพึ่ง FFmpeg ในบางเส้นทาง | ต้องตรวจ full-decode และผล session ก่อน Saved; ไม่ใช่หลักฐานว่า mux เป็น native |
+
+## 2.1 ชั้นระบบ: ADR component → ไฟล์จริง
 
 ```
 RecordingEngine (VB) ───────────── Duluka Capture/Recording/DulukaEngine.Recording/RecordingEngine.vb
@@ -35,7 +99,7 @@ RecordingEngine (VB) ───────────── Duluka Capture/Reco
  ├─ VideoEncoder NVENC (VB)        Encoding/NVENC/DulukaEngine.Encoder.Nvenc/NvencEncoderBackend.vb
  ├─ VideoEncoder QSV (C#)          Encoding/Intel/DulukaEngine.Encoder.Qsv/QsvEncoderBackend.cs (path NV12 เท่านั้น)
  ├─ Audio WASAPI (C#)              Audio/DulukaEngine.Audio.Wasapi/ + Audio/DulukaEngine.Audio/AudioEngineSession.cs
- ├─ FFmpeg backend                 Recording/Backends/FFmpeg/DulukaEngine.FFmpegBackend/ (engine แยกของตัวเอง)
+ ├─ FFmpeg backend                 Recording/Backends/FFmpeg/DulukaEngine.FFmpegBackend/ (LiveMux ยังถูก Duluka ใช้งาน; ต้องย้ายออก)
  ├─ MediaInspector/MediaVerifier   Recording/Media/DulukaEngine.Media/SessionMediaVerifier.vb
  └─ ตัวขับจริง (CLI)               Tools/DulukaEngine.Recording.ConsoleDriver/ (โหมด --videocheck ใช้ config chain จริง)
 
@@ -50,7 +114,7 @@ Control plane:     OSC UI → NodeAPI :59011 → NvContainer :59012 → NvCaptur
 | DXGI Desktop Duplication (Ddagrab) | **Wired, ใช้ production** | `RecordingBackendFactory.CreateCapture` |
 | Native NVENC H.264 | **Wired, ใช้ production** | synthetic 69/69 บน 1080 Ti จริง |
 | Session กลาง (CaptureSession/Clock/Router) | **Wired** | Recording.Tests 41 pass, owned-frames path |
-| FFmpeg engine (แยก) | **Wired** | LiveMux synthetic 13 + audio-intent 5 |
+| FFmpeg engine (แยก) | **Wired** | Standalone แยกได้ แต่ปัจจุบัน Duluka ยังเรียก FFmpeg LiveMux ด้วย |
 | MediaVerifier (ตัดสิน Saved) | **Wired** | Mux 25 + MediaEvidence 25 + decode integrity |
 | QSV encoder (C#) | **มีโค้ด, fail-closed บน path BGRA/live** | `Providers intel:qsv-h264 Implemented=False` → `intel_native_live_input_not_verified`; path NV12 ใช้ได้ผ่าน `CreateEncoderForInput` |
 | WgcCapture | **ไม่ถูก wire** — ไม่มีใคร reference | grep ทั้ง workspace |
@@ -76,8 +140,14 @@ Control plane:     OSC UI → NodeAPI :59011 → NvContainer :59012 → NvCaptur
 | RecordingRecovery / SessionRecovery | 15 / 29 | กู้คืน + lifecycle ไฟล์จริง (lavfi) |
 | MediaEvidence / Mux / DeepDecode / LongScan | 25 / 25 / 5 / 2 | หลักฐานไฟล์ + full decode + scan 1/5 นาที |
 
-นอกชุดอัตโนมัติ — **พิสูจน์แล้ววันที่ 2026-10-29**: `lavfi → h264_nvenc (1080 Ti) → MP4 → ffprobe 15/15 frames → SessionMediaInspector full-decode PASS`
-(เทียบเท่า Phase 7D; สคริปต์ `Invoke-IsolatedNvencSyntheticSmoke.ps1` ตัวเต็มต้องมี worker :59077 idle จึงข้าม)
+นอกชุดอัตโนมัติ — **พิสูจน์แล้ววันที่ 2026-10-29**:
+1. `lavfi → h264_nvenc (1080 Ti) → MP4 → ffprobe 15/15 frames → SessionMediaInspector full-decode PASS` (เทียบเท่า Phase 7D; สคริปต์ตัวเต็มต้องมี worker :59077 idle จึงข้าม)
+2. **Live real-frame validation (I3 เทียบเท่า, อนุมัติโดยผู้ใช้, video-only, ฉากทดสอบควบคุม `Show-CaptureTestScene` ปิดทุกจอ):**
+   `จอจริง 1680×1050 → DXGI Desktop Duplication → native NVENC → MP4 12.00s → 720/720 packet muxed → full-decode 720/720 PASS`
+   (captured 246 เฟรมจริง + 475 CFR duplicate = 720 encoded @60fps, nvenc_errors=0, audio_stream=MISSING ตามขอบเขต, ไม่มี orphan ffmpeg; ไฟล์ถูกลบหลังตรวจตามที่ประกาศ — ขับเคลื่อนด้วย `ConsoleDriver --videocheck --no-audio`)
+3. **Live WITH system audio (2026-10-29 01:43, อนุมัติโดยผู้ใช้, mic ปิดสนิท, ฉากทดสอบ + โทน 440Hz):**
+   12.00s ครบเป้า · video h264 720/720 · **audio AAC FOUND 2.3MB จริง (mean -13dB, max -0.4dB)** · A/V delta 60ms (เกณฑ์ 200ms) · full-decode ทั้งสอง stream ผ่าน · ไฟล์ลบแล้ว
+   **Finding จริง 2 ชิ้น:** (a) `SessionMediaVerifier` ตัด `duration_mismatch` ที่ delta 60ms — เข้มกว่า granularity ของ AAC frame (padding ทำให้ 12.000s เป๊ะเป็นไปไม่ได้) ต้องมี owner ตัดสิน ปรับเกณฑ์หรือ trim; (b) config fps=30 พบ source fault `source_nonmonotonic_or_missing_qpc` ตั้งแต่ ~2s (fps=60 ปกติ) — ยังไม่ทราบรากเหตุ ต้องไล่ต่อ
 
 **ไม่รันอัตโนมัติ (ต้องอนุมัติ/เงื่อนไข):**
 - `DulukaEngine.Video.Tests` ส่วน DDAGRAB (เปิด Desktop Duplication จริง — ต้องฉากทดสอบไร้ความเป็นส่วนตัว)
@@ -95,24 +165,19 @@ Control plane:     OSC UI → NodeAPI :59011 → NvContainer :59012 → NvCaptur
 | `Invoke-IntelCaptureI1/I2/I3Regression.ps1` | regression ฝั่ง Intel | **เครื่อง Intel เท่านั้น** |
 | `IsolatedTest/Invoke-CaptureSmoke.ps1` | smoke E2E ผ่าน REST | privacy confirm ×2 + worker |
 
-## 6. การเชื่อม UI osc / data osc — สถานะปัจจุบัน (รอ Backend/Module แข็ง)
+## 6. การเชื่อม UI osc / data osc — สถานะปัจจุบัน (source wired 2026-10-29, รอ deploy)
 
-โซ่ที่ถูกต้องตาม [Container contract](../../NVIDIA%20Container/CAPTURE-COMMUNICATION-HUB-CONTRACT-20261024.md):
-`OSC UI → NodeAPI :59011 → NvContainer :59012 → NvCapture :59077`
+**เสร็จแล้วใน source** (Backend/Module แข็งแล้วตามคำสั่งผู้ใช้): mount shims ทั้ง 4 + record command relay +
+state sync socket — รายละเอียดครบที่ [NODEAPI-CAPTURE-DATA-PLANE-20261029](../../Overlay%20On-Screen%20Control/NVIDIA%20NodeAPI/NODEAPI-CAPTURE-DATA-PLANE-20261029.md).
+สรุป: UI → NodeAPI :59011 → Container :59012 (broker) → NvCapture :59077; ทุก write ต้อง `{"confirmed":true}`
++ double-gate (`NV_CAPTURE_RUNTIME_ENABLED=1` + Container `allowRecordCommands`); ห้ามแต่งผล started/saved;
+สะพาน desired→actual เป็น opt-in (`NV_CAPTURE_DESIRED_BRIDGE=1`) เพราะ bus ที่ deploy มี worker poll desired เอง
+ทดสอบ: capture/record/hotkey suites 74/74 ผ่าน (ชุด UI/CSS 17 fail เป็นของงาน parallel อื่น) — **ยังไม่ deploy/restart**
 
-**ช่องว่างที่วินิจฉัยแล้ว (2026-10-29):** หน้า UI เรียก `/DulukaCapture/v.1.0/{status,engines,displays,display/select,screenshot}`
-ที่ NodeAPI แต่ `NVIDIA Web Helper/Backend/index.js` **ไม่ได้ mount shims ทั้ง 4 ตัว** —
-`shims/capture-runtime-status.js`, `capture-engine-status.js`, `capture-display-routing.js`, `capture-capabilities.js`
-มีโค้ด + test ครบแล้ว (tests/capture*.test.js) แต่ไม่มีใคร require ใน production → UI ได้ 404 ทั้งหมด
+ช่องว่างเดิมที่วินิจฉัยตอนเช้า (shims ไม่ถูก mount → UI ได้ 404 ทั้งหมด) **ปิดแล้วใน source** — สิ่งที่เหลือคือ
+deploy/restart ตามขั้นตอนของ Build + ตั้ง flag จริง + ยืนยันหน้างาน (ขั้นตอนอยู่ในเอกสาร data plane ด้านบน)
 
-**แผนเชื่อมเมื่อได้สัญญาณ (ข้ามได้ทันที):**
-1. เพิ่ม 4 บรรทัด `require('./shims/...')(app, ctx)` ใน index.js หลัง middleware/ก่อน route-floor
-2. รัน `node --test tests/` (shim tests เขียวอยู่แล้วเมื่อรันตรง)
-3. ตรวจ live: `GET :59011/DulukaCapture/v.1.0/status` ต้องได้ 200 + worker truth จริง (ไม่ mask recording)
-
-**ยังไม่แก้ตามคำสั่งผู้ใช้** — Backend/Module ยังไม่นิ่ง; ห้าม deploy/restart จนกว่าจะบอก
-
-ประเด็นที่เกี่ยวแต่ไม่ใช่ NodeAPI: Container รายงาน `policyValid=false` (`FileNotFoundException` ของ capture routing policy) — เป็นของฝั่ง Container/Capture policy ตาม [NODEAPI-CAPTURE-STATUS-GET-FIX-20261024](../Overlay%20On-Screen%20Control/NVIDIA%20NodeAPI/NODEAPI-CAPTURE-STATUS-GET-FIX-20261024.md)
+ประเด็นที่เกี่ยวแต่ไม่ใช่ NodeAPI: Container รายงาน `policyValid=false` (`FileNotFoundException` ของ capture routing policy) — เป็นของฝั่ง Container/Capture policy ตาม [NODEAPI-CAPTURE-STATUS-GET-FIX-20261024](../../Overlay%20On-Screen%20Control/NVIDIA%20NodeAPI/NODEAPI-CAPTURE-STATUS-GET-FIX-20261024.md)
 
 ## 7. เอกสาร phase (เรียงตามเวลา)
 

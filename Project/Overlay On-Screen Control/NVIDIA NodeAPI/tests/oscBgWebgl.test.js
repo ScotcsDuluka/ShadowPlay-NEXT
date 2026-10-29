@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
-const src=fs.readFileSync(path.join(__dirname,'../osc/mods/osc-bg-webgl.js'),'utf8');
+const src=fs.readFileSync(path.join(__dirname,'../osc/Module/Overlay/Background/osc-bg-webgl.js'),'utf8');
 function load(){const window={};vm.runInNewContext(src,{window,Float32Array});return window.__dulukaBgWebgl;}
 function glMock(){
  const calls=[];

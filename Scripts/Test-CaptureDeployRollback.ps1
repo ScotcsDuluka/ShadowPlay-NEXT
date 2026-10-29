@@ -3,10 +3,22 @@ $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'CaptureDeployReadiness.ps1')
 $script:owners=@()
 $script:mode='normal'
+$script:processTime=[datetime]::UtcNow
+$script:gone=@()
 function Get-CimInstance { param($ClassName) return @($script:owners) }
+function Get-Process {
+    param($Id)
+    if($Id -in $script:gone){return $null}
+    $owner=@($script:owners|Where-Object {$_.ProcessId -eq $Id}) | Select-Object -First 1
+    if($null -eq $owner){return $null}
+    $path=if($script:mode -eq 'identity-changed' -and $Id -eq 101){'C:\fixture\different.exe'}else{$owner.ExecutablePath}
+    return [pscustomobject]@{Path=$path;StartTime=$script:processTime}
+}
 function Stop-Process {
     param($Id)
     if($script:mode -eq 'stop-fails'){throw 'simulated stop failure'}
+    if($script:mode -eq 'exit-before-stop'){$script:gone+= $Id; throw 'already exited'}
+    if($script:mode -eq 'cim-lag'){$script:gone+= $Id; return}
     if($script:mode -ne 'still-running'){$script:owners=@($script:owners|Where-Object {$_.ProcessId -ne $Id})}
 }
 function Wait-Process {
@@ -16,11 +28,12 @@ function Wait-Process {
 function Assert([bool]$ok,[string]$name) {if(-not $ok){throw ('FAIL '+$name)}; Write-Output ('PASS '+$name)}
 $target='C:\fixture\NvContainer.exe'
 $unrelated='C:\fixture\other.exe'
-foreach($mode in @('normal','already-exited','stop-fails','still-running')) {
+foreach($mode in @('normal','already-exited','exit-before-stop','cim-lag','stop-fails','still-running','identity-changed')) {
     $script:mode=$mode
-    $script:owners=@([pscustomobject]@{ExecutablePath=$target;ProcessId=101},[pscustomobject]@{ExecutablePath=$unrelated;ProcessId=102})
+    $script:gone=@()
+    $script:owners=@([pscustomobject]@{ExecutablePath=$target;ProcessId=101;CreationDate=$script:processTime},[pscustomobject]@{ExecutablePath=$unrelated;ProcessId=102;CreationDate=$script:processTime})
     $errors=@(Stop-CaptureDeploymentProcesses -TargetPaths @($target))
-    $expectedFailure=$mode -in @('stop-fails','still-running')
+    $expectedFailure=$mode -in @('stop-fails','still-running','identity-changed')
     Assert (($errors.Count -gt 0) -eq $expectedFailure) ('stop verification '+$mode)
     Assert (@($script:owners|Where-Object {$_.ProcessId -eq 102}).Count -eq 1) ('preserves unrelated process '+$mode)
 }
@@ -35,4 +48,4 @@ Backup-CaptureDeploymentFiles -Files $files -BackupRoot $backup
 [IO.File]::WriteAllText($old,'changed'); [IO.File]::WriteAllText($new,'added')
 $errors=@(Restore-CaptureDeploymentFiles -Files $files -BackupRoot $backup)
 Assert ($errors.Count -eq 0 -and (Get-FileHash -LiteralPath $old).Hash -eq $oldHash -and -not (Test-Path -LiteralPath $new)) 'restores existing and removes newly added file'
-Write-Output 'CAPTURE_DEPLOY_ROLLBACK_TEST_PASS passed=9 failed=0 production_modified=false'
+Write-Output 'CAPTURE_DEPLOY_ROLLBACK_TEST_PASS passed=15 failed=0 production_modified=false'

@@ -7,7 +7,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const osc = path.resolve(__dirname, '..', 'osc');
-const source = fs.readFileSync(path.join(osc, 'mods', 'gallery-media-source.js'), 'utf8');
+const source = fs.readFileSync(path.join(osc, 'Module', 'Gallery', 'Media', 'gallery-media-source.js'), 'utf8');
 
 class Events {
   constructor() { this.listeners = Object.create(null); }

@@ -6,10 +6,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-const sourcePath = path.join(__dirname, '../osc/mods/osc-background.js');
+const sourcePath = path.join(__dirname, '../osc/Module/Overlay/Background/osc-background.js');
 const storageKey = 'DulukaOscBackground';
 const defaults = Object.freeze({
-  mode: 'website', opacity: 50, motion: true, particles: 80,
+  mode: 'classic', opacity: 50, motion: true, particles: 80,
   links: true, react: true, speed: 1
 });
 const plain = value => JSON.parse(JSON.stringify(value));
@@ -106,7 +106,11 @@ function renderer(options = {}) {
     requestAnimationFrame(callback) { const id = nextFrame++; frames.set(id, callback); return id; },
     cancelAnimationFrame(id) { cancelled.push(id); frames.delete(id); }
   };
-  const loaded = load({ document, window });
+  // Renderer behavior tests exercise the animated website backdrop, so storage
+  // defaults to website mode; the shipped factory default is classic.
+  const loaded = load({ document, window, values: options.values || {
+    [storageKey]: JSON.stringify({ ...defaults, mode: 'website' })
+  } });
   function tick(now = 100) {
     const pending = Array.from(frames.entries());
     frames.clear();
@@ -138,7 +142,7 @@ test('normalization clamps rendering limits and keeps explicit false settings', 
   assert.equal(upper.opacity, 100);
   assert.equal(upper.particles, 0);
   assert.equal(upper.speed, 2);
-  assert.equal(api.normalize({ mode: 'unknown' }).mode, 'website');
+  assert.equal(api.normalize({ mode: 'unknown' }).mode, 'classic');
 });
 
 test('non-finite and malformed settings cannot create invalid opacity, particle counts or animation speed', () => {
@@ -188,7 +192,7 @@ test('callers cannot mutate active settings through input objects or returned co
   snapshot.opacity = 100;
   snapshot.mode = 'invalid';
   assert.equal(api.get().opacity, 42);
-  assert.equal(api.get().mode, 'website');
+  assert.equal(api.get().mode, 'classic');
   assert.equal(api.get().particles, 20);
 });
 
@@ -294,13 +298,13 @@ test('opening the menu uses 50% opacity and maintains a single animation loop', 
 
 test('turning motion off or opacity down to zero cancels animation immediately', () => {
   const f = renderer({ hash: '#/base/main-menu' });
-  f.api.set({ ...defaults, motion: false });
+  f.api.set({ ...defaults, mode: 'website', motion: false });
   assert.equal(f.frames.size, 0);
   assert.equal(f.root.classList.contains('nv-osc-bg-paused'), true);
   assert(f.cancelled.length > 0);
-  f.api.set(defaults);
+  f.api.set({ ...defaults, mode: 'website' });
   assert.equal(f.frames.size, 1);
-  f.api.set({ ...defaults, opacity: 0 });
+  f.api.set({ ...defaults, mode: 'website', opacity: 0 });
   assert.equal(f.root.style.opacity, '0');
   assert.equal(f.frames.size, 0);
   assert.equal(f.root.classList.contains('nv-osc-bg-paused'), true);
@@ -315,7 +319,7 @@ test('classic mode restores the native backdrop class and closing OSC stops rend
   assert.equal(f.html.classList.contains('nv-osc-bg-website'), false);
   assert.equal(f.html.classList.contains('nv-osc-bg-classic'), true);
   assert.equal(f.html.style['--nv-osc-bg-opacity'], '0.65');
-  f.api.set(defaults);
+  f.api.set({ ...defaults, mode: 'website' });
   assert.equal(f.frames.size, 1);
   f.navigate('#/base');
   assert.equal(f.root.style.display, 'none');
@@ -342,7 +346,7 @@ test('hidden documents and reduced motion suspend animation while retaining a st
 test('particle rendering obeys count limits and keeps all canvas coordinates finite', () => {
   const f = renderer({ hash: '#/base/main-menu' });
   f.painting.arcs = 0;
-  f.api.set({ ...defaults, particles: 999, links: false });
+  f.api.set({ ...defaults, mode: 'website', particles: 999, links: false });
   assert.equal(f.api.get().particles, 120);
   assert.equal(f.painting.arcs, 120, 'The drawing work must not exceed the configured particle cap');
   f.events.mousemove({ clientX: 0, clientY: 0 });
@@ -354,7 +358,7 @@ test('particle rendering obeys count limits and keeps all canvas coordinates fin
   f.tick(1000032);
   assert(f.painting.coordinates.every(Number.isFinite));
   f.painting.arcs = 0;
-  f.api.set({ ...defaults, particles: -20 });
+  f.api.set({ ...defaults, mode: 'website', particles: -20 });
   f.tick(1000064);
   assert.equal(f.api.get().particles, 0);
   assert.equal(f.painting.arcs, 0, 'A zero-particle setting must actually remove particle work');
@@ -362,7 +366,7 @@ test('particle rendering obeys count limits and keeps all canvas coordinates fin
 
 test('the decorative background cannot intercept pointer input or become an accessibility control', () => {
   const f = renderer();
-  const css = fs.readFileSync(path.join(__dirname, '../osc/mods/osc-background.css'), 'utf8');
+  const css = fs.readFileSync(path.join(__dirname, '../osc/Module/Overlay/Background/osc-background.css'), 'utf8');
   assert.equal(f.root.attributes['aria-hidden'], 'true');
   assert.match(css, /#nv-osc-background\s*\{[^}]*pointer-events\s*:\s*none/);
   assert.match(css, /#nv-osc-background canvas\s*\{[^}]*pointer-events\s*:\s*none/);
@@ -432,7 +436,7 @@ test('a successful Reset background clears a previous save error in the settings
   assert.deepEqual(plain(controller.settings), defaults);
 });
 
-const motionDefaults = Object.freeze({ enabled: true, mode: 'osc', backgroundFade: true,
+const motionDefaults = Object.freeze({ enabled: false, mode: 'osc', backgroundFade: true,
   topAnimation: true, mainMenuAnimation: true, openDuration: 500, closeDuration: 240 });
 function animationController() {
   let settings = { ...motionDefaults }, locale = 'en-US', fail = false;
@@ -479,6 +483,7 @@ test('Animation uses native Material controls without translating over switch in
 
 test('Animation changes and reset go only through the Motion API and leave Background settings intact', () => {
   const f = animationController(), ui = f.controller;
+  ui.motionSettings.enabled = true; ui.saveMotion(); // exercise the active-animation UI (factory default is motion off)
   assert.equal(ui.motionAvailable, true); assert.equal(ui.oscMotionActive(), true);
   ui.motionSettings.openDuration = 820; ui.motionSettings.backgroundFade = false;
   assert.equal(ui.saveMotion(), true);
@@ -488,7 +493,7 @@ test('Animation changes and reset go only through the Motion API and leave Backg
   ui.motionSettings.mode = 'osc'; ui.motionSettings.enabled = false; ui.saveMotion();
   assert.equal(ui.oscMotionActive(), false, 'disabled animation disables component and timing controls');
   assert.equal(ui.resetMotion(), true); assert.deepEqual(plain(ui.motionSettings), motionDefaults);
-  assert.equal(ui.oscMotionActive(), true);
+  assert.equal(ui.oscMotionActive(), false, 'factory default leaves animation off');
   assert.deepEqual(plain(f.api.get()), defaults); assert.equal(f.state.writes, 0);
 });
 
@@ -505,6 +510,7 @@ test('Animation failed saves restore committed values and successful reset clear
 
 test('Animation hides inapplicable options while retaining switches and saved choices for re-enabling', () => {
   const f = animationController(), ui = f.controller;
+  ui.motionSettings.enabled = true; ui.saveMotion(); // exercise the active-animation UI (factory default is motion off)
   assert.equal(ui.motionTimingActive(), true);
   for (const name of ['backgroundFade', 'topAnimation', 'mainMenuAnimation']) ui.motionSettings[name] = false;
   ui.saveMotion();
@@ -545,8 +551,8 @@ test('missing Motion API disables Animation settings without creating another pr
 
 test('classic and website backgrounds use the same fixed full-screen canvas', () => {
   const f = renderer({ hash: '#/base/main-menu' });
-  const css = fs.readFileSync(path.join(__dirname, '../osc/mods/osc-background.css'), 'utf8');
-  const motion = fs.readFileSync(path.join(__dirname, '../osc/mods/osc-motion.css'), 'utf8');
+  const css = fs.readFileSync(path.join(__dirname, '../osc/Module/Overlay/Background/osc-background.css'), 'utf8');
+  const motion = fs.readFileSync(path.join(__dirname, '../osc/Module/Overlay/Motion/osc-motion.css'), 'utf8');
   assert.match(css, /#nv-osc-background\s*\{[^}]*position:fixed[^}]*top:0;right:0;bottom:0;left:0/);
   assert.match(css, /html\.nv-osc-bg-classic\s+#nv-osc-background\s*\{[^}]*background:#000!important/);
   assert.match(css, /html\.nv-osc-bg-classic\s+\.nv-osc\s*\{background:transparent!important\}/);

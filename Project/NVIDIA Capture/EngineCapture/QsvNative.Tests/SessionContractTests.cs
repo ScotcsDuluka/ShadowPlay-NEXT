@@ -198,6 +198,39 @@ static partial class Program
         Check(clean.Verified && clean.DecodedFrames==60 && clean.Packets==60,"strict CFR video conserves 60 decoded access units: "+clean.Reason);
         var sound=SessionMediaVerifier.VerifyNative(av,ffmpeg,60,320,180,30,1);
         Check(sound.Verified && sound.DecodedFrames==60 && sound.Packets==60,"native media verification accepts exactly requested synthetic AAC track: "+sound.Reason);
+
+        // A/V timing acceptance must use measured stream start/end timestamps.
+        // MP4 format.duration can be extended by AAC frame padding; conversely
+        // short audio can hide behind the longer video track's duration.
+        void GenerateAudioLengthFixture(string destination, string seconds) {
+            var start=new System.Diagnostics.ProcessStartInfo(ffmpeg) {
+                UseShellExecute=false,CreateNoWindow=true,RedirectStandardError=true,RedirectStandardOutput=true };
+            foreach(var arg in new[]{"-nostdin","-y","-v","error","-i",video,"-f","lavfi","-i",
+                "sine=frequency=900:sample_rate=48000:duration="+seconds,
+                "-map","0:v:0","-map","1:a:0","-c:v","copy","-c:a","aac","-movflags","+faststart",destination})
+                start.ArgumentList.Add(arg);
+            using var child=System.Diagnostics.Process.Start(start)!;
+            var errors=child.StandardError.ReadToEndAsync();
+            var output=child.StandardOutput.ReadToEndAsync();
+            if(!child.WaitForExit(30000)) { child.Kill(true); child.WaitForExit(2000); throw new Exception("synthetic_audio_length_fixture_timeout"); }
+            output.GetAwaiter().GetResult();
+            Check(child.ExitCode==0,"test-owned audio length fixture generated: "+errors.GetAwaiter().GetResult());
+        }
+        var audioTail=Path.Combine(Evidence,"session-verifier-aac-padding.mp4");
+        var audioLong=Path.Combine(Evidence,"session-verifier-audio-overrun.mp4");
+        var audioShort=Path.Combine(Evidence,"session-verifier-audio-underrun.mp4");
+        GenerateAudioLengthFixture(audioTail,"2.06");
+        GenerateAudioLengthFixture(audioLong,"2.35");
+        GenerateAudioLengthFixture(audioShort,"1.65");
+        var padded=SessionMediaVerifier.VerifyNative(audioTail,ffmpeg,60,320,180,30,1);
+        Check(padded.Verified && padded.DecodedFrames==60,
+            "AAC-aligned 60ms audio tail must not falsely fail verified video: "+padded.Reason);
+        var overrun=SessionMediaVerifier.VerifyNative(audioLong,ffmpeg,60,320,180,30,1);
+        Check(!overrun.Verified && overrun.Reason=="session_audio_timing_mismatch",
+            "audio overrun beyond 200ms is not Saved: "+overrun.Reason);
+        var underrun=SessionMediaVerifier.VerifyNative(audioShort,ffmpeg,60,320,180,30,1);
+        Check(!underrun.Verified && underrun.Reason=="session_audio_timing_mismatch",
+            "audio underrun beyond 200ms is not Saved even if format duration matches video: "+underrun.Reason);
         Check(!SessionMediaVerifier.VerifyNative(av,ffmpeg,60,320,180,30,0).Verified,"unrequested audio stream fails native acceptance");
         Check(!SessionMediaVerifier.VerifyNative(video,ffmpeg,60,320,180,30,1).Verified,"missing requested audio stream fails native acceptance");
         Check(!SessionMediaVerifier.VerifyNative(video,ffmpeg,59,320,180,30,0).Verified,"one missing decoded frame fails acceptance");

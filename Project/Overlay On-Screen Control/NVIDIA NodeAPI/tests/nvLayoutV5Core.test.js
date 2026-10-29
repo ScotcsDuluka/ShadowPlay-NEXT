@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const M = require('../osc/mods/nv-layout-v5-core.js');
+const M = require('../osc/Module/MainMenu/OSCFreestyleV5/nv-layout-v5-core.js');
 
 function defaultState() { return M.defaultLayout(); }
 function totalCells(s) {

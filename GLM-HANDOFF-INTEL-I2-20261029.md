@@ -1,5 +1,8 @@
 # GLM HANDOFF — Intel I2 Runbook (ส่งจากเครื่อง NVIDIA, 2026-10-29)
 
+> **สถานะ: ⏸️ PAUSED (2026-10-29)** — ผู้ใช้สั่งหยุด Intel ไว้ชั่วคราว โฟกัสที่ Duluka Native Pipeline บนเครื่อง NVIDIA ก่อน
+> เอกสารนี้พร้อมใช้งานทันทีเมื่อได้คำสั่งเริ่ม — Agents ฝั่ง Intel **อย่าเริ่มงานเอง** ก่อนได้สัญญาณจากเจ้าของ
+
 **ผู้ส่ง:** GLM (ZCode) session เครื่อง NVIDIA (AORUS-class: GTX 1080 Ti ×2, branch `Stable`)
 **ผู้รับ:** GLM Agents บนเครื่อง Intel (HUAWEI-MateBook, worktree `intel/duluka-capture`, base HEAD `015f0548f82b5c1ed4d9c352fe095cc55e9a5453`)
 **สถานะปลายทางที่คาดหวัง:** I1 เสร็จแล้ว (uncommitted) · I2 ยังไม่เริ่ม — ตาม [INTEL-DULUKA-CAPTURE-I2-HANDOFF](docs/INTEL-DULUKA-CAPTURE-I2-HANDOFF.md)

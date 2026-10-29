@@ -97,8 +97,8 @@ function sha(file){return crypto.createHash('sha256').update(fs.readFileSync(fil
 function refreshHashes(){
  let changed=[];
  for(const a of manifest.assets){
-  const next=sha(path.join(osc,a.source.replace(/^\//,'')));
-  if(next!==a.sha256){changed.push(a.source);a.sha256=next;}
+  const next=sha(path.join(osc,a.module.replace(/^\//,'')));
+  if(next!==a.sha256){changed.push(a.module);a.sha256=next;}
  }
  const legacySha=sha(path.join(osc,legacyName));
  if(manifest.legacyIndexSha!==legacySha){if(manifest.legacyIndexSha!==undefined)changed.push(legacyName);manifest.legacyIndexSha=legacySha;}

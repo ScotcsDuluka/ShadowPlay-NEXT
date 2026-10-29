@@ -33,7 +33,7 @@ test('English fallbacks are explicitly documented and track actual present value
   }
 });
 test('OSC mod phrase keys all exist in all dictionaries', () => {
-  const mapJs = fs.readFileSync(path.join(project, 'osc', 'mods', 'osc-ui-phrase-map.js'), 'utf8');
+  const mapJs = fs.readFileSync(path.join(project, 'osc', 'Module', 'Base', 'Localization', 'osc-ui-phrase-map.js'), 'utf8');
   const context = {window: {}};
   vm.runInNewContext(mapJs, context);
   const map = context.window.__oscUiPhraseKeys;

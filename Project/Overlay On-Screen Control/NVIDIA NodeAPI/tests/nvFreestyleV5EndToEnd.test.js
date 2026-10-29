@@ -1,8 +1,8 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path');
-const M=require('../osc/mods/nv-layout-v5-core.js');
-const read=name=>fs.readFileSync(path.join(__dirname,'../osc/mods',name),'utf8');
+const M=require('../osc/Module/MainMenu/OSCFreestyleV5/nv-layout-v5-core.js');
+const read=name=>fs.readFileSync(path.join(__dirname,'../osc/Module/MainMenu/OSCFreestyleV5',name),'utf8');
 test('empty V5 slots have geometry for native drop targets',()=>{
  let s=M.defaultLayout();
  s=M.changeBlock(s,'g6',0,'small','wideLeft');

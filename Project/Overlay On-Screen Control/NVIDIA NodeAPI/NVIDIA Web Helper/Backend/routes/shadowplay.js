@@ -72,14 +72,42 @@ module.exports = function shadowplayRoutes(app, ctx) {
     //   POST /Record/Running {running:bool}      → engine publishes live truth
     //   GET  /Record/Running                     → {running} (default false)
     const FEATURES = 'Record|InstantReplay';
+    function recordBridgeRequested(feature) {
+        return feature === 'record' && process.env.NV_CAPTURE_DESIRED_BRIDGE === '1';
+    }
+    function bridgeUnavailable(res) {
+        return res.status(503).json({ type: 'Error', code: -1,
+            codeText: 'capture_record_truth_unavailable',
+            message: 'Capture status or command bridge is unavailable.' });
+    }
     app.get(new RegExp('^/ShadowPlay/v\\.1\\.0/(' + FEATURES + ')/Enable/?$'), function (req, res) {
         const feature = req.params[0].toLowerCase();
+        if (recordBridgeRequested(feature)) {
+            const bridge = ctx.captureStateSync;
+            if (!bridge || !bridge.bridgeEnabled()) return bridgeUnavailable(res);
+            const truth = bridge.verifiedRecordState();
+            if (!truth.verified) return bridgeUnavailable(res);
+            return res.status(200).json({ status: truth.recording });
+        }
         const sec = store.getSection(feature + 'Enable');
         res.status(200).json({ status: sec.status === true });
     });
     app.post(new RegExp('^/ShadowPlay/v\\.1\\.0/(' + FEATURES + ')/Enable/?$'), function (req, res) {
         const feature = req.params[0].toLowerCase();
         const body = (req.body && typeof req.body === 'object') ? req.body : {};
+        if (recordBridgeRequested(feature)) {
+            const bridge = ctx.captureStateSync;
+            if (!bridge || !bridge.bridgeEnabled()) return bridgeUnavailable(res);
+            if (typeof body.status !== 'boolean') return res.status(400).json({
+                type: 'Error', code: 4, codeText: 'ET_INVALID_DATA', message: 'Record enable requires a boolean status.' });
+            return bridge.requestRecord(body.status, function (status, result) {
+                if (status < 200 || status >= 300) return res.status(status).json(Object.assign({
+                    type: 'Error', code: -1, codeText: result.error || result.code || 'capture_record_command_failed'
+                }, result));
+                // This is command acceptance, not a saved notification.
+                return res.status(status).json(Object.assign({ status: body.status }, result));
+            });
+        }
         const status = body.status === true;
         store.storeSection(feature + 'Enable', { status: status, changedAt: new Date().toISOString() });
         // production parity: the state flip emits the feature's own channel
@@ -91,6 +119,13 @@ module.exports = function shadowplayRoutes(app, ctx) {
         res.status(200).json({ status: status });
     });
     app.get(new RegExp('^/ShadowPlay/v\\.1\\.0/(' + FEATURES + ')/Running/?$'), function (req, res) {
+        if (recordBridgeRequested(req.params[0].toLowerCase())) {
+            const bridge = ctx.captureStateSync;
+            if (!bridge || !bridge.bridgeEnabled()) return bridgeUnavailable(res);
+            const truth = bridge.verifiedRecordState();
+            if (!truth.verified) return bridgeUnavailable(res);
+            return res.status(200).json({ running: truth.recording });
+        }
         const sec = store.getSection(req.params[0].toLowerCase() + 'Running');
         res.status(200).json({ running: sec.running === true });
     });

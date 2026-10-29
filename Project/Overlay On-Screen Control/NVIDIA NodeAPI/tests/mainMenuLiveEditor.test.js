@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const sourcePath = path.join(__dirname, '../osc/mods/main-menu-live.js');
+const sourcePath = path.join(__dirname, '../osc/Module/MainMenu/NVIDIA/main-menu-live.js');
 const storageKey = 'DulukaMainMenuLayoutV2';
 const defaults = {
   version: 2,

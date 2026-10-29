@@ -3,6 +3,7 @@
 #include "../src/OscFramePublisher/Common/OscPublishCadence.h"
 #include "../src/OscFramePublisher/Common/OscD3D9CpuMirrorPolicy.h"
 #include "../src/OscFramePublisher/Common/OscHookTransportPolicy.h"
+#include "../src/OscDesktopFps.h"
 #include "../src/OscModeFrameBoost.h"
 #ifdef NDEBUG
 #error "Cadence assertions must be enabled in Release tests"
@@ -80,6 +81,33 @@ int main() {
   for(int i=0;i<10000;++i) assert(metadata(9,true,true)==6);
   assert(c.lastPublishedSourceSerial==9);
   assert(c.latestIssued==6);
+  // DesktopFpsLimiter paces from the Present START on a deadline grid so the
+  // present submission, Commit and wake-up stay inside the interval.
+  {
+    osc::DesktopFpsLimiter lim;
+    assert(lim.RemainingUs(12345)==0);        // first present is immediate
+    lim.MarkPresented(1000,240);              // deadline 1000+4167
+    assert(lim.RemainingUs(1000)==4167);
+    assert(lim.RemainingUs(3000)==2167);
+    assert(lim.RemainingUs(5167)==0);
+    lim.MarkPresented(5200,240);              // 33us late keeps the grid (9334)
+    assert(lim.RemainingUs(5200)==4134);
+    lim.MarkPresented(12000,240);             // late < interval: grid holds
+    assert(lim.RemainingUs(12000)==1501);     // next beat 13501
+    lim.MarkPresented(20000,240);             // stalled past the grid: re-anchor
+    assert(lim.RemainingUs(20000)==4167);     // deadline 24167, no burst
+  }
+  {
+    osc::DesktopFpsLimiter lim;
+    lim.MarkPresented(0,60);
+    assert(lim.RemainingUs(0)==16667);
+    assert(lim.RemainingUs(16667)==0);
+    lim.MarkPresented(16667,60);
+    assert(lim.RemainingUs(16667)==16667);
+    osc::DesktopFpsLimiter bad;
+    bad.MarkPresented(0,999);                 // invalid rate falls back to 60
+    assert(bad.RemainingUs(0)==16667);
+  }
   std::cout<<"GPU_SHARED_PUBLISH_CADENCE_PASS\n";
   return 0;
 }

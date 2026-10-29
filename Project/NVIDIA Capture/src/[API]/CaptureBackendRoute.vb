@@ -71,4 +71,22 @@ Public NotInheritable Class CaptureBackendRoute
                 Return Reject("unknown_capture_engine", api, encoder)
         End Select
     End Function
+
+    ' SPN-ADR §C/§D: the Exclusive Capture API is an INDEPENDENT selection.
+    ' For Duluka only one verified native source exists today (Desktop
+    ' Duplication — the same implementation the desktop route resolves to),
+    ' so an explicit exclusive request may name that value or auto; anything
+    ' else fails closed with a precise reason instead of a silent switch.
+    ' Other engines own their own exclusive handling — this overload defers
+    ' to their base decision unchanged.
+    Public Shared Function Decide(mode As String, captureApi As String, exclusiveApi As String, encoderName As String) As Decision
+        Dim base = Decide(mode, captureApi, encoderName)
+        If Not base.Allowed OrElse base.Kind <> "Duluka" Then Return base
+        Select Case If(exclusiveApi, "").Trim().ToLowerInvariant()
+            Case "", "auto", "dxgi_desktop_duplication", "ddagrab"
+                Return base
+            Case Else
+                Return Reject("unsupported_duluka_exclusive_api", captureApi, encoderName)
+        End Select
+    End Function
 End Class

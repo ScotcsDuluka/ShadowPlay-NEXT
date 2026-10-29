@@ -9,7 +9,7 @@ const path = require('node:path');
 // introspection IN MEMORY: the production file and its browser globals are
 // unchanged. No REST connection or real capture backend is started.
 const source = fs.readFileSync(
-  path.join(__dirname, '../osc/mods/video-capture-options.js'), 'utf8');
+  path.join(__dirname, '../osc/Module/Settings/Capture/video-capture-options.js'), 'utf8');
 const ending = /\}\)\(\);\s*$/;
 assert.match(source, ending, 'CEF module IIFE ending changed');
 const exposed = source.replace(ending, `
@@ -346,7 +346,7 @@ test('FFmpeg receives NVIDIA H264/HEVC and Intel QSV only when Capture reports c
 
 test('codec and preset controls live in the native Advanced Capture route', () => {
   const route = fs.readFileSync(
-    path.join(__dirname, '../osc/mods/advanced-capture-route.js'), 'utf8');
+    path.join(__dirname, '../osc/Module/Settings/Capture/advanced-capture-route.js'), 'utf8');
   assert.match(source, /openAdvancedCapture = function/);
   assert.match(source, /main\.osc-capture-advanced/);
   assert.doesNotMatch(source, /panel\.appendChild\(advancedSection\)/);
@@ -357,7 +357,7 @@ test('codec and preset controls live in the native Advanced Capture route', () =
 
 test('Video Settings uses compact static sections, not a nested scrollbar', () => {
   const css = fs.readFileSync(
-    path.join(__dirname, '../osc/mods/video-capture-options.css'), 'utf8');
+    path.join(__dirname, '../osc/Module/Settings/Capture/video-capture-options.css'), 'utf8');
   function block(selector) {
     const start = css.indexOf(selector + ' {');
     assert.ok(start >= 0, 'missing ' + selector);

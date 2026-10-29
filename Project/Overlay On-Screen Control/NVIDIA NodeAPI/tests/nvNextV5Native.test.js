@@ -1,8 +1,8 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
-const M=require('../osc/mods/nv-layout-v5-core.js');
-const nativeCode=fs.readFileSync(path.join(__dirname,'../osc/mods/nv-next-v5-native.js'),'utf8');
+const M=require('../osc/Module/MainMenu/OSCFreestyleV5/nv-layout-v5-core.js');
+const nativeCode=fs.readFileSync(path.join(__dirname,'../osc/Module/MainMenu/OSCFreestyleV5/nv-next-v5-native.js'),'utf8');
 
 function makeRuntime(flag, withClock=false, options={}) {
   const model=options.model||M;

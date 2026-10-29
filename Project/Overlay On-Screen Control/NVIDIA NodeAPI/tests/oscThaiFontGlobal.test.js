@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.join(__dirname, '..', 'osc');
-const stylesheet = fs.readFileSync(path.join(root, 'mods', 'osc-thai-font.css'), 'utf8');
+const stylesheet = fs.readFileSync(path.join(root, 'Module', 'Base', 'Localization', 'osc-thai-font.css'), 'utf8');
 const index = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 
 test('Thai font covers the entire OSC document rather than only selected screens', () => {

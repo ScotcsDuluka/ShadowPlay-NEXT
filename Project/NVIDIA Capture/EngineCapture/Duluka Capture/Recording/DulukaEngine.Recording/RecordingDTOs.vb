@@ -239,6 +239,18 @@ Namespace DulukaEngine.Recording
         Public Property RequestedCaptureMethod As String = ""
 
         ''' <summary>
+        ''' Exclusive Capture API requested by config — an INDEPENDENT
+        ''' selection from the desktop capture API
+        ''' (SPN-ADR-2026-10-24-SESSION-001 §C/§D). "" = no explicit request.
+        ''' auto / dxgi_desktop_duplication resolve to the one implemented
+        ''' verified native source (Desktop Duplication); any other value
+        ''' fails closed with exclusive_capture_api_not_implemented.
+        ''' A selection is evidence only until ExclusiveVerificationGate
+        ''' proves real timestamped frames on the pinned target.
+        ''' </summary>
+        Public Property RequestedExclusiveCaptureMethod As String = ""
+
+        ''' <summary>
         ''' PixelFormat requested by config (engine.json PixelFormat).
         ''' Evidence only — the runtime pipeline is BGRA/ARGB end-to-end;
         ''' nv12 conversion is NOT implemented (BLOCKER, logged loudly).

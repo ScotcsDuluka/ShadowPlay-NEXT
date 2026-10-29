@@ -3,13 +3,15 @@
 (function(window,document){
   'use strict';
   var storageKey='DulukaOscBackground';
-  var defaults={mode:'website',opacity:50,motion:true,particles:80,links:true,react:true,speed:1};
+  /* Owner directive 2026-10-29: NVIDIA classic is the factory background
+   * default, so the reset button restores it instead of website particles. */
+  var defaults={mode:'classic',opacity:50,motion:true,particles:80,links:true,react:true,speed:1};
   var current,error='',subscribers=[];
   function copy(value){return JSON.parse(JSON.stringify(value));}
   function number(value,min,max,fallback){return typeof value==='number'&&isFinite(value)?Math.max(min,Math.min(max,value)):fallback;}
   function bool(value,fallback){return typeof value==='boolean'?value:fallback;}
   function normalize(value){value=value&&typeof value==='object'?value:{};return {
-    mode:value.mode==='classic'?'classic':'website',opacity:number(value.opacity,0,100,50),motion:bool(value.motion,true),particles:Math.round(number(value.particles,0,120,80)),links:bool(value.links,true),react:bool(value.react,true),speed:number(value.speed,.25,2,1)
+    mode:value.mode==='website'?'website':'classic',opacity:number(value.opacity,0,100,50),motion:bool(value.motion,true),particles:Math.round(number(value.particles,0,120,80)),links:bool(value.links,true),react:bool(value.react,true),speed:number(value.speed,.25,2,1)
   };}
   try{current=normalize(JSON.parse(window.localStorage.getItem(storageKey)||'null'));}catch(ignore){current=copy(defaults);}
   var api=window.__dulukaOscBackground={defaults:copy(defaults),normalize:normalize,get:function(){return copy(current);},set:function(value){var next=normalize(value);try{window.localStorage.setItem(storageKey,JSON.stringify(next));}catch(ignore){error='Could not save background settings. Previous settings are still active.';return false;}current=next;error='';subscribers.slice().forEach(function(fn){fn(copy(current));});return true;},reset:function(){return api.set(defaults);},subscribe:function(fn){subscribers.push(fn);return function(){subscribers=subscribers.filter(function(listener){return listener!==fn;});};}};

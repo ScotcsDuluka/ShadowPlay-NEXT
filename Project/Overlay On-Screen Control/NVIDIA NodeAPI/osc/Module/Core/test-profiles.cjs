@@ -12,8 +12,8 @@ const legacyName='index.legacy.html';
 const original=fs.readFileSync(path.join(root,legacyName),'utf8');
 const indexed=[...original.matchAll(/["'](\/mods\/[^"'?]+)(?:\?[^"']*)?["']/gi)].map(x=>x[1]);
 const diagnosticPresets=Object.keys(presets).filter(n=>!presets[n].production);
-test('every Module asset copy is byte-identical to the Source',()=>{
- for(const a of manifest.assets){const src=path.join(root,a.source.replace(/^\//,'')),dst=path.join(root,a.module.replace(/^\//,''));assert.equal(hash(fs.readFileSync(src)),a.sha256,a.source);assert.equal(hash(fs.readFileSync(dst)),a.sha256,a.module)}
+test('every Module asset matches its recorded manifest hash',()=>{
+ for(const a of manifest.assets){const dst=path.join(root,a.module.replace(/^\//,''));assert.equal(hash(fs.readFileSync(dst)),a.sha256,a.module)}
 });
 test('no original index asset is unowned and Module paths are unique',()=>{
  const map=new Map(manifest.assets.map(x=>[x.source,x]));assert.equal(map.size,manifest.assets.length);
@@ -47,11 +47,11 @@ test('core-only strips all static mods and optional camera test script',()=>{
 test('no-V5 and no-Motion disable only named groups',()=>{
  const read=name=>generate(name).html;
  const v5=read('without-v5'),motion=read('without-motion'),all=read('all');
- assert(!v5.includes('/Module/MainMenu/FreestyleV5/'));
+ assert(!v5.includes('/Module/MainMenu/OSCFreestyleV5/'));
  assert(v5.includes('/Module/Overlay/Motion/')&&v5.includes('/Module/MainMenu/NVIDIA/'));
  assert(!motion.includes('/Module/Overlay/Motion/'));
- assert(motion.includes('/Module/MainMenu/FreestyleV5/')&&motion.includes('/Module/MainMenu/NVIDIA/'));
- assert(all.includes('/Module/Overlay/Motion/')&&all.includes('/Module/MainMenu/FreestyleV5/'));
+ assert(motion.includes('/Module/MainMenu/OSCFreestyleV5/')&&motion.includes('/Module/MainMenu/NVIDIA/'));
+ assert(all.includes('/Module/Overlay/Motion/')&&all.includes('/Module/MainMenu/OSCFreestyleV5/'));
 });
 test('production cutover page loads everything from Module and keeps NVIDIA bootstrap order',()=>{
  const html=generate('production').html;

@@ -228,7 +228,19 @@ app.get('/nvcamera-test-mode.js', function (req, res) {
 // from /Module/ (static bootstrap + Module/Core/late-extensions.js), and the
 // native host injection stays empty. Set OSC_ENABLE_LEGACY_MODS_LIST=1 to
 // restore the pre-cutover allowlist for rollback diagnostics.
-// See osc/Module/CUTOVER-20261029.md.
+// See osc/Module/docs/CUTOVER-20261029.md.
+// Launcher language state moved to the osc root (mods retired 2026-10-29);
+// keep the legacy URL working for stale cached pages during the transition.
+app.get('/mods/launcher-language.json', function (req, res) {
+    res.setHeader('Cache-Control', 'no-store');
+    var file = require('path').join(__dirname, 'osc', 'launcher-language.json');
+    require('fs').readFile(file, function (err, data) {
+        if (err) { res.status(404).end(); return; }
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end(data);
+    });
+});
+
 app.get('/mods/list', function (req, res) {
     res.setHeader('Cache-Control', 'no-store');
     if (process.env.OSC_ENABLE_LEGACY_MODS_LIST !== '1') { res.json([]); return; }
@@ -698,9 +710,22 @@ app.use(function (req, res, next) {
 require('./shims/capture-engine-status.js')(app);
 require('./shims/capture-capabilities.js')(app);
 require('./shims/capture-runtime-status.js')(app);
+require('./shims/capture-record-commands.js')(app);
+
+// Keep the bridge opt-in until Capture's legacy command poller is disabled
+// as part of the same rollout. It receives user edges directly from the
+// route below, rather than replaying a state snapshot at startup.
+var captureStateSync = require('./shims/capture-state-sync.js')(app, {
+    enabled: captureRuntimeEnabled,
+    desiredBridge: process.env.NV_CAPTURE_DESIRED_BRIDGE === '1',
+    socket: { io: io, emitChannel: function (channel, payload) { io.emit(channel, payload); } }
+});
 
 // route-floor: OSC API route facade with persisted settings and runtime state.
-require('./shims/route-floor.js')(app, io);
+require('./shims/route-floor.js')(app, io, {
+    captureStateSync: captureStateSync,
+    captureBridgeRequested: process.env.NV_CAPTURE_DESIRED_BRIDGE === '1'
+});
 // ★ เว็บเวอร์ชันของ OSC ของเรา — http://127.0.0.1:<port>/osc/
 try {
     var oscWebDir = require('path').join(__dirname, 'osc-web');

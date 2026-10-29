@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
 const express = require('express');
-const install = require('../osc/mods/hotkey-monitor-lifecycle');
+const install = require('../osc/Module/Base/Hotkey/hotkey-monitor-lifecycle.js');
 const {createMonitorState} = require('../shims/hotkey-monitor-state');
 
 test('page reload retires old writes and delayed old page-start cannot reclaim monitoring', () => {

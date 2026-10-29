@@ -13,7 +13,7 @@ const RUNTIME = path.join(REPO, 'build', 'NVIDIA ShadowPlay', 'Overlay On-Screen
 const SESSION_BASE = path.join(REPO, 'build_test', 'OSC-Live-Preview');
 const ROOT_PREFIX = 'Project/Overlay On-Screen Control/NVIDIA NodeAPI/osc/';
 const FILE_PATTERN = /\.(?:html|js|css|json|png|svg|ico|ttf|woff2?|jpe?g|webp)$/i;
-const EXCLUDED = new Set(['config.js', 'user-config.js', 'mods/launcher-language.json']);
+const EXCLUDED = new Set(['config.js', 'user-config.js', 'launcher-language.json']);
 function assert(ok, msg) { if (!ok) throw new Error(msg); }
 function hash(file) {
   if (!fs.existsSync(file)) return null;

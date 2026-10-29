@@ -1,20 +1,20 @@
-# OSC web UI — source assets and mods
+# OSC web UI — source assets and Module extensions
 
-**Status: active UI source, 24 October 2026.** This is the web layer served through NodeAPI and displayed by the native OSC CEF Host. Modifying these files on `Project/` **does not** automatically change the CEF page already served from the installed `Build/` tree.
+**Status: active UI source, 29 October 2026.** This is the web layer served through NodeAPI and displayed by the native OSC CEF Host. Modifying these files on `Project/` **does not** automatically change the CEF page already served from the installed `Build/` tree.
 
 ## Main owners
 
-- `index.html`, `app.js`, `config.js` — original-style Angular/CEF OSC content and integration entry points.
-- `mods/` — project-specific Main-menu/Customize, Gallery, Hook settings, Game Profiles and notifier extensions.
-- **Mandatory UI guide:** [อ่านก่อนทำ UI](mods/อ่านก่อนทำ%20UI.md) — read before changing OSC UI, **including section 8 on creating Menu/Settings/Submenu/Tab/Dialog routes and NVIDIA page shells**; [NVIDIA OSC UI Reverse Engineering Atlas](mods/NVIDIA-OSC-UI-REVERSE-ENGINEERING.md) inventories routes, components, UI owners, loader, CSS, icons, input and CEF; the [complete Component/Route/Icon Catalog](mods/NVIDIA-OSC-UI-COMPONENT-CATALOG.md) lists the names extracted from Source. [`AGENTS.md`](AGENTS.md) enforces this workflow for agents operating in `osc/`.
+- `index.html`, `app.js`, `config.js` — original-style Angular/CEF OSC content and integration entry points. `index.html` is the generated production page; the pristine pre-cutover page is `index.legacy.html`.
+- `Module/` — project-specific extensions organized by owner (Base, MainMenu, Overlay, Settings, Gallery, GameFilter, Notifier, Core). The legacy flat `mods/` tree was retired on 2026-10-29; the production page loads everything from `/Module/` (static bootstrap + `Module/Core/late-extensions.js`).
+- **Mandatory UI guide:** [อ่านก่อนทำ UI](Module/docs/อ่านก่อนทำ%20UI.md) — read before changing OSC UI, **including section 8 on creating Menu/Settings/Submenu/Tab/Dialog routes and NVIDIA page shells**; [NVIDIA OSC UI Reverse Engineering Atlas](Module/docs/NVIDIA-OSC-UI-REVERSE-ENGINEERING.md) inventories routes, components, UI owners, loader, CSS, icons, input and CEF; the [complete Component/Route/Icon Catalog](Module/docs/NVIDIA-OSC-UI-COMPONENT-CATALOG.md) lists the names extracted from Source. [`AGENTS.md`](AGENTS.md) enforces this workflow for agents operating in `osc/`.
 - `l10n/` — UI locale resources, including English and Thai; verify key completeness and actual CEF rendering separately.
-- [Notifier ownership](mods/notifier/README.md) — single toast system with adapter-specific routing.
+- [Notifier ownership](Module/docs/notifier-README.md) — single toast system with adapter-specific routing.
 
 ### Capture UI refresh v77 — 25 October 2026
 
 The **Video Capture** and native-route **Advanced Capture** panels now use scoped NVIDIA-native controls and an explicit split between live settings and the non-persisted Pipeline Design preview. Version 77 UI assets were staged to Build and **Source/Build hashes matched 4/4**. The targeted Capture UI suite recorded **32/32 PASS**. An actual CEF 73 **Advanced** view at 1920x1200 showed two section groups, two columns and no measured overflow into the action area. **Video Capture CEF visual/geometry is not yet signed off**; none of these UI results validates actual GPU capture or recording.
 
-[Capture UI v77 deploy and remaining acceptance](mods/CAPTURE-UI-REDESIGN-20261025.md) · [OSC native component/route inventory](mods/NVIDIA-OSC-UI-COMPONENT-CATALOG.md) · [Source/runtime cross-plane architecture audit](../../../../docs/osc/OSC-BACKEND-FULL-ARCHITECTURE-AUDIT-20261025.md).
+[Capture UI v77 deploy and remaining acceptance](Module/docs/CAPTURE-UI-REDESIGN-20261025.md) · [OSC native component/route inventory](Module/docs/NVIDIA-OSC-UI-COMPONENT-CATALOG.md) · [Source/runtime cross-plane architecture audit](../../../../docs/osc/OSC-BACKEND-FULL-ARCHITECTURE-AUDIT-20261025.md).
 
 ### Newly integrated UI surfaces (24 October 2026)
 

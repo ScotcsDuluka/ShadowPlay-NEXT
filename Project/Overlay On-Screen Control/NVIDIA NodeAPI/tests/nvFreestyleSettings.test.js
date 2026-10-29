@@ -31,7 +31,7 @@ test('existing Angular-owned background, palette and md-select footer are moved,
  editor.appendChild(head);editor.appendChild(workspace);editor.appendChild(foot);editor.appendChild(background);
  const document={readyState:'complete',querySelector(q){return q==='.nv-live-editor'?editor:null},createElement(tag){return new Node(tag)},createComment(){return new Node('#comment')},addEventListener(){}};
  const window={setInterval:null};
- vm.runInNewContext(read('mods/nv-freestyle-settings.js'),{window,document}, {timeout:2000});
+ vm.runInNewContext(read('Module/MainMenu/OSCFreestyleV5/nv-freestyle-settings.js'),{window,document}, {timeout:2000});
  const grid=editor.querySelector('.nv-freestyle-grid');
  assert.ok(grid);
  const left=grid.querySelector('.nv-freestyle-background'),right=grid.querySelector('.nv-freestyle-controls');
@@ -58,18 +58,18 @@ test('existing Angular-owned background, palette and md-select footer are moved,
  assert.equal(editor.querySelector('.nv-freestyle-grid').querySelector('nv-osc-background-settings'),background);
 });
 test('80/20 visual contract remains scoped to original native Settings',()=>{
- const css=read('mods/nv-freestyle-settings.css'),index=read('index.html');
+ const css=read('Module/MainMenu/OSCFreestyleV5/nv-freestyle-settings.css'),index=read('index.html');
  assert.match(css,/grid-template-columns:minmax\(0,4fr\) minmax\(0,1fr\)/);
  assert.match(css,/\.nv-live-editor\.nv-freestyle-settings/);
  assert.match(css,/\.nv-freestyle-legacy\[open\]/);
  assert.doesNotMatch(css,/\b(?:clamp|min|max)\(/,'the real Chromium 73 runtime cannot parse these CSS functions');
- assert.ok(index.includes('/Module/MainMenu/FreestyleV5/nv-freestyle-settings.js'));
- assert.ok(index.includes('/Module/MainMenu/FreestyleV5/nv-freestyle-settings.css'));
+ assert.ok(index.includes('/Module/MainMenu/OSCFreestyleV5/nv-freestyle-settings.js'));
+ assert.ok(index.includes('/Module/MainMenu/OSCFreestyleV5/nv-freestyle-settings.css'));
  assert.ok(index.includes('/Module/Base/Localization/launcher-language-sync.js'));
  assert.ok(index.includes('/Module/Overlay/Motion/osc-motion.js'));
 });
 test('header actions reserve native focus borders and fixed dimensions while interaction states only change paint',()=>{
- const css=read('mods/nv-freestyle-settings.css');
+ const css=read('Module/MainMenu/OSCFreestyleV5/nv-freestyle-settings.css');
  const rules=Array.from(css.matchAll(/([^{}]+)\{([^{}]*)\}/g),m=>({selector:m[1].trim(),body:m[2]}));
  const base=rules.find(rule=>rule.selector.endsWith('.nv-live-editor.nv-freestyle-settings > header > .osc-button'));
  assert.ok(base,'header actions have an independently scoped box');
@@ -92,7 +92,7 @@ test('header actions reserve native focus borders and fixed dimensions while int
  for(const rule of [gray,green])for(const state of ['hover','focus','active'])assert.ok(rule.selector.includes(':'+state));
  assert.match(gray.body,/border-color:#76b900!important/);assert.match(green.body,/border-color:#fff!important/);
  assert.ok(css.includes('--nv-f-header-button-height:38px'),'short viewports change every height bound together');
- const source=read('mods/main-menu-live.js'),header=source.match(/<header>[\s\S]*?<\/header>/);
+ const source=read('Module/MainMenu/NVIDIA/main-menu-live.js'),header=source.match(/<header>[\s\S]*?<\/header>/);
  assert.ok(header);const buttons=header[0].match(/<button\b[^>]*class="osc-button[^>]*>/g)||[];
  assert.equal(buttons.length,2);for(const button of buttons)assert.match(button,/\bhover-focus\b/,'pointer entry uses the shipped NVIDIA focus directive');
 });
@@ -108,7 +108,7 @@ test('DOM insertions organize the native shell immediately, including delayed Ba
   const window={setInterval:(fn,ms)=>{intervalMs=ms},MutationObserver:function(fn){
    instances++;callback=fn;this.observe=(target,options)=>{observed={target,options}};
   }};
-  vm.runInNewContext(read('mods/nv-freestyle-settings.js'),{window,document},{timeout:2000});
+  vm.runInNewContext(read('Module/MainMenu/OSCFreestyleV5/nv-freestyle-settings.js'),{window,document},{timeout:2000});
   if(readyState==='loading'){
    assert.equal(instances,0,'waits for body at DOMContentLoaded');
    document.body=new Node('body');ready();
@@ -143,7 +143,7 @@ function positioningFixture({width=1920,height=1080,scale=1,offsetX=0,offsetY=16
   if(q.includes('md-menu-bar'))return {getBoundingClientRect:()=>({height:240,bottom:barBottom})};return null},
   createElement:tag=>new Node(tag),createComment:()=>new Node('#comment'),addEventListener(){}};
  const window={innerWidth:width,innerHeight:height,getComputedStyle:computed};
- vm.runInNewContext(read('mods/nv-freestyle-settings.js'),{window,document},{timeout:2000});
+ vm.runInNewContext(read('Module/MainMenu/OSCFreestyleV5/nv-freestyle-settings.js'),{window,document},{timeout:2000});
  return {editor,document,window,close:()=>{visible=null;window.__nvFreestyleSettings.scan()}};
 }
 test('floating Settings follows settled native bar through parent translation and host scaling',()=>{

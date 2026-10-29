@@ -332,6 +332,13 @@ struct OscPerfCounters {
     std::atomic<unsigned long long> presentBusyDrops{ 0 };
     std::atomic<unsigned long long> commitTotalUs{ 0 };
     std::atomic<unsigned long long> commitMaxUs{ 0 };
+    // Desktop worker pacing telemetry: where the interval goes.
+    std::atomic<unsigned long long> capacityWaits{ 0 };
+    std::atomic<unsigned long long> capacityWaitTotalUs{ 0 };
+    std::atomic<unsigned long long> capacityWaitMaxUs{ 0 };
+    std::atomic<unsigned long long> presentGapTotalUs{ 0 };
+    std::atomic<unsigned long long> presentGapMaxUs{ 0 };
+    std::atomic<unsigned long long> presentGapOver5ms{ 0 };
 };
 static OscPerfCounters g_osc_perf;
 
@@ -439,14 +446,22 @@ static void OscPerfFinishCallback(unsigned long long startUs) {
     const auto presentBusyDrops = g_osc_perf.presentBusyDrops.exchange(0, std::memory_order_relaxed);
     const auto commitTotal = g_osc_perf.commitTotalUs.exchange(0, std::memory_order_relaxed);
     const auto commitMax = g_osc_perf.commitMaxUs.exchange(0, std::memory_order_relaxed);
+    const auto capacityWaits = g_osc_perf.capacityWaits.exchange(0, std::memory_order_relaxed);
+    const auto capacityWaitTotal = g_osc_perf.capacityWaitTotalUs.exchange(0, std::memory_order_relaxed);
+    const auto capacityWaitMax = g_osc_perf.capacityWaitMaxUs.exchange(0, std::memory_order_relaxed);
+    const auto gapTotal = g_osc_perf.presentGapTotalUs.exchange(0, std::memory_order_relaxed);
+    const auto gapMax = g_osc_perf.presentGapMaxUs.exchange(0, std::memory_order_relaxed);
+    const auto gapOver5 = g_osc_perf.presentGapOver5ms.exchange(0, std::memory_order_relaxed);
 
-    char line[900];
+    char line[1000];
     sprintf_s(line, sizeof(line),
         "[oscperf] window_ms=%llu view_cb/s=%llu empty_dirty/s=%llu skipped_empty/s=%llu rate_limited/s=%llu processed/s=%llu "
         "callback_us(avg/max)=%llu/%llu composite_n=%llu composite_us(avg/max)=%llu/%llu "
         "publish_n=%llu publish_us(avg/max)=%llu/%llu present_n=%llu present_ok=%llu "
         "present_busy_retries=%llu present_busy_drops=%llu copy_n=%llu copy_call_us(avg/max)=%llu/%llu "
-        "present_us(avg/max)=%llu/%llu commit_us(avg/max)=%llu/%llu mode=%s",
+        "present_us(avg/max)=%llu/%llu commit_us(avg/max)=%llu/%llu "
+        "capacity_wait_n=%llu capacity_wait_us(avg/max)=%llu/%llu "
+        "present_gap_us(avg/max)=%llu/%llu present_gap_over5ms=%llu mode=%s",
         static_cast<unsigned long long>(windowMs),
         callbacks * 1000ULL / windowMs, empty * 1000ULL / windowMs,
         skipped * 1000ULL / windowMs,
@@ -458,6 +473,9 @@ static void OscPerfFinishCallback(unsigned long long startUs) {
         copyCalls, OscPerfAverage(copyTotal, copyCalls), copyMax,
         OscPerfAverage(presentTotal, presents), presentMax,
         OscPerfAverage(commitTotal, presents), commitMax,
+        capacityWaits,
+        OscPerfAverage(capacityWaitTotal, capacityWaits), capacityWaitMax,
+        OscPerfAverage(gapTotal, presents), gapMax, gapOver5,
         OscRenderStateName(g_render_state.load(std::memory_order_relaxed)));
     Log(line);
 }
@@ -882,7 +900,8 @@ static bool EnsureOwnRT(int w, int h) {
 }
 enum class OscPresentResult { Presented, Busy, Failed, Queued };
 static bool OscQueueDesktopPresentFrame();
-static OscPresentResult PresentCurrentBackBuffer(bool forceNonBlocking);
+static OscPresentResult PresentCurrentBackBuffer(bool forceNonBlocking,
+    std::uint64_t* presentStartUsOut = nullptr);
 
 // Called under the GPU mutex, after the desktop worker has waited for DXGI.
 // Never queue a CEF shared handle: GPU command ordering protects our persistent ownRT.
@@ -938,7 +957,8 @@ static OscPresentResult PresentToSwap(int w, int h, bool deferDesktopPresent = f
     return PresentCurrentBackBuffer(false);
 }
 
-static OscPresentResult PresentCurrentBackBuffer(bool forceNonBlocking) {
+static OscPresentResult PresentCurrentBackBuffer(bool forceNonBlocking,
+    std::uint64_t* presentStartUsOut) {
     const bool hookMode = g_game_focused.load(std::memory_order_acquire);
     if (forceNonBlocking && hookMode)
         return OscPresentResult::Failed;
@@ -960,6 +980,7 @@ static OscPresentResult PresentCurrentBackBuffer(bool forceNonBlocking) {
     const auto presentStartUs = OscPerfNowUs();
     const HRESULT hp = g_gpu_swap->Present(0,
         nonBlockingPresent ? DXGI_PRESENT_DO_NOT_WAIT : 0);
+    if (presentStartUsOut) *presentStartUsOut = presentStartUs;
     const auto presentUs = OscPerfNowUs() - presentStartUs;
     if (nonBlockingPresent && hp == DXGI_ERROR_WAS_STILL_DRAWING) {
         // Desktop retries the same copied buffer until accepted. New CEF paints
@@ -1448,6 +1469,7 @@ static DWORD WINAPI OscDesktopPresentWorkerProc(LPVOID) {
         ~PacingTimer() { if (handle) CloseHandle(handle); }
     } pacingTimer;
     osc::DesktopFpsLimiter fpsLimiter;
+    std::uint64_t lastPresentStartUs = 0;
     bool latencyPermit = false;
     bool useLatencyEvent = g_desktop_frame_latency_event != nullptr;
     for (;;) {
@@ -1470,8 +1492,7 @@ static DWORD WINAPI OscDesktopPresentWorkerProc(LPVOID) {
                     !g_desktop_frames.HasPendingFrame()) break;
                 needsCopy = g_desktop_frames.NeedsCopy();
             }
-            const auto remainingUs = fpsLimiter.RemainingUs(OscPerfNowUs(),
-                g_desktop_fps_limit.load(std::memory_order_acquire));
+            const auto remainingUs = fpsLimiter.RemainingUs(OscPerfNowUs());
             if (remainingUs) {
                 DWORD pacedWait = WAIT_FAILED;
                 if (pacingTimer.handle) {
@@ -1488,25 +1509,40 @@ static DWORD WINAPI OscDesktopPresentWorkerProc(LPVOID) {
                 }
                 if (pacedWait == WAIT_OBJECT_0 || pacedWait == WAIT_FAILED)
                     return 0;
-                // New paints/rate changes wake this wait, then recompute the
-                // deadline. Every paint still updates ownRT under the GPU lock.
-                continue;
+                // A new paint/rate change wakes this wait to recompute the
+                // deadline. The pacing timer (index 2) or a fallback timeout
+                // means the deadline has been reached: present in THIS pass.
+                // Looping back would re-arm a microsecond-scale timer and add
+                // one more wake to every frame.
+                if (pacedWait == WAIT_OBJECT_0 + 1)
+                    continue;
             }
             if (needsCopy && useLatencyEvent && !latencyPermit) {
-                HANDLE capacityWaits[2] = {
-                    g_desktop_present_stop_event, g_desktop_frame_latency_event };
-                const DWORD capacity = WaitForMultipleObjects(2, capacityWaits, FALSE, 50);
-                if (capacity == WAIT_OBJECT_0) return 0;
-                if (capacity == WAIT_FAILED) {
-                    Log("[gpu] desktop capacity wait failed; using nonblocking retry fallback");
-                    useLatencyEvent = false;
-                    continue;
+                if (WaitForSingleObject(g_desktop_frame_latency_event, 0) == WAIT_OBJECT_0) {
+                    // Capacity was granted while pacing; do not serialize this
+                    // present behind a blocking wait for the same permit.
+                    latencyPermit = true;
+                } else {
+                    HANDLE capacityWaits[2] = {
+                        g_desktop_present_stop_event, g_desktop_frame_latency_event };
+                    const auto capacityStartUs = OscPerfNowUs();
+                    const DWORD capacity = WaitForMultipleObjects(2, capacityWaits, FALSE, 50);
+                    g_osc_perf.capacityWaits.fetch_add(1, std::memory_order_relaxed);
+                    OscPerfAccumulate(g_osc_perf.capacityWaitTotalUs,
+                        g_osc_perf.capacityWaitMaxUs, OscPerfNowUs() - capacityStartUs);
+                    if (capacity == WAIT_OBJECT_0) return 0;
+                    if (capacity == WAIT_FAILED) {
+                        Log("[gpu] desktop capacity wait failed; using nonblocking retry fallback");
+                        useLatencyEvent = false;
+                        continue;
+                    }
+                    if (capacity == WAIT_TIMEOUT) continue;
+                    latencyPermit = true;
                 }
-                if (capacity == WAIT_TIMEOUT) continue;
-                latencyPermit = true;
             }
 
             OscPresentResult result = OscPresentResult::Failed;
+            std::uint64_t presentStartUs = 0;
             {
                 std::lock_guard<std::mutex> gpuLock(osc::d3d11_frame_publisher::Mutex());
                 if (g_game_focused.load(std::memory_order_acquire) ||
@@ -1519,11 +1555,21 @@ static DWORD WINAPI OscDesktopPresentWorkerProc(LPVOID) {
                     }
                     g_desktop_frames.MarkCopied();
                 }
-                result = PresentCurrentBackBuffer(true);
+                result = PresentCurrentBackBuffer(true, &presentStartUs);
                 if (result == OscPresentResult::Presented) {
                     g_desktop_frames.MarkPresented();
-                    fpsLimiter.MarkPresented(OscPerfNowUs());
+                    fpsLimiter.MarkPresented(presentStartUs,
+                        g_desktop_fps_limit.load(std::memory_order_acquire));
                     latencyPermit = false;
+                    if (lastPresentStartUs && presentStartUs > lastPresentStartUs) {
+                        const auto gapUs = presentStartUs - lastPresentStartUs;
+                        OscPerfAccumulate(g_osc_perf.presentGapTotalUs,
+                            g_osc_perf.presentGapMaxUs, gapUs);
+                        if (gapUs > 5000)
+                            g_osc_perf.presentGapOver5ms.fetch_add(
+                                1, std::memory_order_relaxed);
+                    }
+                    lastPresentStartUs = presentStartUs;
                 } else if (result == OscPresentResult::Failed) {
                     g_desktop_frames.Reset();
                 }
@@ -2458,12 +2504,25 @@ static std::string OscFpsStateOnUi() {
     return CefWriteJSON(value, JSON_WRITER_DEFAULT).ToString();
 }
 
+// Hook-mode overlay cadence: 60fps is the measured steady-state default
+// ([FIX-A] proved forced higher refresh rates collapse the publish path).
+// 240 is strictly opt-in for the patched accelerated CEF via flag file,
+// for max-responsiveness testing with [oscperf] publish_n/publish_us visible.
+static int OscHookCefFps(bool acceleratedSharedTexture) {
+    return acceleratedSharedTexture && HasFlag(L"hook-cef-240.test.flag")
+        ? osc::CefHookFps(true)
+        : 60;
+}
+
 static void OscApplyCefFpsOnUi() {
     CEF_REQUIRE_UI_THREAD();
     if (g_browser && g_browser->GetHost()) {
-        const int cefFps = g_game_focused.load(std::memory_order_acquire) ? 60 :
-            osc::CefDesktopFps(g_desktop_fps_limit.load(std::memory_order_acquire),
-                g_render_state.load(std::memory_order_acquire) == OscRmGpuShared);
+        const bool shared =
+            g_render_state.load(std::memory_order_acquire) == OscRmGpuShared;
+        const int cefFps = g_game_focused.load(std::memory_order_acquire)
+            ? OscHookCefFps(shared)
+            : osc::CefDesktopFps(g_desktop_fps_limit.load(std::memory_order_acquire),
+                shared);
         g_browser->GetHost()->SetWindowlessFrameRate(cefFps);
     }
 }

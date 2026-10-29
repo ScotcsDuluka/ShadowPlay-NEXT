@@ -2,7 +2,7 @@
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
-const source=fs.readFileSync(path.join(__dirname,'../osc/mods/osc-renderer.js'),'utf8');
+const source=fs.readFileSync(path.join(__dirname,'../osc/Module/Overlay/Renderer/osc-renderer.js'),'utf8');
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
 function response(options,state) {
   options.onSuccess(JSON.stringify(Object.assign(
