@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "target": "1920x1080",
+  "aspect": "16:9",
+  "source": "NVIDIA OSC.exe / CEF OSR",
+  "method": "pixel-preserving RGBA8 full-canvas transparent padding (NOT crop, NOT resize, NOT regenerate)",
+  "canvas": {
+    "width": 1920,
+    "height": 1080,
+    "format": "RGBA8 straight-alpha",
+    "pixelCount": 2073600
+  },
+  "originalLayerCanvas": {
+    "width": 1680,
+    "height": 1050
+  },
+  "coordinateSystem": "shared top-left",
+  "layerOrder": [
+    "bg.png",
+    "main-menu.png",
+    "osc-topbar.png"
+  ],
+  "layers": {
+    "osc-topbar.png": {
+      "offset": {
+        "x": 120,
+        "y": 15
+      },
+      "sourcePixelRect": {
+        "x": 120,
+        "y": 15,
+        "width": 1680,
+        "height": 1050
+      },
+      "sourceSHA256": "b0a69f722331455c9dc30430e35792f3c5187ae84e21d7222bb9d9a1918269ea",
+      "sha256": "52fa50391d11a24897c27fb19babe78cf8f70f1caa58ce3d544bd63225ca9281",
+      "pixelExact": true,
+      "width": 1920,
+      "height": 1080,
+      "nonTransparentPixels": 117600,
+      "fullyTransparentPixels": 1956000,
+      "partialAlphaPixels": 113504,
+      "opaquePixels": 4096,
+      "transparentFraction": 0.94329
+    },
+    "bg.png": {
+      "offset": {
+        "x": 120,
+        "y": 15
+      },
+      "sourcePixelRect": {
+        "x": 120,
+        "y": 15,
+        "width": 1680,
+        "height": 1050
+      },
+      "sourceSHA256": "e0b2053d1759f4e3d15fa69319d2791a1ab8402eeb48c3faed973989d6f42b0f",
+      "sha256": "8ffea0e64f4c4fd35301da24a797d3ad26414fd12215fc357fce0abc558a2435",
+      "pixelExact": true,
+      "width": 1920,
+      "height": 1080,
+      "nonTransparentPixels": 1764000,
+      "fullyTransparentPixels": 309600,
+      "partialAlphaPixels": 1764000,
+      "opaquePixels": 0,
+      "transparentFraction": 0.14931
+    },
+    "main-menu.png": {
+      "offset": {
+        "x": 120,
+        "y": 15
+      },
+      "sourcePixelRect": {
+        "x": 120,
+        "y": 15,
+        "width": 1680,
+        "height": 1050
+      },
+      "sourceSHA256": "0f412e1905582b1e884c135d26a8282880665eedb5879d92ec93801cb2bdab72",
+      "sha256": "a641b78174412b790de323e00a02cbe3d16c9a7a035a8539d434f85ea0228625",
+      "pixelExact": true,
+      "width": 1920,
+      "height": 1080,
+      "nonTransparentPixels": 264600,
+      "fullyTransparentPixels": 1809000,
+      "partialAlphaPixels": 209323,
+      "opaquePixels": 55277,
+      "transparentFraction": 0.8724
+    }
+  },
+  "limitations": [
+    "The CEF source is 1680x1050 (16:10). Transparent padding preserves all source pixels but does not create extra NVIDIA UI/background beyond the original surface.",
+    "Background captured in NVIDIA Classic mode, 50% alpha."
+  ]
+}
