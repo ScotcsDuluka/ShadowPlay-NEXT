@@ -7,8 +7,21 @@
 <title>ShadowPlay NEXT · Command Center</title>
 <link rel="stylesheet" href="app.css?v=modules20261024">
 <link rel="stylesheet" href="quick-ui.css?v=webgithub-core-20261024">
+<link rel="stylesheet" href="intro.css?v=github-loading-mp4-20261029">
 </head>
 <body class="quick-mode">
+  <!-- Real 2.54-second Loading.mp4 from ShadowPlay-NEXT GitHub, bundled locally. -->
+  <div id="launcherIntro" role="dialog" aria-label="ShadowPlay NEXT introduction" aria-modal="true">
+    <video id="launcherIntroVideo" class="intro-video" autoplay muted playsinline preload="auto" aria-hidden="true">
+      <!-- CEF 73 lacks H.264/AAC. VP8 WebM is the exact same GitHub MP4 transcoded for playback. -->
+      <source src="media/Loading.webm" type="video/webm">
+      <source src="media/Loading.mp4" type="video/mp4">
+    </video>
+    <div class="intro-shade" aria-hidden="true"></div>
+    <div class="intro-caption" aria-hidden="true"><span class="intro-accent"></span>SHADOWPLAY <strong>NEXT</strong></div>
+    <button type="button" class="intro-skip" id="launcherIntroSkip" aria-label="Skip introduction">SKIP INTRO →</button>
+    <div class="intro-progress" aria-hidden="true"><span id="launcherIntroProgress" class="intro-progress-fill"></span></div>
+  </div>
   <nav id="titlebar" aria-label="Window">
     <div class="nav-brand">
       <div class="brand-mark" aria-hidden="true"><span></span><span></span></div>
@@ -471,5 +484,6 @@
 <script src="i18n.js"></script>
 <script src="app.js"></script>
 <script src="quick-ui.js?v=server-readonly-20261024"></script>
+<script src="intro.js?v=github-loading-mp4-20261029"></script>
 </body>
 </html>

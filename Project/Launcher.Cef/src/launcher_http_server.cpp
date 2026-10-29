@@ -33,6 +33,8 @@ const char* MimeFor(const std::string& path_lower) {
   if (ext == ".jpg" || ext == ".jpeg") return "image/jpeg";
   if (ext == ".gif") return "image/gif";
   if (ext == ".webp") return "image/webp";
+  if (ext == ".mp4") return "video/mp4";  // Original GitHub intro.
+  if (ext == ".webm") return "video/webm";  // VP8 fallback for CEF 73.
   if (ext == ".svg") return "image/svg+xml";
   if (ext == ".woff") return "font/woff";
   if (ext == ".woff2") return "font/woff2";

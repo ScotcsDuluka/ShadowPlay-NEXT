@@ -1,0 +1,49 @@
+/* ShadowPlay NEXT Launcher opening: live Loading.mp4, CEF 73-compatible.
+   Isolated overlay: never changes quick UI, module controls or RPC logic. */
+#launcherIntro {
+  position: fixed; top: 0; right: 0; bottom: 0; left: 0;
+  z-index: 100000; overflow: hidden; background: #050705;
+  color: #fff; font-family: 'GeForce', 'MiSansThai', Arial, sans-serif;
+  opacity: 1; transition: opacity .36s ease-out;
+}
+#launcherIntro.intro-leaving { opacity: 0; pointer-events: none; }
+#launcherIntro .intro-video {
+  display: block; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  width: 100%; height: 100%; object-fit: contain; background: #000;
+}
+#launcherIntro .intro-shade {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 105px;
+  background: linear-gradient(to top,rgba(0,0,0,.72),rgba(0,0,0,0));
+  pointer-events: none;
+}
+#launcherIntro .intro-caption {
+  position: absolute; bottom: 30px; left: 32px;
+  display: flex; align-items: center; gap: 12px;
+  font-weight: 700; font-size: 13px; letter-spacing: 1.8px;
+  text-shadow: 0 1px 8px rgba(0,0,0,.7);
+  pointer-events: none;
+}
+#launcherIntro .intro-caption strong { color: #76B900; }
+#launcherIntro .intro-accent { width: 4px; height: 25px; background: #76B900; }
+#launcherIntro .intro-skip {
+  position: absolute; right: 24px; bottom: 23px;
+  height: 37px; min-width: 114px; padding: 0 15px;
+  color: #fff; border: 1px solid rgba(118,185,0,.85);
+  background: rgba(13,21,9,.86); font: 700 12px Arial,sans-serif;
+  letter-spacing: 1px; cursor: pointer;
+}
+#launcherIntro .intro-skip:hover,
+#launcherIntro .intro-skip:focus { outline: 2px solid #76B900; outline-offset: 2px; background: #283d13; }
+#launcherIntro .intro-progress { position: absolute; left: 0; right: 0; bottom: 0;
+  height: 3px; background: rgba(255,255,255,.2); pointer-events: none; }
+#launcherIntro .intro-progress-fill { display: block; height: 100%; width: 0; background: #76B900; transition: width .1s linear; }
+body.intro-visible > nav, body.intro-visible > .quick-layout,
+body.intro-visible > .workspace, body.intro-visible > footer { pointer-events: none; }
+@media (max-width: 700px) {
+  #launcherIntro .intro-caption { bottom: 25px; left: 16px; font-size: 10px; letter-spacing: 1px; }
+  #launcherIntro .intro-skip { right: 12px; bottom: 15px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #launcherIntro { transition: none; }
+  #launcherIntro .intro-progress-fill { transition: none; }
+}
